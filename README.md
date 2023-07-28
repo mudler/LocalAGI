@@ -2,7 +2,7 @@
 
 From the [LocalAI](https://localai.io) author, miniAGI. 100% Local AI assistant.
 
-Note: this is a fun project, not a serious one. It's a toy, not a tool. Be warned!
+Note: this is a fun project, not a serious one. Be warned!
 
 ## What is miniAGI?
 
@@ -15,6 +15,15 @@ No frills, just run docker-compose and start chatting with your virtual assistan
 ```bash
 docker-compose run --build -i --rm miniagi
 ```
+
+### Test it!
+
+Ask it to:
+
+- "Can you create the agenda for tomorrow?"
+  -> and watch it search through memories to get your agenda!
+- "How are you?"
+  -> and watch it engaging into dialogues with long-term memory
 
 ## Roadmap
 

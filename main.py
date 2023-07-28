@@ -69,12 +69,14 @@ def tts(input_text, model=VOICE_MODEL):
 
 def calculate_plan(user_input):
     print("--> Calculating plan ")
-    print(user_input)
+    res = json.loads(user_input)
+    print(res["description"])
     messages = [
             {"role": "user",
-             "content": f"""Transcript of AI assistant responding to user requests. Replies with a plan to achieve the user's goal.
+             "content": f"""Transcript of AI assistant responding to user requests. 
+Replies with a plan to achieve the user's goal with a list of subtasks with logical steps.
 
-Request: {user_input}
+Request: {res["description"]}
 Function call: """
              }
         ]
@@ -88,16 +90,21 @@ Function call: """
                 "subtasks": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                            "reasoning": {
+                                "type": "string",
+                                "description": "subtask list",
+                            },
+                            "function": {
+                                "type": "string",
+                                "enum": ["save_memory", "search_memory"],
+                            },               
+                        },
                     },
-                    "description": "subtask list"
-                },
-                "thought": {
-                    "type": "string",
-                    "description": "reasoning behind the planning"
                 },
             },
-            "required": ["plan"]
+            "required": ["subtasks"]
         }
         },    
     ]
@@ -129,7 +136,7 @@ def needs_to_do_action(user_input):
              "content": f"""Transcript of AI assistant responding to user requests. Replies with the action to perform, including reasoning, and the confidence interval from 0 to 100.
 For saving a memory, the assistant replies with the action "save_memory" and the string to save. 
 For searching a memory, the assistant replies with the action "search_memory" and the query to search. 
-For generating a plan for complex tasks, the assistant replies with the action "generate_plan" and a list of plans to execute.
+For generating a plan for complex tasks, the assistant replies with the action "generate_plan" and a detailed plan to execute the user goal.
 For replying to the user, the assistant replies with the action "reply" and the reply to the user.
 
 Request: {user_input}
@@ -199,7 +206,6 @@ def search(query):
     print(res)
     return res
 
-function_result = {}
 def process_functions(user_input, action=""):
     messages = [
          #   {"role": "system", "content": "You are a helpful assistant."},
@@ -208,6 +214,7 @@ def process_functions(user_input, action=""):
 For saving a memory, the assistant replies with the action "save_memory" and the string to save. 
 For searching a memory, the assistant replies with the action "search_memory" and the query to search to find information stored previously. 
 For replying to the user, the assistant replies with the action "reply" and the reply to the user directly when there is nothing to do.
+For generating a plan for complex tasks, the assistant replies with the action "generate_plan" and a detailed list of all the subtasks needed to execute the user goal using the available actions.
 
 Request: {user_input}
 Function call: """
@@ -216,10 +223,10 @@ Function call: """
     response = get_completion(messages, action=action)
     response_message = response["choices"][0]["message"]
     response_result = ""
+    function_result = {}
     if response_message.get("function_call"):
         function_name = response.choices[0].message["function_call"].name
         function_parameters = response.choices[0].message["function_call"].arguments
-        function_result = ""
 
 
         available_functions = {
@@ -253,8 +260,7 @@ Function call: """
                 "content": f'{{"result": "{str(function_result)}"}}'
             }
         )
-
-    return messages
+    return messages, function_result
 
 def get_completion(messages, action=""):
     function_call = "auto"
@@ -274,9 +280,23 @@ def get_completion(messages, action=""):
                 "description": "information to save"
             },
             },
-            "required": ["string"]
+            "required": ["thought"]
         }
         },
+        {
+        "name": "generate_plan",
+        "description": """Plan complex tasks.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": "reasoning behind the planning"
+                },
+            },
+            "required": ["description"]
+        }
+        },   
         {
         "name": "search_memory",
         "description": """Search in memory""",
@@ -309,8 +329,10 @@ def get_completion(messages, action=""):
 
     return response
 
-create_image()
+#create_image()
+
 conversation_history = []
+# TODO: process functions also considering the conversation history? conversation history + input
 while True:
     user_input = input("> ")
 
@@ -321,10 +343,10 @@ while True:
         print(e)
         action = {"action": "reply"}
 
-    if action["action"] != "reply":
+    if action["action"] != "reply" and action["action"] != "generate_plan":
         print("==> needs to do action: ")
         print(action)
-        responses = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"])
+        responses, function_results = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"])
         response = openai.ChatCompletion.create(
             model=LLM_MODEL,
             messages=responses,
@@ -348,13 +370,20 @@ while True:
     elif action["action"] == "generate_plan":
         print("==> needs to do planify: ")
         print(action)
-        responses = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"])
-        # cycle subtasks and execute functions
-        for subtask in function_result["subtasks"]:
-            print("==> subtask: ")
-            print(subtask)
-            subtask_response = process_functions(subtask,)
-            responses.extend(subtask_response)
+        input = user_input+"\nReasoning: "+action["reasoning"]
+        print("==> input: ")
+        print(input)
+        responses, function_result = process_functions(input, action=action["action"])
+
+        # if there are no subtasks, we can just reply
+        if len(function_result["subtasks"]) != 0:
+            # cycle subtasks and execute functions
+            for subtask in function_result["subtasks"]:
+                print("==> subtask: ")
+                print(subtask)
+                subtask_response, function_results = process_functions(subtask["reasoning"], subtask["function"])
+                responses.extend(subtask_response)
+
         response = openai.ChatCompletion.create(
             model=LLM_MODEL,
             messages=responses,
