@@ -1,6 +1,15 @@
 import openai
-from langchain.embeddings import HuggingFaceEmbeddings
+#from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.embeddings import LocalAIEmbeddings
 import uuid
+import requests
+from ascii_magic import AsciiArt
+
+# these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 from langchain.vectorstores import Chroma
 from chromadb.config import Settings
 import json
@@ -8,16 +17,120 @@ import os
 
 FUNCTIONS_MODEL = os.environ.get("FUNCTIONS_MODEL", "functions")
 LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4")
+VOICE_MODEL= os.environ.get("TTS_MODEL","en-us-kathleen-low.onnx")
+DEFAULT_SD_MODEL = os.environ.get("DEFAULT_SD_MODEL", "stablediffusion")
+DEFAULT_SD_PROMPT = os.environ.get("DEFAULT_SD_PROMPT", "floating hair, portrait, ((loli)), ((one girl)), cute face, hidden hands, asymmetrical bangs, beautiful detailed eyes, eye shadow, hair ornament, ribbons, bowties, buttons, pleated skirt, (((masterpiece))), ((best quality)), colorful|((part of the head)), ((((mutated hands and fingers)))), deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, Octane renderer, lowres, bad anatomy, bad hands, text")
 
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+#embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embeddings = LocalAIEmbeddings(model="all-MiniLM-L6-v2")
 
 chroma_client = Chroma(collection_name="memories", persist_directory="db", embedding_function=embeddings)
 
+
+# Function to create images with OpenAI
+def create_image(input_text=DEFAULT_SD_PROMPT, model=DEFAULT_SD_MODEL):
+    response = openai.Image.create(
+        prompt=input_text,
+        n=1,
+        size="128x128",
+        api_base=os.environ.get("OPENAI_API_BASE", "http://api:8080")+"/v1"
+    )
+    image_url = response['data'][0]['url']
+    # convert the image to ascii art
+    my_art = AsciiArt.from_url(image_url)
+    my_art.to_terminal()
+
+def tts(input_text, model=VOICE_MODEL):
+    # strip newlines from text
+    input_text = input_text.replace("\n", ".")
+    # Create a temp file to store the audio output
+    output_file_path = '/tmp/output.wav'
+    # get from OPENAI_API_BASE env var
+    url = os.environ.get("OPENAI_API_BASE", "http://api:8080") + '/tts'
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "input": input_text,
+        "model": model
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+
+    if response.status_code == 200:
+        with open(output_file_path, 'wb') as f:
+            f.write(response.content)
+        print('Audio file saved successfully:', output_file_path)
+    else:
+        print('Request failed with status code', response.status_code)
+
+    # Use aplay to play the audio
+    os.system('aplay ' + output_file_path)
+    # remove the audio file
+    os.remove(output_file_path)
+
+def calculate_plan(user_input):
+    print("--> Calculating plan ")
+    print(user_input)
+    messages = [
+            {"role": "user",
+             "content": f"""Transcript of AI assistant responding to user requests. Replies with a plan to achieve the user's goal.
+
+Request: {user_input}
+Function call: """
+             }
+        ]
+    functions = [
+        {
+        "name": "plan",
+        "description": """Decide to do an action.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subtasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "subtask list"
+                },
+                "thought": {
+                    "type": "string",
+                    "description": "reasoning behind the planning"
+                },
+            },
+            "required": ["plan"]
+        }
+        },    
+    ]
+    response = openai.ChatCompletion.create(
+        #model="gpt-3.5-turbo",
+        model=FUNCTIONS_MODEL,
+        messages=messages,
+        functions=functions,
+        max_tokens=200,
+        stop=None,
+        temperature=0.5,
+        #function_call="auto"
+        function_call={"name": "plan"},
+    )
+    response_message = response["choices"][0]["message"]
+    if response_message.get("function_call"):
+        function_name = response.choices[0].message["function_call"].name
+        function_parameters = response.choices[0].message["function_call"].arguments
+        # read the json from the string
+        res = json.loads(function_parameters)
+        print(">>> function name: "+function_name)
+        print(">>> function parameters: "+function_parameters)
+        return res
+    return {"action": "none"}
+
 def needs_to_do_action(user_input):
     messages = [
-         #   {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",
              "content": f"""Transcript of AI assistant responding to user requests. Replies with the action to perform, including reasoning, and the confidence interval from 0 to 100.
+For saving a memory, the assistant replies with the action "save_memory" and the string to save. 
+For searching a memory, the assistant replies with the action "search_memory" and the query to search. 
+For generating a plan for complex tasks, the assistant replies with the action "generate_plan" and a list of plans to execute.
+For replying to the user, the assistant replies with the action "reply" and the reply to the user.
 
 Request: {user_input}
 Function call: """
@@ -36,7 +149,7 @@ Function call: """
             },
             "action": {
                 "type": "string",
-                "enum": ["save_memory", "search_memory", "reply"],
+                "enum": ["save_memory", "search_memory", "reply", "generate_plan"],
                 "description": "user intent"
             },
             "reasoning": {
@@ -67,8 +180,8 @@ Function call: """
         res = json.loads(function_parameters)
         print(">>> function name: "+function_name)
         print(">>> function parameters: "+function_parameters)
-        return res["action"]
-    return "reply"
+        return res
+    return {"action": "reply"}
 
 ### Agent capabilities
 def save(memory):
@@ -86,11 +199,15 @@ def search(query):
     print(res)
     return res
 
+function_result = {}
 def process_functions(user_input, action=""):
     messages = [
          #   {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",
              "content": f"""Transcript of AI assistant responding to user requests.
+For saving a memory, the assistant replies with the action "save_memory" and the string to save. 
+For searching a memory, the assistant replies with the action "search_memory" and the query to search to find information stored previously. 
+For replying to the user, the assistant replies with the action "reply" and the reply to the user directly when there is nothing to do.
 
 Request: {user_input}
 Function call: """
@@ -107,11 +224,14 @@ Function call: """
 
         available_functions = {
             "save_memory": save,
+            "generate_plan": calculate_plan,
             "search_memory": search,
         }
 
         function_to_call = available_functions[function_name]
         function_result = function_to_call(function_parameters)
+        print("==> function result: ")
+        print(function_result)
         messages = [
          #   {"role": "system", "content": "You are a helpful assistant."},
             {
@@ -130,22 +250,10 @@ Function call: """
             {
                 "role": "function",
                 "name": function_name,
-                "content": f'{{"result": {str(function_result)}}}'
+                "content": f'{{"result": "{str(function_result)}"}}'
             }
         )
-        response = openai.ChatCompletion.create(
-            model=LLM_MODEL,
-            messages=messages,
-            max_tokens=200,
-            stop=None,
-            temperature=0.5,
-        )
-        messages.append(
-            {
-                "role": "assistant",
-                "content": response.choices[0].message["content"],
-            }
-        )
+
     return messages
 
 def get_completion(messages, action=""):
@@ -161,7 +269,7 @@ def get_completion(messages, action=""):
         "parameters": {
             "type": "object",
             "properties": {
-            "string": {
+            "thought": {
                 "type": "string",
                 "description": "information to save"
             },
@@ -178,6 +286,10 @@ def get_completion(messages, action=""):
             "query": {
                 "type": "string",
                 "description": "The query to be used to search informations"
+            },
+            "reasoning": {
+                "type": "string",
+                "description": "reasoning behind the intent"
             },
             },
             "required": ["query"]
@@ -197,17 +309,70 @@ def get_completion(messages, action=""):
 
     return response
 
+create_image()
 conversation_history = []
 while True:
     user_input = input("> ")
-    action = needs_to_do_action(user_input) 
-    if action != "reply":
-        print("==> needs to do action: "+action)
-        responses = process_functions(user_input, action=action)
+
+    try:
+        action = needs_to_do_action(user_input) 
+    except Exception as e:
+        print("==> error: ")
+        print(e)
+        action = {"action": "reply"}
+
+    if action["action"] != "reply":
+        print("==> needs to do action: ")
+        print(action)
+        responses = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"])
+        response = openai.ChatCompletion.create(
+            model=LLM_MODEL,
+            messages=responses,
+            max_tokens=200,
+            stop=None,
+            temperature=0.5,
+        )
+        responses.append(
+            {
+                "role": "assistant",
+                "content": response.choices[0].message["content"],
+            }
+        )
         # add responses to conversation history by extending the list
         conversation_history.extend(responses)
         # print the latest response from the conversation history
-        print(conversation_history[-1])
+        print(conversation_history[-1]["content"])
+        tts(conversation_history[-1]["content"])
+
+    # If its a plan, we need to execute it
+    elif action["action"] == "generate_plan":
+        print("==> needs to do planify: ")
+        print(action)
+        responses = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"])
+        # cycle subtasks and execute functions
+        for subtask in function_result["subtasks"]:
+            print("==> subtask: ")
+            print(subtask)
+            subtask_response = process_functions(subtask,)
+            responses.extend(subtask_response)
+        response = openai.ChatCompletion.create(
+            model=LLM_MODEL,
+            messages=responses,
+            max_tokens=200,
+            stop=None,
+            temperature=0.5,
+        )
+        responses.append(
+            {
+                "role": "assistant",
+                "content": response.choices[0].message["content"],
+            }
+        )
+        # add responses to conversation history by extending the list
+        conversation_history.extend(responses)
+        # print the latest response from the conversation history
+        print(conversation_history[-1]["content"])
+        tts(conversation_history[-1]["content"])
     else:
         print("==> no action needed")
         # construct the message and add it to the conversation history
@@ -226,5 +391,7 @@ while True:
         # add the response to the conversation history by extending the list
         conversation_history.append({ "role": "assistant", "content": response.choices[0].message["content"]})
         # print the latest response from the conversation history
-        print(conversation_history[-1])
+        print(conversation_history[-1]["content"])
+        tts(conversation_history[-1]["content"])
+
        
