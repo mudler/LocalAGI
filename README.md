@@ -25,6 +25,18 @@ Ask it to:
 - "How are you?"
   -> and watch it engaging into dialogues with long-term memory
 
+### How it works?
+
+miniAGI uses `LocalAI` and OpenAI functions. 
+
+The approach is the following:
+- Decide based on the conversation history if we need to take an action by using functions.It uses the LLM to detect the intent from the conversation.
+- if we need to take an action (e.g. "remember something from the conversation" ) or generate complex tasks ( executing a chain of functions to achieve a goal)
+
+Under the hood:
+
+- LocalAI converts functions to llama.cpp BNF grammars
+
 ## Roadmap
 
 - [x] 100% Local, with Local AI. NO API KEYS NEEDED!

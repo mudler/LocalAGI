@@ -196,7 +196,7 @@ def save(memory):
     print(memory)
     chroma_client.add_texts([memory],[{"id": str(uuid.uuid4())}])
     chroma_client.persist()
-    return "saved to memory"
+    return f"The object was saved permanently to memory."
 
 def search(query):
     res = chroma_client.similarity_search(query)
@@ -220,7 +220,7 @@ Request: {user_input}
 Function call: """
              }
         ]
-    response = get_completion(messages, action=action)
+    response = function_completion(messages, action=action)
     response_message = response["choices"][0]["message"]
     response_result = ""
     function_result = {}
@@ -262,7 +262,7 @@ Function call: """
         )
     return messages, function_result
 
-def get_completion(messages, action=""):
+def function_completion(messages, action=""):
     function_call = "auto"
     if action != "":
         function_call={"name": action}
@@ -329,13 +329,21 @@ def get_completion(messages, action=""):
 
     return response
 
-#create_image()
+# Gets the content of each message in the history
+def process_history(conversation_history):
+    messages = ""
+    for message in conversation_history:
+        # if there is content append it
+        if message.get("content"):
+            messages+=message["content"]+"\n"
+        if message.get("function_call"):
+            # encode message["function_call" to json and appends it
+            fcall = json.dumps(message["function_call"])
+            messages+=fcall+"\n"
+    return messages
 
-conversation_history = []
-# TODO: process functions also considering the conversation history? conversation history + input
-while True:
-    user_input = input("> ")
 
+def evaluate(user_input, conversation_history = [],re_evaluate=False):
     try:
         action = needs_to_do_action(user_input) 
     except Exception as e:
@@ -343,47 +351,30 @@ while True:
         print(e)
         action = {"action": "reply"}
 
-    if action["action"] != "reply" and action["action"] != "generate_plan":
+    if action["action"] != "reply":
         print("==> needs to do action: ")
         print(action)
+        if action["action"] == "generate_plan":
+            print("==> It's a plan <==: ")
+
         responses, function_results = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"])
-        response = openai.ChatCompletion.create(
-            model=LLM_MODEL,
-            messages=responses,
-            max_tokens=200,
-            stop=None,
-            temperature=0.5,
-        )
-        responses.append(
-            {
-                "role": "assistant",
-                "content": response.choices[0].message["content"],
-            }
-        )
-        # add responses to conversation history by extending the list
-        conversation_history.extend(responses)
-        # print the latest response from the conversation history
-        print(conversation_history[-1]["content"])
-        tts(conversation_history[-1]["content"])
-
-    # If its a plan, we need to execute it
-    elif action["action"] == "generate_plan":
-        print("==> needs to do planify: ")
-        print(action)
-        input = user_input+"\nReasoning: "+action["reasoning"]
-        print("==> input: ")
-        print(input)
-        responses, function_result = process_functions(input, action=action["action"])
-
-        # if there are no subtasks, we can just reply
-        if len(function_result["subtasks"]) != 0:
+        # if there are no subtasks, we can just reply,
+        # otherwise we execute the subtasks
+        # First we check if it's an object
+        if isinstance(function_results, dict) and len(function_results["subtasks"]) != 0:
             # cycle subtasks and execute functions
-            for subtask in function_result["subtasks"]:
+            for subtask in function_results["subtasks"]:
                 print("==> subtask: ")
                 print(subtask)
                 subtask_response, function_results = process_functions(subtask["reasoning"], subtask["function"])
                 responses.extend(subtask_response)
-
+        if re_evaluate:
+            all = process_history(responses)
+            print("==> all: ")
+            print(all)
+            ## Better output or this infinite loops..
+            print("-> Re-evaluate if another action is needed")
+            responses = evaluate(user_input+process_history(responses), responses, re_evaluate)
         response = openai.ChatCompletion.create(
             model=LLM_MODEL,
             messages=responses,
@@ -422,5 +413,12 @@ while True:
         # print the latest response from the conversation history
         print(conversation_history[-1]["content"])
         tts(conversation_history[-1]["content"])
+    return conversation_history
 
-       
+#create_image()
+
+conversation_history = []
+# TODO: process functions also considering the conversation history? conversation history + input
+while True:
+    user_input = input("> ")
+    conversation_history=evaluate(user_input, conversation_history, re_evaluate=True)
