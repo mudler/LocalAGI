@@ -3,6 +3,7 @@ import openai
 from langchain.embeddings import LocalAIEmbeddings
 import uuid
 import requests
+from loguru import logger
 from ascii_magic import AsciiArt
 
 # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
@@ -21,10 +22,13 @@ VOICE_MODEL= os.environ.get("TTS_MODEL","en-us-kathleen-low.onnx")
 DEFAULT_SD_MODEL = os.environ.get("DEFAULT_SD_MODEL", "stablediffusion")
 DEFAULT_SD_PROMPT = os.environ.get("DEFAULT_SD_PROMPT", "floating hair, portrait, ((loli)), ((one girl)), cute face, hidden hands, asymmetrical bangs, beautiful detailed eyes, eye shadow, hair ornament, ribbons, bowties, buttons, pleated skirt, (((masterpiece))), ((best quality)), colorful|((part of the head)), ((((mutated hands and fingers)))), deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, Octane renderer, lowres, bad anatomy, bad hands, text")
 
+REPLY_ACTION = "reply"
+
 #embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 embeddings = LocalAIEmbeddings(model="all-MiniLM-L6-v2")
 
 chroma_client = Chroma(collection_name="memories", persist_directory="db", embedding_function=embeddings)
+
 
 
 # Function to create images with OpenAI
@@ -67,10 +71,8 @@ def tts(input_text, model=VOICE_MODEL):
     # remove the audio file
     os.remove(output_file_path)
 
-def calculate_plan(user_input):
-    print("--> Calculating plan ")
-    res = json.loads(user_input)
-    print(res["description"])
+def calculate_plan(user_input, agent_actions={}):
+    logger.info("--> Calculating plan: {description}", description=res["description"])
     messages = [
             {"role": "user",
              "content": f"""Transcript of AI assistant responding to user requests. 
@@ -80,6 +82,13 @@ Request: {res["description"]}
 Function call: """
              }
         ]
+    # get list of plannable actions
+    plannable_actions = []
+    for action in agent_actions:
+        if agent_actions[action]["plannable"]:
+            # append the key of the dict to plannable_actions
+            plannable_actions.append(action)
+
     functions = [
         {
         "name": "plan",
@@ -98,7 +107,7 @@ Function call: """
                             },
                             "function": {
                                 "type": "string",
-                                "enum": ["save_memory", "search_memory"],
+                                "enum": plannable_actions,
                             },               
                         },
                     },
@@ -130,14 +139,17 @@ Function call: """
         return res
     return {"action": "none"}
 
-def needs_to_do_action(user_input):
+def needs_to_do_action(user_input,agent_actions={}):
+
+    # Get the descriptions and the actions name (the keys)
+    descriptions=""
+    for action in agent_actions:
+        descriptions+=agent_actions[action]["description"]+"\n"
+
     messages = [
             {"role": "user",
              "content": f"""Transcript of AI assistant responding to user requests. Replies with the action to perform, including reasoning, and the confidence interval from 0 to 100.
-For saving a memory, the assistant replies with the action "save_memory" and the string to save. 
-For searching a memory, the assistant replies with the action "search_memory" and the query to search. 
-For generating a plan for complex tasks, the assistant replies with the action "generate_plan" and a detailed plan to execute the user goal.
-For replying to the user, the assistant replies with the action "reply" and the reply to the user.
+{descriptions}
 
 Request: {user_input}
 Function call: """
@@ -156,7 +168,7 @@ Function call: """
             },
             "action": {
                 "type": "string",
-                "enum": ["save_memory", "search_memory", "reply", "generate_plan"],
+                "enum": list(agent_actions.keys()),
                 "description": "user intent"
             },
             "reasoning": {
@@ -188,17 +200,17 @@ Function call: """
         print(">>> function name: "+function_name)
         print(">>> function parameters: "+function_parameters)
         return res
-    return {"action": "reply"}
+    return {"action": REPLY_ACTION}
 
 ### Agent capabilities
-def save(memory):
+def save(memory, agent_actions={}):
     print(">>> saving to memories: ") 
     print(memory)
     chroma_client.add_texts([memory],[{"id": str(uuid.uuid4())}])
     chroma_client.persist()
     return f"The object was saved permanently to memory."
 
-def search(query):
+def search(query, agent_actions={}):
     res = chroma_client.similarity_search(query)
     print(">>> query: ") 
     print(query)
@@ -206,21 +218,23 @@ def search(query):
     print(res)
     return res
 
-def process_functions(user_input, action=""):
+def process_functions(user_input, action="", agent_actions={}):
+
+    descriptions=""
+    for a in agent_actions:
+        descriptions+=agent_actions[a]["description"]+"\n"
+
     messages = [
          #   {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user",
              "content": f"""Transcript of AI assistant responding to user requests.
-For saving a memory, the assistant replies with the action "save_memory" and the string to save. 
-For searching a memory, the assistant replies with the action "search_memory" and the query to search to find information stored previously. 
-For replying to the user, the assistant replies with the action "reply" and the reply to the user directly when there is nothing to do.
-For generating a plan for complex tasks, the assistant replies with the action "generate_plan" and a detailed list of all the subtasks needed to execute the user goal using the available actions.
+{descriptions}
 
 Request: {user_input}
 Function call: """
              }
         ]
-    response = function_completion(messages, action=action)
+    response = function_completion(messages, action=action,agent_actions=agent_actions)
     response_message = response["choices"][0]["message"]
     response_result = ""
     function_result = {}
@@ -228,15 +242,8 @@ Function call: """
         function_name = response.choices[0].message["function_call"].name
         function_parameters = response.choices[0].message["function_call"].arguments
 
-
-        available_functions = {
-            "save_memory": save,
-            "generate_plan": calculate_plan,
-            "search_memory": search,
-        }
-
-        function_to_call = available_functions[function_name]
-        function_result = function_to_call(function_parameters)
+        function_to_call = agent_actions[function_name]["function"]
+        function_result = function_to_call(function_parameters, agent_actions=agent_actions)
         print("==> function result: ")
         print(function_result)
         messages = [
@@ -262,60 +269,22 @@ Function call: """
         )
     return messages, function_result
 
-def function_completion(messages, action=""):
+def function_completion(messages, action="", agent_actions={}):
     function_call = "auto"
     if action != "":
         function_call={"name": action}
     print("==> function_call: ")
     print(function_call)
-    functions = [
-        {
-        "name": "save_memory",
-        "description": """Save or store informations into memory.""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-            "thought": {
-                "type": "string",
-                "description": "information to save"
-            },
-            },
-            "required": ["thought"]
-        }
-        },
-        {
-        "name": "generate_plan",
-        "description": """Plan complex tasks.""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "description": "reasoning behind the planning"
-                },
-            },
-            "required": ["description"]
-        }
-        },   
-        {
-        "name": "search_memory",
-        "description": """Search in memory""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-            "query": {
-                "type": "string",
-                "description": "The query to be used to search informations"
-            },
-            "reasoning": {
-                "type": "string",
-                "description": "reasoning behind the intent"
-            },
-            },
-            "required": ["query"]
-        }
-        },    
-    ]
+
+    # get the functions from the signatures of the agent actions, if exists
+    functions = []
+    for action in agent_actions:
+        if agent_actions[action].get("signature"):
+            functions.append(agent_actions[action]["signature"])
+    print("==> available functions for the LLM: ")
+    print(functions)
+    print("==> messages LLM: ")
+    print(messages)
     response = openai.ChatCompletion.create(
         #model="gpt-3.5-turbo",
         model=FUNCTIONS_MODEL,
@@ -343,21 +312,21 @@ def process_history(conversation_history):
     return messages
 
 
-def evaluate(user_input, conversation_history = [],re_evaluate=False):
+def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_actions={}):
     try:
-        action = needs_to_do_action(user_input) 
+        action = needs_to_do_action(user_input,agent_actions=agent_actions)
     except Exception as e:
         print("==> error: ")
         print(e)
-        action = {"action": "reply"}
+        action = {"action": REPLY_ACTION}
 
-    if action["action"] != "reply":
+    if action["action"] != REPLY_ACTION:
         print("==> needs to do action: ")
         print(action)
         if action["action"] == "generate_plan":
             print("==> It's a plan <==: ")
 
-        responses, function_results = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"])
+        responses, function_results = process_functions(user_input+"\nReasoning: "+action["reasoning"], action=action["action"], agent_actions=agent_actions)
         # if there are no subtasks, we can just reply,
         # otherwise we execute the subtasks
         # First we check if it's an object
@@ -366,7 +335,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False):
             for subtask in function_results["subtasks"]:
                 print("==> subtask: ")
                 print(subtask)
-                subtask_response, function_results = process_functions(subtask["reasoning"], subtask["function"])
+                subtask_response, function_results = process_functions(subtask["reasoning"], subtask["function"],agent_actions=agent_actions)
                 responses.extend(subtask_response)
         if re_evaluate:
             all = process_history(responses)
@@ -374,7 +343,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False):
             print(all)
             ## Better output or this infinite loops..
             print("-> Re-evaluate if another action is needed")
-            responses = evaluate(user_input+process_history(responses), responses, re_evaluate)
+            responses = evaluate(user_input+process_history(responses), responses, re_evaluate,agent_actions=agent_actions)
         response = openai.ChatCompletion.create(
             model=LLM_MODEL,
             messages=responses,
@@ -417,8 +386,77 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False):
 
 #create_image()
 
+agent_actions = {
+    "save_memory": {
+        "function": save,
+        "plannable": True,
+        "description": 'For saving a memory, the assistant replies with the action "save_memory" and the string to save.',
+        "signature": {
+            "name": "save_memory",
+            "description": """Save or store informations into memory.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "thought": {
+                        "type": "string",
+                        "description": "information to save"
+                    },
+                },
+                "required": ["thought"]
+            }
+        },
+    },
+    "search_memory": {
+        "function": search,
+        "plannable": True,
+        "description": 'For searching a memory, the assistant replies with the action "search_memory" and the query to search to find information stored previously.',
+        "signature": {
+            "name": "search_memory",
+            "description": """Search in memory""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The query to be used to search informations"
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "reasoning behind the intent"
+                    },
+                },
+                "required": ["query"]
+            }
+        }, 
+    },
+    "generate_plan": {
+        "function": calculate_plan,
+        "plannable": False,
+        "description": 'For generating a plan for complex tasks, the assistant replies with the action "generate_plan" and a detailed list of all the subtasks needed to execute the user goal using the available actions.',
+        "signature": {
+            "name": "generate_plan",
+            "description": """Plan complex tasks.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "reasoning behind the planning"
+                    },
+                },
+                "required": ["description"]
+            }
+        },
+    },
+    REPLY_ACTION: {
+        "function": None,
+        "plannable": False,
+        "description": 'For replying to the user, the assistant replies with the action "'+REPLY_ACTION+'" and the reply to the user directly when there is nothing to do.',
+    },
+}
+
 conversation_history = []
 # TODO: process functions also considering the conversation history? conversation history + input
 while True:
     user_input = input("> ")
-    conversation_history=evaluate(user_input, conversation_history, re_evaluate=True)
+    conversation_history=evaluate(user_input, conversation_history, re_evaluate=True, agent_actions=agent_actions)

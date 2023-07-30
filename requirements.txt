@@ -4,3 +4,4 @@ chromadb
 pysqlite3-binary
 requests
 ascii-magic
+loguru
