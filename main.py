@@ -9,7 +9,6 @@ from ascii_magic import AsciiArt
 from duckduckgo_search import DDGS
 from typing import Dict, List, Optional
 
-logger.add(sys.stderr, format="{time} {level} {message}", filter="miniAGI", level="INFO")
 # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
 __import__('pysqlite3')
 import sys
@@ -567,6 +566,9 @@ agent_actions = {
 }
 
 conversation_history = []
+
+logger.info("Welcome to miniAGI")
+logger.info("Creating avatar, please wait...")
 
 display_avatar()
 
