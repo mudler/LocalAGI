@@ -3,9 +3,11 @@ import openai
 from langchain.embeddings import LocalAIEmbeddings
 import uuid
 import requests
+import sys
 from loguru import logger
 from ascii_magic import AsciiArt
 
+logger.add(sys.stderr, format="{time} {level} {message}", filter="miniAGI", level="INFO")
 # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
 __import__('pysqlite3')
 import sys
@@ -32,7 +34,7 @@ chroma_client = Chroma(collection_name="memories", persist_directory="db", embed
 
 
 # Function to create images with OpenAI
-def create_image(input_text=DEFAULT_SD_PROMPT, model=DEFAULT_SD_MODEL):
+def display_avatar(input_text=DEFAULT_SD_PROMPT, model=DEFAULT_SD_MODEL):
     response = openai.Image.create(
         prompt=input_text,
         n=1,
@@ -70,74 +72,6 @@ def tts(input_text, model=VOICE_MODEL):
     os.system('aplay ' + output_file_path)
     # remove the audio file
     os.remove(output_file_path)
-
-def calculate_plan(user_input, agent_actions={}):
-    logger.info("--> Calculating plan: {description}", description=res["description"])
-    messages = [
-            {"role": "user",
-             "content": f"""Transcript of AI assistant responding to user requests. 
-Replies with a plan to achieve the user's goal with a list of subtasks with logical steps.
-
-Request: {res["description"]}
-Function call: """
-             }
-        ]
-    # get list of plannable actions
-    plannable_actions = []
-    for action in agent_actions:
-        if agent_actions[action]["plannable"]:
-            # append the key of the dict to plannable_actions
-            plannable_actions.append(action)
-
-    functions = [
-        {
-        "name": "plan",
-        "description": """Decide to do an action.""",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subtasks": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "reasoning": {
-                                "type": "string",
-                                "description": "subtask list",
-                            },
-                            "function": {
-                                "type": "string",
-                                "enum": plannable_actions,
-                            },               
-                        },
-                    },
-                },
-            },
-            "required": ["subtasks"]
-        }
-        },    
-    ]
-    response = openai.ChatCompletion.create(
-        #model="gpt-3.5-turbo",
-        model=FUNCTIONS_MODEL,
-        messages=messages,
-        functions=functions,
-        max_tokens=200,
-        stop=None,
-        temperature=0.5,
-        #function_call="auto"
-        function_call={"name": "plan"},
-    )
-    response_message = response["choices"][0]["message"]
-    if response_message.get("function_call"):
-        function_name = response.choices[0].message["function_call"].name
-        function_parameters = response.choices[0].message["function_call"].arguments
-        # read the json from the string
-        res = json.loads(function_parameters)
-        print(">>> function name: "+function_name)
-        print(">>> function parameters: "+function_parameters)
-        return res
-    return {"action": "none"}
 
 def needs_to_do_action(user_input,agent_actions={}):
 
@@ -201,22 +135,6 @@ Function call: """
         print(">>> function parameters: "+function_parameters)
         return res
     return {"action": REPLY_ACTION}
-
-### Agent capabilities
-def save(memory, agent_actions={}):
-    print(">>> saving to memories: ") 
-    print(memory)
-    chroma_client.add_texts([memory],[{"id": str(uuid.uuid4())}])
-    chroma_client.persist()
-    return f"The object was saved permanently to memory."
-
-def search(query, agent_actions={}):
-    res = chroma_client.similarity_search(query)
-    print(">>> query: ") 
-    print(query)
-    print(">>> retrieved memories: ") 
-    print(res)
-    return res
 
 def process_functions(user_input, action="", agent_actions={}):
 
@@ -330,7 +248,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         # if there are no subtasks, we can just reply,
         # otherwise we execute the subtasks
         # First we check if it's an object
-        if isinstance(function_results, dict) and len(function_results["subtasks"]) != 0:
+        if isinstance(function_results, dict) and function_results.get("subtasks") and len(function_results["subtasks"]) > 0:
             # cycle subtasks and execute functions
             for subtask in function_results["subtasks"]:
                 print("==> subtask: ")
@@ -384,9 +302,156 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         tts(conversation_history[-1]["content"])
     return conversation_history
 
-#create_image()
+
+
+### Agent capabilities
+
+def save(memory, agent_actions={}):
+    print(">>> saving to memories: ") 
+    print(memory)
+    chroma_client.add_texts([memory],[{"id": str(uuid.uuid4())}])
+    chroma_client.persist()
+    return f"The object was saved permanently to memory."
+
+def search(query, agent_actions={}):
+    res = chroma_client.similarity_search(query)
+    print(">>> query: ") 
+    print(query)
+    print(">>> retrieved memories: ") 
+    print(res)
+    return res
+
+def calculate_plan(user_input, agent_actions={}):
+    res = json.loads(user_input)
+    logger.info("--> Calculating plan: {description}", description=res["description"])
+    messages = [
+            {"role": "user",
+             "content": f"""Transcript of AI assistant responding to user requests. 
+Replies with a plan to achieve the user's goal with a list of subtasks with logical steps.
+
+Request: {res["description"]}
+Function call: """
+             }
+        ]
+    # get list of plannable actions
+    plannable_actions = []
+    for action in agent_actions:
+        if agent_actions[action]["plannable"]:
+            # append the key of the dict to plannable_actions
+            plannable_actions.append(action)
+
+    functions = [
+        {
+        "name": "plan",
+        "description": """Decide to do an action.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "subtasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "reasoning": {
+                                "type": "string",
+                                "description": "subtask list",
+                            },
+                            "function": {
+                                "type": "string",
+                                "enum": plannable_actions,
+                            },               
+                        },
+                    },
+                },
+            },
+            "required": ["subtasks"]
+        }
+        },    
+    ]
+    response = openai.ChatCompletion.create(
+        #model="gpt-3.5-turbo",
+        model=FUNCTIONS_MODEL,
+        messages=messages,
+        functions=functions,
+        max_tokens=200,
+        stop=None,
+        temperature=0.5,
+        #function_call="auto"
+        function_call={"name": "plan"},
+    )
+    response_message = response["choices"][0]["message"]
+    if response_message.get("function_call"):
+        function_name = response.choices[0].message["function_call"].name
+        function_parameters = response.choices[0].message["function_call"].arguments
+        # read the json from the string
+        res = json.loads(function_parameters)
+        logger.info("<<< function name: {function_name} >>>> parameters: {parameters}", function_name=function_name,parameters=function_parameters)
+        return res
+    return {"action": REPLY_ACTION}
+
+# write file to disk with content
+def write_file(arg, agent_actions={}):
+    arg = json.loads(arg)
+    filename = arg["filename"]
+    content = arg["content"]
+    with open(filename, 'w') as f:
+        f.write(content)
+    return f"File {filename} saved successfully."
+
+## Search on duckduckgo
+def search_duckduckgo(args, agent_actions={}):
+    args = json.loads(args)
+    url = "https://api.duckduckgo.com/?q="+args["query"]+"&format=json&pretty=1"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {"error": "No results found."}
+
+### End Agent capabilities
+
 
 agent_actions = {
+    "search_internet": {
+        "function": search_duckduckgo,
+        "plannable": True,
+        "description": 'For searching the internet with a query, the assistant replies with the action "search_internet" and the query to search.',
+        "signature": {
+            "name": "search_internet",
+            "description": """For searching internet.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "information to save"
+                    },
+                },
+            }
+        },
+    },
+    "write_file": {
+        "function": write_file,
+        "plannable": True,
+        "description": 'For writing a file to disk with content, the assistant replies with the action "write_file" and the filename and content to save.',
+        "signature": {
+            "name": "write_file",
+            "description": """For saving a file to disk with content.""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "information to save"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "information to save"
+                    },
+                },
+            }
+        },
+    },
     "save_memory": {
         "function": save,
         "plannable": True,
@@ -456,6 +521,9 @@ agent_actions = {
 }
 
 conversation_history = []
+
+display_avatar()
+
 # TODO: process functions also considering the conversation history? conversation history + input
 while True:
     user_input = input("> ")
