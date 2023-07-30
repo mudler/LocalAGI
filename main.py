@@ -6,6 +6,8 @@ import requests
 import sys
 from loguru import logger
 from ascii_magic import AsciiArt
+from duckduckgo_search import DDGS
+from typing import Dict, List, Optional
 
 logger.add(sys.stderr, format="{time} {level} {message}", filter="miniAGI", level="INFO")
 # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
@@ -159,7 +161,10 @@ Function call: """
     if response_message.get("function_call"):
         function_name = response.choices[0].message["function_call"].name
         function_parameters = response.choices[0].message["function_call"].arguments
-
+        print("==> function name: ")
+        print(function_name)
+        print("==> function parameters: ")
+        print(function_parameters)
         function_to_call = agent_actions[function_name]["function"]
         function_result = function_to_call(function_parameters, agent_actions=agent_actions)
         print("==> function result: ")
@@ -199,10 +204,6 @@ def function_completion(messages, action="", agent_actions={}):
     for action in agent_actions:
         if agent_actions[action].get("signature"):
             functions.append(agent_actions[action]["signature"])
-    print("==> available functions for the LLM: ")
-    print(functions)
-    print("==> messages LLM: ")
-    print(messages)
     response = openai.ChatCompletion.create(
         #model="gpt-3.5-turbo",
         model=FUNCTIONS_MODEL,
@@ -239,8 +240,10 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         action = {"action": REPLY_ACTION}
 
     if action["action"] != REPLY_ACTION:
-        print("==> needs to do action: ")
-        print(action)
+        print("==> miniAGI wants to do an action: ")
+        print(action["action"])
+        print("==> Reasoning: ")
+        print(action["reasoning"])
         if action["action"] == "generate_plan":
             print("==> It's a plan <==: ")
 
@@ -398,15 +401,58 @@ def write_file(arg, agent_actions={}):
         f.write(content)
     return f"File {filename} saved successfully."
 
+
+def ddg(query: str, num_results: int, backend: str = "api") -> List[Dict[str, str]]:
+    """Run query through DuckDuckGo and return metadata.
+
+    Args:
+        query: The query to search for.
+        num_results: The number of results to return.
+
+    Returns:
+        A list of dictionaries with the following keys:
+            snippet - The description of the result.
+            title - The title of the result.
+            link - The link to the result.
+    """
+
+    with DDGS() as ddgs:
+        results = ddgs.text(
+            query,
+            backend=backend,
+        )
+        if results is None:
+            return [{"Result": "No good DuckDuckGo Search Result was found"}]
+
+        def to_metadata(result: Dict) -> Dict[str, str]:
+            if backend == "news":
+                return {
+                    "date": result["date"],
+                    "title": result["title"],
+                    "snippet": result["body"],
+                    "source": result["source"],
+                    "link": result["url"],
+                }
+            return {
+                "snippet": result["body"],
+                "title": result["title"],
+                "link": result["href"],
+            }
+
+        formatted_results = []
+        for i, res in enumerate(results, 1):
+            if res is not None:
+                formatted_results.append(to_metadata(res))
+            if len(formatted_results) == num_results:
+                break
+    return formatted_results
+
 ## Search on duckduckgo
 def search_duckduckgo(args, agent_actions={}):
     args = json.loads(args)
-    url = "https://api.duckduckgo.com/?q="+args["query"]+"&format=json&pretty=1"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return {"error": "No results found."}
+    list=ddg(args["query"], 5)
+    l = json.dumps(list)
+    return l
 
 ### End Agent capabilities
 
@@ -527,4 +573,4 @@ display_avatar()
 # TODO: process functions also considering the conversation history? conversation history + input
 while True:
     user_input = input("> ")
-    conversation_history=evaluate(user_input, conversation_history, re_evaluate=True, agent_actions=agent_actions)
+    conversation_history=evaluate(user_input, conversation_history, re_evaluate=False, agent_actions=agent_actions)
