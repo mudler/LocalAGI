@@ -285,12 +285,19 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         # First we check if it's an object
         if isinstance(function_results, dict) and function_results.get("subtasks") and len(function_results["subtasks"]) > 0:
             # cycle subtasks and execute functions
+            subtask_result=""
             for subtask in function_results["subtasks"]:
                 logger.info("==> subtask: ")
                 logger.info(subtask)
                 #ctr="Context: "+user_input+"\nThought: "+action["reasoning"]+ "\nRequest: "+subtask["reasoning"]
-                cr="Context: "+user_input+"\nRequest: "+subtask["reasoning"]
+                cr="Context: "+user_input+"\n"
+                if subtask_result != "":
+                    # Include cumulative results of previous subtasks
+                    # TODO: this grows context, maybe we should use a different approach or summarize
+                    cr+="Subtask results: "+subtask_result+"\n"
+                cr+="Request: "+subtask["reasoning"]
                 subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
+                subtask_result+=process_history(subtask_response)
                 responses.extend(subtask_response)
         if re_evaluate:
             ## Better output or this infinite loops..

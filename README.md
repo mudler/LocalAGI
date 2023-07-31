@@ -1,10 +1,15 @@
-# microAGI
+<h1 align="center">
+  <br>
+  <img height="300" src="https://github.com/mudler/microAGI/assets/2420543/7717fafb-de72-4a2d-a47a-229fc64b5716"> <br>
+    μAGI (microAGI)
+<br>
+</h1>
 
 From the [LocalAI](https://localai.io) author, microAGI. 100% Local AI assistant.
 
 Note: this is a fun project, not a serious one. Be warned!
 
-## What is microAGI?
+## What is μAGI?
 
 It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize.
 
@@ -57,5 +62,5 @@ Under the hood LocalAI converts functions to llama.cpp BNF grammars. While OpenA
 Run docker-compose with main.py checked-out:
 
 ```bash
-docker-compose run -v main.py:/app/main.py -i --rm microAGI
+docker-compose run -v main.py:/app/main.py -i --rm microagi
 ```
