@@ -13,8 +13,9 @@ services:
       - .env
     volumes:
       - ./models:/models:cached
+      - ./config:/config:cached
     command: ["/usr/bin/local-ai" ]
-  miniagi:
+  microagi:
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,5 +26,6 @@ services:
         condition: service_healthy
     volumes:
       - ./db:/app/db
+      - ./data:/data
     env_file:
       - .env
