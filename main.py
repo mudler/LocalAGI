@@ -21,34 +21,42 @@ import os
 
 # Parse arguments such as system prompt and batch mode
 import argparse
-parser = argparse.ArgumentParser(description='microAGI')
+parser = argparse.ArgumentParser(description='μAGI')
 parser.add_argument('--system-prompt', dest='system_prompt', action='store',
                     help='System prompt to use')
-parser.add_argument('--batch-mode', dest='batch_mode', action='store_true', default=False,
-                    help='Batch mode')
+parser.add_argument('--prompt', dest='prompt', action='store', default=False,
+                    help='Prompt mode')
 # skip avatar creation
 parser.add_argument('--skip-avatar', dest='skip_avatar', action='store_true', default=False,
                     help='Skip avatar creation') 
+# Reevaluate
+parser.add_argument('--re-evaluate', dest='re_evaluate', action='store_true', default=False,
+                    help='Reevaluate if another action is needed or we have completed the user request')
+# Postprocess
+parser.add_argument('--postprocess', dest='postprocess', action='store_true', default=False,
+                    help='Postprocess the reasoning')
+# Subtask context
+parser.add_argument('--subtask-context', dest='subtaskContext', action='store_true', default=False,
+                    help='Include context in subtasks')
 args = parser.parse_args()
 
 
 FUNCTIONS_MODEL = os.environ.get("FUNCTIONS_MODEL", "functions")
+EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "all-MiniLM-L6-v2")
 LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4")
 VOICE_MODEL= os.environ.get("TTS_MODEL","en-us-kathleen-low.onnx")
 DEFAULT_SD_MODEL = os.environ.get("DEFAULT_SD_MODEL", "stablediffusion")
 DEFAULT_SD_PROMPT = os.environ.get("DEFAULT_SD_PROMPT", "floating hair, portrait, ((loli)), ((one girl)), cute face, hidden hands, asymmetrical bangs, beautiful detailed eyes, eye shadow, hair ornament, ribbons, bowties, buttons, pleated skirt, (((masterpiece))), ((best quality)), colorful|((part of the head)), ((((mutated hands and fingers)))), deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, Octane renderer, lowres, bad anatomy, bad hands, text")
 PERSISTENT_DIR = os.environ.get("PERSISTENT_DIR", "/data")
 
+## Constants
 REPLY_ACTION = "reply"
-PLAN_ACTION = "plan"
-#embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-embeddings = LocalAIEmbeddings(model="all-MiniLM-L6-v2")
+PLAN_ACTION = "multitask_action"
 
+embeddings = LocalAIEmbeddings(model=EMBEDDINGS_MODEL)
 chroma_client = Chroma(collection_name="memories", persist_directory="db", embedding_function=embeddings)
 
-
-
-# Function to create images with OpenAI
+# Function to create images with LocalAI
 def display_avatar(input_text=DEFAULT_SD_PROMPT, model=DEFAULT_SD_MODEL):
     response = openai.Image.create(
         prompt=input_text,
@@ -61,6 +69,7 @@ def display_avatar(input_text=DEFAULT_SD_PROMPT, model=DEFAULT_SD_MODEL):
     my_art = AsciiArt.from_url(image_url)
     my_art.to_terminal()
 
+# Function to create audio with LocalAI
 def tts(input_text, model=VOICE_MODEL):
     # strip newlines from text
     input_text = input_text.replace("\n", ".")
@@ -88,12 +97,11 @@ def tts(input_text, model=VOICE_MODEL):
     # remove the audio file
     os.remove(output_file_path)
 
+# Function to analyze the user input and pick the next action to do
 def needs_to_do_action(user_input,agent_actions={}):
 
     # Get the descriptions and the actions name (the keys)
-    descriptions=""
-    for action in agent_actions:
-        descriptions+=agent_actions[action]["description"]+"\n"
+    descriptions=action_description("", agent_actions)
 
     messages = [
             {"role": "user",
@@ -151,11 +159,35 @@ Function call: """
         return res
     return {"action": REPLY_ACTION}
 
+# This is used to collect the descriptions of the agent actions, used to populate the LLM prompt
+def action_description(action, agent_actions):
+    descriptions=""
+    # generate descriptions of actions that the agent can pick
+    for a in agent_actions:
+        if ( action != "" and action == a ) or (action == ""):
+            descriptions+=agent_actions[a]["description"]+"\n"
+    return descriptions
+
+## This function is called to ask the user if does agree on the action to take and execute
+def ask_user_confirmation(action_name, action_parameters):
+    logger.info("==> Ask user confirmation")
+    logger.info("==> action_name: {action_name}", action_name=action_name)
+    logger.info("==> action_parameters: {action_parameters}", action_parameters=action_parameters)
+    # Ask via stdin
+    logger.info("==> Do you want to execute the action? (y/n)")
+    user_input = input()
+    if user_input == "y":
+        logger.info("==> Executing action")
+        return True
+    else:
+        logger.info("==> Skipping action")
+        return False
+
+### This function is used to process the functions given a user input.
+### It picks a function, executes it and returns the list of messages containing the result.
 def process_functions(user_input, action="", agent_actions={}):
 
-    descriptions=""
-    for a in agent_actions:
-        descriptions+=agent_actions[a]["description"]+"\n"
+    descriptions=action_description(action, agent_actions)
 
     messages = [
          #   {"role": "system", "content": "You are a helpful assistant."},
@@ -179,6 +211,7 @@ Function call: """
         logger.info("==> function parameters: ")
         logger.info(function_parameters)
         function_to_call = agent_actions[function_name]["function"]
+
         function_result = function_to_call(function_parameters, agent_actions=agent_actions)
         logger.info("==> function result: ")
         logger.info(function_result)
@@ -198,6 +231,7 @@ Function call: """
         )
     return messages, function_result
 
+### function_completion is used to autocomplete functions given a list of messages
 def function_completion(messages, action="", agent_actions={}):
     function_call = "auto"
     if action != "":
@@ -223,7 +257,8 @@ def function_completion(messages, action="", agent_actions={}):
 
     return response
 
-# Gets the content of each message in the history
+# Rework the content of each message in the history in a way that is understandable by the LLM
+# TODO: switch to templates (?)
 def process_history(conversation_history):
     messages = ""
     for message in conversation_history:
@@ -240,8 +275,10 @@ def process_history(conversation_history):
             messages+="Assistant message: "+message["content"]+"\n"
     return messages
 
-
-def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_actions={},re_evaluation_in_progress=False):
+### Main evaluate function
+### This function evaluates in a continuous loop the user input and the conversation history.
+### It returns the conversation history with the latest response from the assistant.
+def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_actions={},re_evaluation_in_progress=False, postprocess=False, subtaskContext=False):
 
     messages = [
         {
@@ -272,11 +309,14 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         action = {"action": REPLY_ACTION}
 
     if action["action"] != REPLY_ACTION:
-        logger.info("==> microAGI wants to call '{action}'", action=action["action"])
+        logger.info("==> μAGI wants to call '{action}'", action=action["action"])
         logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
         if action["action"] == PLAN_ACTION:
             logger.info("==> It's a plan <==: ")
 
+        if postprocess:
+            action["reasoning"] = post_process(action["reasoning"])
+        
         #function_completion_message = "Conversation history:\n"+old_history+"\n"+
         function_completion_message = "Request: "+user_input+"\nReasoning: "+action["reasoning"]
         responses, function_results = process_functions(function_completion_message, action=action["action"], agent_actions=agent_actions)
@@ -291,18 +331,33 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
                 logger.info(subtask)
                 #ctr="Context: "+user_input+"\nThought: "+action["reasoning"]+ "\nRequest: "+subtask["reasoning"]
                 cr="Context: "+user_input+"\n"
-                if subtask_result != "":
+                #cr=""
+                if subtask_result != "" and subtaskContext:
                     # Include cumulative results of previous subtasks
                     # TODO: this grows context, maybe we should use a different approach or summarize
-                    cr+="Subtask results: "+subtask_result+"\n"
-                cr+="Request: "+subtask["reasoning"]
+                    if postprocess:
+                        cr+= "Subtask results: "+post_process(subtask_result)+"\n"
+                    else:
+                        cr+="Subtask results: "+subtask_result+"\n"
+                
+                if postprocess:
+                    cr+= "Request: "+post_process(subtask["reasoning"])
+                else:
+                    cr+= "Request: "+subtask["reasoning"]
                 subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
                 subtask_result+=process_history(subtask_response)
                 responses.extend(subtask_response)
         if re_evaluate:
             ## Better output or this infinite loops..
             logger.info("-> Re-evaluate if another action is needed")
-            responses = evaluate(user_input+"\n Conversation history: \n"+process_history(responses[1:]), responses, re_evaluate,agent_actions=agent_actions,re_evaluation_in_progress=True)
+            ## ? conversation history should go after the user_input maybe?
+            re_eval = user_input +"\n"
+            re_eval += "Conversation history: \n"
+            if postprocess:
+                re_eval+= post_process(process_history(responses[1:])) +"\n"
+            else:
+                re_eval+= process_history(responses[1:]) +"\n"
+            responses = evaluate(re_eval, responses, re_evaluate,agent_actions=agent_actions,re_evaluation_in_progress=True)
 
         if re_evaluation_in_progress:
             conversation_history.extend(responses)
@@ -337,8 +392,8 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         logger.info("==> no action needed")
 
         if re_evaluation_in_progress:
-            logger.info("==> microAGI has completed the user request")
-            logger.info("==> microAGI will reply to the user")
+            logger.info("==> μAGI has completed the user request")
+            logger.info("==> μAGI will reply to the user")
             return conversation_history        
 
         # get the response from the model
@@ -356,10 +411,35 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         tts(conversation_history[-1]["content"])
     return conversation_history
 
+### Fine tune a string before feeding into the LLM
+def post_process(string):
+    messages = [
+        {
+        "role": "user",
+        "content": f"""Summarize the following text, keeping the relevant information:
 
+```
+{string}
+```
+""",
+        }
+    ]
+    logger.info("==> Post processing: {string}", string=string)
+    # get the response from the model
+    response = openai.ChatCompletion.create(
+        model=LLM_MODEL,
+        messages=messages,
+        stop=None,
+        temperature=0.1,
+        request_timeout=1200,
+    )
+    result = response["choices"][0]["message"]["content"]
+    logger.info("==> Processed: {string}", string=result)
+    return result
 
 ### Agent capabilities
-
+### These functions are called by the agent to perform actions
+###
 def save(memory, agent_actions={}):
     q = json.loads(memory)
     logger.info(">>> saving to memories: ") 
@@ -379,12 +459,16 @@ def search(query, agent_actions={}):
 def calculate_plan(user_input, agent_actions={}):
     res = json.loads(user_input)
     logger.info("--> Calculating plan: {description}", description=res["description"])
+    descriptions=action_description("",agent_actions)
     messages = [
             {"role": "user",
              "content": f"""Transcript of AI assistant responding to user requests. 
-Replies with a plan to achieve the user's goal with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed instruction to fullfill the task.
+{descriptions}
 
 Request: {res["description"]}
+
+The assistant replies with a plan to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task.
+
 Function call: """
              }
         ]
@@ -512,8 +596,10 @@ def search_duckduckgo(args, agent_actions={}):
     return l
 
 ### End Agent capabilities
+###
 
 
+### Agent action definitions
 agent_actions = {
     "search_internet": {
         "function": search_duckduckgo,
@@ -555,12 +641,12 @@ agent_actions = {
             }
         },
     },
-    "remember": {
+    "save_memory": {
         "function": save,
         "plannable": True,
-        "description": 'The assistant replies with the action "remember" and the string to save in order to remember something or save an information that thinks it is relevant permanently.',
+        "description": 'The assistant replies with the action "save_memory" and the string to remember or store an information that thinks it is relevant permanently.',
         "signature": {
-            "name": "remember",
+            "name": "save_memory",
             "description": """Save or store informations into memory.""",
             "parameters": {
                 "type": "object",
@@ -574,12 +660,12 @@ agent_actions = {
             }
         },
     },
-    "recall": {
+    "search_memory": {
         "function": search,
         "plannable": True,
-        "description": 'The assistant replies with the action "recall" for searching between its memories with a query term.',
+        "description": 'The assistant replies with the action "search_memory" for searching between its memories with a query term.',
         "signature": {
-            "name": "recall",
+            "name": "search_memory",
             "description": """Search in memory""",
             "parameters": {
                 "type": "object",
@@ -622,23 +708,50 @@ agent_actions = {
 conversation_history = []
 
 # Set a system prompt if SYSTEM_PROMPT is set
-if os.environ.get("SYSTEM_PROMPT"):
+if os.environ.get("SYSTEM_PROMPT") or args.system_prompt:
+    sprompt = os.environ.get("SYSTEM_PROMPT", args.system_prompt)
     conversation_history.append({
         "role": "system",
-        "content": os.environ.get("SYSTEM_PROMPT")
+        "content": sprompt
     })
 
-logger.info("Welcome to microAGI")
-logger.info("Creating avatar, please wait...")
+logger.info("Welcome to μAGI")
 
-display_avatar()
+# Skip avatar creation if --skip-avatar is set
+if not args.skip_avatar:
+    logger.info("Creating avatar, please wait...")
+    display_avatar()
 
-logger.info("Welcome to microAGI")
-logger.info("microAGI has the following actions available at its disposal:")
-for action in agent_actions:
-    logger.info("{action} - {description}", action=action, description=agent_actions[action]["description"])
+if not args.prompt:
+    logger.info("μAGI has the following actions available at its disposal:")
+    for action in agent_actions:
+        logger.info("{action} - {description}", action=action, description=agent_actions[action]["description"])
+else:
+    logger.info(">>> Prompt mode <<<")
+    logger.info(args.prompt)
 
-# TODO: process functions also considering the conversation history? conversation history + input
-while True:
-    user_input = input("> ")
-    conversation_history=evaluate(user_input, conversation_history, re_evaluate=True, agent_actions=agent_actions)
+# IF in prompt mode just evaluate, otherwise loop
+if args.prompt:
+    evaluate(
+        args.prompt, 
+        conversation_history, 
+        re_evaluate=args.re_evaluate, 
+        agent_actions=agent_actions,
+        # Enable to lower context usage but increases LLM calls
+        postprocess=args.postprocess,
+        subtaskContext=args.subtaskContext,
+        )
+else:
+    # TODO: process functions also considering the conversation history? conversation history + input
+    while True:
+        user_input = input("> ")
+        # we are going to use the args to change the evaluation behavior
+        conversation_history=evaluate(
+            user_input, 
+            conversation_history, 
+            re_evaluate=args.re_evaluate, 
+            agent_actions=agent_actions,
+            # Enable to lower context usage but increases LLM calls
+            postprocess=args.postprocess,
+            subtaskContext=args.subtaskContext,
+            )

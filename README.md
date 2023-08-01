@@ -13,7 +13,7 @@ Note: this is a fun project, not a serious one. Be warned!
 
 It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize.
 
-It is different from babyAGI or AutoGPT as it uses [OpenAI functions](https://openai.com/blog/function-calling-and-other-api-updates), but locally with [LocalAI](https://localai.io) (no API keys needed!)
+It is different from babyAGI or AutoGPT as it uses [OpenAI functions](https://openai.com/blog/function-calling-and-other-api-updates) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services.
 
 ## Quick start
 
@@ -32,6 +32,12 @@ Ask it to:
 - "How are you?"
   -> and watch it engaging into dialogues with long-term memory
 - "I want you to act as a marketing and sales guy in a startup company. I want you to come up with a plan to support our new latest project, XXX, which is an open source project. you are free to come up with creative ideas to engage and attract new people to the project. The XXX project is XXX."
+
+### Caveats
+
+The "goodness" of a model has a big impact on how μAGI works. Currently `13b` models are powerful enough to actually able to perform multi-step tasks or do more actions. However, it is quite slow when running on CPU (no big surprise here).
+
+The context size is a limitation - you can find in the `config` examples to run with superhot 8k context size, but the quality is not good enough to perform complex tasks.
 
 ### How it works?
 

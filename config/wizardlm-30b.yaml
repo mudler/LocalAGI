@@ -1,5 +1,6 @@
-- id: huggingface@thebloke/gplatty-30b-ggml/gplatty-30b.ggmlv3.q2_k.bin
-  name: "gpt-4"
+- id: huggingface@thebloke/wizardlm-30b-uncensored-ggml/wizardlm-30b-uncensored.ggmlv3.q2_k.bin
+  galleryModel:
+    name: "gpt-4"
   overrides: 
     context_size: 4096
     mmap: true
@@ -20,7 +21,7 @@
     backend: huggingface-embeddings
     parameters:
       model: all-MiniLM-L6-v2
-- id: huggingface@thebloke/gplatty-30b-ggml/gplatty-30b.ggmlv3.q2_k.bin
+- id: huggingface@thebloke/wizardlm-30b-uncensored-ggml/wizardlm-30b-uncensored.ggmlv3.q2_k.bin
   name: functions
   overrides:
     context_size: 4096
