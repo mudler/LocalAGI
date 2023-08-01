@@ -346,6 +346,8 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
                     cr+= "Request: "+subtask["reasoning"]
                 subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
                 subtask_result+=process_history(subtask_response)
+                if postprocess:
+                    subtask_result=post_process(subtask_result)
                 responses.extend(subtask_response)
         if re_evaluate:
             ## Better output or this infinite loops..
@@ -363,6 +365,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             conversation_history.extend(responses)
             return conversation_history       
 
+        # TODO: this needs to be optimized
         responses.append(
             {
                 "role": "system",
@@ -396,6 +399,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             logger.info("==> μAGI will reply to the user")
             return conversation_history        
 
+        # TODO: this needs to be optimized
         # get the response from the model
         response = openai.ChatCompletion.create(
             model=LLM_MODEL,
@@ -455,6 +459,14 @@ def search(query, agent_actions={}):
     for doc in docs:
         text_res+="- "+doc.page_content+"\n"
     return text_res
+
+# Python REPL
+def python_repl(args, agent_actions={}):
+    args = json.loads(args)
+    try:
+        return eval(args["code"])
+    except Exception as e:
+        return str(e)
 
 def calculate_plan(user_input, agent_actions={}):
     res = json.loads(user_input)
@@ -659,6 +671,29 @@ agent_actions = {
                 "required": ["thought"]
             }
         },
+    },
+    "python": {
+        "function": python_repl,
+        "plannable": True,
+        "description": 'The assistant replies with the action "python" to execute Python code.',
+        "signature": {
+            "name": "python",
+            "description": """Search in memory""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "reasoning behind the intent"
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "reasoning behind the intent"
+                    },
+                },
+                "required": ["code"]
+            }
+        }, 
     },
     "search_memory": {
         "function": search,
