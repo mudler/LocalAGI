@@ -51,7 +51,7 @@ PERSISTENT_DIR = os.environ.get("PERSISTENT_DIR", "/data")
 
 ## Constants
 REPLY_ACTION = "reply"
-PLAN_ACTION = "multitask_action"
+PLAN_ACTION = "generate_plan"
 
 embeddings = LocalAIEmbeddings(model=EMBEDDINGS_MODEL)
 chroma_client = Chroma(collection_name="memories", persist_directory="db", embedding_function=embeddings)
