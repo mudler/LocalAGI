@@ -18,6 +18,7 @@ from langchain.vectorstores import Chroma
 from chromadb.config import Settings
 import json
 import os
+from io import StringIO 
 
 # Parse arguments such as system prompt and batch mode
 import argparse
@@ -275,97 +276,9 @@ def process_history(conversation_history):
             messages+="Assistant message: "+message["content"]+"\n"
     return messages
 
-### Main evaluate function
-### This function evaluates in a continuous loop the user input and the conversation history.
-### It returns the conversation history with the latest response from the assistant.
-def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_actions={},re_evaluation_in_progress=False, postprocess=False, subtaskContext=False):
-
-    messages = [
-        {
-        "role": "user",
-        "content": user_input,
-        }
-    ]
-
-    conversation_history.extend(messages)
-
-    # pulling the old history make the context grow exponentially
-    # and most importantly it repeates the first message with the commands again and again.
-    # it needs a bit of cleanup and process the messages and piggyback more LocalAI functions templates
-    # old_history = process_history(conversation_history)
-    # action_picker_message = "Conversation history:\n"+old_history
-    # action_picker_message += "\n"
-    action_picker_message = "Request: "+user_input
-
-    if re_evaluation_in_progress:
-        action_picker_message+="\nRe-evaluation if another action is needed or we have completed the user request."
-        action_picker_message+="\nReasoning: If no action is needed, I will use "+REPLY_ACTION+" to reply to the user."
-
-    try:
-        action = needs_to_do_action(action_picker_message,agent_actions=agent_actions)
-    except Exception as e:
-        logger.error("==> error: ")
-        logger.error(e)
-        action = {"action": REPLY_ACTION}
-
-    if action["action"] != REPLY_ACTION:
-        logger.info("==> μAGI wants to call '{action}'", action=action["action"])
-        logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
-        if action["action"] == PLAN_ACTION:
-            logger.info("==> It's a plan <==: ")
-
-        if postprocess:
-            action["reasoning"] = post_process(action["reasoning"])
-        
-        #function_completion_message = "Conversation history:\n"+old_history+"\n"+
-        function_completion_message = "Request: "+user_input+"\nReasoning: "+action["reasoning"]
-        responses, function_results = process_functions(function_completion_message, action=action["action"], agent_actions=agent_actions)
-        # if there are no subtasks, we can just reply,
-        # otherwise we execute the subtasks
-        # First we check if it's an object
-        if isinstance(function_results, dict) and function_results.get("subtasks") and len(function_results["subtasks"]) > 0:
-            # cycle subtasks and execute functions
-            subtask_result=""
-            for subtask in function_results["subtasks"]:
-                logger.info("==> subtask: ")
-                logger.info(subtask)
-                #ctr="Context: "+user_input+"\nThought: "+action["reasoning"]+ "\nRequest: "+subtask["reasoning"]
-                cr="Context: "+user_input+"\n"
-                #cr=""
-                if subtask_result != "" and subtaskContext:
-                    # Include cumulative results of previous subtasks
-                    # TODO: this grows context, maybe we should use a different approach or summarize
-                    if postprocess:
-                        cr+= "Subtask results: "+post_process(subtask_result)+"\n"
-                    else:
-                        cr+="Subtask results: "+subtask_result+"\n"
-                
-                if postprocess:
-                    cr+= "Request: "+post_process(subtask["reasoning"])
-                else:
-                    cr+= "Request: "+subtask["reasoning"]
-                subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
-                subtask_result+=process_history(subtask_response)
-                if postprocess:
-                    subtask_result=post_process(subtask_result)
-                responses.extend(subtask_response)
-        if re_evaluate:
-            ## Better output or this infinite loops..
-            logger.info("-> Re-evaluate if another action is needed")
-            ## ? conversation history should go after the user_input maybe?
-            re_eval = user_input +"\n"
-            re_eval += "Conversation history: \n"
-            if postprocess:
-                re_eval+= post_process(process_history(responses[1:])) +"\n"
-            else:
-                re_eval+= process_history(responses[1:]) +"\n"
-            responses = evaluate(re_eval, responses, re_evaluate,agent_actions=agent_actions,re_evaluation_in_progress=True)
-
-        if re_evaluation_in_progress:
-            conversation_history.extend(responses)
-            return conversation_history       
-
-        # TODO: this needs to be optimized
+def clarify(responses, prefix=True):
+    # TODO: this needs to be optimized
+    if prefix:
         responses.append(
             {
                 "role": "system",
@@ -373,47 +286,20 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             }
         ) 
 
-        response = openai.ChatCompletion.create(
-            model=LLM_MODEL,
-            messages=responses,
-            stop=None,
-            request_timeout=1200,
-            temperature=0.1,
-        )
-        responses.append(
-            {
-                "role": "assistant",
-                "content": response.choices[0].message["content"],
-            }
-        )
-        # add responses to conversation history by extending the list
-        conversation_history.extend(responses)
-        # logger.info the latest response from the conversation history
-        logger.info(conversation_history[-1]["content"])
-        tts(conversation_history[-1]["content"])
-    else:
-        logger.info("==> no action needed")
-
-        if re_evaluation_in_progress:
-            logger.info("==> μAGI has completed the user request")
-            logger.info("==> μAGI will reply to the user")
-            return conversation_history        
-
-        # TODO: this needs to be optimized
-        # get the response from the model
-        response = openai.ChatCompletion.create(
-            model=LLM_MODEL,
-            messages=conversation_history,
-            stop=None,
-            temperature=0.1,
-            request_timeout=1200,
-        )
-        # add the response to the conversation history by extending the list
-        conversation_history.append({ "role": "assistant", "content": response.choices[0].message["content"]})
-        # logger.info the latest response from the conversation history
-        logger.info(conversation_history[-1]["content"])
-        tts(conversation_history[-1]["content"])
-    return conversation_history
+    response = openai.ChatCompletion.create(
+        model=LLM_MODEL,
+        messages=responses,
+        stop=None,
+        request_timeout=1200,
+        temperature=0.1,
+    )
+    responses.append(
+        {
+            "role": "assistant",
+            "content": response.choices[0].message["content"],
+        }
+    )
+    return responses
 
 ### Fine tune a string before feeding into the LLM
 def post_process(string):
@@ -464,7 +350,18 @@ def search(query, agent_actions={}):
 def python_repl(args, agent_actions={}):
     args = json.loads(args)
     try:
-        return eval(args["code"])
+        # evaluate the code
+        # redirect standard output and standard error to a string
+        sys.stdout = sys.stderr = mystdout = StringIO()
+        # eval the code
+        r=eval(args["code"])
+        # restore stdout and stderr
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+        # get the output
+        output = mystdout.getvalue()
+        # return the output
+        return { "result": r, "output": output}
     except Exception as e:
         return str(e)
 
@@ -609,6 +506,123 @@ def search_duckduckgo(args, agent_actions={}):
 
 ### End Agent capabilities
 ###
+
+### Main evaluate function
+### This function evaluates the user input and the conversation history.
+### It returns the conversation history with the latest response from the assistant.
+def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_actions={},re_evaluation_in_progress=False, postprocess=False, subtaskContext=False):
+
+    messages = [
+        {
+        "role": "user",
+        "content": user_input,
+        }
+    ]
+
+    conversation_history.extend(messages)
+
+    # pulling the old history make the context grow exponentially
+    # and most importantly it repeates the first message with the commands again and again.
+    # it needs a bit of cleanup and process the messages and piggyback more LocalAI functions templates
+    # old_history = process_history(conversation_history)
+    # action_picker_message = "Conversation history:\n"+old_history
+    # action_picker_message += "\n"
+    action_picker_message = "Request: "+user_input
+
+    if re_evaluation_in_progress:
+        action_picker_message+="\nRe-evaluation if another action is needed or we have completed the user request."
+        action_picker_message+="\nReasoning: If no action is needed, I will use "+REPLY_ACTION+" to reply to the user."
+
+    try:
+        action = needs_to_do_action(action_picker_message,agent_actions=agent_actions)
+    except Exception as e:
+        logger.error("==> error: ")
+        logger.error(e)
+        action = {"action": REPLY_ACTION}
+
+    if action["action"] != REPLY_ACTION:
+        logger.info("==> μAGI wants to call '{action}'", action=action["action"])
+        logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
+        if action["action"] == PLAN_ACTION:
+            logger.info("==> It's a plan <==: ")
+
+        if postprocess:
+            action["reasoning"] = post_process(action["reasoning"])
+        
+        #function_completion_message = "Conversation history:\n"+old_history+"\n"+
+        function_completion_message = "Request: "+user_input+"\nReasoning: "+action["reasoning"]
+        responses, function_results = process_functions(function_completion_message, action=action["action"], agent_actions=agent_actions)
+        # if there are no subtasks, we can just reply,
+        # otherwise we execute the subtasks
+        # First we check if it's an object
+        if isinstance(function_results, dict) and function_results.get("subtasks") and len(function_results["subtasks"]) > 0:
+            # cycle subtasks and execute functions
+            subtask_result=""
+            for subtask in function_results["subtasks"]:
+                logger.info("==> subtask: ")
+                logger.info(subtask)
+                #ctr="Context: "+user_input+"\nThought: "+action["reasoning"]+ "\nRequest: "+subtask["reasoning"]
+                cr="Context: "+user_input+"\n"
+                #cr=""
+                if subtask_result != "" and subtaskContext:
+                    # Include cumulative results of previous subtasks
+                    # TODO: this grows context, maybe we should use a different approach or summarize
+                    if postprocess:
+                        cr+= "Subtask results: "+post_process(subtask_result)+"\n"
+                    else:
+                        cr+="Subtask results: "+subtask_result+"\n"
+                
+                if postprocess:
+                    cr+= "Request: "+post_process(subtask["reasoning"])
+                else:
+                    cr+= "Request: "+subtask["reasoning"]
+                subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
+                subtask_result+=process_history(subtask_response)
+                if postprocess:
+                    subtask_result=post_process(subtask_result)
+                responses.extend(subtask_response)
+        if re_evaluate:
+            ## Better output or this infinite loops..
+            logger.info("-> Re-evaluate if another action is needed")
+            ## ? conversation history should go after the user_input maybe?
+            re_eval = user_input +"\n"
+            re_eval += "Conversation history: \n"
+            if postprocess:
+                re_eval+= post_process(process_history(responses[1:])) +"\n"
+            else:
+                re_eval+= process_history(responses[1:]) +"\n"
+            responses = evaluate(re_eval, responses, re_evaluate,agent_actions=agent_actions,re_evaluation_in_progress=True)
+
+        if re_evaluation_in_progress:
+            conversation_history.extend(responses)
+            return conversation_history       
+
+        # TODO: this needs to be optimized
+        responses = clarify(responses, prefix=True)
+
+        # add responses to conversation history by extending the list
+        conversation_history.extend(responses)
+        # logger.info the latest response from the conversation history
+        logger.info(conversation_history[-1]["content"])
+        tts(conversation_history[-1]["content"])
+    else:
+        logger.info("==> no action needed")
+
+        if re_evaluation_in_progress:
+            logger.info("==> μAGI has completed the user request")
+            logger.info("==> μAGI will reply to the user")
+            return conversation_history        
+
+        # TODO: this needs to be optimized
+        # get the response from the model
+        response = clarify(conversation_history, prefix=False)
+        
+        # add the response to the conversation history by extending the list
+        conversation_history.append(response)
+        # logger.info the latest response from the conversation history
+        logger.info(conversation_history[-1]["content"])
+        tts(conversation_history[-1]["content"])
+    return conversation_history
 
 
 ### Agent action definitions
