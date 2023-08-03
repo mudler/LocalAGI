@@ -463,6 +463,10 @@ Function call: """
                     "items": {
                         "type": "object",
                         "properties": {
+                            "observation": {
+                                "type": "string",
+                                "description": "subtask list",
+                            },
                             "reasoning": {
                                 "type": "string",
                                 "description": "subtask list",
@@ -629,15 +633,17 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
 
     if action["action"] != REPLY_ACTION:
         logger.info("==> LocalAGI wants to call '{action}'", action=action["action"])
+        logger.info("==> Observation '{reasoning}'", reasoning=action["observation"])
         logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
+        reasoning = action["observation"] + "\n" + action["reasoning"]
         if action["action"] == PLAN_ACTION:
             logger.info("==> It's a plan <==: ")
 
         if postprocess:
-            action["reasoning"] = post_process(action["reasoning"])
+            reasoning = post_process(reasoning)
         
         #function_completion_message = "Conversation history:\n"+old_history+"\n"+
-        function_completion_message = "Request: "+user_input+"\nReasoning: "+action["reasoning"]
+        function_completion_message = "Request: "+user_input+"\nReasoning: "+reasoning
         responses, function_results = process_functions(function_completion_message, action=action["action"], agent_actions=agent_actions)
         # if there are no subtasks, we can just reply,
         # otherwise we execute the subtasks
@@ -658,11 +664,12 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
                         cr+= "Subtask results: "+post_process(subtask_result)+"\n"
                     else:
                         cr+="Subtask results: "+subtask_result+"\n"
-                
+                subtask_reasoning = subtask["observation"] + "\n" + subtask["reasoning"]
+
                 if postprocess:
-                    cr+= "Request: "+post_process(subtask["reasoning"])
+                    cr+= "Request: "+post_process(subtask_reasoning)
                 else:
-                    cr+= "Request: "+subtask["reasoning"]
+                    cr+= "Request: "+subtask_reasoning
                 subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
                 subtask_result+=process_history(subtask_response)
                 if postprocess:
