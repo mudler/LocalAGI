@@ -1,4 +1,4 @@
-- id: huggingface@thebloke/gplatty-30b-superhot-8k-ggml/gplatty-30b-superhot-8k.ggmlv3.q2_k.bin
+- id: huggingface@TheBloke/WizardLM-Uncensored-SuperCOT-StoryTelling-30B-SuperHOT-8K-GGML/WizardLM-Uncensored-SuperCOT-StoryTelling-30b-superhot-8k.ggmlv3.q4_0.bin
   name: "gpt-4"
   overrides: 
     context_size: 8192
@@ -21,7 +21,7 @@
     backend: huggingface-embeddings
     parameters:
       model: all-MiniLM-L6-v2
-- id: huggingface@thebloke/gplatty-30b-superhot-8k-ggml/gplatty-30b-superhot-8k.ggmlv3.q2_k.bin
+- id: huggingface@TheBloke/WizardLM-Uncensored-SuperCOT-StoryTelling-30B-SuperHOT-8K-GGML/WizardLM-Uncensored-SuperCOT-StoryTelling-30b-superhot-8k.ggmlv3.q4_0.bin
   name: functions
   overrides:
     context_size: 8192
