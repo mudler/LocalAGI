@@ -3,10 +3,13 @@ import openai
 from langchain.embeddings import LocalAIEmbeddings
 import uuid
 import requests
+import ast
 import sys
+from contextlib import redirect_stdout
 from loguru import logger
 from ascii_magic import AsciiArt
 from duckduckgo_search import DDGS
+from bs4 import BeautifulSoup
 from typing import Dict, List, Optional
 
 # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
@@ -22,7 +25,8 @@ from io import StringIO
 
 # Parse arguments such as system prompt and batch mode
 import argparse
-parser = argparse.ArgumentParser(description='μAGI')
+parser = argparse.ArgumentParser(description='LocalAGI')
+
 parser.add_argument('--system-prompt', dest='system_prompt', action='store',
                     help='System prompt to use')
 parser.add_argument('--prompt', dest='prompt', action='store', default=False,
@@ -39,31 +43,74 @@ parser.add_argument('--postprocess', dest='postprocess', action='store_true', de
 # Subtask context
 parser.add_argument('--subtask-context', dest='subtaskContext', action='store_true', default=False,
                     help='Include context in subtasks')
+
+DEFAULT_PROMPT="floating hair, portrait, ((loli)), ((one girl)), cute face, hidden hands, asymmetrical bangs, beautiful detailed eyes, eye shadow, hair ornament, ribbons, bowties, buttons, pleated skirt, (((masterpiece))), ((best quality)), colorful|((part of the head)), ((((mutated hands and fingers)))), deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, Octane renderer, lowres, bad anatomy, bad hands, text"
+DEFAULT_API_BASE = os.environ.get("DEFAULT_API_BASE", "http://api:8080")
+# TTS api base
+parser.add_argument('--tts-api-base', dest='tts_api_base', action='store', default=DEFAULT_API_BASE,
+                    help='TTS api base')
+# LocalAI api base
+parser.add_argument('--localai-api-base', dest='localai_api_base', action='store', default=DEFAULT_API_BASE,
+                    help='LocalAI api base')
+# Images api base
+parser.add_argument('--images-api-base', dest='images_api_base', action='store', default=DEFAULT_API_BASE,
+                    help='Images api base')
+# Embeddings api base
+parser.add_argument('--embeddings-api-base', dest='embeddings_api_base', action='store', default=DEFAULT_API_BASE,
+                    help='Embeddings api base')
+# Functions model
+parser.add_argument('--functions-model', dest='functions_model', action='store', default="functions",
+                    help='Functions model')
+# Embeddings model
+parser.add_argument('--embeddings-model', dest='embeddings_model', action='store', default="all-MiniLM-L6-v2",
+                    help='Embeddings model')
+# LLM model
+parser.add_argument('--llm-model', dest='llm_model', action='store', default="gpt-4",
+                    help='LLM model')
+# Voice model
+parser.add_argument('--tts-model', dest='tts_model', action='store', default="en-us-kathleen-low.onnx",
+                    help='TTS model')
+# Stable diffusion model
+parser.add_argument('--stablediffusion-model', dest='stablediffusion_model', action='store', default="stablediffusion",
+                    help='Stable diffusion model')
+# Stable diffusion prompt
+parser.add_argument('--stablediffusion-prompt', dest='stablediffusion_prompt', action='store', default=DEFAULT_PROMPT,
+                    help='Stable diffusion prompt')
+
+# Parse arguments
 args = parser.parse_args()
 
 
-FUNCTIONS_MODEL = os.environ.get("FUNCTIONS_MODEL", "functions")
-EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "all-MiniLM-L6-v2")
-LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4")
-VOICE_MODEL= os.environ.get("TTS_MODEL","en-us-kathleen-low.onnx")
-DEFAULT_SD_MODEL = os.environ.get("DEFAULT_SD_MODEL", "stablediffusion")
-DEFAULT_SD_PROMPT = os.environ.get("DEFAULT_SD_PROMPT", "floating hair, portrait, ((loli)), ((one girl)), cute face, hidden hands, asymmetrical bangs, beautiful detailed eyes, eye shadow, hair ornament, ribbons, bowties, buttons, pleated skirt, (((masterpiece))), ((best quality)), colorful|((part of the head)), ((((mutated hands and fingers)))), deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, Octane renderer, lowres, bad anatomy, bad hands, text")
+FUNCTIONS_MODEL = os.environ.get("FUNCTIONS_MODEL", args.functions_model)
+EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", args.embeddings_model)
+LLM_MODEL = os.environ.get("LLM_MODEL", args.llm_model)
+VOICE_MODEL= os.environ.get("TTS_MODEL",args.tts_model)
+STABLEDIFFUSION_MODEL = os.environ.get("STABLEDIFFUSION_MODEL",args.stablediffusion_model)
+STABLEDIFFUSION_PROMPT = os.environ.get("STABLEDIFFUSION_PROMPT", args.stablediffusion_prompt)
 PERSISTENT_DIR = os.environ.get("PERSISTENT_DIR", "/data")
+SYSTEM_PROMPT = ""
+if os.environ.get("SYSTEM_PROMPT") or args.system_prompt:
+    SYSTEM_PROMPT = os.environ.get("SYSTEM_PROMPT", args.system_prompt)
+
+LOCALAI_API_BASE = args.localai_api_base
+TTS_API_BASE = args.tts_api_base
+IMAGE_API_BASE = args.images_api_base
+EMBEDDINGS_API_BASE = args.embeddings_api_base
 
 ## Constants
 REPLY_ACTION = "reply"
-PLAN_ACTION = "generate_plan"
+PLAN_ACTION = "plan"
 
-embeddings = LocalAIEmbeddings(model=EMBEDDINGS_MODEL)
+embeddings = LocalAIEmbeddings(model=EMBEDDINGS_MODEL,openai_api_base=EMBEDDINGS_API_BASE)
 chroma_client = Chroma(collection_name="memories", persist_directory="db", embedding_function=embeddings)
 
 # Function to create images with LocalAI
-def display_avatar(input_text=DEFAULT_SD_PROMPT, model=DEFAULT_SD_MODEL):
+def display_avatar(input_text=STABLEDIFFUSION_PROMPT, model=STABLEDIFFUSION_MODEL):
     response = openai.Image.create(
         prompt=input_text,
         n=1,
         size="128x128",
-        api_base=os.environ.get("OPENAI_API_BASE", "http://api:8080")+"/v1"
+        api_base=IMAGE_API_BASE+"/v1"
     )
     image_url = response['data'][0]['url']
     # convert the image to ascii art
@@ -77,7 +124,7 @@ def tts(input_text, model=VOICE_MODEL):
     # Create a temp file to store the audio output
     output_file_path = '/tmp/output.wav'
     # get from OPENAI_API_BASE env var
-    url = os.environ.get("OPENAI_API_BASE", "http://api:8080") + '/tts'
+    url = TTS_API_BASE + '/tts'
     headers = {'Content-Type': 'application/json'}
     data = {
         "input": input_text,
@@ -106,7 +153,7 @@ def needs_to_do_action(user_input,agent_actions={}):
 
     messages = [
             {"role": "user",
-             "content": f"""Transcript of AI assistant responding to user requests. Replies with the action to perform, including reasoning, and the confidence interval from 0 to 100.
+             "content": f"""Transcript of AI assistant responding to user requests. Replies with the action to perform and the reasoning.
 {descriptions}"""},
             {"role": "user",
    "content": f"""{user_input}
@@ -124,14 +171,18 @@ Function call: """
                 "type": "number",
                 "description": "confidence of the action"
             },
+            "reasoning": {
+                "type": "string",
+                "description": "reasoning behind the intent"
+            },
+            "observation": {
+                "type": "string",
+                "description": "reasoning behind the intent"
+            },
             "action": {
                 "type": "string",
                 "enum": list(agent_actions.keys()),
                 "description": "user intent"
-            },
-            "reasoning": {
-                "type": "string",
-                "description": "reasoning behind the intent"
             },
             },
             "required": ["action"]
@@ -144,6 +195,7 @@ Function call: """
         messages=messages,
         request_timeout=1200,
         functions=functions,
+        api_base=LOCALAI_API_BASE+"/v1",
         stop=None,
         temperature=0.1,
         #function_call="auto"
@@ -252,6 +304,7 @@ def function_completion(messages, action="", agent_actions={}):
         functions=functions,
         request_timeout=1200,
         stop=None,
+        api_base=LOCALAI_API_BASE+"/v1",
         temperature=0.1,
         function_call=function_call
     )
@@ -269,9 +322,9 @@ def process_history(conversation_history):
         elif message.get("function_call"):
             # encode message["function_call" to json and appends it
             fcall = json.dumps(message["function_call"])
-            messages+="Assistant calls function: " +fcall+"\n"
+            messages+= fcall+"\n"
         elif message.get("content") and message["role"] == "user":
-            messages+="User message: "+message["content"]+"\n"
+            messages+=message["content"]+"\n"
         elif message.get("content") and message["role"] == "assistant":
             messages+="Assistant message: "+message["content"]+"\n"
     return messages
@@ -290,6 +343,7 @@ def clarify(responses, prefix=True):
         model=LLM_MODEL,
         messages=responses,
         stop=None,
+        api_base=LOCALAI_API_BASE+"/v1",
         request_timeout=1200,
         temperature=0.1,
     )
@@ -302,6 +356,33 @@ def clarify(responses, prefix=True):
     return responses
 
 ### Fine tune a string before feeding into the LLM
+
+def analyze(responses, prefix=True):
+    # TODO: this needs to be optimized
+    if prefix:
+        responses.append(
+            {
+                "role": "system",
+                "content": "Analyze the above text highlighting the relevant information. If there are errors, suggest solutions to fix them."
+            }
+        ) 
+
+    response = openai.ChatCompletion.create(
+        model=LLM_MODEL,
+        messages=responses,
+        stop=None,
+        api_base=LOCALAI_API_BASE+"/v1",
+        request_timeout=1200,
+        temperature=0.1,
+    )
+    responses.append(
+        {
+            "role": "assistant",
+            "content": response.choices[0].message["content"],
+        }
+    )
+    return responses
+
 def post_process(string):
     messages = [
         {
@@ -319,6 +400,7 @@ def post_process(string):
     response = openai.ChatCompletion.create(
         model=LLM_MODEL,
         messages=messages,
+        api_base=LOCALAI_API_BASE+"/v1",
         stop=None,
         temperature=0.1,
         request_timeout=1200,
@@ -350,20 +432,25 @@ def search(query, agent_actions={}):
 def python_repl(args, agent_actions={}):
     args = json.loads(args)
     try:
-        # evaluate the code
-        # redirect standard output and standard error to a string
-        sys.stdout = sys.stderr = mystdout = StringIO()
-        # eval the code
-        r=eval(args["code"])
-        # restore stdout and stderr
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-        # get the output
-        output = mystdout.getvalue()
-        # return the output
-        return { "result": r, "output": output}
+        tree = ast.parse(args["code"])
+        module = ast.Module(tree.body[:-1], type_ignores=[])
+        exec(ast.unparse(module))  # type: ignore
+        module_end = ast.Module(tree.body[-1:], type_ignores=[])
+        module_end_str = ast.unparse(module_end)  # type: ignore
+        io_buffer = StringIO()
+        try:
+            with redirect_stdout(io_buffer):
+                ret = eval(module_end_str)
+                if ret is None:
+                    return { "output": io_buffer.getvalue() }
+                else:
+                    return { "output": ret }
+        except Exception:
+            with redirect_stdout(io_buffer):
+                exec(module_end_str)
+            return { "output": io_buffer.getvalue() }
     except Exception as e:
-        return str(e)
+        return { "error" :"{}: {}".format(type(e).__name__, str(e)) }
 
 def calculate_plan(user_input, agent_actions={}):
     res = json.loads(user_input)
@@ -421,6 +508,7 @@ Function call: """
         model=FUNCTIONS_MODEL,
         messages=messages,
         functions=functions,
+        api_base=LOCALAI_API_BASE+"/v1",
         stop=None,
         temperature=0.1,
         #function_call="auto"
@@ -501,8 +589,26 @@ def ddg(query: str, num_results: int, backend: str = "api") -> List[Dict[str, st
 def search_duckduckgo(args, agent_actions={}):
     args = json.loads(args)
     list=ddg(args["query"], 5)
-    l = json.dumps(list)
-    return l
+
+    text_res="Internet search results:\n"
+    for doc in list:
+        text_res+=f"""- {doc["snippet"]}. Source: {doc["title"]} - {doc["link"]}\n"""
+    return text_res
+    #l = json.dumps(list)
+    #return l
+## Action to browse an url and return only text in the body (stripping HTML tags)
+def browse_url(args, agent_actions={}):
+    args = json.loads(args)
+    url=args["url"]
+    logger.info("==> browsing url: {url}", url=url)
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    # kill all script and style elements
+    for script in soup(["script", "style"]):
+        script.extract()    # rip it out
+    text_res=f"Website {url}:\n"
+    text_res+=soup.get_text()
+    return text_res
 
 ### End Agent capabilities
 ###
@@ -529,9 +635,14 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
     # action_picker_message += "\n"
     action_picker_message = "Request: "+user_input
 
+    #if re_evaluate and not re_evaluation_in_progress:
+    #    observation = analyze(conversation_history, prefix=True)
+    #    action_picker_message+="\n\nObservation: "+observation[-1]["content"]
     if re_evaluation_in_progress:
-        action_picker_message+="\nRe-evaluation if another action is needed or we have completed the user request."
-        action_picker_message+="\nReasoning: If no action is needed, I will use "+REPLY_ACTION+" to reply to the user."
+        observation = analyze(conversation_history, prefix=True)
+        action_picker_message="Decide from the output below if we have to do another action:\n"
+        action_picker_message+="```\n"+user_input+"\n```"
+        action_picker_message+="\n\nObservation: "+observation[-1]["content"]
 
     try:
         action = needs_to_do_action(action_picker_message,agent_actions=agent_actions)
@@ -541,7 +652,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         action = {"action": REPLY_ACTION}
 
     if action["action"] != REPLY_ACTION:
-        logger.info("==> μAGI wants to call '{action}'", action=action["action"])
+        logger.info("==> LocalAGI wants to call '{action}'", action=action["action"])
         logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
         if action["action"] == PLAN_ACTION:
             logger.info("==> It's a plan <==: ")
@@ -585,8 +696,10 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             ## Better output or this infinite loops..
             logger.info("-> Re-evaluate if another action is needed")
             ## ? conversation history should go after the user_input maybe?
-            re_eval = user_input +"\n"
-            re_eval += "Conversation history: \n"
+            re_eval = ""
+            # This is probably not needed as already in the history:
+            #re_eval = user_input +"\n"
+            #re_eval += "Conversation history: \n"
             if postprocess:
                 re_eval+= post_process(process_history(responses[1:])) +"\n"
             else:
@@ -609,8 +722,8 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         logger.info("==> no action needed")
 
         if re_evaluation_in_progress:
-            logger.info("==> μAGI has completed the user request")
-            logger.info("==> μAGI will reply to the user")
+            logger.info("==> LocalAGI has completed the user request")
+            logger.info("==> LocalAGI will reply to the user")
             return conversation_history        
 
         # TODO: this needs to be optimized
@@ -686,10 +799,33 @@ agent_actions = {
             }
         },
     },
+    "browser": {
+        "function": browse_url,
+        "plannable": True,
+        "description": 'The assistant replies with the action "browser" to navigate links.',
+        "signature": {
+            "name": "python",
+            "description": """Search in memory""",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "reasoning behind the intent"
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "reasoning behind the intent"
+                    },
+                },
+                "required": ["url"]
+            }
+        }, 
+    },
     "python": {
         "function": python_repl,
         "plannable": True,
-        "description": 'The assistant replies with the action "python" to execute Python code.',
+        "description": 'The assistant replies with the action "python" to execute Python code. This action can be used to do calculations or running code to solve complex tasks.',
         "signature": {
             "name": "python",
             "description": """Search in memory""",
@@ -731,7 +867,7 @@ agent_actions = {
     PLAN_ACTION: {
         "function": calculate_plan,
         "plannable": False,
-        "description": 'The assistant for solving complex tasks that involves more than one action or planning actions in sequence, replies with the action "'+PLAN_ACTION+'" and a detailed list of all the subtasks.',
+        "description": 'The assistant for solving complex tasks that involves calling more functions in sequence, replies with the action "'+PLAN_ACTION+'".',
         "signature": {
             "name": PLAN_ACTION,
             "description": """Plan complex tasks.""",
@@ -757,14 +893,13 @@ agent_actions = {
 conversation_history = []
 
 # Set a system prompt if SYSTEM_PROMPT is set
-if os.environ.get("SYSTEM_PROMPT") or args.system_prompt:
-    sprompt = os.environ.get("SYSTEM_PROMPT", args.system_prompt)
+if SYSTEM_PROMPT != "":
     conversation_history.append({
         "role": "system",
-        "content": sprompt
+        "content": SYSTEM_PROMPT
     })
 
-logger.info("Welcome to μAGI")
+logger.info("Welcome to LocalAGI")
 
 # Skip avatar creation if --skip-avatar is set
 if not args.skip_avatar:
@@ -772,9 +907,13 @@ if not args.skip_avatar:
     display_avatar()
 
 if not args.prompt:
-    logger.info("μAGI has the following actions available at its disposal:")
+    actions = ""
     for action in agent_actions:
-        logger.info("{action} - {description}", action=action, description=agent_actions[action]["description"])
+        actions+=action+"\n"
+    logger.info("LocalAGI can do the following actions: {actions}", actions=actions)
+
+if not args.prompt:
+    logger.info(">>> Interactive mode <<<")
 else:
     logger.info(">>> Prompt mode <<<")
     logger.info(args.prompt)

@@ -6,3 +6,4 @@ requests
 ascii-magic
 loguru
 duckduckgo_search
+beautifulsoup4
