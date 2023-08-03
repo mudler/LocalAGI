@@ -428,30 +428,6 @@ def search(query, agent_actions={}):
         text_res+="- "+doc.page_content+"\n"
     return text_res
 
-# Python REPL
-def python_repl(args, agent_actions={}):
-    args = json.loads(args)
-    try:
-        tree = ast.parse(args["code"])
-        module = ast.Module(tree.body[:-1], type_ignores=[])
-        exec(ast.unparse(module))  # type: ignore
-        module_end = ast.Module(tree.body[-1:], type_ignores=[])
-        module_end_str = ast.unparse(module_end)  # type: ignore
-        io_buffer = StringIO()
-        try:
-            with redirect_stdout(io_buffer):
-                ret = eval(module_end_str)
-                if ret is None:
-                    return { "output": io_buffer.getvalue() }
-                else:
-                    return { "output": ret }
-        except Exception:
-            with redirect_stdout(io_buffer):
-                exec(module_end_str)
-            return { "output": io_buffer.getvalue() }
-    except Exception as e:
-        return { "error" :"{}: {}".format(type(e).__name__, str(e)) }
-
 def calculate_plan(user_input, agent_actions={}):
     res = json.loads(user_input)
     logger.info("--> Calculating plan: {description}", description=res["description"])
@@ -804,7 +780,7 @@ agent_actions = {
         "plannable": True,
         "description": 'The assistant replies with the action "browser" to navigate links.',
         "signature": {
-            "name": "python",
+            "name": "browser",
             "description": """Search in memory""",
             "parameters": {
                 "type": "object",
@@ -819,29 +795,6 @@ agent_actions = {
                     },
                 },
                 "required": ["url"]
-            }
-        }, 
-    },
-    "python": {
-        "function": python_repl,
-        "plannable": True,
-        "description": 'The assistant replies with the action "python" to execute Python code. This action can be used to do calculations or running code to solve complex tasks.',
-        "signature": {
-            "name": "python",
-            "description": """Search in memory""",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "reasoning behind the intent"
-                    },
-                    "reasoning": {
-                        "type": "string",
-                        "description": "reasoning behind the intent"
-                    },
-                },
-                "required": ["code"]
             }
         }, 
     },
