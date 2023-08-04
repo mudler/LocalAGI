@@ -418,9 +418,10 @@ def search_memory(query, agent_actions={}):
     for doc in docs:
         text_res+="- "+doc.page_content+"\n"
 
-    if args.postprocess:
-        return post_process(text_res)
-    return text_res
+    #if args.postprocess:
+    #    return post_process(text_res)
+    #return text_res
+    return post_process(text_res)
 
 def generate_plan(user_input, agent_actions={}):
     res = json.loads(user_input)
@@ -437,10 +438,8 @@ def generate_plan(user_input, agent_actions={}):
              "content": f"""Transcript of AI assistant responding to user requests. 
 {descriptions}
 
-Request: {res["description"]}
-
-The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task.
-
+Request: {plan_message}
+Thought: {res["description"]}
 Function call: """
              }
         ]
@@ -640,28 +639,28 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             subtask_result=""
             for subtask in function_results["subtasks"]:
                 #ctr="Context: "+user_input+"\nThought: "+action["reasoning"]+ "\nRequest: "+subtask["reasoning"]
-                #cr="Context: "+user_input+"\n"
-                cr="Reasoning: "+action["reasoning"]+ "\n"
-                #cr=""
+                #cr="Request: "+user_input+"\n"
+                cr=""
                 if subtask_result != "" and subtaskContext:
                     # Include cumulative results of previous subtasks
                     # TODO: this grows context, maybe we should use a different approach or summarize
                     ##if postprocess:
                     ##    cr+= "Subtask results: "+post_process(subtask_result)+"\n"
                     ##else:
-                    cr+="Subtask results: "+subtask_result+"\n"
+                    cr+="\n"+subtask_result+"\n"
                 subtask_reasoning = subtask["reasoning"]
-
+                cr+="Reasoning: "+action["reasoning"]+ "\n"
+                cr+="\nFunction to call:" +subtask["function"]+"\n"
                 logger.info("==> subtask '{subtask}' ({reasoning})", subtask=subtask["function"], reasoning=subtask_reasoning)
                 if postprocess:
-                    cr+= "Request: "+post_process(subtask_reasoning)
+                    cr+= "Assistant: "+post_process(subtask_reasoning)
                 else:
-                    cr+= "Request: "+subtask_reasoning
+                    cr+= "Assistant: "+subtask_reasoning
                 subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
-                subtask_result+=process_history(subtask_response[1:])
+                subtask_result+=str(function_results)+"\n"
                 # if postprocess:
                 #    subtask_result=post_process(subtask_result)
-                responses.extend(subtask_response)
+                responses.append(subtask_response[-1])
         if re_evaluate:
             ## Better output or this infinite loops..
             logger.info("-> Re-evaluate if another action is needed")
@@ -681,7 +680,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             return conversation_history       
 
         # TODO: this needs to be optimized
-        responses = analyze(responses, prefix=f"Return an appropriate answer to the user input '{user_input}' given the context below and summarizing the actions taken\n")
+        responses = analyze(responses, prefix=f"You are an AI assistant. Return an appropriate answer to the user input '{user_input}' given the context below and summarizing the actions taken\n")
 
         # add responses to conversation history by extending the list
         conversation_history.append(
