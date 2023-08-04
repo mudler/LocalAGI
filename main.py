@@ -409,8 +409,8 @@ def post_process(string):
 def save(memory, agent_actions={}):
     q = json.loads(memory)
     logger.info(">>> saving to memories: ") 
-    logger.info(q["thought"])
-    chroma_client.add_texts([q["thought"]],[{"id": str(uuid.uuid4())}])
+    logger.info(q["content"])
+    chroma_client.add_texts([q["content"]],[{"id": str(uuid.uuid4())}])
     chroma_client.persist()
     return f"The object was saved permanently to memory."
 
@@ -584,7 +584,7 @@ def search_duckduckgo(a, agent_actions={}):
 ### Main evaluate function
 ### This function evaluates the user input and the conversation history.
 ### It returns the conversation history with the latest response from the assistant.
-def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_actions={},re_evaluation_in_progress=False, postprocess=False, subtaskContext=False):
+def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_actions={},re_evaluation_in_progress=False, postprocess=False, subtaskContext=False, processed_messages=0):
 
     messages = [
         {
@@ -630,9 +630,10 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
 
         #if postprocess:
             #reasoning = post_process(reasoning)
-        
-        #function_completion_message = "Conversation history:\n"+old_history+"\n"+
-        function_completion_message = "Request: "+user_input+"\nReasoning: "+reasoning
+        function_completion_message=""
+        if processed_messages > 0:
+            function_completion_message += "History:\n ```\n"+process_history(conversation_history)+"\n```\n"
+        function_completion_message += "Request: "+user_input+"\nReasoning: "+reasoning
         responses, function_results = process_functions(function_completion_message, action=action["action"], agent_actions=agent_actions)
         # if there are no subtasks, we can just reply,
         # otherwise we execute the subtasks
@@ -766,12 +767,12 @@ agent_actions = {
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "thought": {
+                    "content": {
                         "type": "string",
                         "description": "information to save"
                     },
                 },
-                "required": ["thought"]
+                "required": ["content"]
             }
         },
     },
@@ -862,6 +863,7 @@ if args.prompt:
 else:
     # TODO: process functions also considering the conversation history? conversation history + input
     logger.info(">>> Ready! What can I do for you? ( try with: plan a roadtrip to San Francisco ) <<<")
+    processed_messages = 0
     while True:
         user_input = input(">>> ")
         # we are going to use the args to change the evaluation behavior
@@ -873,4 +875,6 @@ else:
             # Enable to lower context usage but increases LLM calls
             postprocess=args.postprocess,
             subtaskContext=args.subtaskContext,
+            processed_messages=processed_messages,
             )
+        processed_messages+=1
