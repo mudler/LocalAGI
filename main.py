@@ -148,10 +148,13 @@ def tts(input_text, model=VOICE_MODEL):
     else:
         logger.info('Request failed with status code', response.status_code)
 
-    # Use aplay to play the audio
-    os.system('aplay ' + output_file_path)
-    # remove the audio file
-    os.remove(output_file_path)
+    try:
+        # Use aplay to play the audio
+        os.system('aplay ' + output_file_path)
+        # remove the audio file
+        os.remove(output_file_path)
+    except:
+        logger.info('Unable to play audio')
 
 # Function to analyze the user input and pick the next action to do
 def needs_to_do_action(user_input,agent_actions={}):
