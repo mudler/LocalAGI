@@ -5,7 +5,17 @@
 <br>
 </h1>
 
-From the [LocalAI](https://localai.io) author, microAGI. 100% Local AI assistant.
+From the [LocalAI](https://localai.io) author, μAGI. 100% Local AI assistant.
+
+LocalAGI is AutoGPT that you can run locally.
+
+The goal is:
+- Keep it simple, hackable and easy to understand
+- If you can't run it locally, it is not AGI
+- No API keys needed
+- No cloud services needed
+- Small set of dependencies
+- Run with Docker
 
 Note: this is a fun project, not a serious one. Be warned!
 
@@ -41,7 +51,7 @@ The context size is a limitation - you can find in the `config` examples to run 
 
 ### How it works?
 
-`microAGI` just does the minimal around LocalAI functions to create a virtual assistant that can do generic tasks. It works by an endless loop of `intent detection`, `function invocation`, `self-evaluation` and `reply generation` (if it decides to reply! :)). The agent is capable of planning complex tasks by invoking multiple functions, and remember things from the conversation.
+`μAGI` just does the minimal around LocalAI functions to create a virtual assistant that can do generic tasks. It works by an endless loop of `intent detection`, `function invocation`, `self-evaluation` and `reply generation` (if it decides to reply! :)). The agent is capable of planning complex tasks by invoking multiple functions, and remember things from the conversation.
 
 In a nutshell, it goes like this:
 
@@ -51,6 +61,15 @@ In a nutshell, it goes like this:
 - return the result back to the LLM to generate a reply for the user
 
 Under the hood LocalAI converts functions to llama.cpp BNF grammars. While OpenAI fine-tuned a model to reply to functions, LocalAI constrains the LLM to follow grammars. This is a much more efficient way to do it, and it is also more flexible as you can define your own functions and grammars. For learning more about this, check out the [LocalAI documentation](https://localai.io/docs/llm) and my tweet that explains how it works under the hoods: https://twitter.com/mudler_it/status/1675524071457533953.
+
+### Agent functions
+
+The intention of this project is to keep the agent minimal, so can be built on top of it or forked. The agent is capable of doing the following functions:
+- remember something from the conversation
+- recall something from the conversation
+- search something from the internet
+- plan a complex task by invoking multiple functions
+- write files to disk
 
 ## Roadmap
 

@@ -9,8 +9,8 @@ from contextlib import redirect_stdout
 from loguru import logger
 from ascii_magic import AsciiArt
 from duckduckgo_search import DDGS
-from bs4 import BeautifulSoup
 from typing import Dict, List, Optional
+import subprocess
 
 # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
 __import__('pysqlite3')
@@ -43,6 +43,14 @@ parser.add_argument('--postprocess', dest='postprocess', action='store_true', de
 # Subtask context
 parser.add_argument('--subtask-context', dest='subtaskContext', action='store_true', default=False,
                     help='Include context in subtasks')
+
+# Search results number
+parser.add_argument('--search-results', dest='search_results', type=int, action='store', default=2,
+                    help='Number of search results to return')
+# Plan message
+parser.add_argument('--plan-message', dest='plan_message', action='store', 
+                    help="What message to use during planning",
+)                   
 
 DEFAULT_PROMPT="floating hair, portrait, ((loli)), ((one girl)), cute face, hidden hands, asymmetrical bangs, beautiful detailed eyes, eye shadow, hair ornament, ribbons, bowties, buttons, pleated skirt, (((masterpiece))), ((best quality)), colorful|((part of the head)), ((((mutated hands and fingers)))), deformed, blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, blurry, floating limbs, disconnected limbs, malformed hands, blur, out of focus, long neck, long body, Octane renderer, lowres, bad anatomy, bad hands, text"
 DEFAULT_API_BASE = os.environ.get("DEFAULT_API_BASE", "http://api:8080")
@@ -175,10 +183,10 @@ Function call: """
                 "type": "string",
                 "description": "reasoning behind the intent"
             },
-            "observation": {
-                "type": "string",
-                "description": "reasoning behind the intent"
-            },
+            # "observation": {
+            #     "type": "string",
+            #     "description": "reasoning behind the intent"
+            # },
             "action": {
                 "type": "string",
                 "enum": list(agent_actions.keys()),
@@ -259,15 +267,11 @@ Function call: """
     if response_message.get("function_call"):
         function_name = response.choices[0].message["function_call"].name
         function_parameters = response.choices[0].message["function_call"].arguments
-        logger.info("==> function name: ")
-        logger.info(function_name)
-        logger.info("==> function parameters: ")
-        logger.info(function_parameters)
+        logger.info("==> function parameters: {function_parameters}",function_parameters=function_parameters)
         function_to_call = agent_actions[function_name]["function"]
 
         function_result = function_to_call(function_parameters, agent_actions=agent_actions)
-        logger.info("==> function result: ")
-        logger.info(function_result)
+        logger.info("==> function result: {function_result}", function_result=function_result)
         messages.append(
             {
                 "role": "assistant",
@@ -289,9 +293,7 @@ def function_completion(messages, action="", agent_actions={}):
     function_call = "auto"
     if action != "":
         function_call={"name": action}
-    logger.info("==> function_call: ")
-    logger.info(function_call)
-
+    logger.info("==> function name: {function_call}", function_call=function_call)
     # get the functions from the signatures of the agent actions, if exists
     functions = []
     for action in agent_actions:
@@ -329,16 +331,7 @@ def process_history(conversation_history):
             messages+="Assistant message: "+message["content"]+"\n"
     return messages
 
-def clarify(responses, prefix=True):
-    # TODO: this needs to be optimized
-    if prefix:
-        responses.append(
-            {
-                "role": "system",
-                "content": "Return an appropriate answer to the user given the context above."
-            }
-        ) 
-
+def converse(responses):
     response = openai.ChatCompletion.create(
         model=LLM_MODEL,
         messages=responses,
@@ -357,31 +350,29 @@ def clarify(responses, prefix=True):
 
 ### Fine tune a string before feeding into the LLM
 
-def analyze(responses, prefix=True):
-    # TODO: this needs to be optimized
-    if prefix:
-        responses.append(
-            {
-                "role": "system",
-                "content": "Analyze the above text highlighting the relevant information. If there are errors, suggest solutions to fix them."
-            }
-        ) 
+def analyze(responses, prefix="Analyze the following text highlighting the relevant information and identify a list of actions to take if there are any. If there are errors, suggest solutions to fix them"):
+    string = process_history(responses)
+    messages = [
+        {
+        "role": "user",
+        "content": f"""{prefix}:
 
+```
+{string}
+```
+""",
+        }
+    ]
+ 
     response = openai.ChatCompletion.create(
         model=LLM_MODEL,
-        messages=responses,
+        messages=messages,
         stop=None,
         api_base=LOCALAI_API_BASE+"/v1",
         request_timeout=1200,
         temperature=0.1,
     )
-    responses.append(
-        {
-            "role": "assistant",
-            "content": response.choices[0].message["content"],
-        }
-    )
-    return responses
+    return  response.choices[0].message["content"]
 
 def post_process(string):
     messages = [
@@ -420,18 +411,27 @@ def save(memory, agent_actions={}):
     chroma_client.persist()
     return f"The object was saved permanently to memory."
 
-def search(query, agent_actions={}):
+def search_memory(query, agent_actions={}):
     q = json.loads(query)
     docs = chroma_client.similarity_search(q["reasoning"])
     text_res="Memories found in the database:\n"
     for doc in docs:
         text_res+="- "+doc.page_content+"\n"
+
+    if args.postprocess:
+        return post_process(text_res)
     return text_res
 
-def calculate_plan(user_input, agent_actions={}):
+def generate_plan(user_input, agent_actions={}):
     res = json.loads(user_input)
     logger.info("--> Calculating plan: {description}", description=res["description"])
     descriptions=action_description("",agent_actions)
+
+    plan_message = "The assistant replies with a plan to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
+    if args.plan_message:
+        plan_message = args.plan_message
+        # plan_message = "The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
+
     messages = [
             {"role": "user",
              "content": f"""Transcript of AI assistant responding to user requests. 
@@ -439,7 +439,7 @@ def calculate_plan(user_input, agent_actions={}):
 
 Request: {res["description"]}
 
-The assistant replies with a plan to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task.
+The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task.
 
 Function call: """
              }
@@ -463,10 +463,6 @@ Function call: """
                     "items": {
                         "type": "object",
                         "properties": {
-                            "observation": {
-                                "type": "string",
-                                "description": "subtask list",
-                            },
                             "reasoning": {
                                 "type": "string",
                                 "description": "subtask list",
@@ -566,29 +562,19 @@ def ddg(query: str, num_results: int, backend: str = "api") -> List[Dict[str, st
     return formatted_results
 
 ## Search on duckduckgo
-def search_duckduckgo(args, agent_actions={}):
-    args = json.loads(args)
-    list=ddg(args["query"], 5)
+def search_duckduckgo(a, agent_actions={}):
+    a = json.loads(a)
+    list=ddg(a["query"], args.search_results)
 
-    text_res="Internet search results:\n"
+    text_res="Internet search results:\n"   
     for doc in list:
         text_res+=f"""- {doc["snippet"]}. Source: {doc["title"]} - {doc["link"]}\n"""
+
+    #if args.postprocess:
+    #    return post_process(text_res)
     return text_res
     #l = json.dumps(list)
     #return l
-## Action to browse an url and return only text in the body (stripping HTML tags)
-def browse_url(args, agent_actions={}):
-    args = json.loads(args)
-    url=args["url"]
-    logger.info("==> browsing url: {url}", url=url)
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    # kill all script and style elements
-    for script in soup(["script", "style"]):
-        script.extract()    # rip it out
-    text_res=f"Website {url}:\n"
-    text_res+=soup.get_text()
-    return text_res
 
 ### End Agent capabilities
 ###
@@ -617,13 +603,13 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
 
     #if re_evaluate and not re_evaluation_in_progress:
     #    observation = analyze(conversation_history, prefix=True)
-    #    action_picker_message+="\n\nObservation: "+observation[-1]["content"]
+    #    action_picker_message+="\n\Thought: "+observation[-1]["content"]
     if re_evaluation_in_progress:
-        observation = analyze(conversation_history, prefix=True)
+        observation = analyze(conversation_history)
         action_picker_message="Decide from the output below if we have to do another action:\n"
         action_picker_message+="```\n"+user_input+"\n```"
-        action_picker_message+="\n\nObservation: "+observation[-1]["content"]
-
+        action_picker_message+="\n\nObservation: "+observation
+        # if there is no action to do, we can just reply to the user with REPLY_ACTION
     try:
         action = needs_to_do_action(action_picker_message,agent_actions=agent_actions)
     except Exception as e:
@@ -633,14 +619,15 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
 
     if action["action"] != REPLY_ACTION:
         logger.info("==> LocalAGI wants to call '{action}'", action=action["action"])
-        logger.info("==> Observation '{reasoning}'", reasoning=action["observation"])
+        #logger.info("==> Observation '{reasoning}'", reasoning=action["observation"])
         logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
-        reasoning = action["observation"] + "\n" + action["reasoning"]
-        if action["action"] == PLAN_ACTION:
-            logger.info("==> It's a plan <==: ")
 
-        if postprocess:
-            reasoning = post_process(reasoning)
+        reasoning = action["reasoning"]
+        if action["action"] == PLAN_ACTION:
+            logger.info("==> LocalAGI wants to create a plan that involves more actions ")
+
+        #if postprocess:
+            #reasoning = post_process(reasoning)
         
         #function_completion_message = "Conversation history:\n"+old_history+"\n"+
         function_completion_message = "Request: "+user_input+"\nReasoning: "+reasoning
@@ -652,28 +639,28 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             # cycle subtasks and execute functions
             subtask_result=""
             for subtask in function_results["subtasks"]:
-                logger.info("==> subtask: ")
-                logger.info(subtask)
                 #ctr="Context: "+user_input+"\nThought: "+action["reasoning"]+ "\nRequest: "+subtask["reasoning"]
-                cr="Context: "+user_input+"\n"
+                #cr="Context: "+user_input+"\n"
+                cr="Reasoning: "+action["reasoning"]+ "\n"
                 #cr=""
                 if subtask_result != "" and subtaskContext:
                     # Include cumulative results of previous subtasks
                     # TODO: this grows context, maybe we should use a different approach or summarize
-                    if postprocess:
-                        cr+= "Subtask results: "+post_process(subtask_result)+"\n"
-                    else:
-                        cr+="Subtask results: "+subtask_result+"\n"
-                subtask_reasoning = subtask["observation"] + "\n" + subtask["reasoning"]
+                    ##if postprocess:
+                    ##    cr+= "Subtask results: "+post_process(subtask_result)+"\n"
+                    ##else:
+                    cr+="Subtask results: "+subtask_result+"\n"
+                subtask_reasoning = subtask["reasoning"]
 
+                logger.info("==> subtask '{subtask}' ({reasoning})", subtask=subtask["function"], reasoning=subtask_reasoning)
                 if postprocess:
                     cr+= "Request: "+post_process(subtask_reasoning)
                 else:
                     cr+= "Request: "+subtask_reasoning
                 subtask_response, function_results = process_functions(cr, subtask["function"],agent_actions=agent_actions)
-                subtask_result+=process_history(subtask_response)
-                if postprocess:
-                    subtask_result=post_process(subtask_result)
+                subtask_result+=process_history(subtask_response[1:])
+                # if postprocess:
+                #    subtask_result=post_process(subtask_result)
                 responses.extend(subtask_response)
         if re_evaluate:
             ## Better output or this infinite loops..
@@ -694,10 +681,15 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             return conversation_history       
 
         # TODO: this needs to be optimized
-        responses = clarify(responses, prefix=True)
+        responses = analyze(responses, prefix=f"Return an appropriate answer to the user input '{user_input}' given the context below and summarizing the actions taken\n")
 
         # add responses to conversation history by extending the list
-        conversation_history.extend(responses)
+        conversation_history.append(
+            {
+            "role": "assistant",
+            "content": responses,
+            }
+        )
         # logger.info the latest response from the conversation history
         logger.info(conversation_history[-1]["content"])
         tts(conversation_history[-1]["content"])
@@ -709,9 +701,8 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             logger.info("==> LocalAGI will reply to the user")
             return conversation_history        
 
-        # TODO: this needs to be optimized
         # get the response from the model
-        response = clarify(conversation_history, prefix=False)
+        response = converse(conversation_history)
         
         # add the response to the conversation history by extending the list
         conversation_history.append(response)
@@ -782,31 +773,8 @@ agent_actions = {
             }
         },
     },
-    "browser": {
-        "function": browse_url,
-        "plannable": True,
-        "description": 'The assistant replies with the action "browser" to navigate links.',
-        "signature": {
-            "name": "browser",
-            "description": """Search in memory""",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "reasoning behind the intent"
-                    },
-                    "reasoning": {
-                        "type": "string",
-                        "description": "reasoning behind the intent"
-                    },
-                },
-                "required": ["url"]
-            }
-        }, 
-    },
     "search_memory": {
-        "function": search,
+        "function": search_memory,
         "plannable": True,
         "description": 'The assistant replies with the action "search_memory" for searching between its memories with a query term.',
         "signature": {
@@ -825,7 +793,7 @@ agent_actions = {
         }, 
     },
     PLAN_ACTION: {
-        "function": calculate_plan,
+        "function": generate_plan,
         "plannable": False,
         "description": 'The assistant for solving complex tasks that involves calling more functions in sequence, replies with the action "'+PLAN_ACTION+'".',
         "signature": {
@@ -869,8 +837,8 @@ if not args.skip_avatar:
 if not args.prompt:
     actions = ""
     for action in agent_actions:
-        actions+=action+"\n"
-    logger.info("LocalAGI can do the following actions: {actions}", actions=actions)
+        actions+=" '"+action+"'"
+    logger.info("LocalAGI internally can do the following actions:{actions}", actions=actions)
 
 if not args.prompt:
     logger.info(">>> Interactive mode <<<")
@@ -891,8 +859,9 @@ if args.prompt:
         )
 else:
     # TODO: process functions also considering the conversation history? conversation history + input
+    logger.info(">>> Ready! What can I do for you? ( try with: plan a roadtrip to San Francisco ) <<<")
     while True:
-        user_input = input("> ")
+        user_input = input(">>> ")
         # we are going to use the args to change the evaluation behavior
         conversation_history=evaluate(
             user_input, 
