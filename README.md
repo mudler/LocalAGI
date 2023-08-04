@@ -7,7 +7,9 @@
 
 From the [LocalAI](https://localai.io) author, μAGI. 100% Local AI assistant.
 
-LocalAGI is AutoGPT that you can run locally.
+AutoGPT, babyAGI, ... and now μAGI!
+
+LocalAGI is a microAGI that you can run locally.
 
 The goal is:
 - Keep it simple, hackable and easy to understand
@@ -16,6 +18,7 @@ The goal is:
 - No cloud services needed
 - Small set of dependencies
 - Run with Docker
+
 
 Note: this is a fun project, not a serious one. Be warned!
 
