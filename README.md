@@ -18,6 +18,7 @@ The goal is:
 - Do a smart-agent/virtual assistant that can do tasks
 - Small set of dependencies
 - Run with Docker everywhere
+- Rather than trying to do everything, provide a good starting point for other projects
 
 Note: this is a fun project, not a serious one. Be warned!
 
