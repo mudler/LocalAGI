@@ -1,3 +1,4 @@
+
 <h1 align="center">
   <br>
   <img height="300" src="https://github.com/mudler/LocalAGI/assets/2420543/b69817ce-2361-4234-a575-8f578e159f33"> <br>
@@ -37,11 +38,11 @@ Note: Be warned! It was hacked in a weekend, and it's just an experiment to see 
 
 Search on internet (interactive mode)
 
-https://github.com/mudler/LocalAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
+https://github.com/mudler/LocalAGI/assets/2420543/23199ca3-7380-4efc-9fac-a6bc2b52bdb3
 
 Plan a road trip (batch mode)
 
-https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
+https://github.com/mudler/LocalAGI/assets/2420543/9ba43b82-dec5-432a-bdb9-8318e7db59a4
 
 > Note: The demo is with a GPU and `30b` models size
 
