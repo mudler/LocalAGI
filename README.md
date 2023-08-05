@@ -24,6 +24,16 @@ Note: this is a fun project, not a serious one. Be warned!
 
 ## What is μAGI?
 
+
+https://github.com/mudler/microAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
+
+
+
+https://github.com/mudler/microAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
+
+
+
+
 It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize for everyone.
 
 It is different from babyAGI or AutoGPT as it uses [LocalAI functions](https://localai.io/features/openai-functions/) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services. It sets apart from other projects as it strives to be small, and easy to fork on.
