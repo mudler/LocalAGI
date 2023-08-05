@@ -19,15 +19,13 @@ The goal is:
 
 Note: this is a fun project, not a serious one. Be warned! It was hacked in a weekend, and it's just an experiment to see what can be done with local LLMs.
 
-## What is LocalAGI?
+## Demo
 
+Search on internet (interactive mode)
 https://github.com/mudler/LocalAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
 
+Plan a road trip (batch mode)
 https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
-
-It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize for everyone.
-
-It is different from babyAGI or AutoGPT as it uses [LocalAI functions](https://localai.io/features/openai-functions/) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services. It sets apart from other projects as it strives to be small, and easy to fork on.
 
 ## 🚀 Features
 
@@ -40,6 +38,10 @@ It is different from babyAGI or AutoGPT as it uses [LocalAI functions](https://l
     - 🔌 Plan steps to achieve a goal
 - 🤖 Avatar creation with Stable Diffusion
 - 🗣️ Voice synthesis with TTS
+
+
+
+
 
 ## :book: Quick start
 
@@ -60,13 +62,24 @@ By default localagi starts in interactive mode
 Road trip planner by limiting searching to internet to 3 results only:
 
 ```bash
-docker-compose run -i --rm localagi --skip-avatar --subtask-context --postprocess --prompt "prepare a plan for my roadtrip to san francisco" --search-results 3
+docker-compose run -i --rm localagi \
+  --skip-avatar \
+  --subtask-context \
+  --postprocess \
+  --search-results 3 \
+  --prompt "prepare a plan for my roadtrip to san francisco"
 ```
 
 Limit results of planning to 3 steps:
 
 ```bash
-docker-compose run -v $PWD/main.py:/app/main.py -i --rm localagi --skip-avatar --subtask-context --postprocess --prompt "do a plan for my roadtrip to san francisco" --search-results 1 --plan-message "The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
+docker-compose run -i --rm localagi \
+  --skip-avatar \
+  --subtask-context \
+  --postprocess \
+  --search-results 1 \
+  --prompt "do a plan for my roadtrip to san francisco" \
+  --plan-message "The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
 ```
 
 ### Advanced
@@ -105,6 +118,12 @@ To select a model, modify the `.env` file and change the `PRELOAD_MODELS_CONFIG`
 The "goodness" of a model has a big impact on how LocalAGI works. Currently `13b` models are powerful enough to actually able to perform multi-step tasks or do more actions. However, it is quite slow when running on CPU (no big surprise here).
 
 The context size is a limitation - you can find in the `config` examples to run with superhot 8k context size, but the quality is not good enough to perform complex tasks.
+
+## What is LocalAGI?
+
+It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize for everyone.
+
+It is different from babyAGI or AutoGPT as it uses [LocalAI functions](https://localai.io/features/openai-functions/) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services. It sets apart from other projects as it strives to be small, and easy to fork on.
 
 ### How it works?
 
