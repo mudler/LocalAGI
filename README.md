@@ -7,11 +7,11 @@
 
 [AutoGPT](https://github.com/Significant-Gravitas/Auto-GPT), [babyAGI](https://github.com/yoheinakajima/babyagi), ... and now LocalAGI!
 
-LocalAGI is a small 🤖 virtual assistant that you can run locally.
+LocalAGI is a small 🤖 virtual assistant that you can run locally, powered by [LocalAI](https://github.com/go-skynet/LocalAI).
 
 The goal is:
 - Keep it simple, hackable and easy to understand
-- No API keys needed, No cloud services needed, 100% Local
+- No API keys needed, No cloud services needed, 100% Local. Tailored for Local use, however still compatible with OpenAI.
 - Smart-agent/virtual assistant that can do tasks
 - Small set of dependencies
 - Run with Docker/Podman/Containers
