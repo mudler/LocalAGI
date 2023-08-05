@@ -22,9 +22,11 @@ Note: this is a fun project, not a serious one. Be warned! It was hacked in a we
 ## Demo
 
 Search on internet (interactive mode)
+
 https://github.com/mudler/LocalAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
 
 Plan a road trip (batch mode)
+
 https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
 
 ## 🚀 Features
