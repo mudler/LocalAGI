@@ -692,7 +692,12 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
 
         if re_evaluation_in_progress:
             conversation_history.extend(responses)
-            return conversation_history       
+            return conversation_history
+               
+        # unwrap the list of responses
+        conversation_history.append(responses[-1])
+
+        #responses = converse(responses)
 
         # TODO: this needs to be optimized
         responses = analyze(responses, prefix=f"You are an AI assistant. Return an appropriate answer to the user input '{user_input}' given the context below and summarizing the actions taken\n")
