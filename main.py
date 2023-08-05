@@ -327,11 +327,18 @@ def process_history(conversation_history):
     for message in conversation_history:
         # if there is content append it
         if message.get("content") and message["role"] == "function":
-            messages+="Function result: " + message["content"]+"\n"
+            messages+="Function result: \n" + message["content"]+"\n"
         elif message.get("function_call"):
             # encode message["function_call" to json and appends it
             fcall = json.dumps(message["function_call"])
-            messages+= fcall+"\n"
+            parameters = "calling " + message["function_call"]["name"]+" with arguments:"
+            args=json.loads(message["function_call"]["arguments"])
+            for arg in args:
+                logger.debug(arg)
+                logger.debug(args)
+                v=args[arg]
+                parameters+=f""" {arg}=\"{v}\""""
+            messages+= parameters+"\n"
         elif message.get("content") and message["role"] == "user":
             messages+=message["content"]+"\n"
         elif message.get("content") and message["role"] == "assistant":
@@ -572,9 +579,9 @@ def search_duckduckgo(a, agent_actions={}):
     a = json.loads(a)
     list=ddg(a["query"], args.search_results)
 
-    text_res="Internet search results:\n"   
+    text_res=""   
     for doc in list:
-        text_res+=f"""- {doc["snippet"]}. Source: {doc["title"]} - {doc["link"]}\n"""
+        text_res+=f"""- {doc["snippet"]}. Source: {doc["title"]} - {doc["link"]}\n"""  
 
     #if args.postprocess:
     #    return post_process(text_res)
@@ -636,7 +643,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
             #reasoning = post_process(reasoning)
         function_completion_message=""
         if processed_messages > 0:
-            function_completion_message += "History:\n ```\n"+process_history(conversation_history)+"\n```\n"
+            function_completion_message += process_history(conversation_history)+"\n"
         function_completion_message += "Request: "+user_input+"\nReasoning: "+reasoning
         responses, function_results = process_functions(function_completion_message, action=action["action"], agent_actions=agent_actions)
         # if there are no subtasks, we can just reply,
