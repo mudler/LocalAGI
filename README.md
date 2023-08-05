@@ -7,34 +7,66 @@
 
 From the [LocalAI](https://localai.io) author, μAGI. 100% Local AI assistant.
 
-AutoGPT, babyAGI, ... and now μAGI!
+[AutoGPT](https://github.com/Significant-Gravitas/Auto-GPT), [babyAGI](https://github.com/yoheinakajima/babyagi), ... and now LocalAGI!
 
 LocalAGI is a microAGI that you can run locally.
 
 The goal is:
 - Keep it simple, hackable and easy to understand
 - If you can't run it locally, it is not AGI
-- No API keys needed
-- No cloud services needed
+- No API keys needed, No cloud services needed, 100% Local
+- Do a smart-agent/virtual assistant that can do tasks
 - Small set of dependencies
-- Run with Docker
-
+- Run with Docker everywhere
 
 Note: this is a fun project, not a serious one. Be warned!
 
 ## What is μAGI?
 
-It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize.
+It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize for everyone.
 
-It is different from babyAGI or AutoGPT as it uses [OpenAI functions](https://openai.com/blog/function-calling-and-other-api-updates) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services.
+It is different from babyAGI or AutoGPT as it uses [LocalAI functions](https://localai.io/features/openai-functions/) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services. It sets apart from other projects as it strives to be small, and easy to fork on.
 
 ## Quick start
 
 No frills, just run docker-compose and start chatting with your virtual assistant:
 
 ```bash
-docker-compose run --build -i --rm microagi
+docker-compose run -i --rm microagi
 ```
+
+## How to use it
+
+By default microagi starts in interactive mode
+
+### Basics
+
+### Advanced
+
+microagi has several options in the CLI to tweak the experience:
+
+- `--system-prompt` is the system prompt to use. If not specified, it will use none.
+- `--prompt` is the prompt to use for batch mode. If not specified, it will default to interactive mode.
+- `--interactive` is the interactive mode. When used with `--prompt` will drop you in an interactive session after the first prompt is evaluated.
+- `--skip-avatar` will skip avatar creation. Useful if you want to run it in a headless environment.
+- `--re-evaluate` will re-evaluate if another action is needed or we have completed the user request.
+- `--postprocess` will postprocess the reasoning for analysis.
+- `--subtask-context` will include context in subtasks.
+- `--search-results` is the number of search results to use.
+- `--plan-message` is the message to use during planning. You can override the message for example to force a plan to have a different message.
+- `--tts-api-base` is the TTS API base. Defaults to `http://api:8080`.
+- `--localai-api-base` is the LocalAI API base. Defaults to `http://api:8080`.
+- `--images-api-base` is the Images API base. Defaults to `http://api:8080`.
+- `--embeddings-api-base` is the Embeddings API base. Defaults to `http://api:8080`.
+- `--functions-model` is the functions model to use. Defaults to `functions`.
+- `--embeddings-model` is the embeddings model to use. Defaults to `all-MiniLM-L6-v2`.
+- `--llm-model` is the LLM model to use. Defaults to `gpt-4`.
+- `--tts-model` is the TTS model to use. Defaults to `en-us-kathleen-low.onnx`.
+- `--stablediffusion-model` is the Stable Diffusion model to use. Defaults to `stablediffusion`.
+- `--stablediffusion-prompt` is the Stable Diffusion prompt to use. Defaults to `DEFAULT_PROMPT`.
+- `--force-action` will force a specific action.
+- `--debug` will enable debug mode.
+
 
 ### Test it!
 
@@ -45,6 +77,25 @@ Ask it to:
 - "How are you?"
   -> and watch it engaging into dialogues with long-term memory
 - "I want you to act as a marketing and sales guy in a startup company. I want you to come up with a plan to support our new latest project, XXX, which is an open source project. you are free to come up with creative ideas to engage and attract new people to the project. The XXX project is XXX."
+
+#### Examples
+
+Road trip planner by limiting searching to internet to 3 results only:
+
+```bash
+docker-compose run -i --rm microagi --skip-avatar --subtask-context --postprocess --prompt "prepare a plan for my roadtrip to san francisco" --search-results 3
+```
+
+Limit results of planning to 3 steps:
+
+```bash
+docker-compose run -v $PWD/main.py:/app/main.py -i --rm microagi --skip-avatar --subtask-context --postprocess --prompt "do a plan for my roadtrip to san francisco" --search-results 1 --plan-message "The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
+```
+
+### Customize
+
+To use a different model, you can see the examples in the `config` folder.
+To select a model, modify the `.env` file and change the `PRELOAD_MODELS_CONFIG` variable to use a different configuration file.
 
 ### Caveats
 
