@@ -17,7 +17,7 @@ The goal is:
 - Run with Docker/Podman/Containers
 - Rather than trying to do everything, provide a good starting point for other projects
 
-Note: this is a fun project, not a serious one. Be warned! It was hacked in a weekend, and it's just an experiment to see what can be done with local LLMs.
+Note: Be warned! It was hacked in a weekend, and it's just an experiment to see what can be done with local LLMs. 
 
 ## Demo
 
@@ -28,6 +28,8 @@ https://github.com/mudler/LocalAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef
 Plan a road trip (batch mode)
 
 https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
+
+> Note: The demo is with a GPU and `30b` models size
 
 ## 🚀 Features
 
@@ -156,9 +158,10 @@ The intention of this project is to keep the agent minimal, so can be built on t
 - [x] Make the virtual assistant do functions like store long-term memory and autonomously search between them when needed
 - [x] Create the assistant avatar with Stable Diffusion
 - [x] Give it a voice 
-- [] Get voice input (push to talk or wakeword)
-- [] Make a REST API (OpenAI compliant?) so can be plugged by e.g. a third party service
-- [] Take a system prompt so can act with a "character" (e.g. "answer in rick and morty style")
+- [ ] Use weaviate instead of Chroma
+- [ ] Get voice input (push to talk or wakeword)
+- [ ] Make a REST API (OpenAI compliant?) so can be plugged by e.g. a third party service
+- [x] Take a system prompt so can act with a "character" (e.g. "answer in rick and morty style")
 
 ## Development
 
@@ -167,3 +170,12 @@ Run docker-compose with main.py checked-out:
 ```bash
 docker-compose run -v main.py:/app/main.py -i --rm localagi
 ```
+
+## Notes
+
+- a 13b model is enough for doing contextualized research and search/retrieve memory
+- a 30b model is enough to generate a roadmap trip plan ( so cool! )
+- With superhot models looses its magic, but maybe suitable for search
+- Context size is your enemy. `--postprocess` some times helps, but not always
+- It can be silly!
+- It is slow on CPU, don't expect `7b` models to perform good, and `13b` models perform better but on CPU are quite slow.
