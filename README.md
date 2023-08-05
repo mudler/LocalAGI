@@ -21,18 +21,6 @@ Note: Be warned! It was hacked in a weekend, and it's just an experiment to see 
 
 ![Screenshot from 2023-08-05 22-40-40](https://github.com/mudler/LocalAGI/assets/2420543/fc9d3c5d-d522-467b-9a84-fea18a78e75f)
 
-## Demo
-
-Search on internet (interactive mode)
-
-https://github.com/mudler/LocalAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
-
-Plan a road trip (batch mode)
-
-https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
-
-> Note: The demo is with a GPU and `30b` models size
-
 ## 🚀 Features
 
 - 🧠 LLM for intent detection
@@ -45,9 +33,17 @@ https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42
 - 🤖 Avatar creation with Stable Diffusion
 - 🗣️ Voice synthesis with TTS
 
+## Demo
 
+Search on internet (interactive mode)
 
+https://github.com/mudler/LocalAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
 
+Plan a road trip (batch mode)
+
+https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
+
+> Note: The demo is with a GPU and `30b` models size
 
 ## :book: Quick start
 
