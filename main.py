@@ -26,11 +26,15 @@ from io import StringIO
 # Parse arguments such as system prompt and batch mode
 import argparse
 parser = argparse.ArgumentParser(description='LocalAGI')
-
+# System prompt
 parser.add_argument('--system-prompt', dest='system_prompt', action='store',
                     help='System prompt to use')
+# Batch mode
 parser.add_argument('--prompt', dest='prompt', action='store', default=False,
                     help='Prompt mode')
+# Interactive mode
+parser.add_argument('--interactive', dest='interactive', action='store_true', default=False,
+                    help='Interactive mode. Can be used with --prompt to start an interactive session')
 # skip avatar creation
 parser.add_argument('--skip-avatar', dest='skip_avatar', action='store_true', default=False,
                     help='Skip avatar creation') 
@@ -849,9 +853,10 @@ else:
     logger.info(">>> Prompt mode <<<")
     logger.info(args.prompt)
 
+processed_messages = 0
 # IF in prompt mode just evaluate, otherwise loop
 if args.prompt:
-    evaluate(
+    conversation_history=evaluate(
         args.prompt, 
         conversation_history, 
         re_evaluate=args.re_evaluate, 
@@ -859,11 +864,14 @@ if args.prompt:
         # Enable to lower context usage but increases LLM calls
         postprocess=args.postprocess,
         subtaskContext=args.subtaskContext,
+        processed_messages=processed_messages,
         )
-else:
+    processed_messages+=1
+
+if not args.prompt or args.interactive:
     # TODO: process functions also considering the conversation history? conversation history + input
     logger.info(">>> Ready! What can I do for you? ( try with: plan a roadtrip to San Francisco ) <<<")
-    processed_messages = 0
+
     while True:
         user_input = input(">>> ")
         # we are going to use the args to change the evaluation behavior
