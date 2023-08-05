@@ -8,19 +8,17 @@
 From the [LocalAI](https://localai.io) author, μAGI. 100% Local AI assistant.
 
 [AutoGPT](https://github.com/Significant-Gravitas/Auto-GPT), [babyAGI](https://github.com/yoheinakajima/babyagi), ... and now LocalAGI!
-
 LocalAGI is a microAGI that you can run locally.
 
 The goal is:
 - Keep it simple, hackable and easy to understand
-- If you can't run it locally, it is not AGI
 - No API keys needed, No cloud services needed, 100% Local
-- Do a smart-agent/virtual assistant that can do tasks
+- Smart-agent/virtual assistant that can do tasks
 - Small set of dependencies
-- Run with Docker everywhere
+- Run with Docker/Podman/Containers
 - Rather than trying to do everything, provide a good starting point for other projects
 
-Note: this is a fun project, not a serious one. Be warned!
+Note: this is a fun project, not a serious one. Be warned! It was hacked in a weekend, and it's just an experiment to see what can be done with local LLMs.
 
 ## What is μAGI?
 
@@ -38,11 +36,25 @@ It is a dead simple experiment to show how to tie the various LocalAI functional
 
 It is different from babyAGI or AutoGPT as it uses [LocalAI functions](https://localai.io/features/openai-functions/) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services. It sets apart from other projects as it strives to be small, and easy to fork on.
 
-## Quick start
+## 🚀 Features
+
+- 🧠 LLM for intent detection
+- 🧠 Uses functions for actions
+    - 📝 Write to long-term memory
+    - 📖 Read from long-term memory 
+    - 🌐 Internet access for search
+    - :card_file_box: Write files
+    - 🔌 Plan steps to achieve a goal
+- 🤖 Avatar creation with Stable Diffusion
+- 🗣️ Voice synthesis with TTS
+
+## :book: Quick start
 
 No frills, just run docker-compose and start chatting with your virtual assistant:
 
 ```bash
+# Modify the configuration
+# vim .env
 docker-compose run -i --rm microagi
 ```
 
