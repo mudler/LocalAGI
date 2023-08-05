@@ -7,7 +7,7 @@
 
 [AutoGPT](https://github.com/Significant-Gravitas/Auto-GPT), [babyAGI](https://github.com/yoheinakajima/babyagi), ... and now LocalAGI!
 
-LocalAGI is a small virtual assistant that you can run locally.
+LocalAGI is a small 🤖 virtual assistant that you can run locally.
 
 The goal is:
 - Keep it simple, hackable and easy to understand
