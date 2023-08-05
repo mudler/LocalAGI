@@ -644,6 +644,13 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
     # action_picker_message += "\n"
     action_picker_message = "Request: "+user_input
 
+    picker_actions = agent_actions
+    if args.force_action:
+        aa = {}
+        aa[args.force_action] = agent_actions[args.force_action]
+        picker_actions = aa
+        logger.info("==> Forcing action to '{action}' as requested by the user", action=args.force_action)
+
     #if re_evaluate and not re_evaluation_in_progress:
     #    observation = analyze(conversation_history, prefix=True)
     #    action_picker_message+="\n\Thought: "+observation[-1]["content"]
@@ -654,7 +661,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         action_picker_message+="\n\nObservation: "+observation
         # if there is no action to do, we can just reply to the user with REPLY_ACTION
     try:
-        action = needs_to_do_action(action_picker_message,agent_actions=agent_actions)
+        action = needs_to_do_action(action_picker_message,agent_actions=picker_actions)
     except Exception as e:
         logger.error("==> error: ")
         logger.error(e)
@@ -665,9 +672,6 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         #logger.info("==> Observation '{reasoning}'", reasoning=action["observation"])
         logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
         # Force executing a plan instead
-        if args.force_action:
-            action["action"] = args.force_action
-            logger.info("==> Forcing action to '{action}' as requested by the user", action=action["action"])
 
         reasoning = action["reasoning"]
         if action["action"] == PLAN_ACTION:
