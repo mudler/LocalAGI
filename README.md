@@ -19,6 +19,8 @@ The goal is:
 
 Note: Be warned! It was hacked in a weekend, and it's just an experiment to see what can be done with local LLMs. 
 
+![Screenshot from 2023-08-05 22-40-40](https://github.com/mudler/LocalAGI/assets/2420543/fc9d3c5d-d522-467b-9a84-fea18a78e75f)
+
 ## Demo
 
 Search on internet (interactive mode)
