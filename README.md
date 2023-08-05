@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <img height="300" src="[https://github.com/mudler/LocalAGI/assets/2420543/7717fafb-de72-4a2d-a47a-229fc64b5716](https://github.com/mudler/LocalAGI/assets/2420543/b69817ce-2361-4234-a575-8f578e159f33)"> <br>
+  <img height="300" src="https://github.com/mudler/LocalAGI/assets/2420543/b69817ce-2361-4234-a575-8f578e159f33"> <br>
     LocalAGI
 <br>
 </h1>
