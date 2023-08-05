@@ -1,14 +1,13 @@
 <h1 align="center">
   <br>
-  <img height="300" src="https://github.com/mudler/microAGI/assets/2420543/7717fafb-de72-4a2d-a47a-229fc64b5716"> <br>
-    μAGI (microAGI)
+  <img height="300" src="https://github.com/mudler/LocalAGI/assets/2420543/7717fafb-de72-4a2d-a47a-229fc64b5716"> <br>
+    LocalAGI
 <br>
 </h1>
 
-From the [LocalAI](https://localai.io) author, μAGI. 100% Local AI assistant.
-
 [AutoGPT](https://github.com/Significant-Gravitas/Auto-GPT), [babyAGI](https://github.com/yoheinakajima/babyagi), ... and now LocalAGI!
-LocalAGI is a microAGI that you can run locally.
+
+LocalAGI is a small virtual assistant that you can run locally.
 
 The goal is:
 - Keep it simple, hackable and easy to understand
@@ -20,17 +19,11 @@ The goal is:
 
 Note: this is a fun project, not a serious one. Be warned! It was hacked in a weekend, and it's just an experiment to see what can be done with local LLMs.
 
-## What is μAGI?
+## What is LocalAGI?
 
+https://github.com/mudler/LocalAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
 
-https://github.com/mudler/microAGI/assets/2420543/f0371f24-f77c-4324-b4a0-23ecef56893a
-
-
-
-https://github.com/mudler/microAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
-
-
-
+https://github.com/mudler/LocalAGI/assets/2420543/19f936ea-9fa5-4d91-9cdf-006a42dd9a0c
 
 It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize for everyone.
 
@@ -55,18 +48,30 @@ No frills, just run docker-compose and start chatting with your virtual assistan
 ```bash
 # Modify the configuration
 # vim .env
-docker-compose run -i --rm microagi
+docker-compose run -i --rm localagi
 ```
 
 ## How to use it
 
-By default microagi starts in interactive mode
+By default localagi starts in interactive mode
 
-### Basics
+### Examples
+
+Road trip planner by limiting searching to internet to 3 results only:
+
+```bash
+docker-compose run -i --rm localagi --skip-avatar --subtask-context --postprocess --prompt "prepare a plan for my roadtrip to san francisco" --search-results 3
+```
+
+Limit results of planning to 3 steps:
+
+```bash
+docker-compose run -v $PWD/main.py:/app/main.py -i --rm localagi --skip-avatar --subtask-context --postprocess --prompt "do a plan for my roadtrip to san francisco" --search-results 1 --plan-message "The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
+```
 
 ### Advanced
 
-microagi has several options in the CLI to tweak the experience:
+localagi has several options in the CLI to tweak the experience:
 
 - `--system-prompt` is the system prompt to use. If not specified, it will use none.
 - `--prompt` is the prompt to use for batch mode. If not specified, it will default to interactive mode.
@@ -90,31 +95,6 @@ microagi has several options in the CLI to tweak the experience:
 - `--force-action` will force a specific action.
 - `--debug` will enable debug mode.
 
-
-### Test it!
-
-Ask it to:
-
-- "Can you create the agenda for tomorrow?"
-  -> and watch it search through memories to get your agenda!
-- "How are you?"
-  -> and watch it engaging into dialogues with long-term memory
-- "I want you to act as a marketing and sales guy in a startup company. I want you to come up with a plan to support our new latest project, XXX, which is an open source project. you are free to come up with creative ideas to engage and attract new people to the project. The XXX project is XXX."
-
-#### Examples
-
-Road trip planner by limiting searching to internet to 3 results only:
-
-```bash
-docker-compose run -i --rm microagi --skip-avatar --subtask-context --postprocess --prompt "prepare a plan for my roadtrip to san francisco" --search-results 3
-```
-
-Limit results of planning to 3 steps:
-
-```bash
-docker-compose run -v $PWD/main.py:/app/main.py -i --rm microagi --skip-avatar --subtask-context --postprocess --prompt "do a plan for my roadtrip to san francisco" --search-results 1 --plan-message "The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
-```
-
 ### Customize
 
 To use a different model, you can see the examples in the `config` folder.
@@ -122,13 +102,13 @@ To select a model, modify the `.env` file and change the `PRELOAD_MODELS_CONFIG`
 
 ### Caveats
 
-The "goodness" of a model has a big impact on how μAGI works. Currently `13b` models are powerful enough to actually able to perform multi-step tasks or do more actions. However, it is quite slow when running on CPU (no big surprise here).
+The "goodness" of a model has a big impact on how LocalAGI works. Currently `13b` models are powerful enough to actually able to perform multi-step tasks or do more actions. However, it is quite slow when running on CPU (no big surprise here).
 
 The context size is a limitation - you can find in the `config` examples to run with superhot 8k context size, but the quality is not good enough to perform complex tasks.
 
 ### How it works?
 
-`μAGI` just does the minimal around LocalAI functions to create a virtual assistant that can do generic tasks. It works by an endless loop of `intent detection`, `function invocation`, `self-evaluation` and `reply generation` (if it decides to reply! :)). The agent is capable of planning complex tasks by invoking multiple functions, and remember things from the conversation.
+`LocalAGI` just does the minimal around LocalAI functions to create a virtual assistant that can do generic tasks. It works by an endless loop of `intent detection`, `function invocation`, `self-evaluation` and `reply generation` (if it decides to reply! :)). The agent is capable of planning complex tasks by invoking multiple functions, and remember things from the conversation.
 
 In a nutshell, it goes like this:
 
@@ -164,5 +144,5 @@ The intention of this project is to keep the agent minimal, so can be built on t
 Run docker-compose with main.py checked-out:
 
 ```bash
-docker-compose run -v main.py:/app/main.py -i --rm microagi
+docker-compose run -v main.py:/app/main.py -i --rm localagi
 ```

@@ -15,7 +15,7 @@ services:
       - ./models:/models:cached
       - ./config:/config:cached
     command: ["/usr/bin/local-ai" ]
-  microagi:
+  localagi:
     build:
       context: .
       dockerfile: Dockerfile
