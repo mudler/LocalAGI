@@ -8,7 +8,7 @@
 
 [AutoGPT](https://github.com/Significant-Gravitas/Auto-GPT), [babyAGI](https://github.com/yoheinakajima/babyagi), ... and now LocalAGI!
 
-LocalAGI is a small 🤖 virtual assistant that you can run locally, powered by [LocalAI](https://github.com/go-skynet/LocalAI).
+LocalAGI is a small 🤖 virtual assistant that you can run locally, made by the [LocalAI](https://github.com/go-skynet/LocalAI) author and powered by it.
 
 The goal is:
 - Keep it simple, hackable and easy to understand
@@ -32,6 +32,7 @@ Note: Be warned! It was hacked in a weekend, and it's just an experiment to see 
     - :card_file_box: Write files
     - 🔌 Plan steps to achieve a goal
 - 🤖 Avatar creation with Stable Diffusion
+- 🗨️ Conversational
 - 🗣️ Voice synthesis with TTS
 
 ## Demo
