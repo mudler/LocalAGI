@@ -762,7 +762,7 @@ def evaluate(user_input, conversation_history = [],re_evaluate=False, agent_acti
         response = converse(conversation_history)
         
         # add the response to the conversation history by extending the list
-        conversation_history.append(response)
+        conversation_history.extend(response)
         # logger.info the latest response from the conversation history
         logger.info(conversation_history[-1]["content"])
         tts(conversation_history[-1]["content"])
