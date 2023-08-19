@@ -14,5 +14,5 @@ RUN apt-get update -y && \
     apt-get clean
 
 COPY . /app
-
+RUN pip install .
 ENTRYPOINT [ "python", "./main.py" ];
