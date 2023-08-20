@@ -366,8 +366,6 @@ if __name__ == "__main__":
     logger.info("Creating LocalAGI instance")
     localagi = LocalAGI(
         agent_actions=agent_actions,
-        embeddings_model=EMBEDDINGS_MODEL,
-        embeddings_api_base=EMBEDDINGS_API_BASE,
         llm_model=LLM_MODEL,
         tts_model=VOICE_MODEL,
         tts_api_base=TTS_API_BASE,
