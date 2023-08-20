@@ -93,6 +93,9 @@ parser.add_argument('--force-action', dest='force_action', action='store', defau
 # Debug mode
 parser.add_argument('--debug', dest='debug', action='store_true', default=False,
                     help='Debug mode')
+# Critic mode
+parser.add_argument('--critic', dest='critic', action='store_true', default=False,
+                    help='Enable critic')
 # Parse arguments
 args = parser.parse_args()
 
@@ -172,7 +175,6 @@ def ask_user_confirmation(action_name, action_parameters):
         logger.info("==> Skipping action")
         return False
 
-
 ### Agent capabilities
 ### These functions are called by the agent to perform actions
 ###
@@ -198,7 +200,7 @@ def search_memory(query, agent_actions={}, localagi=None):
 
 
 # write file to disk with content
-def write_file(arg, agent_actions={}, localagi=None):
+def save_file(arg, agent_actions={}, localagi=None):
     arg = json.loads(arg)
     filename = arg["filename"]
     content = arg["content"]
@@ -264,7 +266,7 @@ def search_duckduckgo(a, agent_actions={}, localagi=None):
 
     text_res=""   
     for doc in list:
-        text_res+=f"""- {doc["snippet"]}. Source: {doc["title"]} - {doc["link"]}\n"""  
+        text_res+=f"""{doc["link"]}: {doc["title"]} {doc["snippet"]}\n"""  
 
     #if args.postprocess:
     #    return post_process(text_res)
@@ -295,12 +297,12 @@ agent_actions = {
             }
         },
     },
-    "write_file": {
-        "function": write_file,
+    "save_file": {
+        "function": save_file,
         "plannable": True,
-        "description": 'The assistant replies with the action "write_file", the filename and content to save for writing a file to disk permanently. This can be used to store the result of complex actions locally.',
+        "description": 'The assistant replies with the action "save_file", the filename and content to save for writing a file to disk permanently. This can be used to store the result of complex actions locally.',
         "signature": {
-            "name": "write_file",
+            "name": "save_file",
             "description": """For saving a file to disk with content.""",
             "parameters": {
                 "type": "object",
@@ -407,6 +409,7 @@ if __name__ == "__main__":
         conversation_history=localagi.evaluate(
             args.prompt, 
             conversation_history, 
+            critic=args.critic,
             re_evaluate=args.re_evaluate, 
             # Enable to lower context usage but increases LLM calls
             postprocess=args.postprocess,
@@ -424,6 +427,7 @@ if __name__ == "__main__":
             conversation_history=localagi.evaluate(
                 user_input, 
                 conversation_history, 
+                critic=args.critic,
                 re_evaluate=args.re_evaluate, 
                 # Enable to lower context usage but increases LLM calls
                 postprocess=args.postprocess,

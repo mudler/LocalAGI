@@ -140,11 +140,11 @@ class LocalAGI:
                     "type": "number",
                     "description": "confidence of the action"
                 },
-                "reasoning": {
+                "detailed_reasoning": {
                     "type": "string",
                     "description": "reasoning behind the intent"
                 },
-                # "observation": {
+                # "detailed_reasoning": {
                 #     "type": "string",
                 #     "description": "reasoning behind the intent"
                 # },
@@ -214,7 +214,7 @@ class LocalAGI:
         if response_message.get("function_call"):
             function_name = response.choices[0].message["function_call"].name
             function_parameters = response.choices[0].message["function_call"].arguments
-            logger.debug("==> function parameters: {function_parameters}",function_parameters=function_parameters)
+            logger.info("==> function parameters: {function_parameters}",function_parameters=function_parameters)
             function_to_call = self.agent_actions[function_name]["function"]
 
             function_result = function_to_call(function_parameters, agent_actions=self.agent_actions, localagi=self)
@@ -406,7 +406,7 @@ class LocalAGI:
                         "items": {
                             "type": "object",
                             "properties": {
-                                "reasoning": {
+                                "detailed_reasoning": {
                                     "type": "string",
                                     "description": "subtask list",
                                 },
@@ -443,7 +443,7 @@ class LocalAGI:
             return res
         return {"action": self.reply_action}
     
-    def evaluate(self,user_input, conversation_history = [],re_evaluate=False,re_evaluation_in_progress=False, postprocess=False, subtaskContext=False):
+    def evaluate(self,user_input, conversation_history = [], critic=True, re_evaluate=False,re_evaluation_in_progress=False, postprocess=False, subtaskContext=False):
         messages = [
             {
             "role": "user",
@@ -486,11 +486,11 @@ class LocalAGI:
 
         if action["action"] != self.reply_action:
             logger.info("==> LocalAGI wants to call '{action}'", action=action["action"])
-            #logger.info("==> Observation '{reasoning}'", reasoning=action["observation"])
-            logger.info("==> Reasoning '{reasoning}'", reasoning=action["reasoning"])
+            #logger.info("==> Observation '{reasoning}'", reasoning=action["detailed_reasoning"])
+            logger.info("==> Reasoning '{reasoning}'", reasoning=action["detailed_reasoning"])
             # Force executing a plan instead
 
-            reasoning = action["reasoning"]
+            reasoning = action["detailed_reasoning"]
             if action["action"] == self.reply_action:
                 logger.info("==> LocalAGI wants to create a plan that involves more actions ")
 
@@ -500,7 +500,29 @@ class LocalAGI:
             if self.processed_messages > 0:
                 function_completion_message += self.process_history(conversation_history)+"\n"
             function_completion_message += "Request: "+user_input+"\nReasoning: "+reasoning
+
             responses, function_results = self.process_functions(function_completion_message, action=action["action"])
+            # Critic re-evaluates the action
+            # if critic:
+            #     critic = self.analyze(responses[1:-1], suffix=f"Analyze if the function that was picked is correct and satisfies the user request from the context above. Suggest a different action if necessary. If the function picked was correct, write the picked function.\n")
+            #     logger.info("==> Critic action: {critic}", critic=critic)
+            #     previous_action = action["action"]
+            #     try:
+            #         action = self.needs_to_do_action(critic,agent_actions=picker_actions)
+            #         if action["action"] != previous_action:
+            #             logger.info("==> Critic decided to change action to: {action}", action=action["action"])
+            #         responses, function_results = self.process_functions(function_completion_message, action=action["action"])
+            #     except Exception as e:
+            #         logger.error("==> error: ")
+            #         logger.error(e)
+            #         action = {"action": self.reply_action}
+
+            # Critic re-evaluates the plan
+            if critic and isinstance(function_results, dict) and function_results.get("subtasks") and len(function_results["subtasks"]) > 0:
+                critic = self.analyze(responses[1:], prefix="", suffix=f"Analyze if the plan is correct and satisfies the user request from the context above. Suggest a revised plan if necessary.\n")
+                logger.info("==> Critic plan: {critic}", critic=critic)
+                responses, function_results = self.process_functions(function_completion_message+"\n"+critic, action=action["action"])
+
             # if there are no subtasks, we can just reply,
             # otherwise we execute the subtasks
             # First we check if it's an object
@@ -508,18 +530,18 @@ class LocalAGI:
                 # cycle subtasks and execute functions
                 subtask_result=""
                 for subtask in function_results["subtasks"]:
-                    #ctr="Context: "+user_input+"\nThought: "+action["reasoning"]+ "\nRequest: "+subtask["reasoning"]
+                    cr="Request: "+user_input+"\nReasoning: "+action["detailed_reasoning"]+ "\n"
                     #cr="Request: "+user_input+"\n"
-                    cr=""
+                    #cr=""
                     if subtask_result != "" and subtaskContext:
                         # Include cumulative results of previous subtasks
                         # TODO: this grows context, maybe we should use a different approach or summarize
                         ##if postprocess:
                         ##    cr+= "Subtask results: "+post_process(subtask_result)+"\n"
                         ##else:
-                        cr+="\n"+subtask_result+"\n"
-                    subtask_reasoning = subtask["reasoning"]
-                    cr+="Reasoning: "+action["reasoning"]+ "\n"
+                        cr+="\nAdditional context: ```\n"+subtask_result+"\n```\n"
+                    subtask_reasoning = subtask["detailed_reasoning"]
+                    #cr+="Reasoning: "+action["detailed_reasoning"]+ "\n"
                     cr+="\nFunction to call:" +subtask["function"]+"\n"
                     logger.info("==> subtask '{subtask}' ({reasoning})", subtask=subtask["function"], reasoning=subtask_reasoning)
                     if postprocess:
@@ -558,7 +580,9 @@ class LocalAGI:
             #responses = converse(responses)
 
             # TODO: this needs to be optimized
-            responses = self.analyze(responses[1:], suffix=f"Return an appropriate answer given the context above\n")
+            responses = self.analyze(responses[1:],
+                                     prefix="", 
+                                     suffix=f"Return an appropriate answer given the context above\n")
 
             # add responses to conversation history by extending the list
             conversation_history.append(
