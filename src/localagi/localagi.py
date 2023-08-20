@@ -582,7 +582,7 @@ class LocalAGI:
             # TODO: this needs to be optimized
             responses = self.analyze(responses[1:],
                                      prefix="", 
-                                     suffix=f"Return an appropriate answer given the context above\n")
+                                     suffix=f"Return an appropriate answer given the context above, including a summary.\n")
 
             # add responses to conversation history by extending the list
             conversation_history.append(
