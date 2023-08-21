@@ -34,7 +34,6 @@ class LocalAGI:
         self.agent_actions = agent_actions
         self.plan_message = plan_message
         self.force_action = force_action
-        self.processed_messages=0
         self.tts_player = tts_player
         self.action_callback = action_callback
         self.reasoning_callback = reasoning_callback
@@ -501,7 +500,7 @@ class LocalAGI:
             #if postprocess:
                 #reasoning = post_process(reasoning)
             function_completion_message=""
-            if self.processed_messages > 0:
+            if len(conversation_history) > 1:
                 function_completion_message += self.process_history(conversation_history)+"\n"
             function_completion_message += "Request: "+user_input+"\nReasoning: "+reasoning
 
@@ -596,7 +595,6 @@ class LocalAGI:
                 }
             )
 
-            self.processed_messages+=1
             # logger.info the latest response from the conversation history
             logger.info(conversation_history[-1]["content"])
             #self.tts(conversation_history[-1]["content"])
@@ -610,7 +608,6 @@ class LocalAGI:
 
             # get the response from the model
             response = self.converse(conversation_history)
-            self.processed_messages+=1
 
             # add the response to the conversation history by extending the list
             conversation_history.extend(response)
