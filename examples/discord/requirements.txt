@@ -1,0 +1,8 @@
+discord
+openai
+git+https://github.com/mudler/LocalAGI
+ascii-magic
+loguru
+duckduckgo_search
+chromadb
+pysqlite3-binary
