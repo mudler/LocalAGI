@@ -6,3 +6,4 @@ loguru
 duckduckgo_search
 chromadb
 pysqlite3-binary
+langchain
