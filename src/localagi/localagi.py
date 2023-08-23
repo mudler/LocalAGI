@@ -124,7 +124,7 @@ class LocalAGI:
     {descriptions}"""},
                 {"role": "user",
     "content": f"""{user_input}
-    Function call: """
+Function call: """
                 }
             ]
         functions = [
@@ -202,7 +202,7 @@ class LocalAGI:
     {descriptions}"""},
                 {"role": "user",
     "content": f"""{user_input}
-    Function call: """
+Function call: """
                 }
             ]
         response = self.function_completion(messages, action=action)
@@ -314,9 +314,9 @@ class LocalAGI:
                 "role": "user",
                 "content": f"""{prefix}:
 
-        ```
-        {string}
-        ```
+```
+{string}
+```
         """,
                 }
             ]
@@ -478,7 +478,23 @@ class LocalAGI:
             action_picker_message+="\n\nObservation: "+observation
             # if there is no action to do, we can just reply to the user with REPLY_ACTION
         try:
-            action = self.needs_to_do_action(action_picker_message,agent_actions=picker_actions)
+              critic_msg=""
+              if critic:
+                descriptions=self.action_description("", self.agent_actions)
+
+                messages = [
+                                {"role": "user",
+                                "content": f"""Transcript of AI assistant responding to user requests. Replies with the action to perform and the reasoning.
+                    {descriptions}"""},
+                                {"role": "user",
+                    "content": f"""
+    This is the user input: {user_input}
+    Decide now the function to call and give a detailed explaination"""
+                                }
+                            ]
+                critic_msg=self.analyze(messages, prefix="", suffix=f"")
+                logger.info("==> Critic: {critic}", critic=critic_msg)
+              action = self.needs_to_do_action(action_picker_message+"\n"+critic_msg,agent_actions=picker_actions)
         except Exception as e:
             logger.error("==> error: ")
             logger.error(e)
