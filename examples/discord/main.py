@@ -80,6 +80,22 @@ async def close_thread(thread: discord.Thread):
 async def on_ready():
     print(f"We have logged in as {client.user}")
 
+def diff(history, processed):
+    return [item for item in processed if item not in history]
+
+def analyze_history(history, processed, callback, channel):
+    diff_list = diff(history, processed)
+    for item in diff_list:
+        if item["role"] == "function":
+            content = item["content"]
+            # Function result
+            callback(channel.send(f"⚙️ Processed: {content}"))
+        if item["role"] == "assistant" and "function_call" in item:
+            function_name = item["function_call"]["name"]
+            function_parameters = item["function_call"]["arguments"]
+            # Function call
+            callback(channel.send(f"⚙️ Called: {function_name} with {function_parameters}"))
+
 def run_localagi_thread_history(history, message, thread, loop):
    agent.channel = message.channel
    def call(thing):
@@ -106,14 +122,14 @@ def run_localagi_thread_history(history, message, thread, loop):
     )
    # remove bot ID from the message content
    message.content = message.content.replace(f"<@{client.user.id}>", "")
-
    conversation_history = localagi.evaluate(
                 message.content, 
                 history, 
                 subtaskContext=True,
         )
+   
+   analyze_history(history, conversation_history, call, thread)
    call(sent_message.edit(content=f"<@{user.id}> {conversation_history[-1]['content']}"))
-
 
 def run_localagi_message(message, loop):
    agent.channel = message.channel
@@ -147,6 +163,7 @@ def run_localagi_message(message, loop):
                 [], 
                 subtaskContext=True,
         )
+   analyze_history([], conversation_history, call, message.channel)
    call(sent_message.edit(content=f"<@{user.id}> {conversation_history[-1]['content']}"))
 
 def run_localagi(interaction, prompt, loop):
@@ -201,6 +218,7 @@ def run_localagi(interaction, prompt, loop):
                 messages, 
                 subtaskContext=True,
         )
+    analyze_history(messages, conversation_history, call, interaction.channel)
     call(sent_message.edit(content=f"<@{user.id}> {conversation_history[-1]['content']}"))
 
 @client.tree.command()
