@@ -81,6 +81,7 @@ async def on_ready():
     print(f"We have logged in as {client.user}")
 
 def run_localagi_thread_history(history, message, thread, loop):
+   agent.channel = message.channel
    def call(thing):
         return asyncio.run_coroutine_threadsafe(thing,loop).result()
    sent_message = call(thread.send(f"⚙️ LocalAGI starts"))
@@ -115,6 +116,7 @@ def run_localagi_thread_history(history, message, thread, loop):
 
 
 def run_localagi_message(message, loop):
+   agent.channel = message.channel
    def call(thing):
         return asyncio.run_coroutine_threadsafe(thing,loop).result()
    sent_message = call(message.channel.send(f"⚙️ LocalAGI starts"))
@@ -148,6 +150,7 @@ def run_localagi_message(message, loop):
    call(sent_message.edit(content=f"<@{user.id}> {conversation_history[-1]['content']}"))
 
 def run_localagi(interaction, prompt, loop):
+    agent.channel = interaction.channel
 
     def call(thing):
         return asyncio.run_coroutine_threadsafe(thing,loop).result()
@@ -204,8 +207,6 @@ def run_localagi(interaction, prompt, loop):
 @app_commands.describe(prompt="Ask me anything!")
 async def localai(interaction: discord.Interaction, prompt: str):
     loop = asyncio.get_running_loop()
-    agent.loop = loop
-    agent.channel = interaction.channel
     threading.Thread(target=run_localagi, args=[interaction, prompt,loop]).start()    
 
 # https://github.com/openai/gpt-discord-bot/blob/1161634a59c6fb642e58edb4f4fa1a46d2883d3b/src/utils.py#L15
@@ -225,15 +226,18 @@ def discord_message_to_message(message):
     return None
 
 @client.event
+async def on_ready():
+    loop = asyncio.get_running_loop() 
+    agent.loop = loop
+
+@client.event
 async def on_message(message):
     # ignore messages from the bot
     if message.author == client.user:
         return
     loop = asyncio.get_running_loop() 
-    agent.loop = loop
     # ignore messages not in a thread
     channel = message.channel
-    agent.channel = channel
     if not isinstance(channel, discord.Thread) and client.user.mentioned_in(message):
         threading.Thread(target=run_localagi_message, args=[message,loop]).start()    
         return

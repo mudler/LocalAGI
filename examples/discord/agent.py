@@ -19,6 +19,7 @@ from ascii_magic import AsciiArt
 from duckduckgo_search import DDGS
 from typing import Dict, List
 import os
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import discord
 import openai
 import urllib.request
