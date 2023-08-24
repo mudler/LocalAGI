@@ -7,3 +7,4 @@ duckduckgo_search
 chromadb
 pysqlite3-binary
 langchain
+beautifulsoup4
