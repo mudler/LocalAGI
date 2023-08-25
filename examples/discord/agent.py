@@ -46,13 +46,12 @@ MEMORY_CHUNK_OVERLAP = int(config["agent"]["memory_chunk_overlap"])
 MEMORY_RESULTS = int(config["agent"]["memory_results"])
 MEMORY_SEARCH_TYPE = config["agent"]["memory_search_type"]
 
+if not os.environ.get("PYSQL_HACK", "false") == "false":
+    # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 if MILVUS_HOST == "":
-    if not os.environ.get("PYSQL_HACK", "false") == "false":
-        # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
-        __import__('pysqlite3')
-        import sys
-        sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
     from langchain.vectorstores import Chroma
 else:
     from langchain.vectorstores import Milvus

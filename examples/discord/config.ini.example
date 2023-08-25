@@ -3,7 +3,6 @@ server_id =
 api_key = 
 
 [openai]
-organization = fff
 api_key = sl-d-d-d
 
 [settings]
@@ -19,3 +18,14 @@ functions_model = functions
 api_base = http://api:8080
 stablediffusion_api_base = http://api:8080
 stablediffusion_model = stablediffusion
+embeddings_model = all-MiniLM-L6-v2
+embeddings_api_base = http://api:30316/v1
+persistent_dir = /tmp/data
+db_dir = /tmp/data/db
+milvus_host = 
+milvus_port = 
+memory_collection = localai
+memory_chunk_size = 600
+memory_chunk_overlap = 110
+memory_results = 3
+memory_search_type = mmr
