@@ -7,12 +7,21 @@ GitHub: https://https://github.com/StefanRial/ClaudeBot
 E-Mail: mail.stefanrial@gmail.com
 """
 
-import discord
-import openai
-import urllib.request
+from config import config
 import os
+
+OPENAI_API_KEY = config["openai"][str("api_key")]
+
+if OPENAI_API_KEY == "":
+    OPENAI_API_KEY = "foo"
+os.environ["OPENAI_API_BASE"] = config["agent"]["api_base"]
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+import openai
+
+import discord
+
+import urllib.request
 from datetime import datetime
-from configparser import ConfigParser
 from queue import Queue
 import agent
 from agent import agent_actions
@@ -23,14 +32,11 @@ from discord import app_commands
 import functools
 import typing
 
-config_file = "config.ini"
-config = ConfigParser(interpolation=None)
-config.read(config_file)
-
 SERVER_ID = config["discord"]["server_id"]
 DISCORD_API_KEY = config["discord"][str("api_key")]
 OPENAI_ORG = config["openai"][str("organization")]
-OPENAI_API_KEY = config["openai"][str("api_key")]
+
+
 
 FILE_PATH = config["settings"][str("file_path")]
 FILE_NAME_FORMAT = config["settings"][str("file_name_format")]
@@ -126,6 +132,7 @@ def run_localagi_thread_history(history, message, thread, loop):
                 message.content, 
                 history, 
                 subtaskContext=True,
+                critic=True,
         )
    
    analyze_history(history, conversation_history, call, thread)
@@ -161,6 +168,7 @@ def run_localagi_message(message, loop):
    conversation_history = localagi.evaluate(
                 message.content, 
                 [], 
+                critic=True,
                 subtaskContext=True,
         )
    analyze_history([], conversation_history, call, message.channel)
@@ -217,6 +225,7 @@ def run_localagi(interaction, prompt, loop):
                 prompt, 
                 messages, 
                 subtaskContext=True,
+                critic=True,
         )
     analyze_history(messages, conversation_history, call, interaction.channel)
     call(sent_message.edit(content=f"<@{user.id}> {conversation_history[-1]['content']}"))

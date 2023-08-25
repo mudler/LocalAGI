@@ -8,3 +8,4 @@ chromadb
 pysqlite3-binary
 langchain
 beautifulsoup4
+pymilvus

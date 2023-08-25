@@ -10,6 +10,8 @@ from langchain.document_loaders import (
 
 import uuid
 import sys
+from config import config
+
 from queue import Queue
 import asyncio
 import threading
@@ -24,22 +26,31 @@ import discord
 import openai
 import urllib.request
 from datetime import datetime
-# these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
-from langchain.vectorstores import Chroma
+
 from chromadb.config import Settings
 import json
 import os
 from io import StringIO 
 FILE_NAME_FORMAT = '%Y_%m_%d_%H_%M_%S'
 
-EMBEDDINGS_MODEL = os.environ.get("EMBEDDINGS_MODEL", "all-MiniLM-L6-v2")
-EMBEDDINGS_API_BASE = os.environ.get("EMBEDDINGS_API_BASE", "http://api:8080")
-PERSISTENT_DIR = os.environ.get("PERSISTENT_DIR", "/tmp/data/")
-DB_DIR = os.environ.get("DB_DIR", "/tmp/data/db")
+EMBEDDINGS_MODEL = config["agent"]["embeddings_model"]
+EMBEDDINGS_API_BASE = config["agent"]["embeddings_api_base"]
+PERSISTENT_DIR = config["agent"]["persistent_dir"]
+MILVUS_HOST = config["agent"]["milvus_host"]
+MILVUS_PORT = config["agent"]["milvus_port"]
+DB_DIR =  config["agent"]["db_dir"]
+
+if MILVUS_HOST == "":
+    if not os.environ.get("PYSQL_HACK", "false") == "false":
+        # these three lines swap the stdlib sqlite3 lib with the pysqlite3 package for chroma
+        __import__('pysqlite3')
+        import sys
+        sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
+    from langchain.vectorstores import Chroma
+else:
+    from langchain.vectorstores import Milvus
 
 embeddings = LocalAIEmbeddings(model=EMBEDDINGS_MODEL,openai_api_base=EMBEDDINGS_API_BASE)
 
@@ -50,8 +61,8 @@ def call(thing):
 
 def ingest(a, agent_actions={}, localagi=None):
     q = json.loads(a)
-    chunk_size = 500
-    chunk_overlap = 50
+    chunk_size = 1024
+    chunk_overlap = 110
     logger.info(">>> ingesting: ")
     logger.info(q)
     documents = []
@@ -59,9 +70,12 @@ def ingest(a, agent_actions={}, localagi=None):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     documents.extend(sitemap_loader.load())
     texts = text_splitter.split_documents(documents)
-    db = Chroma.from_documents(texts,embeddings,collection_name="memories", persist_directory=DB_DIR)
-    db.persist()
-    db = None
+    if MILVUS_HOST == "":
+        db = Chroma.from_documents(texts,embeddings,collection_name="memories", persist_directory=DB_DIR)
+        db.persist()
+        db = None
+    else:
+        Milvus.from_documents(texts,embeddings,collection_name="memories", connection_args={"host": MILVUS_HOST, "port": MILVUS_PORT})
     return f"Documents ingested"
 
 def create_image(a, agent_actions={}, localagi=None):
@@ -96,24 +110,33 @@ def save(memory, agent_actions={}, localagi=None):
     q = json.loads(memory)
     logger.info(">>> saving to memories: ") 
     logger.info(q["content"])
-    chroma_client = Chroma(collection_name="memories",embedding_function=embeddings, persist_directory=DB_DIR)
+    if MILVUS_HOST == "":
+        chroma_client = Chroma(collection_name="memories",embedding_function=embeddings, persist_directory=DB_DIR)
+    else:
+        chroma_client = Milvus(collection_name="memories",embedding_function=embeddings, connection_args={"host": MILVUS_HOST, "port": MILVUS_PORT})
     chroma_client.add_texts([q["content"]],[{"id": str(uuid.uuid4())}])
-    chroma_client.persist()
-    chroma_client = None
+    if MILVUS_HOST == "":
+        chroma_client.persist()
+        chroma_client = None
     return f"The object was saved permanently to memory."
 
 def search_memory(query, agent_actions={}, localagi=None):
     q = json.loads(query)
-    chroma_client = Chroma(collection_name="memories",embedding_function=embeddings, persist_directory=DB_DIR)
-    docs = chroma_client.similarity_search(q["reasoning"])
+    if MILVUS_HOST == "":
+        chroma_client = Chroma(collection_name="memories",embedding_function=embeddings, persist_directory=DB_DIR)
+    else:
+        chroma_client = Milvus(collection_name="memories",embedding_function=embeddings, connection_args={"host": MILVUS_HOST, "port": MILVUS_PORT})
+    docs = chroma_client.search(q["keywords"], "mmr")
     text_res="Memories found in the database:\n"
     for doc in docs:
+        # drop newlines from page_content
+        doc.page_content = " ".join(doc.page_content.replace.split())
         text_res+="- "+doc.page_content+"\n"
     chroma_client = None
     #if args.postprocess:
     #    return post_process(text_res)
-    #return text_res
-    return localagi.post_process(text_res)
+    return text_res
+    #return localagi.post_process(text_res)
 
 # write file to disk with content
 def save_file(arg, agent_actions={}, localagi=None):
@@ -317,12 +340,12 @@ agent_actions = {
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "reasoning": {
+                    "keywords": {
                         "type": "string",
                         "description": "reasoning behind the intent"
                     },
                 },
-                "required": ["reasoning"]
+                "required": ["keywords"]
             }
         }, 
     },
