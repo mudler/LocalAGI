@@ -40,7 +40,7 @@ OPENAI_ORG = config["openai"][str("organization")]
 
 FILE_PATH = config["settings"][str("file_path")]
 FILE_NAME_FORMAT = config["settings"][str("file_name_format")]
-
+CRITIC = config["settings"]["critic"] if "critic" in config["settings"] else False
 SIZE_LARGE = "1024x1024"
 SIZE_MEDIUM = "512x512"
 SIZE_SMALL = "256x256"
@@ -132,7 +132,7 @@ def run_localagi_thread_history(history, message, thread, loop):
                 message.content, 
                 history, 
                 subtaskContext=True,
-                critic=True,
+                critic=CRITIC,
         )
    
    analyze_history(history, conversation_history, call, thread)
@@ -168,7 +168,7 @@ def run_localagi_message(message, loop):
    conversation_history = localagi.evaluate(
                 message.content, 
                 [], 
-                critic=True,
+                critic=CRITIC,
                 subtaskContext=True,
         )
    analyze_history([], conversation_history, call, message.channel)
@@ -225,7 +225,7 @@ def run_localagi(interaction, prompt, loop):
                 prompt, 
                 messages, 
                 subtaskContext=True,
-                critic=True,
+                critic=CRITIC,
         )
     analyze_history(messages, conversation_history, call, interaction.channel)
     call(sent_message.edit(content=f"<@{user.id}> {conversation_history[-1]['content']}"))
