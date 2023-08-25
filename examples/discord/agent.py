@@ -26,9 +26,6 @@ import discord
 import openai
 import urllib.request
 from datetime import datetime
-
-
-from chromadb.config import Settings
 import json
 import os
 from io import StringIO 
