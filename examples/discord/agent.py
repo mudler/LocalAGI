@@ -82,9 +82,9 @@ def ingest(a, agent_actions={}, localagi=None):
 def create_image(a, agent_actions={}, localagi=None):
     q = json.loads(a)
     logger.info(">>> creating image: ") 
-    logger.info(q["caption"])
+    logger.info(q["description"])
     size=f"{q['width']}x{q['height']}"
-    response = openai.Image.create(prompt=q["caption"], n=1, size=size)
+    response = openai.Image.create(prompt=q["description"], n=1, size=size)
     image_url = response["data"][0]["url"]
     image_name = download_image(image_url)
     image_path = f"{PERSISTENT_DIR}{image_name}"
@@ -252,13 +252,13 @@ agent_actions = {
     "generate_picture": {
         "function": create_image,
         "plannable": True,
-        "description": 'For creating a picture, the assistant replies with "generate_picture" and a detailed caption, enhancing it with as much detail as possible.',
+        "description": 'For creating a picture, the assistant replies with "generate_picture" and a detailed description, enhancing it with as much detail as possible.',
         "signature": {
             "name": "generate_picture",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "caption": {
+                    "description": {
                         "type": "string",
                     },
                     "width": {
