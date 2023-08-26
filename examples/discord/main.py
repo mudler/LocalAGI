@@ -14,7 +14,8 @@ OPENAI_API_KEY = config["openai"][str("api_key")]
 
 if OPENAI_API_KEY == "":
     OPENAI_API_KEY = "foo"
-os.environ["OPENAI_API_BASE"] = config["agent"]["api_base"]
+if "OPENAI_API_BASE" not in os.environ:
+    os.environ["OPENAI_API_BASE"] = config["agent"]["api_base"]
 os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 import openai
 
