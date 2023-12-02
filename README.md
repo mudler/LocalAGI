@@ -54,6 +54,9 @@ No frills, just run docker-compose and start chatting with your virtual assistan
 ```bash
 # Modify the configuration
 # vim .env
+# first run (and pulling the container)
+docker-compose up
+# next runs 
 docker-compose run -i --rm localagi
 ```
 
