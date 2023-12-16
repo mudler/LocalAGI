@@ -1,0 +1,43 @@
+display_information:
+  name: ChatGPT
+  description: Interact with ChatGPT in Slack!
+  background_color: "#195208"
+features:
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: ChatGPT Bot
+    always_online: true
+oauth_config:
+  redirect_urls:
+    - https://TODO.amazonaws.com/slack/oauth_redirect
+  scopes:
+    bot:
+      - app_mentions:read
+      - channels:history
+      - groups:history
+      - im:history
+      - mpim:history
+      - chat:write.public
+      - chat:write
+      - users:read
+settings:
+  event_subscriptions:
+    request_url: https://TODO.amazonaws.com/slack/events
+    bot_events:
+      - app_home_opened
+      - app_mention
+      - app_uninstalled
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim
+      - tokens_revoked
+  interactivity:
+    is_enabled: true
+    request_url: https://TODO.amazonaws.com/slack/events
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

@@ -1,0 +1,15 @@
+slack-bolt>=1.18.0,<2
+lxml==4.9.2
+bs4==0.0.1
+openai>=0.27.4,<0.28
+tiktoken>=0.3.3,<0.4
+chromadb==0.3.23
+langchain==0.0.242
+GitPython==3.1.31
+InstructorEmbedding
+loguru
+git+https://github.com/mudler/LocalAGI
+pysqlite3-binary
+requests
+ascii-magic
+duckduckgo_search
