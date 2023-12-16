@@ -81,16 +81,16 @@ def respond_to_app_mention(
                 limit=1000,
             ).get("messages", [])
             reply = replies_in_thread[-1]
-            #for reply in replies_in_thread:
-            c = reply["text"]+"\n\n"
-            content += c
+            for reply in replies_in_thread:
+                c = reply["text"]+"\n\n"
+                content += c
             role = "assistant" if reply["user"] == context.bot_user_id else "user"
             messages.append(
                 {
                     "role": role,
                     "content": (
                         format_openai_message_content(
-                            reply["text"], TRANSLATE_MARKDOWN
+                            content, TRANSLATE_MARKDOWN
                         )
                     ),
                 }
