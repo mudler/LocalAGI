@@ -3,7 +3,7 @@ openai
 git+https://github.com/mudler/LocalAGI
 ascii-magic
 loguru
-duckduckgo_search
+duckduckgo_search==4.1.1
 chromadb
 pysqlite3-binary
 langchain
