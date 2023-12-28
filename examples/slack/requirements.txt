@@ -12,4 +12,4 @@ git+https://github.com/mudler/LocalAGI
 pysqlite3-binary
 requests
 ascii-magic
-duckduckgo_search
+duckduckgo_search==4.1.1
