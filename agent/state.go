@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/mudler/local-agent-framework/llm"
@@ -17,6 +18,7 @@ type Character struct {
 	Memories    []string `json:"memories"`
 	Hobbies     []string `json:"hobbies"`
 	MusicTaste  []string `json:"music_taste"`
+	Sex         string   `json:"sex"`
 }
 
 func Load(path string) (*Character, error) {
@@ -33,16 +35,37 @@ func Load(path string) (*Character, error) {
 }
 
 func (a *Agent) Save(path string) error {
-	data, err := json.Marshal(a.options.Character)
+	data, err := json.Marshal(a.options.character)
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
 }
 
-func (a *Agent) GenerateIdentity(guidance string) error {
-	err := llm.GenerateJSONFromStruct(a.client, guidance, a.options.LLMAPI.Model, &a.options.Character)
+func (a *Agent) generateIdentity(guidance string) error {
+	if guidance == "" {
+		guidance = "Generate a random character for roleplaying."
+	}
+	err := llm.GenerateJSONFromStruct(a.client, guidance, a.options.LLMAPI.Model, &a.options.character)
+	a.Character = a.options.character
+	if err != nil {
+		return err
+	}
 
-	a.Character = a.options.Character
-	return err
+	if !a.validCharacter() {
+		return fmt.Errorf("invalid character")
+	}
+	return nil
+}
+
+func (a *Agent) validCharacter() bool {
+	return a.Character.Name != "" &&
+		a.Character.Age != 0 &&
+		a.Character.Occupation != "" &&
+		a.Character.NowDoing != "" &&
+		a.Character.DoingNext != "" &&
+		len(a.Character.DoneHistory) != 0 &&
+		len(a.Character.Memories) != 0 &&
+		len(a.Character.Hobbies) != 0 &&
+		len(a.Character.MusicTaste) != 0
 }
