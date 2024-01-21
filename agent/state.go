@@ -69,3 +69,30 @@ func (a *Agent) validCharacter() bool {
 		len(a.Character.Hobbies) != 0 &&
 		len(a.Character.MusicTaste) != 0
 }
+
+const fmtT = `=====================
+Name: %s
+Age: %d
+Occupation: %s
+Now doing: %s
+Doing next: %s
+Done history: %v
+Memories: %v
+Hobbies: %v
+Music taste: %v
+=====================`
+
+func (a *Agent) String() string {
+	return fmt.Sprintf(
+		fmtT,
+		a.Character.Name,
+		a.Character.Age,
+		a.Character.Occupation,
+		a.Character.NowDoing,
+		a.Character.DoingNext,
+		a.Character.DoneHistory,
+		a.Character.Memories,
+		a.Character.Hobbies,
+		a.Character.MusicTaste,
+	)
+}

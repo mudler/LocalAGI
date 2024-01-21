@@ -27,7 +27,7 @@ var _ = Describe("Agent test", func() {
 			Expect(agent.Character.Memories).ToNot(BeEmpty())
 			Expect(agent.Character.Hobbies).ToNot(BeEmpty())
 			Expect(agent.Character.MusicTaste).ToNot(BeEmpty())
-			fmt.Printf("%+v\n", agent.Character)
+			fmt.Println(agent.String())
 		})
 		It("detect an invalid character", func() {
 			_, err := New(WithRandomIdentity())
@@ -49,7 +49,7 @@ var _ = Describe("Agent test", func() {
 			Expect(agent.Character.Memories).ToNot(BeEmpty())
 			Expect(agent.Character.Hobbies).ToNot(BeEmpty())
 			Expect(agent.Character.MusicTaste).ToNot(BeEmpty())
-			fmt.Printf("%+v\n", agent.Character)
+			fmt.Println(agent.String())
 		})
 	})
 })
