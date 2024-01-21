@@ -72,7 +72,7 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	if a.options.randomIdentity {
-		err = a.generateIdentity("")
+		err = a.generateIdentity(a.options.randomIdentityGuidance)
 	}
 
 	return a, err
