@@ -1,12 +1,11 @@
 package agent
 
 import (
-	"fmt"
-
-	"github.com/mudler/local-agent-framework/llm"
-	"github.com/sashabaranov/go-openai"
+	"context"
+	"strings"
 )
 
+type Option func(*options) error
 type llmOptions struct {
 	APIURL string
 	APIKey string
@@ -18,15 +17,8 @@ type options struct {
 	character              Character
 	randomIdentityGuidance string
 	randomIdentity         bool
+	context                context.Context
 }
-
-type Agent struct {
-	options   *options
-	Character Character
-	client    *openai.Client
-}
-
-type Option func(*options) error
 
 func defaultOptions() *options {
 	return &options{
@@ -58,26 +50,6 @@ func newOptions(opts ...Option) (*options, error) {
 	return options, nil
 }
 
-func New(opts ...Option) (*Agent, error) {
-	options, err := newOptions(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL)
-	a := &Agent{
-		options:   options,
-		client:    client,
-		Character: options.character,
-	}
-
-	if a.options.randomIdentity {
-		err = a.generateIdentity(a.options.randomIdentityGuidance)
-	}
-
-	return a, err
-}
-
 func WithLLMAPIURL(url string) Option {
 	return func(o *options) error {
 		o.LLMAPI.APIURL = url
@@ -88,6 +60,13 @@ func WithLLMAPIURL(url string) Option {
 func WithLLMAPIKey(key string) Option {
 	return func(o *options) error {
 		o.LLMAPI.APIKey = key
+		return nil
+	}
+}
+
+func WithContext(ctx context.Context) Option {
+	return func(o *options) error {
+		o.context = ctx
 		return nil
 	}
 }
@@ -119,7 +98,7 @@ func FromFile(path string) Option {
 
 func WithRandomIdentity(guidance ...string) Option {
 	return func(o *options) error {
-		o.randomIdentityGuidance = fmt.Sprint(guidance)
+		o.randomIdentityGuidance = strings.Join(guidance, "")
 		o.randomIdentity = true
 		return nil
 	}

@@ -46,14 +46,14 @@ func (a *Agent) generateIdentity(guidance string) error {
 	if guidance == "" {
 		guidance = "Generate a random character for roleplaying."
 	}
-	err := llm.GenerateJSONFromStruct(a.client, guidance, a.options.LLMAPI.Model, &a.options.character)
+	err := llm.GenerateJSONFromStruct(a.context.Context, a.client, guidance, a.options.LLMAPI.Model, &a.options.character)
 	a.Character = a.options.character
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate JSON from structure: %v", err)
 	}
 
 	if !a.validCharacter() {
-		return fmt.Errorf("invalid character")
+		return fmt.Errorf("generated character is not valid ( guidance: %s ): %v", guidance, a.String())
 	}
 	return nil
 }

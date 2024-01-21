@@ -9,7 +9,7 @@ import (
 )
 
 // generateAnswer generates an answer for the given text using the OpenAI API
-func GenerateJSON(client *openai.Client, model, text string, i interface{}) error {
+func GenerateJSON(ctx context.Context, client *openai.Client, model, text string, i interface{}) error {
 	req := openai.ChatCompletionRequest{
 		ResponseFormat: &openai.ChatCompletionResponseFormat{Type: openai.ChatCompletionResponseFormatTypeJSONObject},
 		Model:          model,
@@ -22,7 +22,7 @@ func GenerateJSON(client *openai.Client, model, text string, i interface{}) erro
 		},
 	}
 
-	resp, err := client.CreateChatCompletion(context.Background(), req)
+	resp, err := client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to generate answer: %v", err)
 	}
@@ -37,11 +37,11 @@ func GenerateJSON(client *openai.Client, model, text string, i interface{}) erro
 	return nil
 }
 
-func GenerateJSONFromStruct(client *openai.Client, guidance, model string, i interface{}) error {
+func GenerateJSONFromStruct(ctx context.Context, client *openai.Client, guidance, model string, i interface{}) error {
 	// TODO: use functions?
 	exampleJSON, err := json.Marshal(i)
 	if err != nil {
 		return err
 	}
-	return GenerateJSON(client, model, "Generate a character as JSON data. "+guidance+". This is the JSON fields that should contain: "+string(exampleJSON), i)
+	return GenerateJSON(ctx, client, model, "Generate a character as JSON data. "+guidance+". This is the JSON fields that should contain: "+string(exampleJSON), i)
 }
