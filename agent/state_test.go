@@ -13,8 +13,8 @@ var _ = Describe("Agent test", func() {
 	Context("identity", func() {
 		It("generates all the fields with random data", func() {
 			agent, err := New(
-				WithLLMAPIURL("http://192.168.68.113:8080"),
-				WithModel("echidna"),
+				WithLLMAPIURL(apiModel),
+				WithModel(testModel),
 				WithRandomIdentity(),
 			)
 			Expect(err).ToNot(HaveOccurred())
@@ -35,8 +35,8 @@ var _ = Describe("Agent test", func() {
 		})
 		It("generates all the fields", func() {
 			agent, err := New(
-				WithLLMAPIURL("http://192.168.68.113:8080"),
-				WithModel("echidna"),
+				WithLLMAPIURL(apiModel),
+				WithModel(testModel),
 				WithRandomIdentity("An old man with a long beard, a wizard, who lives in a tower."),
 			)
 			Expect(err).ToNot(HaveOccurred())

@@ -3,12 +3,14 @@ package agent
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/mudler/local-agent-framework/llm"
 	"github.com/sashabaranov/go-openai"
 )
 
 type Agent struct {
+	sync.Mutex
 	options          *options
 	Character        Character
 	client           *openai.Client
@@ -16,6 +18,8 @@ type Agent struct {
 	actionContext    *ActionContext
 	context          *ActionContext
 	availableActions []Action
+
+	currentConversation []openai.ChatCompletionMessage
 }
 
 func New(opts ...Option) (*Agent, error) {
@@ -36,6 +40,7 @@ func New(opts ...Option) (*Agent, error) {
 
 	ctx, cancel := context.WithCancel(c)
 	a := &Agent{
+		jobQueue:  make(chan *Job),
 		options:   options,
 		client:    client,
 		Character: options.character,
@@ -43,6 +48,7 @@ func New(opts ...Option) (*Agent, error) {
 			Context:    ctx,
 			cancelFunc: cancel,
 		},
+		availableActions: options.actions,
 	}
 
 	if a.options.randomIdentity {
@@ -56,9 +62,12 @@ func New(opts ...Option) (*Agent, error) {
 
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
-func (a *Agent) Ask(text, image string) string {
-	a.StopAction()
+func (a *Agent) Ask(text, image string) []string {
+	//a.StopAction()
 	j := NewJob(text, image)
+	fmt.Println("Job created", text)
 	a.jobQueue <- j
+	fmt.Println("Waiting for result")
+
 	return j.Result.WaitResult()
 }

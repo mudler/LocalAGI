@@ -17,6 +17,7 @@ type options struct {
 	character              Character
 	randomIdentityGuidance string
 	randomIdentity         bool
+	actions                []Action
 	context                context.Context
 }
 
@@ -100,6 +101,13 @@ func WithRandomIdentity(guidance ...string) Option {
 	return func(o *options) error {
 		o.randomIdentityGuidance = strings.Join(guidance, "")
 		o.randomIdentity = true
+		return nil
+	}
+}
+
+func WithActions(actions ...Action) Option {
+	return func(o *options) error {
+		o.actions = actions
 		return nil
 	}
 }

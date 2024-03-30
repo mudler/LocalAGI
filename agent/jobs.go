@@ -16,7 +16,7 @@ type Job struct {
 type JobResult struct {
 	sync.Mutex
 	// The result of a job
-	Text  string
+	Data  []string
 	ready chan bool
 }
 
@@ -44,14 +44,21 @@ func (j *JobResult) SetResult(text string) {
 	j.Lock()
 	defer j.Unlock()
 
-	j.Text = text
+	j.Data = append(j.Data, text)
+}
+
+// SetResult sets the result of a job
+func (j *JobResult) Finish() {
+	j.Lock()
+	defer j.Unlock()
+
 	close(j.ready)
 }
 
 // WaitResult waits for the result of a job
-func (j *JobResult) WaitResult() string {
+func (j *JobResult) WaitResult() []string {
 	<-j.ready
 	j.Lock()
 	defer j.Unlock()
-	return j.Text
+	return j.Data
 }
