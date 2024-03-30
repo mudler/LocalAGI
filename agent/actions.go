@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	//"github.com/mudler/local-agent-framework/llm"
 	"github.com/mudler/local-agent-framework/llm"
 	"github.com/sashabaranov/go-openai"
 )
@@ -31,6 +32,7 @@ func (a ActionDefinition) FD() openai.FunctionDefinition {
 // Actions is something the agent can do
 type Action interface {
 	ID() string
+	Description() string
 	Run(ActionParams) (string, error)
 	Definition() ActionDefinition
 }
@@ -117,10 +119,46 @@ func (a *Agent) consumeJob(job *Job) {
 	}
 
 	actionChoice := struct {
-		Choice string `json:"choice"`
+		Intent    string `json:"intent"`
+		Reasoning string `json:"reasoning"`
 	}{}
 
-	llm.GenerateJSON(ctx, a.client, a.options.LLMAPI.Model, , &actionChoice)
+	action_pick := "You can take any action between: "
+	for _, action := range a.options.actions {
+		action_pick += action.ID() + ": " + action.Description() + ", "
+	}
+
+	action_pick += "or none."
+	action_pick += "Given the text below, decide which action to take and explain the reasoning behind it. For answering without picking a choice, reply with 'none'."
+	action_pick += "return the result as a JSON object with the 'intent' and 'reasoning' fields."
+
+	err := llm.GenerateJSON(ctx, a.client, a.options.LLMAPI.Model, action_pick, &actionChoice)
+	if err != nil {
+		fmt.Println("Error generating JSON: ", err)
+		return
+	}
+
+	fmt.Println("Action choice: ", actionChoice)
+	if actionChoice.Intent == "" || actionChoice.Intent == "none" {
+		fmt.Println("No intent detected")
+		return
+	}
+
+	// Find the action
+	var action Action
+	for _, a := range a.options.actions {
+		if a.ID() == actionChoice.Intent {
+			action = a
+			break
+		}
+	}
+
+	if action == nil {
+		fmt.Println("No action found for intent: ", actionChoice.Intent)
+		return
+	}
+
+	// Fill the action parameters
 
 	// https://github.com/sashabaranov/go-openai/blob/0925563e86c2fdc5011310aa616ba493989cfe0a/examples/completion-with-tool/main.go#L16
 	actions := a.options.actions
@@ -145,6 +183,10 @@ func (a *Agent) consumeJob(job *Job) {
 		Model:    a.options.LLMAPI.Model,
 		Messages: messages,
 		Tools:    tools,
+		ToolChoice: &openai.ToolChoice{
+			Type:     openai.ToolTypeFunction,
+			Function: openai.ToolFunction{Name: action.ID()},
+		},
 	}
 	resp, err := a.client.CreateChatCompletion(ctx, decision)
 	if err != nil || len(resp.Choices) != 1 {
@@ -184,7 +226,7 @@ func (a *Agent) consumeJob(job *Job) {
 	}
 	fmt.Printf("Action run result: %v\n", result)
 
-	// simulate calling the function
+	// result of calling the function
 	messages = append(messages, openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		Content:    result,
@@ -196,7 +238,7 @@ func (a *Agent) consumeJob(job *Job) {
 		openai.ChatCompletionRequest{
 			Model:    a.options.LLMAPI.Model,
 			Messages: messages,
-			Tools:    tools,
+			//		Tools:    tools,
 		},
 	)
 	if err != nil || len(resp.Choices) != 1 {

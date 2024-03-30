@@ -30,6 +30,7 @@ func GenerateJSON(ctx context.Context, client *openai.Client, model, text string
 		return fmt.Errorf("no response from OpenAI API")
 	}
 
+	fmt.Println(resp.Choices[0].Message.Content)
 	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), i)
 	if err != nil {
 		return err
