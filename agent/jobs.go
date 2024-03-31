@@ -1,6 +1,13 @@
 package agent
 
-import "sync"
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"github.com/mudler/local-agent-framework/action"
+	"github.com/sashabaranov/go-openai"
+)
 
 // Job is a request to the agent to do something
 type Job struct {
@@ -61,4 +68,108 @@ func (j *JobResult) WaitResult() []string {
 	j.Lock()
 	defer j.Unlock()
 	return j.Data
+}
+
+func (a *Agent) consumeJob(job *Job) {
+
+	// Consume the job and generate a response
+	a.Lock()
+	// Set the action context
+	ctx, cancel := context.WithCancel(context.Background())
+	a.actionContext = action.NewContext(ctx, cancel)
+	a.Unlock()
+
+	if job.Image != "" {
+		// TODO: Use llava to explain the image content
+	}
+
+	if job.Text == "" {
+		fmt.Println("no text!")
+		return
+	}
+
+	messages := a.currentConversation
+	if job.Text != "" {
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:    "user",
+			Content: job.Text,
+		})
+	}
+
+	chosenAction, err := a.pickAction(ctx, messages)
+	if err != nil {
+		fmt.Printf("error picking action: %v\n", err)
+		return
+	}
+	params, err := a.generateParameters(ctx, chosenAction, messages)
+	if err != nil {
+		fmt.Printf("error generating parameters: %v\n", err)
+		return
+	}
+
+	var result string
+	for _, action := range a.options.actions {
+		fmt.Println("Checking action: ", action.Definition().Name, chosenAction.Definition().Name)
+		if action.Definition().Name == chosenAction.Definition().Name {
+			fmt.Printf("Running action: %v\n", action.Definition().Name)
+			if result, err = action.Run(params); err != nil {
+				fmt.Printf("error running action: %v\n", err)
+				return
+			}
+		}
+	}
+	fmt.Printf("Action run result: %v\n", result)
+
+	// calling the function
+	messages = append(messages, openai.ChatCompletionMessage{
+		Role: "assistant",
+		FunctionCall: &openai.FunctionCall{
+			Name:      chosenAction.Definition().Name,
+			Arguments: params.String(),
+		},
+	})
+
+	// result of calling the function
+	messages = append(messages, openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		Content:    result,
+		Name:       chosenAction.Definition().Name,
+		ToolCallID: chosenAction.Definition().Name,
+	})
+
+	resp, err := a.client.CreateChatCompletion(ctx,
+		openai.ChatCompletionRequest{
+			Model:    a.options.LLMAPI.Model,
+			Messages: messages,
+			//		Tools:    tools,
+		},
+	)
+	if err != nil || len(resp.Choices) != 1 {
+		fmt.Printf("2nd completion error: err:%v len(choices):%v\n", err,
+			len(resp.Choices))
+		return
+	}
+
+	// display OpenAI's response to the original question utilizing our function
+	msg := resp.Choices[0].Message
+	fmt.Printf("OpenAI answered the original request with: %v\n",
+		msg.Content)
+
+	messages = append(messages, msg)
+	a.currentConversation = append(a.currentConversation, messages...)
+
+	if len(msg.ToolCalls) != 0 {
+		fmt.Printf("OpenAI wants to call again functions: %v\n", msg)
+		// wants to call again an action (?)
+		job.Text = "" // Call the job with the current conversation
+		job.Result.SetResult(result)
+		a.jobQueue <- job
+		return
+	}
+
+	// perform the action (if any)
+	// or reply with a result
+	// if there is an action...
+	job.Result.SetResult(result)
+	job.Result.Finish()
 }

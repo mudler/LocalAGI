@@ -6,119 +6,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"time"
 
-	//"github.com/mudler/local-agent-framework/llm"
+	"github.com/mudler/local-agent-framework/action"
 
 	"github.com/sashabaranov/go-openai"
-	"github.com/sashabaranov/go-openai/jsonschema"
 )
-
-type ActionContext struct {
-	context.Context
-	cancelFunc context.CancelFunc
-}
-
-type ActionParams map[string]string
-
-func (ap ActionParams) Read(s string) error {
-	err := json.Unmarshal([]byte(s), &ap)
-	return err
-}
-
-func (ap ActionParams) String() string {
-	b, _ := json.Marshal(ap)
-	return string(b)
-}
-
-//type ActionDefinition openai.FunctionDefinition
 
 // Actions is something the agent can do
 type Action interface {
-	Run(ActionParams) (string, error)
-	Definition() ActionDefinition
+	Run(action.ActionParams) (string, error)
+	Definition() action.ActionDefinition
 }
 
-type ActionDefinition struct {
-	Properties  map[string]jsonschema.Definition
-	Required    []string
-	Name        string
-	Description string
-}
+type Actions []Action
 
-func (a ActionDefinition) ToFunctionDefinition() openai.FunctionDefinition {
-	return openai.FunctionDefinition{
-		Name:        a.Name,
-		Description: a.Description,
-		Parameters: jsonschema.Definition{
-			Type:       jsonschema.Object,
-			Properties: a.Properties,
-			Required:   a.Required,
-		},
+func (a Actions) ToTools() []openai.Tool {
+	tools := []openai.Tool{}
+	for _, action := range a {
+		tools = append(tools, openai.Tool{
+			Type:     openai.ToolTypeFunction,
+			Function: action.Definition().ToFunctionDefinition(),
+		})
 	}
+	return tools
 }
 
-var ErrContextCanceled = fmt.Errorf("context canceled")
-
-func (a *Agent) Stop() {
-	a.Lock()
-	defer a.Unlock()
-	a.context.cancelFunc()
-}
-
-func (a *Agent) Run() error {
-	// The agent run does two things:
-	// picks up requests from a queue
-	// and generates a response/perform actions
-
-	// It is also preemptive.
-	// That is, it can interrupt the current action
-	// if another one comes in.
-
-	// If there is no action, periodically evaluate if it has to do something on its own.
-
-	// Expose a REST API to interact with the agent to ask it things
-
-	fmt.Println("Agent is running")
-	clearConvTimer := time.NewTicker(1 * time.Minute)
-	for {
-		fmt.Println("Agent loop")
-
-		select {
-		case job := <-a.jobQueue:
-			fmt.Println("job from the queue")
-
-			// Consume the job and generate a response
-			// TODO: Give a short-term memory to the agent
-			a.consumeJob(job)
-		case <-a.context.Done():
-			fmt.Println("Context canceled, agent is stopping...")
-
-			// Agent has been canceled, return error
-			return ErrContextCanceled
-		case <-clearConvTimer.C:
-			fmt.Println("Removing chat history...")
-
-			// TODO: decide to do something on its own with the conversation result
-			// before clearing it out
-
-			// Clear the conversation
-			a.currentConversation = []openai.ChatCompletionMessage{}
-		}
-	}
-}
-
-// StopAction stops the current action
-// if any. Can be called before adding a new job.
-func (a *Agent) StopAction() {
-	a.Lock()
-	defer a.Unlock()
-	if a.actionContext != nil {
-		a.actionContext.cancelFunc()
-	}
-}
-
-func (a *Agent) decision(ctx context.Context, conversation []openai.ChatCompletionMessage, tools []openai.Tool, toolchoice any) (ActionParams, error) {
+func (a *Agent) decision(ctx context.Context, conversation []openai.ChatCompletionMessage, tools []openai.Tool, toolchoice any) (action.ActionParams, error) {
 	decision := openai.ChatCompletionRequest{
 		Model:      a.options.LLMAPI.Model,
 		Messages:   conversation,
@@ -137,7 +50,7 @@ func (a *Agent) decision(ctx context.Context, conversation []openai.ChatCompleti
 		return nil, fmt.Errorf("len(toolcalls): %v", len(msg.ToolCalls))
 	}
 
-	params := ActionParams{}
+	params := action.ActionParams{}
 	if err := params.Read(msg.ToolCalls[0].Function.Arguments); err != nil {
 		fmt.Println("can't read params", err)
 
@@ -147,20 +60,7 @@ func (a *Agent) decision(ctx context.Context, conversation []openai.ChatCompleti
 	return params, nil
 }
 
-type Actions []Action
-
-func (a Actions) ToTools() []openai.Tool {
-	tools := []openai.Tool{}
-	for _, action := range a {
-		tools = append(tools, openai.Tool{
-			Type:     openai.ToolTypeFunction,
-			Function: action.Definition().ToFunctionDefinition(),
-		})
-	}
-	return tools
-}
-
-func (a *Agent) generateParameters(ctx context.Context, action Action, conversation []openai.ChatCompletionMessage) (ActionParams, error) {
+func (a *Agent) generateParameters(ctx context.Context, action Action, conversation []openai.ChatCompletionMessage) (action.ActionParams, error) {
 	return a.decision(ctx, conversation, a.options.actions.ToTools(), action.Definition().Name)
 }
 
@@ -184,12 +84,12 @@ func (a *Agent) pickAction(ctx context.Context, messages []openai.ChatCompletion
 	if err != nil {
 		return nil, err
 	}
-	definitions := []ActionDefinition{}
+	definitions := []action.ActionDefinition{}
 	for _, m := range a.options.actions {
 		definitions = append(definitions, m.Definition())
 	}
 	err = tmpl.Execute(prompt, struct {
-		Actions  []ActionDefinition
+		Actions  []action.ActionDefinition
 		Messages []openai.ChatCompletionMessage
 	}{
 		Actions:  definitions,
@@ -205,7 +105,7 @@ func (a *Agent) pickAction(ctx context.Context, messages []openai.ChatCompletion
 	for _, m := range a.options.actions {
 		actionsID = append(actionsID, m.Definition().Name)
 	}
-	intentionsTools := NewIntention(actionsID...)
+	intentionsTools := action.NewIntention(actionsID...)
 
 	conversation := []openai.ChatCompletionMessage{
 		{
@@ -253,111 +153,4 @@ func (a *Agent) pickAction(ctx context.Context, messages []openai.ChatCompletion
 	}
 
 	return action, nil
-}
-
-func (a *Agent) consumeJob(job *Job) {
-
-	// Consume the job and generate a response
-	a.Lock()
-	// Set the action context
-	ctx, cancel := context.WithCancel(context.Background())
-	a.actionContext = &ActionContext{
-		Context:    ctx,
-		cancelFunc: cancel,
-	}
-	a.Unlock()
-
-	if job.Image != "" {
-		// TODO: Use llava to explain the image content
-	}
-
-	if job.Text == "" {
-		fmt.Println("no text!")
-		return
-	}
-
-	messages := a.currentConversation
-	if job.Text != "" {
-		messages = append(messages, openai.ChatCompletionMessage{
-			Role:    "user",
-			Content: job.Text,
-		})
-	}
-
-	chosenAction, err := a.pickAction(ctx, messages)
-	if err != nil {
-		fmt.Printf("error picking action: %v\n", err)
-		return
-	}
-	params, err := a.generateParameters(ctx, chosenAction, messages)
-	if err != nil {
-		fmt.Printf("error generating parameters: %v\n", err)
-		return
-	}
-
-	var result string
-	for _, action := range a.options.actions {
-		fmt.Println("Checking action: ", action.Definition().Name, chosenAction.Definition().Name)
-		if action.Definition().Name == chosenAction.Definition().Name {
-			fmt.Printf("Running action: %v\n", action.Definition().Name)
-			if result, err = action.Run(params); err != nil {
-				fmt.Printf("error running action: %v\n", err)
-				return
-			}
-		}
-	}
-	fmt.Printf("Action run result: %v\n", result)
-
-	// calling the function
-	messages = append(messages, openai.ChatCompletionMessage{
-		Role: "assistant",
-		FunctionCall: &openai.FunctionCall{
-			Name:      chosenAction.Definition().Name,
-			Arguments: params.String(),
-		},
-	})
-
-	// result of calling the function
-	messages = append(messages, openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    result,
-		Name:       chosenAction.Definition().Name,
-		ToolCallID: chosenAction.Definition().Name,
-	})
-
-	resp, err := a.client.CreateChatCompletion(ctx,
-		openai.ChatCompletionRequest{
-			Model:    a.options.LLMAPI.Model,
-			Messages: messages,
-			//		Tools:    tools,
-		},
-	)
-	if err != nil || len(resp.Choices) != 1 {
-		fmt.Printf("2nd completion error: err:%v len(choices):%v\n", err,
-			len(resp.Choices))
-		return
-	}
-
-	// display OpenAI's response to the original question utilizing our function
-	msg := resp.Choices[0].Message
-	fmt.Printf("OpenAI answered the original request with: %v\n",
-		msg.Content)
-
-	messages = append(messages, msg)
-	a.currentConversation = append(a.currentConversation, messages...)
-
-	if len(msg.ToolCalls) != 0 {
-		fmt.Printf("OpenAI wants to call again functions: %v\n", msg)
-		// wants to call again an action (?)
-		job.Text = "" // Call the job with the current conversation
-		job.Result.SetResult(result)
-		a.jobQueue <- job
-		return
-	}
-
-	// perform the action (if any)
-	// or reply with a result
-	// if there is an action...
-	job.Result.SetResult(result)
-	job.Result.Finish()
 }
