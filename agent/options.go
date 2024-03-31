@@ -17,7 +17,7 @@ type options struct {
 	character              Character
 	randomIdentityGuidance string
 	randomIdentity         bool
-	actions                []Action
+	actions                Actions
 	context                context.Context
 }
 
