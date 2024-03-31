@@ -36,18 +36,39 @@ func (ap ActionParams) String() string {
 	return string(b)
 }
 
+func (ap ActionParams) Unmarshal(v interface{}) error {
+	b, err := json.Marshal(ap)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		return err
+	}
+	return nil
+}
+
 //type ActionDefinition openai.FunctionDefinition
 
 type ActionDefinition struct {
 	Properties  map[string]jsonschema.Definition
 	Required    []string
-	Name        string
+	Name        ActionDefinitionName
 	Description string
+}
+
+type ActionDefinitionName string
+
+func (a ActionDefinitionName) Is(name string) bool {
+	return string(a) == name
+}
+
+func (a ActionDefinitionName) String() string {
+	return string(a)
 }
 
 func (a ActionDefinition) ToFunctionDefinition() openai.FunctionDefinition {
 	return openai.FunctionDefinition{
-		Name:        a.Name,
+		Name:        a.Name.String(),
 		Description: a.Description,
 		Parameters: jsonschema.Definition{
 			Type:       jsonschema.Object,

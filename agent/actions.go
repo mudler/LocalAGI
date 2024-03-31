@@ -3,7 +3,6 @@ package agent
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"html/template"
 
@@ -31,7 +30,21 @@ func (a Actions) ToTools() []openai.Tool {
 	return tools
 }
 
-func (a *Agent) decision(ctx context.Context, conversation []openai.ChatCompletionMessage, tools []openai.Tool, toolchoice any) (action.ActionParams, error) {
+func (a Actions) Find(name string) Action {
+	for _, action := range a {
+		if action.Definition().Name.Is(name) {
+			return action
+		}
+	}
+	return nil
+}
+
+// decision forces the agent to take on of the available actions
+func (a *Agent) decision(
+	ctx context.Context,
+	conversation []openai.ChatCompletionMessage,
+	tools []openai.Tool, toolchoice any) (action.ActionParams, error) {
+
 	decision := openai.ChatCompletionRequest{
 		Model:      a.options.LLMAPI.Model,
 		Messages:   conversation,
@@ -47,13 +60,13 @@ func (a *Agent) decision(ctx context.Context, conversation []openai.ChatCompleti
 
 	msg := resp.Choices[0].Message
 	if len(msg.ToolCalls) != 1 {
+		fmt.Println(msg)
 		return nil, fmt.Errorf("len(toolcalls): %v", len(msg.ToolCalls))
 	}
 
 	params := action.ActionParams{}
 	if err := params.Read(msg.ToolCalls[0].Function.Arguments); err != nil {
 		fmt.Println("can't read params", err)
-
 		return nil, err
 	}
 
@@ -61,33 +74,71 @@ func (a *Agent) decision(ctx context.Context, conversation []openai.ChatCompleti
 }
 
 func (a *Agent) generateParameters(ctx context.Context, action Action, conversation []openai.ChatCompletionMessage) (action.ActionParams, error) {
-	return a.decision(ctx, conversation, a.options.actions.ToTools(), action.Definition().Name)
+	return a.decision(ctx,
+		conversation,
+		a.options.actions.ToTools(),
+		action.Definition().Name)
 }
 
 const pickActionTemplate = `You can take any of the following tools: 
 
-{{range .Actions}}{{.Name}}: {{.Description}}{{end}}
+{{range .Actions -}}
+{{.Name}}: {{.Description }}
+{{ end }}
 
-or none. Given the text below, decide which action to take and explain the reasoning behind it. For answering without picking a choice, reply with 'none'.
+To answer back to the user, use the "answer" tool.
+Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
 
-{{range .Messages}}{{.Content}}{{end}}
+{{range .Messages }}
+{{if eq .Role "tool"}}Tool result{{else}}{{.Role}}{{ end }}: {{.Content}}
+{{if .FunctionCall}}
+Tool called with: {{.FunctionCall}}
+{{end}}
+{{range .ToolCalls}}
+{{.Name}}: {{.Arguments}}
+{{end}}
+{{end}}
 `
 
-func (a *Agent) pickAction(ctx context.Context, messages []openai.ChatCompletionMessage) (Action, error) {
+const reEvalTemplate = `You can take any of the following tools: 
+
+{{range .Actions}}{{.Name}}: {{.Description}}{{end}}
+
+To answer back to the user, use the "answer" tool.
+For answering without picking a choice, reply with 'none'.
+
+Given the text below, decide which action to take and explain the reasoning behind it. 
+
+{{range .Messages -}}
+{{if eq .Role "tool" }}Tool result{{else}}{{.Role}}: {{ end }}{{.Content }}
+{{if .FunctionCall}}Tool called with: {{.FunctionCall}}{{end}}
+{{range .ToolCalls}}
+{{.Name}}: {{.Arguments}}
+{{end}}
+{{end}}
+
+We already have called tools. Evaluate the current situation and decide if we need to execute other tools or answer back with a result.`
+
+// pickAction picks an action based on the conversation
+func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
 	actionChoice := struct {
 		Intent    string `json:"tool"`
 		Reasoning string `json:"reasoning"`
 	}{}
 
 	prompt := bytes.NewBuffer([]byte{})
-	tmpl, err := template.New("pickAction").Parse(pickActionTemplate)
+
+	tmpl, err := template.New("pickAction").Parse(templ)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	definitions := []action.ActionDefinition{}
+
+	// It can pick the reply action too
+	definitions := []action.ActionDefinition{action.NewReply().Definition()}
 	for _, m := range a.options.actions {
 		definitions = append(definitions, m.Definition())
 	}
+
 	err = tmpl.Execute(prompt, struct {
 		Actions  []action.ActionDefinition
 		Messages []openai.ChatCompletionMessage
@@ -96,14 +147,14 @@ func (a *Agent) pickAction(ctx context.Context, messages []openai.ChatCompletion
 		Messages: messages,
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	fmt.Println(prompt.String())
+	fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
 
 	actionsID := []string{}
 	for _, m := range a.options.actions {
-		actionsID = append(actionsID, m.Definition().Name)
+		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 	intentionsTools := action.NewIntention(actionsID...)
 
@@ -120,37 +171,26 @@ func (a *Agent) pickAction(ctx context.Context, messages []openai.ChatCompletion
 		intentionsTools.Definition().Name)
 	if err != nil {
 		fmt.Println("failed decision", err)
-		return nil, err
+		return nil, "", err
 	}
 
-	dat, err := json.Marshal(params)
+	err = params.Unmarshal(&actionChoice)
 	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(dat, &actionChoice)
-	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	fmt.Printf("Action choice: %v\n", actionChoice)
+
 	if actionChoice.Intent == "" || actionChoice.Intent == "none" {
-		return nil, fmt.Errorf("no intent detected")
+		return nil, "", fmt.Errorf("no intent detected")
 	}
 
 	// Find the action
-	var action Action
-	for _, a := range a.options.actions {
-		if a.Definition().Name == actionChoice.Intent {
-			action = a
-			break
-		}
-	}
-
-	if action == nil {
+	chosenAction := append(a.options.actions, action.NewReply()).Find(actionChoice.Intent)
+	if chosenAction == nil {
 		fmt.Println("No action found for intent: ", actionChoice.Intent)
-		return nil, fmt.Errorf("No action found for intent:" + actionChoice.Intent)
+		return nil, "", fmt.Errorf("No action found for intent:" + actionChoice.Intent)
 	}
 
-	return action, nil
+	return chosenAction, actionChoice.Reasoning, nil
 }

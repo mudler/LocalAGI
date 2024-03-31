@@ -23,7 +23,7 @@ func (a *IntentAction) Definition() ActionDefinition {
 		Properties: map[string]jsonschema.Definition{
 			"reasoning": {
 				Type:        jsonschema.String,
-				Description: "The city and state, e.g. San Francisco, CA",
+				Description: "A detailed reasoning on why you want to call this tool.",
 			},
 			"tool": {
 				Type: jsonschema.String,

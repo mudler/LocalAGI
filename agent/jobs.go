@@ -96,11 +96,20 @@ func (a *Agent) consumeJob(job *Job) {
 		})
 	}
 
-	chosenAction, err := a.pickAction(ctx, messages)
+	// choose an action first
+	chosenAction, reasoning, err := a.pickAction(ctx, pickActionTemplate, messages)
 	if err != nil {
 		fmt.Printf("error picking action: %v\n", err)
 		return
 	}
+
+	if chosenAction.Definition().Name.Is(action.ReplyActionName) {
+		fmt.Println("No action to do, just reply")
+		job.Result.SetResult(reasoning)
+		job.Result.Finish()
+		return
+	}
+
 	params, err := a.generateParameters(ctx, chosenAction, messages)
 	if err != nil {
 		fmt.Printf("error generating parameters: %v\n", err)
@@ -124,7 +133,7 @@ func (a *Agent) consumeJob(job *Job) {
 	messages = append(messages, openai.ChatCompletionMessage{
 		Role: "assistant",
 		FunctionCall: &openai.FunctionCall{
-			Name:      chosenAction.Definition().Name,
+			Name:      chosenAction.Definition().Name.String(),
 			Arguments: params.String(),
 		},
 	})
@@ -133,9 +142,24 @@ func (a *Agent) consumeJob(job *Job) {
 	messages = append(messages, openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		Content:    result,
-		Name:       chosenAction.Definition().Name,
-		ToolCallID: chosenAction.Definition().Name,
+		Name:       chosenAction.Definition().Name.String(),
+		ToolCallID: chosenAction.Definition().Name.String(),
 	})
+
+	// given the result, we can now ask OpenAI to complete the conversation or
+	// to continue using another tool given the result
+	followingAction, reasoning, err := a.pickAction(ctx, reEvalTemplate, messages)
+	if err != nil {
+		fmt.Printf("error picking action: %v\n", err)
+		return
+	}
+	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
+		// We need to do another action (?)
+		// The agent decided to do another action
+		fmt.Println("Another action to do: ", followingAction.Definition().Name)
+		fmt.Println("Reasoning: ", reasoning)
+		return
+	}
 
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{

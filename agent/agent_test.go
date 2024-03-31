@@ -10,7 +10,7 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-const testActionResult = "It's going to be windy"
+const testActionResult = "In Boston it's 30C today, it's sunny, and humidity is at 98%"
 
 var _ Action = &TestAction{}
 
