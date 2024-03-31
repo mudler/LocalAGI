@@ -11,6 +11,10 @@ func NewIntention(s ...string) *IntentAction {
 type IntentAction struct {
 	tools []string
 }
+type IntentResponse struct {
+	Tool      string `json:"tool"`
+	Reasoning string `json:"reasoning"`
+}
 
 func (a *IntentAction) Run(ActionParams) (string, error) {
 	return "no-op", nil

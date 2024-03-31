@@ -103,7 +103,7 @@ func (a *Agent) consumeJob(job *Job) {
 		return
 	}
 
-	if chosenAction.Definition().Name.Is(action.ReplyActionName) {
+	if chosenAction == nil || chosenAction.Definition().Name.Is(action.ReplyActionName) {
 		fmt.Println("No action to do, just reply")
 		job.Result.SetResult(reasoning)
 		job.Result.Finish()
@@ -116,12 +116,17 @@ func (a *Agent) consumeJob(job *Job) {
 		return
 	}
 
+	if params.actionParams == nil {
+		fmt.Println("no parameters")
+		return
+	}
+
 	var result string
 	for _, action := range a.options.actions {
 		fmt.Println("Checking action: ", action.Definition().Name, chosenAction.Definition().Name)
 		if action.Definition().Name == chosenAction.Definition().Name {
 			fmt.Printf("Running action: %v\n", action.Definition().Name)
-			if result, err = action.Run(params); err != nil {
+			if result, err = action.Run(params.actionParams); err != nil {
 				fmt.Printf("error running action: %v\n", err)
 				return
 			}
@@ -134,7 +139,7 @@ func (a *Agent) consumeJob(job *Job) {
 		Role: "assistant",
 		FunctionCall: &openai.FunctionCall{
 			Name:      chosenAction.Definition().Name.String(),
-			Arguments: params.String(),
+			Arguments: params.actionParams.String(),
 		},
 	})
 
@@ -153,7 +158,10 @@ func (a *Agent) consumeJob(job *Job) {
 		fmt.Printf("error picking action: %v\n", err)
 		return
 	}
-	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
+
+	if followingAction == nil || followingAction.Definition().Name.Is(action.ReplyActionName) {
+		fmt.Println("No action to do, just reply")
+	} else if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
 		// We need to do another action (?)
 		// The agent decided to do another action
 		fmt.Println("Another action to do: ", followingAction.Definition().Name)
@@ -161,11 +169,11 @@ func (a *Agent) consumeJob(job *Job) {
 		return
 	}
 
+	// Generate a human-readable response
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
 			Model:    a.options.LLMAPI.Model,
 			Messages: messages,
-			//		Tools:    tools,
 		},
 	)
 	if err != nil || len(resp.Choices) != 1 {
