@@ -11,13 +11,23 @@ import (
 )
 
 const testActionResult = "In Boston it's 30C today, it's sunny, and humidity is at 98%"
+const testActionResult2 = "In milan it's very hot today"
 
 var _ Action = &TestAction{}
 
-type TestAction struct{}
+type TestAction struct {
+	response  []string
+	responseN int
+}
 
 func (a *TestAction) Run(action.ActionParams) (string, error) {
-	return testActionResult, nil
+	res := a.response[a.responseN]
+	if len(a.response) == a.responseN {
+		a.responseN = 0
+	} else {
+		a.responseN++
+	}
+	return res, nil
 }
 
 func (a *TestAction) Definition() action.ActionDefinition {
@@ -46,7 +56,21 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
 				//	WithRandomIdentity(),
-				WithActions(&TestAction{}),
+				WithActions(&TestAction{response: []string{testActionResult, testActionResult2}}),
+			)
+			Expect(err).ToNot(HaveOccurred())
+			go agent.Run()
+			defer agent.Stop()
+			res := agent.Ask("can you get the weather in boston, and afterward of Milano, Italy?", "")
+			Expect(res).To(ContainElement(testActionResult), fmt.Sprint(res))
+			Expect(res).To(ContainElement(testActionResult2), fmt.Sprint(res))
+		})
+		It("pick the correct action", func() {
+			agent, err := New(
+				WithLLMAPIURL(apiModel),
+				WithModel(testModel),
+				//	WithRandomIdentity(),
+				WithActions(&TestAction{response: []string{testActionResult}}),
 			)
 			Expect(err).ToNot(HaveOccurred())
 			go agent.Run()

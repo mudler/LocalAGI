@@ -187,7 +187,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		reason = thought.message
 	}
 
-	fmt.Println(reason)
+	fmt.Println("---- Thought: " + reason)
 
 	// Decode tool call
 	intentionsTools := action.NewIntention(actionsID...)

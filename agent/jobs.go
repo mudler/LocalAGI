@@ -71,7 +71,6 @@ func (j *JobResult) WaitResult() []string {
 }
 
 func (a *Agent) consumeJob(job *Job) {
-
 	// Consume the job and generate a response
 	a.Lock()
 	// Set the action context
@@ -83,11 +82,6 @@ func (a *Agent) consumeJob(job *Job) {
 		// TODO: Use llava to explain the image content
 	}
 
-	if job.Text == "" {
-		fmt.Println("no text!")
-		return
-	}
-
 	messages := a.currentConversation
 	if job.Text != "" {
 		messages = append(messages, openai.ChatCompletionMessage{
@@ -97,16 +91,28 @@ func (a *Agent) consumeJob(job *Job) {
 	}
 
 	// choose an action first
-	chosenAction, reasoning, err := a.pickAction(ctx, pickActionTemplate, messages)
-	if err != nil {
-		fmt.Printf("error picking action: %v\n", err)
-		return
+	var chosenAction Action
+	var reasoning string
+
+	if a.currentReasoning != "" && a.nextAction != nil {
+		// if we are being re-evaluated, we already have the action
+		// and the reasoning. Consume it here and reset it
+		chosenAction = a.nextAction
+		reasoning = a.currentReasoning
+		a.currentReasoning = ""
+		a.nextAction = nil
+	} else {
+		var err error
+		chosenAction, reasoning, err = a.pickAction(ctx, pickActionTemplate, messages)
+		if err != nil {
+			fmt.Printf("error picking action: %v\n", err)
+			return
+		}
 	}
 
 	if chosenAction == nil || chosenAction.Definition().Name.Is(action.ReplyActionName) {
 		fmt.Println("No action to do, just reply")
 		job.Result.SetResult(reasoning)
-		job.Result.Finish()
 		return
 	}
 
@@ -126,6 +132,7 @@ func (a *Agent) consumeJob(job *Job) {
 		fmt.Println("Checking action: ", action.Definition().Name, chosenAction.Definition().Name)
 		if action.Definition().Name == chosenAction.Definition().Name {
 			fmt.Printf("Running action: %v\n", action.Definition().Name)
+			fmt.Printf("With parameters: %v\n", params.actionParams)
 			if result, err = action.Run(params.actionParams); err != nil {
 				fmt.Printf("error running action: %v\n", err)
 				return
@@ -133,6 +140,7 @@ func (a *Agent) consumeJob(job *Job) {
 		}
 	}
 	fmt.Printf("Action run result: %v\n", result)
+	job.Result.SetResult(result)
 
 	// calling the function
 	messages = append(messages, openai.ChatCompletionMessage{
@@ -151,6 +159,8 @@ func (a *Agent) consumeJob(job *Job) {
 		ToolCallID: chosenAction.Definition().Name.String(),
 	})
 
+	a.currentConversation = append(a.currentConversation, messages...)
+
 	// given the result, we can now ask OpenAI to complete the conversation or
 	// to continue using another tool given the result
 	followingAction, reasoning, err := a.pickAction(ctx, reEvalTemplate, messages)
@@ -166,6 +176,11 @@ func (a *Agent) consumeJob(job *Job) {
 		// The agent decided to do another action
 		fmt.Println("Another action to do: ", followingAction.Definition().Name)
 		fmt.Println("Reasoning: ", reasoning)
+		// call ourselves again
+		a.currentReasoning = reasoning
+		a.nextAction = followingAction
+		job.Text = ""
+		a.consumeJob(job)
 		return
 	}
 
@@ -187,21 +202,6 @@ func (a *Agent) consumeJob(job *Job) {
 	fmt.Printf("OpenAI answered the original request with: %v\n",
 		msg.Content)
 
-	messages = append(messages, msg)
-	a.currentConversation = append(a.currentConversation, messages...)
-
-	if len(msg.ToolCalls) != 0 {
-		fmt.Printf("OpenAI wants to call again functions: %v\n", msg)
-		// wants to call again an action (?)
-		job.Text = "" // Call the job with the current conversation
-		job.Result.SetResult(result)
-		a.jobQueue <- job
-		return
-	}
-
-	// perform the action (if any)
-	// or reply with a result
-	// if there is an action...
-	job.Result.SetResult(result)
+	a.currentConversation = append(a.currentConversation, msg)
 	job.Result.Finish()
 }

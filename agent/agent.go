@@ -21,6 +21,8 @@ type Agent struct {
 	context          *action.ActionContext
 	availableActions []Action
 
+	currentReasoning    string
+	nextAction          Action
 	currentConversation []openai.ChatCompletionMessage
 }
 
