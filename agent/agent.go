@@ -63,12 +63,11 @@ func New(opts ...Option) (*Agent, error) {
 
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
-func (a *Agent) Ask(text, image string) []string {
+func (a *Agent) Ask(opts ...JobOption) []string {
 	//a.StopAction()
-	j := NewJob(text, image)
-	fmt.Println("Job created", text)
+	j := NewJob(opts...)
+	//	fmt.Println("Job created", text)
 	a.jobQueue <- j
-	fmt.Println("Waiting for result")
 
 	return j.Result.WaitResult()
 }
@@ -94,26 +93,18 @@ func (a *Agent) Run() error {
 
 	// Expose a REST API to interact with the agent to ask it things
 
-	fmt.Println("Agent is running")
 	clearConvTimer := time.NewTicker(1 * time.Minute)
 	for {
-		fmt.Println("Agent loop")
-
 		select {
 		case job := <-a.jobQueue:
-			fmt.Println("job from the queue")
 
 			// Consume the job and generate a response
 			// TODO: Give a short-term memory to the agent
 			a.consumeJob(job)
 		case <-a.context.Done():
-			fmt.Println("Context canceled, agent is stopping...")
-
 			// Agent has been canceled, return error
 			return ErrContextCanceled
 		case <-clearConvTimer.C:
-			fmt.Println("Removing chat history...")
-
 			// TODO: decide to do something on its own with the conversation result
 			// before clearing it out
 

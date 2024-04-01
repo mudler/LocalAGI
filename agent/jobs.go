@@ -14,52 +14,82 @@ type Job struct {
 	// The job is a request to the agent to do something
 	// It can be a question, a command, or a request to do something
 	// The agent will try to do it, and return a response
-	Text   string
-	Image  string // base64 encoded image
-	Result *JobResult
+	Text              string
+	Image             string // base64 encoded image
+	Result            *JobResult
+	reasoningCallback func(Action, action.ActionParams, string)
+	resultCallback    func(Action, action.ActionParams, string, string)
 }
 
 // JobResult is the result of a job
 type JobResult struct {
 	sync.Mutex
 	// The result of a job
-	Data              []string
-	reasoningCallback func(Action, action.ActionParams, string)
-	resultCallback    func(Action, action.ActionParams, string, string)
-	ready             chan bool
+	Data  []string
+	Error error
+	ready chan bool
+}
+
+type JobOption func(*Job)
+
+func WithReasoningCallback(f func(Action, action.ActionParams, string)) JobOption {
+	return func(r *Job) {
+		r.reasoningCallback = f
+	}
+}
+
+func WithResultCallback(f func(Action, action.ActionParams, string, string)) JobOption {
+	return func(r *Job) {
+		r.resultCallback = f
+	}
 }
 
 // NewJobResult creates a new job result
 func NewJobResult() *JobResult {
-	return &JobResult{
+	r := &JobResult{
 		ready: make(chan bool),
 	}
+	return r
 }
 
-func (j *JobResult) Callback(a Action, p action.ActionParams, s string) {
+func (j *Job) Callback(a Action, p action.ActionParams, s string) {
 	if j.reasoningCallback == nil {
 		return
 	}
 	j.reasoningCallback(a, p, s)
 }
 
-func (j *JobResult) CallbackWithResult(a Action, p action.ActionParams, s, r string) {
+func (j *Job) CallbackWithResult(a Action, p action.ActionParams, s, r string) {
 	if j.resultCallback == nil {
 		return
 	}
 	j.resultCallback(a, p, s, r)
 }
 
+func WithImage(image string) JobOption {
+	return func(j *Job) {
+		j.Image = image
+	}
+}
+
+func WithText(text string) JobOption {
+	return func(j *Job) {
+		j.Text = text
+	}
+}
+
 // NewJob creates a new job
 // It is a request to the agent to do something
 // It has a JobResult to get the result asynchronously
 // To wait for a Job result, use JobResult.WaitResult()
-func NewJob(text, image string) *Job {
-	return &Job{
-		Text:   text,
-		Image:  image,
+func NewJob(opts ...JobOption) *Job {
+	j := &Job{
 		Result: NewJobResult(),
 	}
+	for _, o := range opts {
+		o(j)
+	}
+	return j
 }
 
 // SetResult sets the result of a job
@@ -71,10 +101,11 @@ func (j *JobResult) SetResult(text string) {
 }
 
 // SetResult sets the result of a job
-func (j *JobResult) Finish() {
+func (j *JobResult) Finish(e error) {
 	j.Lock()
 	defer j.Unlock()
 
+	j.Error = e
 	close(j.ready)
 }
 
@@ -165,7 +196,7 @@ func (a *Agent) consumeJob(job *Job) {
 		return
 	}
 
-	job.Result.Callback(chosenAction, params.actionParams, reasoning)
+	job.Callback(chosenAction, params.actionParams, reasoning)
 
 	if params.actionParams == nil {
 		fmt.Println("no parameters")
@@ -186,7 +217,7 @@ func (a *Agent) consumeJob(job *Job) {
 	}
 	fmt.Printf("Action run result: %v\n", result)
 	job.Result.SetResult(result)
-	job.Result.CallbackWithResult(chosenAction, params.actionParams, reasoning, result)
+	job.CallbackWithResult(chosenAction, params.actionParams, reasoning, result)
 
 	// calling the function
 	messages = append(messages, openai.ChatCompletionMessage{
@@ -220,8 +251,6 @@ func (a *Agent) consumeJob(job *Job) {
 	} else if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
 		// We need to do another action (?)
 		// The agent decided to do another action
-		fmt.Println("Another action to do: ", followingAction.Definition().Name)
-		fmt.Println("Reasoning: ", reasoning)
 		// call ourselves again
 		a.currentReasoning = reasoning
 		a.nextAction = followingAction
@@ -249,5 +278,5 @@ func (a *Agent) consumeJob(job *Job) {
 		msg.Content)
 
 	a.currentConversation = append(a.currentConversation, msg)
-	job.Result.Finish()
+	job.Result.Finish(nil)
 }

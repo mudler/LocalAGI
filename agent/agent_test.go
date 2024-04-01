@@ -61,7 +61,12 @@ var _ = Describe("Agent test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			go agent.Run()
 			defer agent.Stop()
-			res := agent.Ask("can you get the weather in boston, and afterward of Milano, Italy?", "")
+			res := agent.Ask(
+				WithReasoningCallback(func(a Action, ap action.ActionParams, s string) {
+					fmt.Println("Reasoning", s)
+				}),
+				WithText("can you get the weather in boston, and afterward of Milano, Italy?"),
+			)
 			Expect(res).To(ContainElement(testActionResult), fmt.Sprint(res))
 			Expect(res).To(ContainElement(testActionResult2), fmt.Sprint(res))
 		})
@@ -75,7 +80,9 @@ var _ = Describe("Agent test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			go agent.Run()
 			defer agent.Stop()
-			res := agent.Ask("can you get the weather in boston?", "")
+			res := agent.Ask(
+				WithText("can you get the weather in boston?"),
+			)
 			Expect(res).To(ContainElement(testActionResult), fmt.Sprint(res))
 		})
 	})
