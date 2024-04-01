@@ -85,50 +85,46 @@ func (a *Agent) generateParameters(ctx context.Context, action Action, conversat
 		action.Definition().Name)
 }
 
-const pickActionTemplate = `You can take any of the following tools: 
+func (a *Agent) prepareHUD() PromptHUD {
+	return PromptHUD{
+		Character: a.Character,
+	}
+}
 
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-To answer back to the user, use the "reply" tool.
-Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
-
-{{range .Messages -}}
-{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
+const hudTemplate = `You have a character and your replies and actions might be influenced by it.
+{{if .Character.Name}}Name: {{.Character.Name}}
+{{end}}{{if .Character.Age}}Age: {{.Character.Age}}
+{{end}}{{if .Character.Occupation}}Occupation: {{.Character.Occupation}}
+{{end}}{{if .Character.NowDoing}}Now doing: {{.Character.NowDoing}}
+{{end}}{{if .Character.DoingNext}}Doing next: {{.Character.DoingNext}}
+{{end}}{{if .Character.DoneHistory}}Done history: {{.Character.DoneHistory}}
+{{end}}{{if .Character.Memories}}Memories: {{.Character.Memories}}
+{{end}}{{if .Character.Hobbies}}Hobbies: {{.Character.Hobbies}}
+{{end}}{{if .Character.MusicTaste}}Music taste: {{.Character.MusicTaste}}
 {{end}}
 `
-
-const reEvalTemplate = `You can take any of the following tools: 
-
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-To answer back to the user, use the "reply" tool.
-Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
-
-{{range .Messages -}}
-{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
-{{end}}
-
-We already have called tools. Evaluate the current situation and decide if we need to execute other tools or answer back with a result.`
 
 // pickAction picks an action based on the conversation
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
 	// prepare the prompt
 	prompt := bytes.NewBuffer([]byte{})
+	hud := bytes.NewBuffer([]byte{})
 
-	tmpl, err := template.New("pickAction").Parse(templ)
+	promptTemplate, err := template.New("pickAction").Parse(templ)
 	if err != nil {
 		return nil, "", err
 	}
-
+	hudTmpl, err := template.New("HUD").Parse(hudTemplate)
+	if err != nil {
+		return nil, "", err
+	}
 	// Get all the actions definitions
 	definitions := []action.ActionDefinition{action.NewReply().Definition()}
 	for _, m := range a.options.actions {
 		definitions = append(definitions, m.Definition())
 	}
 
-	err = tmpl.Execute(prompt, struct {
+	err = promptTemplate.Execute(prompt, struct {
 		Actions  []action.ActionDefinition
 		Messages []openai.ChatCompletionMessage
 	}{
@@ -139,6 +135,12 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return nil, "", err
 	}
 
+	err = hudTmpl.Execute(prompt, a.prepareHUD())
+	if err != nil {
+		return nil, "", err
+	}
+	fmt.Println("=== HUD START ===", hud.String(), "=== HUD END ===")
+
 	fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
 
 	// Get all the available actions IDs
@@ -147,12 +149,19 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 
-	conversation := []openai.ChatCompletionMessage{
-		{
-			Role:    "user",
-			Content: prompt.String(),
-		},
+	conversation := []openai.ChatCompletionMessage{}
+
+	if a.options.enableHUD {
+		conversation = append(conversation, openai.ChatCompletionMessage{
+			Role:    "system",
+			Content: hud.String(),
+		})
 	}
+
+	conversation = append(conversation, openai.ChatCompletionMessage{
+		Role:    "user",
+		Content: prompt.String(),
+	})
 
 	// Get the LLM to think on what to do
 	thought, err := a.decision(ctx,

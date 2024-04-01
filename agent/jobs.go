@@ -70,6 +70,33 @@ func (j *JobResult) WaitResult() []string {
 	return j.Data
 }
 
+const pickActionTemplate = `You can take any of the following tools: 
+
+{{range .Actions -}}
+- {{.Name}}: {{.Description }}
+{{ end }}
+To answer back to the user, use the "reply" tool.
+Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
+
+{{range .Messages -}}
+{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
+{{end}}
+`
+
+const reEvalTemplate = `You can take any of the following tools: 
+
+{{range .Actions -}}
+- {{.Name}}: {{.Description }}
+{{ end }}
+To answer back to the user, use the "reply" tool.
+Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
+
+{{range .Messages -}}
+{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
+{{end}}
+
+We already have called tools. Evaluate the current situation and decide if we need to execute other tools or answer back with a result.`
+
 func (a *Agent) consumeJob(job *Job) {
 	// Consume the job and generate a response
 	a.Lock()

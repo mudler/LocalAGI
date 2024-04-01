@@ -18,6 +18,7 @@ type options struct {
 	randomIdentityGuidance string
 	randomIdentity         bool
 	actions                Actions
+	enableHUD              bool
 	context                context.Context
 }
 
@@ -49,6 +50,11 @@ func newOptions(opts ...Option) (*options, error) {
 		}
 	}
 	return options, nil
+}
+
+var EnableHUD = func(o *options) error {
+	o.enableHUD = true
+	return nil
 }
 
 func WithLLMAPIURL(url string) Option {

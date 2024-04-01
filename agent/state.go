@@ -8,6 +8,13 @@ import (
 	"github.com/mudler/local-agent-framework/llm"
 )
 
+// PromptHUD contains
+// all information that should be displayed to the LLM
+// in the prompts
+type PromptHUD struct {
+	Character Character `json:"character"`
+}
+
 type Character struct {
 	Name        string   `json:"name"`
 	Age         int      `json:"age"`
