@@ -17,28 +17,28 @@ type Job struct {
 	Text              string
 	Image             string // base64 encoded image
 	Result            *JobResult
-	reasoningCallback func(Action, action.ActionParams, string)
-	resultCallback    func(Action, action.ActionParams, string, string)
+	reasoningCallback func(ActionCurrentState) bool
+	resultCallback    func(ActionState)
 }
 
 // JobResult is the result of a job
 type JobResult struct {
 	sync.Mutex
 	// The result of a job
-	Data  []string
+	State []ActionState
 	Error error
 	ready chan bool
 }
 
 type JobOption func(*Job)
 
-func WithReasoningCallback(f func(Action, action.ActionParams, string)) JobOption {
+func WithReasoningCallback(f func(ActionCurrentState) bool) JobOption {
 	return func(r *Job) {
 		r.reasoningCallback = f
 	}
 }
 
-func WithResultCallback(f func(Action, action.ActionParams, string, string)) JobOption {
+func WithResultCallback(f func(ActionState)) JobOption {
 	return func(r *Job) {
 		r.resultCallback = f
 	}
@@ -52,18 +52,18 @@ func NewJobResult() *JobResult {
 	return r
 }
 
-func (j *Job) Callback(a Action, p action.ActionParams, s string) {
+func (j *Job) Callback(stateResult ActionCurrentState) bool {
 	if j.reasoningCallback == nil {
-		return
+		return true
 	}
-	j.reasoningCallback(a, p, s)
+	return j.reasoningCallback(stateResult)
 }
 
-func (j *Job) CallbackWithResult(a Action, p action.ActionParams, s, r string) {
+func (j *Job) CallbackWithResult(stateResult ActionState) {
 	if j.resultCallback == nil {
 		return
 	}
-	j.resultCallback(a, p, s, r)
+	j.resultCallback(stateResult)
 }
 
 func WithImage(image string) JobOption {
@@ -93,11 +93,11 @@ func NewJob(opts ...JobOption) *Job {
 }
 
 // SetResult sets the result of a job
-func (j *JobResult) SetResult(text string) {
+func (j *JobResult) SetResult(text ActionState) {
 	j.Lock()
 	defer j.Unlock()
 
-	j.Data = append(j.Data, text)
+	j.State = append(j.State, text)
 }
 
 // SetResult sets the result of a job
@@ -110,11 +110,11 @@ func (j *JobResult) Finish(e error) {
 }
 
 // WaitResult waits for the result of a job
-func (j *JobResult) WaitResult() []string {
+func (j *JobResult) WaitResult() []ActionState {
 	<-j.ready
 	j.Lock()
 	defer j.Unlock()
-	return j.Data
+	return j.State
 }
 
 const pickActionTemplate = `You can take any of the following tools: 
@@ -185,8 +185,7 @@ func (a *Agent) consumeJob(job *Job) {
 	}
 
 	if chosenAction == nil || chosenAction.Definition().Name.Is(action.ReplyActionName) {
-		fmt.Println("No action to do, just reply")
-		job.Result.SetResult(reasoning)
+		job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
 		return
 	}
 
@@ -196,7 +195,11 @@ func (a *Agent) consumeJob(job *Job) {
 		return
 	}
 
-	job.Callback(chosenAction, params.actionParams, reasoning)
+	if !job.Callback(ActionCurrentState{chosenAction, params.actionParams, reasoning}) {
+		fmt.Println("Stop from callback")
+		job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, params.actionParams, reasoning}, "stopped by callback"})
+		return
+	}
 
 	if params.actionParams == nil {
 		fmt.Println("no parameters")
@@ -216,8 +219,9 @@ func (a *Agent) consumeJob(job *Job) {
 		}
 	}
 	fmt.Printf("Action run result: %v\n", result)
-	job.Result.SetResult(result)
-	job.CallbackWithResult(chosenAction, params.actionParams, reasoning, result)
+	stateResult := ActionState{ActionCurrentState{chosenAction, params.actionParams, reasoning}, result}
+	job.Result.SetResult(stateResult)
+	job.CallbackWithResult(stateResult)
 
 	// calling the function
 	messages = append(messages, openai.ChatCompletionMessage{

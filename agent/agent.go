@@ -63,7 +63,7 @@ func New(opts ...Option) (*Agent, error) {
 
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
-func (a *Agent) Ask(opts ...JobOption) []string {
+func (a *Agent) Ask(opts ...JobOption) []ActionState {
 	//a.StopAction()
 	j := NewJob(opts...)
 	//	fmt.Println("Job created", text)

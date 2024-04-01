@@ -62,13 +62,18 @@ var _ = Describe("Agent test", func() {
 			go agent.Run()
 			defer agent.Stop()
 			res := agent.Ask(
-				WithReasoningCallback(func(a Action, ap action.ActionParams, s string) {
-					fmt.Println("Reasoning", s)
+				WithReasoningCallback(func(state ActionCurrentState) bool {
+					fmt.Println("Reasoning", state)
+					return true
 				}),
 				WithText("can you get the weather in boston, and afterward of Milano, Italy?"),
 			)
-			Expect(res).To(ContainElement(testActionResult), fmt.Sprint(res))
-			Expect(res).To(ContainElement(testActionResult2), fmt.Sprint(res))
+			reasons := []string{}
+			for _, r := range res {
+				reasons = append(reasons, r.Result)
+			}
+			Expect(reasons).To(ContainElement(testActionResult), fmt.Sprint(res))
+			Expect(reasons).To(ContainElement(testActionResult2), fmt.Sprint(res))
 		})
 		It("pick the correct action", func() {
 			agent, err := New(
@@ -83,7 +88,11 @@ var _ = Describe("Agent test", func() {
 			res := agent.Ask(
 				WithText("can you get the weather in boston?"),
 			)
-			Expect(res).To(ContainElement(testActionResult), fmt.Sprint(res))
+			reasons := []string{}
+			for _, r := range res {
+				reasons = append(reasons, r.Result)
+			}
+			Expect(reasons).To(ContainElement(testActionResult), fmt.Sprint(res))
 		})
 	})
 })

@@ -11,6 +11,17 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+type ActionState struct {
+	ActionCurrentState
+	Result string
+}
+
+type ActionCurrentState struct {
+	Action    Action
+	Params    action.ActionParams
+	Reasoning string
+}
+
 // Actions is something the agent can do
 type Action interface {
 	Run(action.ActionParams) (string, error)
@@ -135,7 +146,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return nil, "", err
 	}
 
-	err = hudTmpl.Execute(prompt, a.prepareHUD())
+	err = hudTmpl.Execute(hud, a.prepareHUD())
 	if err != nil {
 		return nil, "", err
 	}
