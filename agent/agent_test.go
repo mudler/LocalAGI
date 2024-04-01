@@ -11,7 +11,7 @@ import (
 )
 
 const testActionResult = "In Boston it's 30C today, it's sunny, and humidity is at 98%"
-const testActionResult2 = "In milan it's very hot today"
+const testActionResult2 = "In milan it's very hot today, it is 45C and the humidity is at 200%"
 
 var _ Action = &TestAction{}
 

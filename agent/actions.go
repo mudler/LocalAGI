@@ -88,38 +88,26 @@ func (a *Agent) generateParameters(ctx context.Context, action Action, conversat
 const pickActionTemplate = `You can take any of the following tools: 
 
 {{range .Actions -}}
-{{.Name}}: {{.Description }}
+- {{.Name}}: {{.Description }}
 {{ end }}
-
-To answer back to the user, use the "answer" tool.
+To answer back to the user, use the "reply" tool.
 Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
 
-{{range .Messages }}
-{{if eq .Role "tool"}}Tool result{{else}}{{.Role}}{{ end }}: {{.Content}}
-{{if .FunctionCall}}
-Tool called with: {{.FunctionCall}}
-{{end}}
-{{range .ToolCalls}}
-{{.Name}}: {{.Arguments}}
-{{end}}
+{{range .Messages -}}
+{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
 {{end}}
 `
 
 const reEvalTemplate = `You can take any of the following tools: 
 
-{{range .Actions}}{{.Name}}: {{.Description}}{{end}}
-
-To answer back to the user, use the "answer" tool.
-For answering without picking a choice, reply with 'none'.
-
-Given the text below, decide which action to take and explain the reasoning behind it. 
+{{range .Actions -}}
+- {{.Name}}: {{.Description }}
+{{ end }}
+To answer back to the user, use the "reply" tool.
+Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
 
 {{range .Messages -}}
-{{if eq .Role "tool" }}Tool result{{else}}{{.Role}}: {{ end }}{{.Content }}
-{{if .FunctionCall}}Tool called with: {{.FunctionCall}}{{end}}
-{{range .ToolCalls}}
-{{.Name}}: {{.Arguments}}
-{{end}}
+{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
 {{end}}
 
 We already have called tools. Evaluate the current situation and decide if we need to execute other tools or answer back with a result.`
