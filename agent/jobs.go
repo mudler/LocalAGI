@@ -23,8 +23,10 @@ type Job struct {
 type JobResult struct {
 	sync.Mutex
 	// The result of a job
-	Data  []string
-	ready chan bool
+	Data              []string
+	reasoningCallback func(Action, action.ActionParams, string)
+	resultCallback    func(Action, action.ActionParams, string, string)
+	ready             chan bool
 }
 
 // NewJobResult creates a new job result
@@ -32,6 +34,20 @@ func NewJobResult() *JobResult {
 	return &JobResult{
 		ready: make(chan bool),
 	}
+}
+
+func (j *JobResult) Callback(a Action, p action.ActionParams, s string) {
+	if j.reasoningCallback == nil {
+		return
+	}
+	j.reasoningCallback(a, p, s)
+}
+
+func (j *JobResult) CallbackWithResult(a Action, p action.ActionParams, s, r string) {
+	if j.resultCallback == nil {
+		return
+	}
+	j.resultCallback(a, p, s, r)
 }
 
 // NewJob creates a new job
@@ -149,6 +165,8 @@ func (a *Agent) consumeJob(job *Job) {
 		return
 	}
 
+	job.Result.Callback(chosenAction, params.actionParams, reasoning)
+
 	if params.actionParams == nil {
 		fmt.Println("no parameters")
 		return
@@ -168,6 +186,7 @@ func (a *Agent) consumeJob(job *Job) {
 	}
 	fmt.Printf("Action run result: %v\n", result)
 	job.Result.SetResult(result)
+	job.Result.CallbackWithResult(chosenAction, params.actionParams, reasoning, result)
 
 	// calling the function
 	messages = append(messages, openai.ChatCompletionMessage{
