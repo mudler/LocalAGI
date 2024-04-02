@@ -72,6 +72,18 @@ func (a *Agent) Ask(opts ...JobOption) []ActionState {
 	return j.Result.WaitResult()
 }
 
+func (a *Agent) CurrentConversation() []openai.ChatCompletionMessage {
+	a.Lock()
+	defer a.Unlock()
+	return a.currentConversation
+}
+
+func (a *Agent) ResetConversation() {
+	a.Lock()
+	defer a.Unlock()
+	a.currentConversation = []openai.ChatCompletionMessage{}
+}
+
 var ErrContextCanceled = fmt.Errorf("context canceled")
 
 func (a *Agent) Stop() {
@@ -109,7 +121,7 @@ func (a *Agent) Run() error {
 			// before clearing it out
 
 			// Clear the conversation
-			a.currentConversation = []openai.ChatCompletionMessage{}
+			//	a.currentConversation = []openai.ChatCompletionMessage{}
 		}
 	}
 }

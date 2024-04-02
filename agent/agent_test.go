@@ -12,6 +12,7 @@ import (
 
 const testActionResult = "In Boston it's 30C today, it's sunny, and humidity is at 98%"
 const testActionResult2 = "In milan it's very hot today, it is 45C and the humidity is at 200%"
+const testActionResult3 = "In paris it's very cold today, it is 2C and the humidity is at 10%"
 
 var _ Action = &TestAction{}
 
@@ -22,11 +23,12 @@ type TestAction struct {
 
 func (a *TestAction) Run(action.ActionParams) (string, error) {
 	res := a.response[a.responseN]
+	a.responseN++
+
 	if len(a.response) == a.responseN {
 		a.responseN = 0
-	} else {
-		a.responseN++
 	}
+
 	return res, nil
 }
 
@@ -56,7 +58,7 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
 				//	WithRandomIdentity(),
-				WithActions(&TestAction{response: []string{testActionResult, testActionResult2}}),
+				WithActions(&TestAction{response: []string{testActionResult, testActionResult2, testActionResult3}}),
 			)
 			Expect(err).ToNot(HaveOccurred())
 			go agent.Run()

@@ -156,9 +156,8 @@ func (a *Agent) consumeJob(job *Job) {
 		// TODO: Use llava to explain the image content
 	}
 
-	messages := a.currentConversation
 	if job.Text != "" {
-		messages = append(messages, openai.ChatCompletionMessage{
+		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 			Role:    "user",
 			Content: job.Text,
 		})
@@ -177,7 +176,7 @@ func (a *Agent) consumeJob(job *Job) {
 		a.nextAction = nil
 	} else {
 		var err error
-		chosenAction, reasoning, err = a.pickAction(ctx, pickActionTemplate, messages)
+		chosenAction, reasoning, err = a.pickAction(ctx, pickActionTemplate, a.currentConversation)
 		if err != nil {
 			fmt.Printf("error picking action: %v\n", err)
 			return
@@ -189,7 +188,7 @@ func (a *Agent) consumeJob(job *Job) {
 		return
 	}
 
-	params, err := a.generateParameters(ctx, chosenAction, messages)
+	params, err := a.generateParameters(ctx, chosenAction, a.currentConversation)
 	if err != nil {
 		fmt.Printf("error generating parameters: %v\n", err)
 		return
@@ -224,7 +223,7 @@ func (a *Agent) consumeJob(job *Job) {
 	job.CallbackWithResult(stateResult)
 
 	// calling the function
-	messages = append(messages, openai.ChatCompletionMessage{
+	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 		Role: "assistant",
 		FunctionCall: &openai.FunctionCall{
 			Name:      chosenAction.Definition().Name.String(),
@@ -233,18 +232,19 @@ func (a *Agent) consumeJob(job *Job) {
 	})
 
 	// result of calling the function
-	messages = append(messages, openai.ChatCompletionMessage{
+	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		Content:    result,
 		Name:       chosenAction.Definition().Name.String(),
 		ToolCallID: chosenAction.Definition().Name.String(),
 	})
 
-	a.currentConversation = append(a.currentConversation, messages...)
+	//a.currentConversation = append(a.currentConversation, messages...)
+	//a.currentConversation = messages
 
 	// given the result, we can now ask OpenAI to complete the conversation or
 	// to continue using another tool given the result
-	followingAction, reasoning, err := a.pickAction(ctx, reEvalTemplate, messages)
+	followingAction, reasoning, err := a.pickAction(ctx, reEvalTemplate, a.currentConversation)
 	if err != nil {
 		fmt.Printf("error picking action: %v\n", err)
 		return
@@ -267,7 +267,7 @@ func (a *Agent) consumeJob(job *Job) {
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
 			Model:    a.options.LLMAPI.Model,
-			Messages: messages,
+			Messages: a.currentConversation,
 		},
 	)
 	if err != nil || len(resp.Choices) != 1 {
