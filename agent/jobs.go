@@ -154,6 +154,7 @@ func (a *Agent) consumeJob(job *Job) {
 
 	if job.Image != "" {
 		// TODO: Use llava to explain the image content
+
 	}
 
 	if job.Text != "" {

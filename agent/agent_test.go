@@ -53,7 +53,7 @@ func (a *TestAction) Definition() action.ActionDefinition {
 
 var _ = Describe("Agent test", func() {
 	Context("jobs", func() {
-		FIt("pick the correct action", func() {
+		It("pick the correct action", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
@@ -76,6 +76,18 @@ var _ = Describe("Agent test", func() {
 			}
 			Expect(reasons).To(ContainElement(testActionResult), fmt.Sprint(res))
 			Expect(reasons).To(ContainElement(testActionResult2), fmt.Sprint(res))
+			reasons = []string{}
+
+			res = agent.Ask(WithText("Now I want to know the weather in Paris"))
+			conversation := agent.CurrentConversation()
+			Expect(len(conversation)).To(Equal(10), fmt.Sprint(conversation))
+			for _, r := range res {
+				reasons = append(reasons, r.Result)
+			}
+			Expect(reasons).ToNot(ContainElement(testActionResult), fmt.Sprint(res))
+			Expect(reasons).ToNot(ContainElement(testActionResult2), fmt.Sprint(res))
+			Expect(reasons).To(ContainElement(testActionResult3), fmt.Sprint(res))
+
 		})
 		It("pick the correct action", func() {
 			agent, err := New(
