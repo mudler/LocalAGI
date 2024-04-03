@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mudler/local-agent-framework/action"
 	"github.com/mudler/local-agent-framework/llm"
 )
 
@@ -12,25 +13,9 @@ import (
 // all information that should be displayed to the LLM
 // in the prompts
 type PromptHUD struct {
-	Character    Character `json:"character"`
-	CurrentState State     `json:"current_state"`
-}
-
-// State is the structure
-// that is used to keep track of the current state
-// and the Agent's short memory that it can update
-// Besides a long term memory that is accessible by the agent (With vector database),
-// And a context memory (that is always powered by a vector database),
-// this memory is the shorter one that the LLM keeps across conversation and across its
-// reasoning process's and life time.
-// TODO: A special action is then used to let the LLM itself update its memory
-// periodically during self-processing, and the same action is ALSO exposed
-// during the conversation to let the user put for example, a new goal to the agent.
-type State struct {
-	NowDoing    string   `json:"doing_now"`
-	DoingNext   string   `json:"doing_next"`
-	DoneHistory []string `json:"done_history"`
-	Memories    []string `json:"memories"`
+	Character     Character          `json:"character"`
+	CurrentState  action.StateResult `json:"current_state"`
+	PermanentGoal string             `json:"permanent_goal"`
 }
 
 type Character struct {

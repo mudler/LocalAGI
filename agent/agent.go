@@ -47,15 +47,15 @@ const (
 
 type Agent struct {
 	sync.Mutex
-	options          *options
-	Character        Character
-	client           *openai.Client
-	jobQueue         chan *Job
-	actionContext    *action.ActionContext
-	context          *action.ActionContext
-	availableActions []Action
+	options       *options
+	Character     Character
+	client        *openai.Client
+	jobQueue      chan *Job
+	actionContext *action.ActionContext
+	context       *action.ActionContext
 
 	currentReasoning    string
+	currentState        *action.StateResult
 	nextAction          Action
 	currentConversation []openai.ChatCompletionMessage
 }
@@ -78,12 +78,12 @@ func New(opts ...Option) (*Agent, error) {
 
 	ctx, cancel := context.WithCancel(c)
 	a := &Agent{
-		jobQueue:         make(chan *Job),
-		options:          options,
-		client:           client,
-		Character:        options.character,
-		context:          action.NewContext(ctx, cancel),
-		availableActions: options.actions,
+		jobQueue:     make(chan *Job),
+		options:      options,
+		client:       client,
+		Character:    options.character,
+		currentState: &action.StateResult{},
+		context:      action.NewContext(ctx, cancel),
 	}
 
 	if a.options.randomIdentity {
@@ -135,6 +135,30 @@ func (a *Agent) Stop() {
 	a.context.Cancel()
 }
 
+func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (result string, err error) {
+	for _, action := range a.systemActions() {
+		if action.Definition().Name == chosenAction.Definition().Name {
+			if result, err = action.Run(decisionResult.actionParams); err != nil {
+				return "", fmt.Errorf("error running action: %w", err)
+			}
+		}
+	}
+
+	if chosenAction.Definition().Name.Is(action.StateActionName) {
+		// We need to store the result in the state
+		state := action.StateResult{}
+
+		err = decisionResult.actionParams.Unmarshal(&result)
+		if err != nil {
+			return "", err
+		}
+		// update the current state with the one we just got from the action
+		a.currentState = &state
+	}
+
+	return result, nil
+}
+
 func (a *Agent) consumeJob(job *Job, role string) {
 	// Consume the job and generate a response
 	a.Lock()
@@ -175,9 +199,9 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
-	if chosenAction == nil || chosenAction.Definition().Name.Is(action.ReplyActionName) {
-		job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
-		job.Result.Finish(nil)
+	if chosenAction == nil {
+		//job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
+		job.Result.Finish(fmt.Errorf("no action to do"))
 		return
 	}
 
@@ -187,70 +211,68 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
+	if params.actionParams == nil {
+		job.Result.Finish(fmt.Errorf("no parameters"))
+		return
+	}
+
 	if !job.Callback(ActionCurrentState{chosenAction, params.actionParams, reasoning}) {
 		job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, params.actionParams, reasoning}, "stopped by callback"})
 		job.Result.Finish(nil)
 		return
 	}
 
-	if params.actionParams == nil {
-		job.Result.Finish(fmt.Errorf("no parameters"))
-		return
-	}
-
-	var result string
-	for _, action := range a.options.actions {
-		if action.Definition().Name == chosenAction.Definition().Name {
-			if result, err = action.Run(params.actionParams); err != nil {
-				job.Result.Finish(fmt.Errorf("error running action: %w", err))
-				return
-			}
+	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
+		result, err := a.runAction(chosenAction, params)
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("error running action: %w", err))
+			return
 		}
-	}
 
-	stateResult := ActionState{ActionCurrentState{chosenAction, params.actionParams, reasoning}, result}
-	job.Result.SetResult(stateResult)
-	job.CallbackWithResult(stateResult)
+		stateResult := ActionState{ActionCurrentState{chosenAction, params.actionParams, reasoning}, result}
+		job.Result.SetResult(stateResult)
+		job.CallbackWithResult(stateResult)
 
-	// calling the function
-	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-		Role: "assistant",
-		FunctionCall: &openai.FunctionCall{
-			Name:      chosenAction.Definition().Name.String(),
-			Arguments: params.actionParams.String(),
-		},
-	})
+		// calling the function
+		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+			Role: "assistant",
+			FunctionCall: &openai.FunctionCall{
+				Name:      chosenAction.Definition().Name.String(),
+				Arguments: params.actionParams.String(),
+			},
+		})
 
-	// result of calling the function
-	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    result,
-		Name:       chosenAction.Definition().Name.String(),
-		ToolCallID: chosenAction.Definition().Name.String(),
-	})
+		// result of calling the function
+		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    result,
+			Name:       chosenAction.Definition().Name.String(),
+			ToolCallID: chosenAction.Definition().Name.String(),
+		})
 
-	//a.currentConversation = append(a.currentConversation, messages...)
-	//a.currentConversation = messages
+		//a.currentConversation = append(a.currentConversation, messages...)
+		//a.currentConversation = messages
 
-	// given the result, we can now ask OpenAI to complete the conversation or
-	// to continue using another tool given the result
-	followingAction, reasoning, err := a.pickAction(ctx, reEvalTemplate, a.currentConversation)
-	if err != nil {
-		job.Result.Finish(fmt.Errorf("error picking action: %w", err))
-		return
-	}
+		// given the result, we can now ask OpenAI to complete the conversation or
+		// to continue using another tool given the result
+		followingAction, reasoning, err := a.pickAction(ctx, reEvalTemplate, a.currentConversation)
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("error picking action: %w", err))
+			return
+		}
 
-	if followingAction != nil &&
-		!followingAction.Definition().Name.Is(action.ReplyActionName) &&
-		!chosenAction.Definition().Name.Is(action.ReplyActionName) {
-		// We need to do another action (?)
-		// The agent decided to do another action
-		// call ourselves again
-		a.currentReasoning = reasoning
-		a.nextAction = followingAction
-		job.Text = ""
-		a.consumeJob(job, role)
-		return
+		if followingAction != nil &&
+			!followingAction.Definition().Name.Is(action.ReplyActionName) &&
+			!chosenAction.Definition().Name.Is(action.ReplyActionName) {
+			// We need to do another action (?)
+			// The agent decided to do another action
+			// call ourselves again
+			a.currentReasoning = reasoning
+			a.nextAction = followingAction
+			job.Text = ""
+			a.consumeJob(job, role)
+			return
+		}
 	}
 
 	// Generate a human-readable response
@@ -335,7 +357,6 @@ func (a *Agent) Run() error {
 	for {
 		select {
 		case job := <-a.jobQueue:
-
 			// Consume the job and generate a response
 			// TODO: Give a short-term memory to the agent
 			a.consumeJob(job, UserRole)

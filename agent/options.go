@@ -17,9 +17,10 @@ type options struct {
 	character                Character
 	randomIdentityGuidance   string
 	randomIdentity           bool
-	actions                  Actions
+	userActions              Actions
 	enableHUD, standaloneJob bool
 	context                  context.Context
+	permanentGoal            string
 }
 
 func defaultOptions() *options {
@@ -74,6 +75,13 @@ func WithLLMAPIKey(key string) Option {
 	}
 }
 
+func WithPermanentGoal(goal string) Option {
+	return func(o *options) error {
+		o.permanentGoal = goal
+		return nil
+	}
+}
+
 func WithContext(ctx context.Context) Option {
 	return func(o *options) error {
 		o.context = ctx
@@ -116,7 +124,7 @@ func WithRandomIdentity(guidance ...string) Option {
 
 func WithActions(actions ...Action) Option {
 	return func(o *options) error {
-		o.actions = actions
+		o.userActions = actions
 		return nil
 	}
 }

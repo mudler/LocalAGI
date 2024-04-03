@@ -88,13 +88,23 @@ func (a *Agent) decision(
 func (a *Agent) generateParameters(ctx context.Context, action Action, conversation []openai.ChatCompletionMessage) (*decisionResult, error) {
 	return a.decision(ctx,
 		conversation,
-		a.options.actions.ToTools(),
+		a.systemActions().ToTools(),
 		action.Definition().Name)
+}
+
+func (a *Agent) systemActions() Actions {
+	if a.options.enableHUD {
+		return append(a.options.userActions, action.NewReply(), action.NewState())
+	}
+
+	return append(a.options.userActions, action.NewReply())
 }
 
 func (a *Agent) prepareHUD() PromptHUD {
 	return PromptHUD{
-		Character: a.Character,
+		Character:     a.Character,
+		CurrentState:  *a.currentState,
+		PermanentGoal: a.options.permanentGoal,
 	}
 }
 
@@ -105,6 +115,14 @@ const hudTemplate = `You have a character and your replies and actions might be 
 {{end}}{{if .Character.Hobbies}}Hobbies: {{.Character.Hobbies}}
 {{end}}{{if .Character.MusicTaste}}Music taste: {{.Character.MusicTaste}}
 {{end}}
+
+This is your current state:
+{{if .CurrentState.NowDoing}}NowDoing: {{.CurrentState.NowDoing}} {{end}}
+{{if .CurrentState.DoingNext}}DoingNext: {{.CurrentState.DoingNext}} {{end}}
+{{if .PermanentGoal}}Your permanent goal is: {{.PermanentGoal}} {{end}}
+{{if .CurrentState.Goal}}Your current goal is: {{.CurrentState.Goal}} {{end}}
+You have done: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
+You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}
 `
 
 // pickAction picks an action based on the conversation
@@ -122,8 +140,8 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return nil, "", err
 	}
 	// Get all the actions definitions
-	definitions := []action.ActionDefinition{action.NewReply().Definition()}
-	for _, m := range a.options.actions {
+	definitions := []action.ActionDefinition{}
+	for _, m := range a.systemActions() {
 		definitions = append(definitions, m.Definition())
 	}
 
@@ -148,7 +166,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 
 	// Get all the available actions IDs
 	actionsID := []string{}
-	for _, m := range a.options.actions {
+	for _, m := range a.systemActions() {
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 
@@ -215,7 +233,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	}
 
 	// Find the action
-	chosenAction := append(a.options.actions, action.NewReply()).Find(actionChoice.Tool)
+	chosenAction := a.systemActions().Find(actionChoice.Tool)
 	if chosenAction == nil {
 		return nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	}
