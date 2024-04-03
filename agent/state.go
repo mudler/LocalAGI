@@ -23,7 +23,7 @@ type PromptHUD struct {
 // And a context memory (that is always powered by a vector database),
 // this memory is the shorter one that the LLM keeps across conversation and across its
 // reasoning process's and life time.
-// A special action is then used to let the LLM itself update its memory
+// TODO: A special action is then used to let the LLM itself update its memory
 // periodically during self-processing, and the same action is ALSO exposed
 // during the conversation to let the user put for example, a new goal to the agent.
 type State struct {

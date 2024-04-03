@@ -281,7 +281,6 @@ func (a *Agent) consumeJob(job *Job, role string) {
 }
 
 func (a *Agent) periodicallyRun() {
-
 	// Here the LLM could decide to store some part of the conversation too in the memory
 	evaluateMemory := NewJob(
 		WithText(
@@ -319,12 +318,6 @@ func (a *Agent) periodicallyRun() {
 	a.consumeJob(evaluateAction, SystemRole)
 
 	a.ResetConversation()
-
-	// TODO: decide to do something on its own with the conversation result
-	// before clearing it out
-
-	// Clear the conversation
-	//	a.currentConversation = []openai.ChatCompletionMessage{}
 }
 
 func (a *Agent) Run() error {
