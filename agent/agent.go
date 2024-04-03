@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -280,7 +281,45 @@ func (a *Agent) consumeJob(job *Job, role string) {
 }
 
 func (a *Agent) periodicallyRun() {
-	a.consumeJob(NewJob(WithText("What should I do next?")), SystemRole)
+
+	// Here the LLM could decide to store some part of the conversation too in the memory
+	evaluateMemory := NewJob(
+		WithText(
+			`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
+		))
+	a.consumeJob(evaluateMemory, SystemRole)
+
+	a.ResetConversation()
+
+	// Here we go in a loop of
+	// - asking the agent to do something
+	// - evaluating the result
+	// - asking the agent to do something else based on the result
+
+	whatNext := NewJob(WithText("What should I do next?"))
+	a.consumeJob(whatNext, SystemRole)
+
+	doWork := NewJob(WithText("Try to fullfill our goals automatically"))
+	a.consumeJob(doWork, SystemRole)
+
+	results := []string{}
+	for _, v := range doWork.Result.State {
+		results = append(results, v.Result)
+	}
+
+	a.ResetConversation()
+
+	// Here the LLM could decide to do something based on the result of our automatic action
+	evaluateAction := NewJob(
+		WithText(
+			`Evaluate the current situation and decide if we need to execute other tools (for instance to store results into permanent, or short memory).
+			We have done the following actions:
+			` + strings.Join(results, "\n"),
+		))
+	a.consumeJob(evaluateAction, SystemRole)
+
+	a.ResetConversation()
+
 	// TODO: decide to do something on its own with the conversation result
 	// before clearing it out
 
