@@ -29,15 +29,11 @@ func defaultOptions() *options {
 			Model:  "echidna",
 		},
 		character: Character{
-			Name:        "John Doe",
-			Age:         0,
-			Occupation:  "Unemployed",
-			NowDoing:    "Nothing",
-			DoingNext:   "Nothing",
-			DoneHistory: []string{},
-			Memories:    []string{},
-			Hobbies:     []string{},
-			MusicTaste:  []string{},
+			Name:       "John Doe",
+			Age:        0,
+			Occupation: "Unemployed",
+			Hobbies:    []string{},
+			MusicTaste: []string{},
 		},
 	}
 }

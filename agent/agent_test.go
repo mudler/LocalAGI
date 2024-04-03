@@ -16,6 +16,18 @@ const testActionResult3 = "In paris it's very cold today, it is 2C and the humid
 
 var _ Action = &TestAction{}
 
+var debugOptions = []JobOption{
+	WithReasoningCallback(func(state ActionCurrentState) bool {
+		fmt.Println("Reasoning", state)
+		return true
+	}),
+	WithResultCallback(func(state ActionState) {
+		fmt.Println("Reasoning", state.Reasoning)
+		fmt.Println("Action", state.Action)
+		fmt.Println("Result", state.Result)
+	}),
+}
+
 type TestAction struct {
 	response  []string
 	responseN int
@@ -64,11 +76,9 @@ var _ = Describe("Agent test", func() {
 			go agent.Run()
 			defer agent.Stop()
 			res := agent.Ask(
-				WithReasoningCallback(func(state ActionCurrentState) bool {
-					fmt.Println("Reasoning", state)
-					return true
-				}),
-				WithText("can you get the weather in boston, and afterward of Milano, Italy?"),
+				append(debugOptions,
+					WithText("can you get the weather in boston, and afterward of Milano, Italy?"),
+				)...,
 			)
 			reasons := []string{}
 			for _, r := range res {
@@ -78,7 +88,10 @@ var _ = Describe("Agent test", func() {
 			Expect(reasons).To(ContainElement(testActionResult2), fmt.Sprint(res))
 			reasons = []string{}
 
-			res = agent.Ask(WithText("Now I want to know the weather in Paris"))
+			res = agent.Ask(
+				append(debugOptions,
+					WithText("Now I want to know the weather in Paris"),
+				)...)
 			conversation := agent.CurrentConversation()
 			Expect(len(conversation)).To(Equal(10), fmt.Sprint(conversation))
 			for _, r := range res {
@@ -93,6 +106,7 @@ var _ = Describe("Agent test", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
+
 				//	WithRandomIdentity(),
 				WithActions(&TestAction{response: []string{testActionResult}}),
 			)
@@ -100,7 +114,8 @@ var _ = Describe("Agent test", func() {
 			go agent.Run()
 			defer agent.Stop()
 			res := agent.Ask(
-				WithText("can you get the weather in boston?"),
+				append(debugOptions,
+					WithText("can you get the weather in boston?"))...,
 			)
 			reasons := []string{}
 			for _, r := range res {
