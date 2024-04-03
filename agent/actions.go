@@ -102,10 +102,6 @@ const hudTemplate = `You have a character and your replies and actions might be 
 {{if .Character.Name}}Name: {{.Character.Name}}
 {{end}}{{if .Character.Age}}Age: {{.Character.Age}}
 {{end}}{{if .Character.Occupation}}Occupation: {{.Character.Occupation}}
-{{end}}{{if .Character.NowDoing}}Now doing: {{.Character.NowDoing}}
-{{end}}{{if .Character.DoingNext}}Doing next: {{.Character.DoingNext}}
-{{end}}{{if .Character.DoneHistory}}Done history: {{.Character.DoneHistory}}
-{{end}}{{if .Character.Memories}}Memories: {{.Character.Memories}}
 {{end}}{{if .Character.Hobbies}}Hobbies: {{.Character.Hobbies}}
 {{end}}{{if .Character.MusicTaste}}Music taste: {{.Character.MusicTaste}}
 {{end}}
