@@ -105,9 +105,9 @@ func (j *JobResult) Finish(e error) {
 }
 
 // WaitResult waits for the result of a job
-func (j *JobResult) WaitResult() []ActionState {
+func (j *JobResult) WaitResult() *JobResult {
 	<-j.ready
 	j.Lock()
 	defer j.Unlock()
-	return j.State
+	return j
 }

@@ -80,8 +80,10 @@ var _ = Describe("Agent test", func() {
 					WithText("can you get the weather in boston, and afterward of Milano, Italy?"),
 				)...,
 			)
+			Expect(res.Error).ToNot(HaveOccurred())
 			reasons := []string{}
-			for _, r := range res {
+			for _, r := range res.State {
+
 				reasons = append(reasons, r.Result)
 			}
 			Expect(reasons).To(ContainElement(testActionResult), fmt.Sprint(res))
@@ -94,7 +96,7 @@ var _ = Describe("Agent test", func() {
 				)...)
 			conversation := agent.CurrentConversation()
 			Expect(len(conversation)).To(Equal(10), fmt.Sprint(conversation))
-			for _, r := range res {
+			for _, r := range res.State {
 				reasons = append(reasons, r.Result)
 			}
 			Expect(reasons).ToNot(ContainElement(testActionResult), fmt.Sprint(res))
@@ -118,7 +120,7 @@ var _ = Describe("Agent test", func() {
 					WithText("can you get the weather in boston?"))...,
 			)
 			reasons := []string{}
-			for _, r := range res {
+			for _, r := range res.State {
 				reasons = append(reasons, r.Result)
 			}
 			Expect(reasons).To(ContainElement(testActionResult), fmt.Sprint(res))

@@ -47,13 +47,13 @@ const (
 
 type Agent struct {
 	sync.Mutex
-	options                *options
-	Character              Character
-	client                 *openai.Client
-	jobQueue, selfJobQueue chan *Job
-	actionContext          *action.ActionContext
-	context                *action.ActionContext
-	availableActions       []Action
+	options          *options
+	Character        Character
+	client           *openai.Client
+	jobQueue         chan *Job
+	actionContext    *action.ActionContext
+	context          *action.ActionContext
+	availableActions []Action
 
 	currentReasoning    string
 	nextAction          Action
@@ -79,7 +79,6 @@ func New(opts ...Option) (*Agent, error) {
 	ctx, cancel := context.WithCancel(c)
 	a := &Agent{
 		jobQueue:         make(chan *Job),
-		selfJobQueue:     make(chan *Job),
 		options:          options,
 		client:           client,
 		Character:        options.character,
@@ -108,12 +107,11 @@ func (a *Agent) StopAction() {
 
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
-func (a *Agent) Ask(opts ...JobOption) []ActionState {
+func (a *Agent) Ask(opts ...JobOption) *JobResult {
 	a.StopAction()
 	j := NewJob(opts...)
 	//	fmt.Println("Job created", text)
 	a.jobQueue <- j
-
 	return j.Result.WaitResult()
 }
 
@@ -336,10 +334,6 @@ func (a *Agent) Run() error {
 	todoTimer := time.NewTicker(1 * time.Minute)
 	for {
 		select {
-		case job := <-a.selfJobQueue:
-
-			// XXX: is it needed?
-			a.consumeJob(job, SystemRole)
 		case job := <-a.jobQueue:
 
 			// Consume the job and generate a response
@@ -349,6 +343,9 @@ func (a *Agent) Run() error {
 			// Agent has been canceled, return error
 			return ErrContextCanceled
 		case <-todoTimer.C:
+			if !a.options.standaloneJob {
+				continue
+			}
 			a.periodicallyRun()
 		}
 	}

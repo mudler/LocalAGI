@@ -13,13 +13,13 @@ type llmOptions struct {
 }
 
 type options struct {
-	LLMAPI                 llmOptions
-	character              Character
-	randomIdentityGuidance string
-	randomIdentity         bool
-	actions                Actions
-	enableHUD              bool
-	context                context.Context
+	LLMAPI                   llmOptions
+	character                Character
+	randomIdentityGuidance   string
+	randomIdentity           bool
+	actions                  Actions
+	enableHUD, standaloneJob bool
+	context                  context.Context
 }
 
 func defaultOptions() *options {
@@ -50,6 +50,13 @@ func newOptions(opts ...Option) (*options, error) {
 
 var EnableHUD = func(o *options) error {
 	o.enableHUD = true
+	return nil
+}
+
+// EnableStandaloneJob is an option to enable the agent
+// to run jobs in the background automatically
+var EnableStandaloneJob = func(o *options) error {
+	o.standaloneJob = true
 	return nil
 }
 
