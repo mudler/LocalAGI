@@ -69,20 +69,16 @@ func (a *Agent) decision(
 	}
 	resp, err := a.client.CreateChatCompletion(ctx, decision)
 	if err != nil || len(resp.Choices) != 1 {
-		fmt.Println("no choices", err)
-
 		return nil, err
 	}
 
 	msg := resp.Choices[0].Message
 	if len(msg.ToolCalls) != 1 {
-		fmt.Println(msg)
 		return &decisionResult{message: msg.Content}, nil
 	}
 
 	params := action.ActionParams{}
 	if err := params.Read(msg.ToolCalls[0].Function.Arguments); err != nil {
-		fmt.Println("can't read params", err)
 		return nil, err
 	}
 
@@ -150,9 +146,9 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	if err != nil {
 		return nil, "", err
 	}
-	fmt.Println("=== HUD START ===", hud.String(), "=== HUD END ===")
+	//fmt.Println("=== HUD START ===", hud.String(), "=== HUD END ===")
 
-	fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
+	//fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
 
 	// Get all the available actions IDs
 	actionsID := []string{}
@@ -180,7 +176,6 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		Actions{action.NewReasoning()}.ToTools(),
 		action.NewReasoning().Definition().Name)
 	if err != nil {
-		fmt.Println("failed thinking", err)
 		return nil, "", err
 	}
 	reason := ""
@@ -195,8 +190,6 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		reason = thought.message
 	}
 
-	fmt.Println("---- Thought: " + reason)
-
 	// Decode tool call
 	intentionsTools := action.NewIntention(actionsID...)
 	params, err := a.decision(ctx,
@@ -207,7 +200,6 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name)
 	if err != nil {
-		fmt.Println("failed decision", err)
 		return nil, "", err
 	}
 
@@ -222,8 +214,6 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return nil, "", err
 	}
 
-	fmt.Printf("Action choice: %v\n", actionChoice)
-
 	if actionChoice.Tool == "" || actionChoice.Tool == "none" {
 		return nil, "", fmt.Errorf("no intent detected")
 	}
@@ -231,8 +221,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	// Find the action
 	chosenAction := append(a.options.actions, action.NewReply()).Find(actionChoice.Tool)
 	if chosenAction == nil {
-		fmt.Println("No action found for intent: ", actionChoice.Tool)
-		return nil, "", fmt.Errorf("No action found for intent:" + actionChoice.Tool)
+		return nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	}
 
 	return chosenAction, actionChoice.Reasoning, nil
