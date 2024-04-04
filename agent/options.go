@@ -73,7 +73,7 @@ var EnableStandaloneJob = func(o *options) error {
 	return nil
 }
 
-var EnableCharacter = func(o *options) error {
+var EnablePersonality = func(o *options) error {
 	o.showCharacter = true
 	return nil
 }
@@ -149,6 +149,7 @@ func WithRandomIdentity(guidance ...string) Option {
 	return func(o *options) error {
 		o.randomIdentityGuidance = strings.Join(guidance, "")
 		o.randomIdentity = true
+		o.showCharacter = true
 		return nil
 	}
 }
