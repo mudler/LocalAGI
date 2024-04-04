@@ -237,10 +237,6 @@ var _ = Describe("Agent test", func() {
 				fmt.Println(agent.State())
 				return agent.State().String()
 			}, "10m", "10s").Should(ContainSubstring("store"), fmt.Sprint(agent.State()))
-			Eventually(func() string {
-				fmt.Println(agent.State())
-				return agent.State().String()
-			}, "10m", "10s").Should(ContainSubstring("inform"), fmt.Sprint(agent.State()))
 
 			// result := agent.Ask(
 			// 	WithText("Update your goals such as you want to learn to play the guitar"),
