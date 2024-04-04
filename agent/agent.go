@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,33 +11,6 @@ import (
 	"github.com/mudler/local-agent-framework/llm"
 	"github.com/sashabaranov/go-openai"
 )
-
-const pickActionTemplate = `You can take any of the following tools: 
-
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-To answer back to the user, use the "reply" tool.
-Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
-
-{{range .Messages -}}
-{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
-{{end}}
-`
-
-const reEvalTemplate = `You can take any of the following tools: 
-
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-To answer back to the user, use the "reply" tool.
-Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
-
-{{range .Messages -}}
-{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
-{{end}}
-
-We already have called tools. Evaluate the current situation and decide if we need to execute other tools or answer back with a result.`
 
 const (
 	UserRole      = "user"
@@ -202,6 +174,7 @@ func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (
 }
 
 func (a *Agent) consumeJob(job *Job, role string) {
+	selfEvaluation := role == SystemRole
 	// Consume the job and generate a response
 	a.Lock()
 	// Set the action context
@@ -221,6 +194,17 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		})
 	}
 
+	var pickTemplate string
+	var reEvaluationTemplate string
+
+	if selfEvaluation {
+		pickTemplate = pickSelfTemplate
+		reEvaluationTemplate = reSelfEvalTemplate
+	} else {
+		pickTemplate = pickActionTemplate
+		reEvaluationTemplate = reEvalTemplate
+	}
+
 	// choose an action first
 	var chosenAction Action
 	var reasoning string
@@ -234,7 +218,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		a.nextAction = nil
 	} else {
 		var err error
-		chosenAction, reasoning, err = a.pickAction(ctx, pickActionTemplate, a.currentConversation)
+		chosenAction, reasoning, err = a.pickAction(ctx, pickTemplate, a.currentConversation, true)
 		if err != nil {
 			job.Result.Finish(err)
 			return
@@ -247,7 +231,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	params, err := a.generateParameters(ctx, chosenAction, a.currentConversation)
+	params, err := a.generateParameters(ctx, pickTemplate, chosenAction, a.currentConversation, reasoning)
 	if err != nil {
 		job.Result.Finish(fmt.Errorf("error generating action's parameters: %w", err))
 		return
@@ -298,7 +282,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 		// given the result, we can now ask OpenAI to complete the conversation or
 		// to continue using another tool given the result
-		followingAction, reasoning, err := a.pickAction(ctx, reEvalTemplate, a.currentConversation)
+		followingAction, reasoning, err := a.pickAction(ctx, reEvaluationTemplate, a.currentConversation, !selfEvaluation)
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("error picking action: %w", err))
 			return
@@ -344,43 +328,48 @@ func (a *Agent) consumeJob(job *Job, role string) {
 }
 
 func (a *Agent) periodicallyRun() {
-	// Here the LLM could decide to store some part of the conversation too in the memory
-	evaluateMemory := NewJob(
-		WithText(
-			`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
-		))
-	a.consumeJob(evaluateMemory, SystemRole)
+	if len(a.CurrentConversation()) != 0 {
+		// Here the LLM could decide to store some part of the conversation too in the memory
+		evaluateMemory := NewJob(
+			WithText(
+				`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
+			))
+		a.consumeJob(evaluateMemory, SystemRole)
 
-	a.ResetConversation()
+		a.ResetConversation()
+	}
 
 	// Here we go in a loop of
 	// - asking the agent to do something
 	// - evaluating the result
 	// - asking the agent to do something else based on the result
 
-	whatNext := NewJob(WithText("What should I do next?"))
+	//	whatNext := NewJob(WithText("Decide what to do based on the state"))
+	whatNext := NewJob(WithText("Decide what to based on the goal and the persistent goal."))
 	a.consumeJob(whatNext, SystemRole)
 
-	doWork := NewJob(WithText("Try to fullfill our goals automatically"))
-	a.consumeJob(doWork, SystemRole)
+	// a.ResetConversation()
 
-	results := []string{}
-	for _, v := range doWork.Result.State {
-		results = append(results, v.Result)
-	}
+	// doWork := NewJob(WithText("Select the tool to use based on your goal and the current state."))
+	// a.consumeJob(doWork, SystemRole)
 
-	a.ResetConversation()
+	// results := []string{}
+	// for _, v := range doWork.Result.State {
+	// 	results = append(results, v.Result)
+	// }
 
-	// Here the LLM could decide to do something based on the result of our automatic action
-	evaluateAction := NewJob(
-		WithText(
-			`Evaluate the current situation and decide if we need to execute other tools (for instance to store results into permanent, or short memory).
-			We have done the following actions:
-			` + strings.Join(results, "\n"),
-		))
-	a.consumeJob(evaluateAction, SystemRole)
+	// a.ResetConversation()
 
-	a.ResetConversation()
+	// // Here the LLM could decide to do something based on the result of our automatic action
+	// evaluateAction := NewJob(
+	// 	WithText(
+	// 		`Evaluate the current situation and decide if we need to execute other tools (for instance to store results into permanent, or short memory).
+	// 		We have done the following actions:
+	// 		` + strings.Join(results, "\n"),
+	// 	))
+	// a.consumeJob(evaluateAction, SystemRole)
+
+	// a.ResetConversation()
 }
 
 func (a *Agent) Run() error {

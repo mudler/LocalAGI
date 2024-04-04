@@ -147,5 +147,32 @@ var _ = Describe("Agent test", func() {
 			Expect(result.Error).ToNot(HaveOccurred())
 			Expect(agent.State().Goal).To(ContainSubstring("guitar"), fmt.Sprint(agent.State()))
 		})
+
+		FIt("it automatically performs things in the background", func() {
+			agent, err := New(
+				WithLLMAPIURL(apiModel),
+				WithModel(testModel),
+				EnableHUD,
+				DebugMode,
+				EnableStandaloneJob,
+				WithRandomIdentity(),
+				WithPermanentGoal("get the weather of all the cities in italy"),
+			)
+			Expect(err).ToNot(HaveOccurred())
+			go agent.Run()
+			defer agent.Stop()
+
+			Eventually(func() string {
+				fmt.Println(agent.State())
+				return agent.State().NowDoing
+			}, "4m", "10s").Should(ContainSubstring("weather"), fmt.Sprint(agent.State()))
+
+			// result := agent.Ask(
+			// 	WithText("Update your goals such as you want to learn to play the guitar"),
+			// )
+			// fmt.Printf("%+v\n", result)
+			// Expect(result.Error).ToNot(HaveOccurred())
+			// Expect(agent.State().Goal).To(ContainSubstring("guitar"), fmt.Sprint(agent.State()))
+		})
 	})
 })

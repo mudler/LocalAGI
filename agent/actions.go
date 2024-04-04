@@ -85,19 +85,28 @@ func (a *Agent) decision(
 	return &decisionResult{actionParams: params}, nil
 }
 
-func (a *Agent) generateParameters(ctx context.Context, action Action, conversation []openai.ChatCompletionMessage) (*decisionResult, error) {
+func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
+	conversation, _, _, err := a.prepareConversationParse(pickTemplate, c, false, reasoning)
+	if err != nil {
+		return nil, err
+	}
+
 	return a.decision(ctx,
 		conversation,
 		a.systemActions().ToTools(),
-		action.Definition().Name)
+		act.Definition().Name)
+}
+
+func (a *Agent) systemInternalActions() Actions {
+	if a.options.enableHUD {
+		return append(a.options.userActions, action.NewState())
+	}
+
+	return append(a.options.userActions)
 }
 
 func (a *Agent) systemActions() Actions {
-	if a.options.enableHUD {
-		return append(a.options.userActions, action.NewReply(), action.NewState())
-	}
-
-	return append(a.options.userActions, action.NewReply())
+	return append(a.systemInternalActions(), action.NewReply())
 }
 
 func (a *Agent) prepareHUD() PromptHUD {
@@ -108,83 +117,73 @@ func (a *Agent) prepareHUD() PromptHUD {
 	}
 }
 
-const hudTemplate = `You have a character and your replies and actions might be influenced by it.
-{{if .Character.Name}}Name: {{.Character.Name}}
-{{end}}{{if .Character.Age}}Age: {{.Character.Age}}
-{{end}}{{if .Character.Occupation}}Occupation: {{.Character.Occupation}}
-{{end}}{{if .Character.Hobbies}}Hobbies: {{.Character.Hobbies}}
-{{end}}{{if .Character.MusicTaste}}Music taste: {{.Character.MusicTaste}}
-{{end}}
-
-This is your current state:
-NowDoing: {{if .CurrentState.NowDoing}}{{.CurrentState.NowDoing}}{{else}}Nothing{{end}}
-DoingNext: {{if .CurrentState.DoingNext}}{{.CurrentState.DoingNext}}{{else}}Nothing{{end}}
-Your permanent goal is: {{if .PermanentGoal}}{{.PermanentGoal}}{{else}}Nothing{{end}}
-Your current goal is: {{if .CurrentState.Goal}}{{.CurrentState.Goal}}{{else}}Nothing{{end}}
-You have done: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
-You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}`
-
-// pickAction picks an action based on the conversation
-func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
+func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCompletionMessage, canReply bool, reasoning string) ([]openai.ChatCompletionMessage, Actions, []string, error) {
 	// prepare the prompt
 	prompt := bytes.NewBuffer([]byte{})
-	hud := bytes.NewBuffer([]byte{})
 
 	promptTemplate, err := template.New("pickAction").Parse(templ)
 	if err != nil {
-		return nil, "", err
+		return nil, []Action{}, nil, err
 	}
-	hudTmpl, err := template.New("HUD").Parse(hudTemplate)
-	if err != nil {
-		return nil, "", err
+
+	actions := a.systemActions()
+	if !canReply {
+		actions = a.systemInternalActions()
 	}
+
 	// Get all the actions definitions
 	definitions := []action.ActionDefinition{}
-	for _, m := range a.systemActions() {
+	for _, m := range actions {
 		definitions = append(definitions, m.Definition())
 	}
 
-	err = promptTemplate.Execute(prompt, struct {
-		Actions  []action.ActionDefinition
-		Messages []openai.ChatCompletionMessage
-	}{
-		Actions:  definitions,
-		Messages: messages,
-	})
-	if err != nil {
-		return nil, "", err
+	var promptHUD *PromptHUD
+	if a.options.enableHUD {
+		h := a.prepareHUD()
+		promptHUD = &h
 	}
 
-	err = hudTmpl.Execute(hud, a.prepareHUD())
+	err = promptTemplate.Execute(prompt, struct {
+		HUD       *PromptHUD
+		Actions   []action.ActionDefinition
+		Reasoning string
+		Messages  []openai.ChatCompletionMessage
+	}{
+		Actions:   definitions,
+		Reasoning: reasoning,
+		Messages:  messages,
+		HUD:       promptHUD,
+	})
 	if err != nil {
-		return nil, "", err
+		return nil, []Action{}, nil, err
 	}
 
 	if a.options.debugMode {
-		fmt.Println("=== HUD START ===", hud.String(), "=== HUD END ===")
 		fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
 	}
 
 	// Get all the available actions IDs
 	actionsID := []string{}
-	for _, m := range a.systemActions() {
+	for _, m := range actions {
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 
 	conversation := []openai.ChatCompletionMessage{}
-
-	if a.options.enableHUD {
-		conversation = append(conversation, openai.ChatCompletionMessage{
-			Role:    "system",
-			Content: hud.String(),
-		})
-	}
 
 	conversation = append(conversation, openai.ChatCompletionMessage{
 		Role:    "user",
 		Content: prompt.String(),
 	})
 
+	return conversation, actions, actionsID, nil
+}
+
+// pickAction picks an action based on the conversation
+func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage, canReply bool) (Action, string, error) {
+	conversation, actions, actionsID, err := a.prepareConversationParse(templ, messages, canReply, "")
+	if err != nil {
+		return nil, "", err
+	}
 	// Get the LLM to think on what to do
 	thought, err := a.decision(ctx,
 		conversation,
@@ -234,7 +233,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	}
 
 	// Find the action
-	chosenAction := a.systemActions().Find(actionChoice.Tool)
+	chosenAction := actions.Find(actionChoice.Tool)
 	if chosenAction == nil {
 		return nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	}
