@@ -87,10 +87,60 @@ func (a *Agent) decision(
 
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
 
-	// XXX: compressing conversation for generating parameters.. sucks!
-	conversation, _, _, err := a.prepareConversationParse(pickTemplate, c, false, reasoning)
+	// prepare the prompt
+	stateHUD := bytes.NewBuffer([]byte{})
+
+	promptTemplate, err := template.New("pickAction").Parse(hudTemplate)
 	if err != nil {
 		return nil, err
+	}
+
+	actions := a.systemInternalActions()
+
+	// Get all the actions definitions
+	definitions := []action.ActionDefinition{}
+	for _, m := range actions {
+		definitions = append(definitions, m.Definition())
+	}
+
+	var promptHUD *PromptHUD
+	if a.options.enableHUD {
+		h := a.prepareHUD()
+		promptHUD = &h
+	}
+
+	err = promptTemplate.Execute(stateHUD, struct {
+		HUD       *PromptHUD
+		Actions   []action.ActionDefinition
+		Reasoning string
+		Messages  []openai.ChatCompletionMessage
+	}{
+		Actions:   definitions,
+		Reasoning: reasoning,
+		HUD:       promptHUD,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// check if there is already a message with the hud in the conversation already, otherwise
+	// add a message at the top with it
+
+	conversation := c
+	found := false
+	for _, cc := range c {
+		if cc.Content == stateHUD.String() {
+			found = true
+			break
+		}
+	}
+	if !found && a.options.enableHUD {
+		conversation = append([]openai.ChatCompletionMessage{
+			{
+				Role:    "system",
+				Content: stateHUD.String(),
+			},
+		}, conversation...)
 	}
 
 	return a.decision(ctx,

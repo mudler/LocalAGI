@@ -1,6 +1,6 @@
 package agent
 
-const hud = `{{with .HUD }}You have a character and your replies and actions might be influenced by it.
+const hudTemplate = `{{with .HUD }}You have a character and your replies and actions might be influenced by it.
 {{if .Character.Name}}Name: {{.Character.Name}}
 {{end}}{{if .Character.Age}}Age: {{.Character.Age}}
 {{end}}{{if .Character.Occupation}}Occupation: {{.Character.Occupation}}
@@ -38,13 +38,13 @@ You can update the short-term goal, the current action, the next action, the his
 You can't ask things to the user as you are thinking by yourself. You are autonomous.
 
 {{if .Reasoning}}Reasoning: {{.Reasoning}}{{end}}
-` + hud
+` + hudTemplate
 
 const reSelfEvalTemplate = pickSelfTemplate + `
 
 We already have called other tools. Evaluate the current situation and decide if we need to execute other tools.`
 
-const pickActionTemplate = hud + `
+const pickActionTemplate = hudTemplate + `
 You can take any of the following tools: 
 
 {{range .Actions -}}
