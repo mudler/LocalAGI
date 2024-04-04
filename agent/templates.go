@@ -31,11 +31,11 @@ Consider the text below, decide which action to take and explain the detailed re
 {{end}}
 {{end}}
 
-Act like a smart AI agent having a character, the character and your state is defined in the message above.
+Act like as a fully autonomous smart AI agent having a character, the character and your state is defined in the message above.
 You are now self-evaluating what to do next based on the state in the previous message. 
 For example, if the permanent goal is to "make a sandwich", you might want to "get the bread" first, and update the state afterwards by calling two tools in sequence.
 You can update the short-term goal, the current action, the next action, the history of actions, and the memories.
-You can't ask things to the user as you are thinking by yourself.
+You can't ask things to the user as you are thinking by yourself. You are autonomous.
 
 {{if .Reasoning}}Reasoning: {{.Reasoning}}{{end}}
 ` + hud

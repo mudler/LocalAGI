@@ -63,6 +63,25 @@ func (a *TestAction) Definition() action.ActionDefinition {
 	}
 }
 
+type FakeInternetAction struct {
+	TestAction
+}
+
+func (a *FakeInternetAction) Definition() action.ActionDefinition {
+	return action.ActionDefinition{
+		Name:        "search_internet",
+		Description: "search on internet",
+		Properties: map[string]jsonschema.Definition{
+			"term": {
+				Type:        jsonschema.String,
+				Description: "What to search for",
+			},
+		},
+
+		Required: []string{"term"},
+	}
+}
+
 var _ = Describe("Agent test", func() {
 	Context("jobs", func() {
 		It("pick the correct action", func() {
@@ -155,6 +174,7 @@ var _ = Describe("Agent test", func() {
 				EnableHUD,
 				DebugMode,
 				EnableStandaloneJob,
+				WithActions(&FakeInternetAction{TestAction{response: []string{"Roma, Venice, Milan"}}}),
 				WithRandomIdentity(),
 				WithPermanentGoal("get the weather of all the cities in italy"),
 			)

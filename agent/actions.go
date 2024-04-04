@@ -86,6 +86,8 @@ func (a *Agent) decision(
 }
 
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
+
+	// XXX: compressing conversation for generating parameters.. sucks!
 	conversation, _, _, err := a.prepareConversationParse(pickTemplate, c, false, reasoning)
 	if err != nil {
 		return nil, err
