@@ -167,7 +167,7 @@ var _ = Describe("Agent test", func() {
 			Expect(agent.State().Goal).To(ContainSubstring("guitar"), fmt.Sprint(agent.State()))
 		})
 
-		FIt("it automatically performs things in the background", func() {
+		It("it automatically performs things in the background", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),

@@ -169,13 +169,13 @@ func (a *Agent) prepareHUD() PromptHUD {
 	}
 }
 
-func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCompletionMessage, canReply bool, reasoning string) ([]openai.ChatCompletionMessage, Actions, []string, error) {
+func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCompletionMessage, canReply bool, reasoning string) ([]openai.ChatCompletionMessage, Actions, error) {
 	// prepare the prompt
 	prompt := bytes.NewBuffer([]byte{})
 
 	promptTemplate, err := template.New("pickAction").Parse(templ)
 	if err != nil {
-		return nil, []Action{}, nil, err
+		return nil, []Action{}, err
 	}
 
 	actions := a.systemActions()
@@ -207,17 +207,11 @@ func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCom
 		HUD:       promptHUD,
 	})
 	if err != nil {
-		return nil, []Action{}, nil, err
+		return nil, []Action{}, err
 	}
 
 	if a.options.debugMode {
 		fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
-	}
-
-	// Get all the available actions IDs
-	actionsID := []string{}
-	for _, m := range actions {
-		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 
 	conversation := []openai.ChatCompletionMessage{}
@@ -227,18 +221,75 @@ func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCom
 		Content: prompt.String(),
 	})
 
-	return conversation, actions, actionsID, nil
+	return conversation, actions, nil
 }
 
 // pickAction picks an action based on the conversation
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage, canReply bool) (Action, string, error) {
-	conversation, actions, actionsID, err := a.prepareConversationParse(templ, messages, canReply, "")
+	c := messages
+
+	// prepare the prompt
+	prompt := bytes.NewBuffer([]byte{})
+
+	promptTemplate, err := template.New("pickAction").Parse(templ)
 	if err != nil {
 		return nil, "", err
 	}
+
+	actions := a.systemActions()
+	if !canReply {
+		actions = a.systemInternalActions()
+	}
+
+	// Get all the actions definitions
+	definitions := []action.ActionDefinition{}
+	for _, m := range actions {
+		definitions = append(definitions, m.Definition())
+	}
+
+	var promptHUD *PromptHUD
+	if a.options.enableHUD {
+		h := a.prepareHUD()
+		promptHUD = &h
+	}
+
+	err = promptTemplate.Execute(prompt, struct {
+		HUD       *PromptHUD
+		Actions   []action.ActionDefinition
+		Reasoning string
+		Messages  []openai.ChatCompletionMessage
+	}{
+		Actions:  definitions,
+		Messages: messages,
+		HUD:      promptHUD,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
 	// Get the LLM to think on what to do
+	// and have a thought
+
+	found := false
+	for _, cc := range c {
+		if cc.Content == prompt.String() {
+			found = true
+			break
+		}
+	}
+	if !found {
+		c = append([]openai.ChatCompletionMessage{
+			{
+				Role:    "system",
+				Content: prompt.String(),
+			},
+		}, c...)
+	}
+
+	// We also could avoid to use functions here and get just a reply from the LLM
+	// and then use the reply to get the action
 	thought, err := a.decision(ctx,
-		conversation,
+		c,
 		Actions{action.NewReasoning()}.ToTools(),
 		action.NewReasoning().Definition().Name)
 	if err != nil {
@@ -256,10 +307,15 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		reason = thought.message
 	}
 
-	// Decode tool call
+	// From the thought, get the action call
+	// Get all the available actions IDs
+	actionsID := []string{}
+	for _, m := range actions {
+		actionsID = append(actionsID, m.Definition().Name.String())
+	}
 	intentionsTools := action.NewIntention(actionsID...)
 	params, err := a.decision(ctx,
-		append(conversation, openai.ChatCompletionMessage{
+		append(c, openai.ChatCompletionMessage{
 			Role:    "assistent",
 			Content: reason,
 		}),

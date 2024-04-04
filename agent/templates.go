@@ -53,8 +53,10 @@ You can take any of the following tools:
 To answer back to the user, use the "reply" tool.
 Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
 
+{{if .Messages}}
 {{range .Messages -}}
 {{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
+{{end}}
 {{end}}
 
 {{if .Reasoning}}Reasoning: {{.Reasoning}}{{end}}
