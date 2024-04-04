@@ -1,6 +1,8 @@
 package action
 
 import (
+	"fmt"
+
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -31,7 +33,7 @@ type StateResult struct {
 }
 
 func (a *StateAction) Run(ActionParams) (string, error) {
-	return "no-op", nil
+	return "internal state has been updated", nil
 }
 
 func (a *StateAction) Definition() ActionDefinition {
@@ -67,4 +69,24 @@ func (a *StateAction) Definition() ActionDefinition {
 			},
 		},
 	}
+}
+
+const fmtT = `=====================
+NowDoing: %s
+DoingNext: %s
+Your current goal is: %s
+You have done: %+v
+You have a short memory with: %+v
+=====================
+`
+
+func (c StateResult) String() string {
+	return fmt.Sprintf(
+		fmtT,
+		c.NowDoing,
+		c.DoingNext,
+		c.Goal,
+		c.DoneHistory,
+		c.Memories,
+	)
 }

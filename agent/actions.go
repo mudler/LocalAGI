@@ -117,13 +117,12 @@ const hudTemplate = `You have a character and your replies and actions might be 
 {{end}}
 
 This is your current state:
-{{if .CurrentState.NowDoing}}NowDoing: {{.CurrentState.NowDoing}} {{end}}
-{{if .CurrentState.DoingNext}}DoingNext: {{.CurrentState.DoingNext}} {{end}}
-{{if .PermanentGoal}}Your permanent goal is: {{.PermanentGoal}} {{end}}
-{{if .CurrentState.Goal}}Your current goal is: {{.CurrentState.Goal}} {{end}}
+NowDoing: {{if .CurrentState.NowDoing}}{{.CurrentState.NowDoing}}{{else}}Nothing{{end}}
+DoingNext: {{if .CurrentState.DoingNext}}{{.CurrentState.DoingNext}}{{else}}Nothing{{end}}
+Your permanent goal is: {{if .PermanentGoal}}{{.PermanentGoal}}{{else}}Nothing{{end}}
+Your current goal is: {{if .CurrentState.Goal}}{{.CurrentState.Goal}}{{else}}Nothing{{end}}
 You have done: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
-You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}
-`
+You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}`
 
 // pickAction picks an action based on the conversation
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
@@ -160,9 +159,11 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	if err != nil {
 		return nil, "", err
 	}
-	//fmt.Println("=== HUD START ===", hud.String(), "=== HUD END ===")
 
-	//fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
+	if a.options.debugMode {
+		fmt.Println("=== HUD START ===", hud.String(), "=== HUD END ===")
+		fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
+	}
 
 	// Get all the available actions IDs
 	actionsID := []string{}
@@ -214,7 +215,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)
 	}
 
 	actionChoice := action.IntentResponse{}

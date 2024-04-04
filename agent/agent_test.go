@@ -125,5 +125,27 @@ var _ = Describe("Agent test", func() {
 			}
 			Expect(reasons).To(ContainElement(testActionResult), fmt.Sprint(res))
 		})
+
+		It("updates the state with internal actions", func() {
+			agent, err := New(
+				WithLLMAPIURL(apiModel),
+				WithModel(testModel),
+				EnableHUD,
+				DebugMode,
+				//	EnableStandaloneJob,
+				WithRandomIdentity(),
+				WithPermanentGoal("I want to learn to play music"),
+			)
+			Expect(err).ToNot(HaveOccurred())
+			go agent.Run()
+			defer agent.Stop()
+
+			result := agent.Ask(
+				WithText("Update your goals such as you want to learn to play the guitar"),
+			)
+			fmt.Printf("%+v\n", result)
+			Expect(result.Error).ToNot(HaveOccurred())
+			Expect(agent.State().Goal).To(ContainSubstring("guitar"), fmt.Sprint(agent.State()))
+		})
 	})
 })

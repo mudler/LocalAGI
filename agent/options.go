@@ -19,6 +19,9 @@ type options struct {
 	randomIdentity           bool
 	userActions              Actions
 	enableHUD, standaloneJob bool
+	debugMode                bool
+	characterfile            string
+	statefile                string
 	context                  context.Context
 	permanentGoal            string
 }
@@ -51,6 +54,11 @@ func newOptions(opts ...Option) (*options, error) {
 
 var EnableHUD = func(o *options) error {
 	o.enableHUD = true
+	return nil
+}
+
+var DebugMode = func(o *options) error {
+	o.debugMode = true
 	return nil
 }
 

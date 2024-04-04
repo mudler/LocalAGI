@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/mudler/local-agent-framework/action"
 	"github.com/mudler/local-agent-framework/llm"
@@ -40,8 +41,39 @@ func Load(path string) (*Character, error) {
 	return &c, nil
 }
 
-func (a *Agent) Save(path string) error {
-	data, err := json.Marshal(a.options.character)
+func (a *Agent) State() action.StateResult {
+	return *a.currentState
+}
+
+func (a *Agent) LoadState(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, a.currentState)
+}
+
+func (a *Agent) LoadCharacter(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &a.Character)
+}
+
+func (a *Agent) SaveState(path string) error {
+	os.MkdirAll(filepath.Dir(path), 0755)
+	data, err := json.Marshal(a.currentState)
+	if err != nil {
+		return err
+	}
+	os.WriteFile(path, data, 0644)
+	return nil
+}
+
+func (a *Agent) SaveCharacter(path string) error {
+	os.MkdirAll(filepath.Dir(path), 0755)
+	data, err := json.Marshal(a.Character)
 	if err != nil {
 		return err
 	}
@@ -59,7 +91,7 @@ func (a *Agent) generateIdentity(guidance string) error {
 	}
 
 	if !a.validCharacter() {
-		return fmt.Errorf("generated character is not valid ( guidance: %s ): %v", guidance, a.String())
+		return fmt.Errorf("generated character is not valid ( guidance: %s ): %v", guidance, a.Character.String())
 	}
 	return nil
 }
@@ -80,13 +112,13 @@ Hobbies: %v
 Music taste: %v
 =====================`
 
-func (a *Agent) String() string {
+func (c *Character) String() string {
 	return fmt.Sprintf(
 		fmtT,
-		a.Character.Name,
-		a.Character.Age,
-		a.Character.Occupation,
-		a.Character.Hobbies,
-		a.Character.MusicTaste,
+		c.Name,
+		c.Age,
+		c.Occupation,
+		c.Hobbies,
+		c.MusicTaste,
 	)
 }

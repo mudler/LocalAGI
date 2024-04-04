@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -92,6 +93,35 @@ func New(opts ...Option) (*Agent, error) {
 		}
 	}
 
+	if a.options.statefile != "" {
+		if _, err := os.Stat(a.options.statefile); err == nil {
+			if err = a.LoadState(a.options.statefile); err != nil {
+				return a, fmt.Errorf("failed to load state: %v", err)
+			}
+		}
+	}
+
+	if a.options.characterfile != "" {
+		if _, err := os.Stat(a.options.characterfile); err == nil {
+			// if there is a file, load the character back
+			if err = a.LoadCharacter(a.options.characterfile); err != nil {
+				return a, fmt.Errorf("failed to load character: %v", err)
+			}
+		} else {
+			// otherwise save it for next time
+			if err = a.SaveCharacter(a.options.characterfile); err != nil {
+				return a, fmt.Errorf("failed to save character: %v", err)
+			}
+		}
+	}
+
+	if a.options.debugMode {
+		fmt.Println("=== Agent in Debug mode ===")
+		fmt.Println(a.Character.String())
+		fmt.Println(a.State().String())
+		fmt.Println("Permanent goal: ", a.options.permanentGoal)
+	}
+
 	return a, nil
 }
 
@@ -144,16 +174,28 @@ func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (
 		}
 	}
 
+	if a.options.debugMode {
+		fmt.Println("Action", chosenAction.Definition().Name)
+		fmt.Println("Result", result)
+	}
+
 	if chosenAction.Definition().Name.Is(action.StateActionName) {
 		// We need to store the result in the state
 		state := action.StateResult{}
 
-		err = decisionResult.actionParams.Unmarshal(&result)
+		err = decisionResult.actionParams.Unmarshal(&state)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error unmarshalling state of the agent: %w", err)
 		}
 		// update the current state with the one we just got from the action
 		a.currentState = &state
+
+		// update the state file
+		if a.options.statefile != "" {
+			if err := a.SaveState(a.options.statefile); err != nil {
+				return "", err
+			}
+		}
 	}
 
 	return result, nil
@@ -207,7 +249,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	params, err := a.generateParameters(ctx, chosenAction, a.currentConversation)
 	if err != nil {
-		job.Result.Finish(err)
+		job.Result.Finish(fmt.Errorf("error generating action's parameters: %w", err))
 		return
 	}
 
@@ -222,6 +264,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
+	// If we don't have to reply , run the action!
 	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
 		result, err := a.runAction(chosenAction, params)
 		if err != nil {
