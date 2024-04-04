@@ -20,9 +20,10 @@ type Job struct {
 type JobResult struct {
 	sync.Mutex
 	// The result of a job
-	State []ActionState
-	Error error
-	ready chan bool
+	State    []ActionState
+	Response string
+	Error    error
+	ready    chan bool
 }
 
 type JobOption func(*Job)
@@ -102,6 +103,14 @@ func (j *JobResult) Finish(e error) {
 
 	j.Error = e
 	close(j.ready)
+}
+
+// SetResult sets the result of a job
+func (j *JobResult) SetResponse(response string) {
+	j.Lock()
+	defer j.Unlock()
+
+	j.Response = response
 }
 
 // WaitResult waits for the result of a job

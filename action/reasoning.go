@@ -4,6 +4,9 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
+// NewReasoning creates a new reasoning action
+// The reasoning action is special as it tries to force the LLM
+// to think about what to do next
 func NewReasoning() *ReasoningAction {
 	return &ReasoningAction{}
 }

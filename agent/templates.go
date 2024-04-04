@@ -1,11 +1,12 @@
 package agent
 
-const hudTemplate = `{{with .HUD }}You have a character and your replies and actions might be influenced by it.
+const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}You have a character and your replies and actions might be influenced by it.
 {{if .Character.Name}}Name: {{.Character.Name}}
 {{end}}{{if .Character.Age}}Age: {{.Character.Age}}
 {{end}}{{if .Character.Occupation}}Occupation: {{.Character.Occupation}}
 {{end}}{{if .Character.Hobbies}}Hobbies: {{.Character.Hobbies}}
 {{end}}{{if .Character.MusicTaste}}Music taste: {{.Character.MusicTaste}}
+{{end}}
 {{end}}
 
 This is your current state:
@@ -16,20 +17,13 @@ Your current goal is: {{if .CurrentState.Goal}}{{.CurrentState.Goal}}{{else}}Not
 You have done: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
 You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}{{end}}`
 
-const pickSelfTemplate = `
-You can take any of the following tools: 
+const pickSelfTemplate = `You can take any of the following tools: 
 
 {{range .Actions -}}
 - {{.Name}}: {{.Description }}
 {{ end }}
 
-{{if .Messages}}
-Consider the text below, decide which action to take and explain the detailed reasoning behind it.
-
-{{range .Messages -}}
-{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
-{{end}}
-{{end}}
+To finish your session, use the "reply" tool with your answer.
 
 Act like as a fully autonomous smart AI agent having a character, the character and your state is defined in the message above.
 You are now self-evaluating what to do next based on the state in the previous message. 
@@ -52,12 +46,6 @@ You can take any of the following tools:
 {{ end }}
 To answer back to the user, use the "reply" tool.
 Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
-
-{{if .Messages}}
-{{range .Messages -}}
-{{.Role}}{{if .FunctionCall}}(tool_call){{.FunctionCall}}{{end}}: {{if .FunctionCall}}{{.FunctionCall}}{{else if .ToolCalls -}}{{range .ToolCalls -}}{{.Name}} called with {{.Arguments}}{{end}}{{ else }}{{.Content -}}{{end}}
-{{end}}
-{{end}}
 
 {{if .Reasoning}}Reasoning: {{.Reasoning}}{{end}}
 `

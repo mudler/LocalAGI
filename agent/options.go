@@ -13,17 +13,21 @@ type llmOptions struct {
 }
 
 type options struct {
-	LLMAPI                   llmOptions
-	character                Character
-	randomIdentityGuidance   string
-	randomIdentity           bool
-	userActions              Actions
-	enableHUD, standaloneJob bool
-	debugMode                bool
-	characterfile            string
-	statefile                string
-	context                  context.Context
-	permanentGoal            string
+	LLMAPI                                  llmOptions
+	character                               Character
+	randomIdentityGuidance                  string
+	randomIdentity                          bool
+	userActions                             Actions
+	enableHUD, standaloneJob, showCharacter bool
+	debugMode                               bool
+	characterfile                           string
+	statefile                               string
+	context                                 context.Context
+	permanentGoal                           string
+
+	// callbacks
+	reasoningCallback func(ActionCurrentState) bool
+	resultCallback    func(ActionState)
 }
 
 func defaultOptions() *options {
@@ -69,6 +73,11 @@ var EnableStandaloneJob = func(o *options) error {
 	return nil
 }
 
+var EnableCharacter = func(o *options) error {
+	o.showCharacter = true
+	return nil
+}
+
 func WithLLMAPIURL(url string) Option {
 	return func(o *options) error {
 		o.LLMAPI.APIURL = url
@@ -93,6 +102,20 @@ func WithPermanentGoal(goal string) Option {
 func WithContext(ctx context.Context) Option {
 	return func(o *options) error {
 		o.context = ctx
+		return nil
+	}
+}
+
+func WithAgentReasoningCallback(cb func(ActionCurrentState) bool) Option {
+	return func(o *options) error {
+		o.reasoningCallback = cb
+		return nil
+	}
+}
+
+func WithAgentResultCallback(cb func(ActionState)) Option {
+	return func(o *options) error {
+		o.resultCallback = cb
 		return nil
 	}
 }

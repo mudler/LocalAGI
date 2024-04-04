@@ -111,7 +111,7 @@ func (a *Agent) StopAction() {
 // It discards any other computation.
 func (a *Agent) Ask(opts ...JobOption) *JobResult {
 	a.StopAction()
-	j := NewJob(opts...)
+	j := NewJob(append(opts, WithReasoningCallback(a.options.reasoningCallback), WithResultCallback(a.options.resultCallback))...)
 	//	fmt.Println("Job created", text)
 	a.jobQueue <- j
 	return j.Result.WaitResult()
@@ -138,7 +138,7 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (result string, err error) {
-	for _, action := range a.systemActions() {
+	for _, action := range a.systemInternalActions() {
 		if action.Definition().Name == chosenAction.Definition().Name {
 			if result, err = action.Run(decisionResult.actionParams); err != nil {
 				return "", fmt.Errorf("error running action: %w", err)
@@ -218,7 +218,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		a.nextAction = nil
 	} else {
 		var err error
-		chosenAction, reasoning, err = a.pickAction(ctx, pickTemplate, a.currentConversation, true)
+		chosenAction, reasoning, err = a.pickAction(ctx, pickTemplate, a.currentConversation)
 		if err != nil {
 			job.Result.Finish(err)
 			return
@@ -231,10 +231,19 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
+	if a.options.debugMode {
+		fmt.Println("===> Generating parameters for", chosenAction.Definition().Name)
+	}
+
 	params, err := a.generateParameters(ctx, pickTemplate, chosenAction, a.currentConversation, reasoning)
 	if err != nil {
 		job.Result.Finish(fmt.Errorf("error generating action's parameters: %w", err))
 		return
+	}
+
+	if a.options.debugMode {
+		fmt.Println("===> Generated parameters for", chosenAction.Definition().Name)
+		fmt.Println(params.actionParams.String())
 	}
 
 	if params.actionParams == nil {
@@ -282,7 +291,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 		// given the result, we can now ask OpenAI to complete the conversation or
 		// to continue using another tool given the result
-		followingAction, reasoning, err := a.pickAction(ctx, reEvaluationTemplate, a.currentConversation, !selfEvaluation)
+		followingAction, reasoning, err := a.pickAction(ctx, reEvaluationTemplate, a.currentConversation)
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("error picking action: %w", err))
 			return
@@ -324,16 +333,25 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	msg := resp.Choices[0].Message
 
 	a.currentConversation = append(a.currentConversation, msg)
+	job.Result.SetResponse(msg.Content)
 	job.Result.Finish(nil)
 }
 
 func (a *Agent) periodicallyRun() {
+
+	if a.options.debugMode {
+		fmt.Println("START -- Periodically run is starting")
+	}
+
 	if len(a.CurrentConversation()) != 0 {
 		// Here the LLM could decide to store some part of the conversation too in the memory
 		evaluateMemory := NewJob(
 			WithText(
 				`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
-			))
+			),
+			WithReasoningCallback(a.options.reasoningCallback),
+			WithResultCallback(a.options.resultCallback),
+		)
 		a.consumeJob(evaluateMemory, SystemRole)
 
 		a.ResetConversation()
@@ -345,8 +363,18 @@ func (a *Agent) periodicallyRun() {
 	// - asking the agent to do something else based on the result
 
 	//	whatNext := NewJob(WithText("Decide what to do based on the state"))
-	whatNext := NewJob(WithText("Decide what to based on the goal and the persistent goal."))
+	whatNext := NewJob(
+		WithText("Decide what to based on the goal and the persistent goal."),
+		WithReasoningCallback(a.options.reasoningCallback),
+		WithResultCallback(a.options.resultCallback),
+	)
 	a.consumeJob(whatNext, SystemRole)
+	a.ResetConversation()
+
+	if a.options.debugMode {
+		fmt.Println("STOP -- Periodically run is done")
+	}
+	// Save results from state
 
 	// a.ResetConversation()
 

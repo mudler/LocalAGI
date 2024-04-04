@@ -4,6 +4,9 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
+// NewIntention creates a new intention action
+// The inention action is special as it tries to identify
+// a tool to use and a reasoning over to use it
 func NewIntention(s ...string) *IntentAction {
 	return &IntentAction{tools: s}
 }

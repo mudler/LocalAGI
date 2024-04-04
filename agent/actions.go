@@ -55,7 +55,7 @@ type decisionResult struct {
 	message      string
 }
 
-// decision forces the agent to take on of the available actions
+// decision forces the agent to take one of the available actions
 func (a *Agent) decision(
 	ctx context.Context,
 	conversation []openai.ChatCompletionMessage,
@@ -145,20 +145,20 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 
 	return a.decision(ctx,
 		conversation,
-		a.systemActions().ToTools(),
-		act.Definition().Name)
+		a.systemInternalActions().ToTools(),
+		openai.ToolChoice{
+			Type:     openai.ToolTypeFunction,
+			Function: openai.ToolFunction{Name: act.Definition().Name.String()},
+		},
+	)
 }
 
 func (a *Agent) systemInternalActions() Actions {
 	if a.options.enableHUD {
-		return append(a.options.userActions, action.NewState())
+		return append(a.options.userActions, action.NewState(), action.NewReply())
 	}
 
-	return append(a.options.userActions)
-}
-
-func (a *Agent) systemActions() Actions {
-	return append(a.systemInternalActions(), action.NewReply())
+	return append(a.options.userActions, action.NewReply())
 }
 
 func (a *Agent) prepareHUD() PromptHUD {
@@ -166,10 +166,11 @@ func (a *Agent) prepareHUD() PromptHUD {
 		Character:     a.Character,
 		CurrentState:  *a.currentState,
 		PermanentGoal: a.options.permanentGoal,
+		ShowCharacter: a.options.showCharacter,
 	}
 }
 
-func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCompletionMessage, canReply bool, reasoning string) ([]openai.ChatCompletionMessage, Actions, error) {
+func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCompletionMessage, reasoning string) ([]openai.ChatCompletionMessage, Actions, error) {
 	// prepare the prompt
 	prompt := bytes.NewBuffer([]byte{})
 
@@ -178,10 +179,7 @@ func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCom
 		return nil, []Action{}, err
 	}
 
-	actions := a.systemActions()
-	if !canReply {
-		actions = a.systemInternalActions()
-	}
+	actions := a.systemInternalActions()
 
 	// Get all the actions definitions
 	definitions := []action.ActionDefinition{}
@@ -225,7 +223,7 @@ func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCom
 }
 
 // pickAction picks an action based on the conversation
-func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage, canReply bool) (Action, string, error) {
+func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
 	c := messages
 
 	// prepare the prompt
@@ -236,10 +234,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return nil, "", err
 	}
 
-	actions := a.systemActions()
-	if !canReply {
-		actions = a.systemInternalActions()
-	}
+	actions := a.systemInternalActions()
 
 	// Get all the actions definitions
 	definitions := []action.ActionDefinition{}

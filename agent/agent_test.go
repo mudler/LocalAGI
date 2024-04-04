@@ -63,6 +63,25 @@ func (a *TestAction) Definition() action.ActionDefinition {
 	}
 }
 
+type FakeStoreResultAction struct {
+	TestAction
+}
+
+func (a *FakeStoreResultAction) Definition() action.ActionDefinition {
+	return action.ActionDefinition{
+		Name:        "store_results",
+		Description: "store results permanently. Use this tool after you have a result you want to keep.",
+		Properties: map[string]jsonschema.Definition{
+			"term": {
+				Type:        jsonschema.String,
+				Description: "What to store permanently",
+			},
+		},
+
+		Required: []string{"term"},
+	}
+}
+
 type FakeInternetAction struct {
 	TestAction
 }
@@ -167,16 +186,43 @@ var _ = Describe("Agent test", func() {
 			Expect(agent.State().Goal).To(ContainSubstring("guitar"), fmt.Sprint(agent.State()))
 		})
 
-		It("it automatically performs things in the background", func() {
+		FIt("it automatically performs things in the background", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
 				EnableHUD,
 				DebugMode,
 				EnableStandaloneJob,
-				WithActions(&FakeInternetAction{TestAction{response: []string{"Roma, Venice, Milan"}}}),
+				WithAgentReasoningCallback(func(state ActionCurrentState) bool {
+					fmt.Println("Reasoning", state)
+					return true
+				}),
+				WithAgentResultCallback(func(state ActionState) {
+					fmt.Println("Reasoning", state.Reasoning)
+					fmt.Println("Action", state.Action)
+					fmt.Println("Result", state.Result)
+				}),
+				WithActions(
+					&FakeInternetAction{
+						TestAction{
+							response: []string{
+								"Major cities in italy: Roma, Venice, Milan",
+								"In rome it's 30C today, it's sunny, and humidity is at 98%",
+								"In venice it's very hot today, it is 45C and the humidity is at 200%",
+								"In milan it's very cold today, it is 2C and the humidity is at 10%",
+							},
+						},
+					},
+					&FakeStoreResultAction{
+						TestAction{
+							response: []string{
+								"Result permanently stored",
+							},
+						},
+					},
+				),
 				WithRandomIdentity(),
-				WithPermanentGoal("get the weather of all the cities in italy"),
+				WithPermanentGoal("get the weather of all the cities in italy and store the results"),
 			)
 			Expect(err).ToNot(HaveOccurred())
 			go agent.Run()
@@ -184,8 +230,17 @@ var _ = Describe("Agent test", func() {
 
 			Eventually(func() string {
 				fmt.Println(agent.State())
-				return agent.State().NowDoing
-			}, "4m", "10s").Should(ContainSubstring("weather"), fmt.Sprint(agent.State()))
+				return agent.State().Goal
+			}, "10m", "10s").Should(ContainSubstring("weather"), fmt.Sprint(agent.State()))
+
+			Eventually(func() string {
+				fmt.Println(agent.State())
+				return agent.State().String()
+			}, "10m", "10s").Should(ContainSubstring("store"), fmt.Sprint(agent.State()))
+			Eventually(func() string {
+				fmt.Println(agent.State())
+				return agent.State().String()
+			}, "10m", "10s").Should(ContainSubstring("inform"), fmt.Sprint(agent.State()))
 
 			// result := agent.Ask(
 			// 	WithText("Update your goals such as you want to learn to play the guitar"),
