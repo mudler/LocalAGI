@@ -28,12 +28,12 @@
 <div class="chat-container bg-white shadow-lg rounded-lg" hx-ext="sse" sse-connect="/sse">
     <!-- Chat Header -->
     <div class="border-b border-gray-200 p-4">
-        <h1 class="text-lg font-semibold">Talk to Smart Agent</h1>
+        <h1 class="text-lg font-semibold">Talk to '{{.Character.Name}}'</h1>
     </div>
     
     <!-- Chat Messages -->
     <div class="chat-messages p-4">
-        <!-- Agent Status Box -->
+        <!-- Client Box -->
         <div class="bg-gray-100 p-4">
             <h2 class="text-sm font-semibold">Clients:</h2>
             <div id="clients" class="text-sm text-gray-700">
@@ -41,6 +41,7 @@
                 <div sse-swap="clients" ></div>
             </div>
         </div>
+        <!-- HUD Box -->
         <div class="bg-gray-100 p-4">
             <h2 class="text-sm font-semibold">Status:</h2>
             <div id="hud" class="text-sm text-gray-700">
@@ -55,7 +56,7 @@
     
     <!-- Agent Status Box -->
     <div class="bg-gray-100 p-4">
-        <h2 class="text-sm font-semibold">Agent is currently:</h2>
+        <h2 class="text-sm font-semibold">Agent:</h2>
         <div id="agentStatus" class="text-sm text-gray-700" >
             <!-- Status updates dynamically here -->
             <div sse-swap="status" ></div>

@@ -115,7 +115,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /", http.HandlerFunc(app.Home))
+	mux.Handle("GET /", http.HandlerFunc(app.Home(agent)))
 
 	// External notifications (e.g. webhook)
 	mux.Handle("POST /notify", http.HandlerFunc(app.Notify))
@@ -131,14 +131,21 @@ func main() {
 	log.Fatal(err)
 }
 
-func (a *App) Home(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("index.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+func (a *App) Home(agent *Agent) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tmpl, err := template.ParseFiles("index.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-	tmpl.Execute(w, nil)
+		tmpl.Execute(w,
+			struct {
+				Character Character
+			}{
+				Character: agent.Character,
+			})
+	}
 }
 
 func (a *App) SSE(w http.ResponseWriter, r *http.Request) {
