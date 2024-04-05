@@ -1,4 +1,4 @@
-package action
+package external
 
 import (
 	"fmt"
@@ -8,11 +8,14 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-func NewSearch() *SearchAction {
-	return &SearchAction{}
+func NewSearch(results int) *SearchAction {
+	if results == 0 {
+		results = 3
+	}
+	return &SearchAction{results: results}
 }
 
-type SearchAction struct{}
+type SearchAction struct{ results int }
 
 func (a *SearchAction) Run(params action.ActionParams) (string, error) {
 	result := struct {
@@ -25,7 +28,7 @@ func (a *SearchAction) Run(params action.ActionParams) (string, error) {
 		return "", err
 	}
 	ddg := client.NewDuckDuckGoSearchClient()
-	res, err := ddg.SearchLimited(result.Query, 10)
+	res, err := ddg.SearchLimited(result.Query, a.results)
 	if err != nil {
 		msg := fmt.Sprintf("error: %v", err)
 		fmt.Printf(msg)

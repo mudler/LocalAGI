@@ -12,7 +12,7 @@ import (
 
 	"github.com/donseba/go-htmx"
 	"github.com/donseba/go-htmx/sse"
-	actions "github.com/mudler/local-agent-framework/example/webui/actions"
+	external "github.com/mudler/local-agent-framework/external"
 
 	. "github.com/mudler/local-agent-framework/agent"
 )
@@ -65,7 +65,7 @@ func main() {
 			)
 			return true
 		}),
-		WithActions(actions.NewSearch()),
+		WithActions(external.NewSearch(3)),
 		WithAgentResultCallback(func(state ActionState) {
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
