@@ -1,10 +1,8 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 
 	"github.com/mudler/local-agent-framework/action"
 
@@ -85,23 +83,22 @@ func (a *Agent) decision(
 	return &decisionResult{actionParams: params}, nil
 }
 
+type Messages []openai.ChatCompletionMessage
+
+func (m Messages) ToOpenAI() []openai.ChatCompletionMessage {
+	return []openai.ChatCompletionMessage(m)
+}
+
+func (m Messages) Exist(content string) bool {
+	for _, cc := range m {
+		if cc.Content == content {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
-
-	// prepare the prompt
-	stateHUD := bytes.NewBuffer([]byte{})
-
-	promptTemplate, err := template.New("pickAction").Parse(hudTemplate)
-	if err != nil {
-		return nil, err
-	}
-
-	actions := a.systemInternalActions()
-
-	// Get all the actions definitions
-	definitions := []action.ActionDefinition{}
-	for _, m := range actions {
-		definitions = append(definitions, m.Definition())
-	}
 
 	var promptHUD *PromptHUD
 	if a.options.enableHUD {
@@ -109,16 +106,7 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 		promptHUD = &h
 	}
 
-	err = promptTemplate.Execute(stateHUD, struct {
-		HUD       *PromptHUD
-		Actions   []action.ActionDefinition
-		Reasoning string
-		Messages  []openai.ChatCompletionMessage
-	}{
-		Actions:   definitions,
-		Reasoning: reasoning,
-		HUD:       promptHUD,
-	})
+	stateHUD, err := renderTemplate(pickTemplate, promptHUD, a.systemInternalActions(), reasoning)
 	if err != nil {
 		return nil, err
 	}
@@ -127,18 +115,12 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	// add a message at the top with it
 
 	conversation := c
-	found := false
-	for _, cc := range c {
-		if cc.Content == stateHUD.String() {
-			found = true
-			break
-		}
-	}
-	if !found && a.options.enableHUD {
+
+	if !Messages(c).Exist(stateHUD) && a.options.enableHUD {
 		conversation = append([]openai.ChatCompletionMessage{
 			{
 				Role:    "system",
-				Content: stateHUD.String(),
+				Content: stateHUD,
 			},
 		}, conversation...)
 	}
@@ -170,113 +152,27 @@ func (a *Agent) prepareHUD() PromptHUD {
 	}
 }
 
-func (a *Agent) prepareConversationParse(templ string, messages []openai.ChatCompletionMessage, reasoning string) ([]openai.ChatCompletionMessage, Actions, error) {
-	// prepare the prompt
-	prompt := bytes.NewBuffer([]byte{})
-
-	promptTemplate, err := template.New("pickAction").Parse(templ)
-	if err != nil {
-		return nil, []Action{}, err
-	}
-
-	actions := a.systemInternalActions()
-
-	// Get all the actions definitions
-	definitions := []action.ActionDefinition{}
-	for _, m := range actions {
-		definitions = append(definitions, m.Definition())
-	}
-
-	var promptHUD *PromptHUD
-	if a.options.enableHUD {
-		h := a.prepareHUD()
-		promptHUD = &h
-	}
-
-	err = promptTemplate.Execute(prompt, struct {
-		HUD       *PromptHUD
-		Actions   []action.ActionDefinition
-		Reasoning string
-		Messages  []openai.ChatCompletionMessage
-	}{
-		Actions:   definitions,
-		Reasoning: reasoning,
-		Messages:  messages,
-		HUD:       promptHUD,
-	})
-	if err != nil {
-		return nil, []Action{}, err
-	}
-
-	if a.options.debugMode {
-		fmt.Println("=== PROMPT START ===", prompt.String(), "=== PROMPT END ===")
-	}
-
-	conversation := []openai.ChatCompletionMessage{}
-
-	conversation = append(conversation, openai.ChatCompletionMessage{
-		Role:    "user",
-		Content: prompt.String(),
-	})
-
-	return conversation, actions, nil
-}
-
 // pickAction picks an action based on the conversation
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
 	c := messages
 
-	// prepare the prompt
-	prompt := bytes.NewBuffer([]byte{})
-
-	promptTemplate, err := template.New("pickAction").Parse(templ)
-	if err != nil {
-		return nil, "", err
-	}
-
-	actions := a.systemInternalActions()
-
-	// Get all the actions definitions
-	definitions := []action.ActionDefinition{}
-	for _, m := range actions {
-		definitions = append(definitions, m.Definition())
-	}
-
 	var promptHUD *PromptHUD
 	if a.options.enableHUD {
 		h := a.prepareHUD()
 		promptHUD = &h
 	}
 
-	err = promptTemplate.Execute(prompt, struct {
-		HUD       *PromptHUD
-		Actions   []action.ActionDefinition
-		Reasoning string
-		Messages  []openai.ChatCompletionMessage
-	}{
-		Actions:  definitions,
-		Messages: messages,
-		HUD:      promptHUD,
-	})
+	prompt, err := renderTemplate(templ, promptHUD, a.systemInternalActions(), "")
 	if err != nil {
 		return nil, "", err
 	}
-
 	// Get the LLM to think on what to do
 	// and have a thought
-
-	found := false
-	for _, cc := range c {
-		if cc.Content == prompt.String() {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !Messages(c).Exist(prompt) {
 		c = append([]openai.ChatCompletionMessage{
 			{
 				Role:    "system",
-				Content: prompt.String(),
+				Content: prompt,
 			},
 		}, c...)
 	}
@@ -305,7 +201,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	// From the thought, get the action call
 	// Get all the available actions IDs
 	actionsID := []string{}
-	for _, m := range actions {
+	for _, m := range a.systemInternalActions() {
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 	intentionsTools := action.NewIntention(actionsID...)
@@ -336,7 +232,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	}
 
 	// Find the action
-	chosenAction := actions.Find(actionChoice.Tool)
+	chosenAction := a.systemInternalActions().Find(actionChoice.Tool)
 	if chosenAction == nil {
 		return nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	}

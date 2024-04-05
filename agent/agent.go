@@ -311,6 +311,44 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
+	// If we have already a reply from the action, just return it.
+	// Otherwise generate a full conversation to get a proper message response
+	// if chosenAction.Definition().Name.Is(action.ReplyActionName) {
+	// 	replyResponse := action.ReplyResponse{}
+	// 	if err := params.actionParams.Unmarshal(&replyResponse); err != nil {
+	// 		job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
+	// 		return
+	// 	}
+	// 	if replyResponse.Message != "" {
+	// 		job.Result.SetResponse(replyResponse.Message)
+	// 		job.Result.Finish(nil)
+	// 		return
+	// 	}
+	// }
+
+	// If we have a hud, display it
+	if a.options.enableHUD {
+		var promptHUD *PromptHUD
+		if a.options.enableHUD {
+			h := a.prepareHUD()
+			promptHUD = &h
+		}
+
+		prompt, err := renderTemplate(hudTemplate, promptHUD, a.systemInternalActions(), reasoning)
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
+			return
+		}
+		if !Messages(a.currentConversation).Exist(prompt) {
+			a.currentConversation = append([]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: prompt,
+				},
+			}, a.currentConversation...)
+		}
+	}
+
 	// Generate a human-readable response
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
@@ -413,7 +451,7 @@ func (a *Agent) Run() error {
 
 	// Expose a REST API to interact with the agent to ask it things
 
-	todoTimer := time.NewTicker(1 * time.Minute)
+	todoTimer := time.NewTicker(a.options.periodicRuns)
 	for {
 		select {
 		case job := <-a.jobQueue:

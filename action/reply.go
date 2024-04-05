@@ -15,6 +15,10 @@ func NewReply() *ReplyAction {
 
 type ReplyAction struct{}
 
+type ReplyResponse struct {
+	Message string `json:"message"`
+}
+
 func (a *ReplyAction) Run(ActionParams) (string, error) {
 	return "no-op", nil
 }

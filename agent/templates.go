@@ -1,11 +1,51 @@
 package agent
 
-const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}You have a character and your replies and actions might be influenced by it.
-{{if .Character.Name}}Name: {{.Character.Name}}
-{{end}}{{if .Character.Age}}Age: {{.Character.Age}}
-{{end}}{{if .Character.Occupation}}Occupation: {{.Character.Occupation}}
-{{end}}{{if .Character.Hobbies}}Hobbies: {{.Character.Hobbies}}
-{{end}}{{if .Character.MusicTaste}}Music taste: {{.Character.MusicTaste}}
+import (
+	"bytes"
+	"html/template"
+
+	"github.com/mudler/local-agent-framework/action"
+	"github.com/sashabaranov/go-openai"
+)
+
+func renderTemplate(templ string, hud *PromptHUD, actions Actions, reasoning string) (string, error) {
+	// prepare the prompt
+	prompt := bytes.NewBuffer([]byte{})
+
+	promptTemplate, err := template.New("pickAction").Parse(templ)
+	if err != nil {
+		return "", err
+	}
+
+	// Get all the actions definitions
+	definitions := []action.ActionDefinition{}
+	for _, m := range actions {
+		definitions = append(definitions, m.Definition())
+	}
+
+	err = promptTemplate.Execute(prompt, struct {
+		HUD       *PromptHUD
+		Actions   []action.ActionDefinition
+		Reasoning string
+		Messages  []openai.ChatCompletionMessage
+	}{
+		Actions:   definitions,
+		HUD:       hud,
+		Reasoning: reasoning,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return prompt.String(), nil
+}
+
+const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}The assistant acts like an human, has a character and the replies and actions might be influenced by it.
+{{if .Character.Name}}This is the assistant name: {{.Character.Name}}
+{{end}}{{if .Character.Age}}This is the assistant age: {{.Character.Age}}
+{{end}}{{if .Character.Occupation}}This is the assistant jop: {{.Character.Occupation}}
+{{end}}{{if .Character.Hobbies}}This is the assistant's hobbies: {{.Character.Hobbies}}
+{{end}}{{if .Character.MusicTaste}}This is the assistant's music taste: {{.Character.MusicTaste}}
 {{end}}
 {{end}}
 

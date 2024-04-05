@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"strings"
+	"time"
 )
 
 type Option func(*options) error
@@ -24,6 +25,7 @@ type options struct {
 	statefile                               string
 	context                                 context.Context
 	permanentGoal                           string
+	periodicRuns                            time.Duration
 
 	// callbacks
 	reasoningCallback func(ActionCurrentState) bool
@@ -95,6 +97,17 @@ func WithLLMAPIKey(key string) Option {
 func WithPermanentGoal(goal string) Option {
 	return func(o *options) error {
 		o.permanentGoal = goal
+		return nil
+	}
+}
+
+func WithPeriodicRuns(duration string) Option {
+	return func(o *options) error {
+		t, err := time.ParseDuration(duration)
+		if err != nil {
+			o.periodicRuns, _ = time.ParseDuration("1m")
+		}
+		o.periodicRuns = t
 		return nil
 	}
 }

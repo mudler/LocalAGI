@@ -1,6 +1,8 @@
 module github.com/mudler/local-agent-framework
 
-go 1.21.1
+go 1.22
+
+toolchain go1.22.2
 
 require (
 	github.com/onsi/ginkgo/v2 v2.15.0
@@ -9,6 +11,7 @@ require (
 )
 
 require (
+	github.com/donseba/go-htmx v1.8.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
