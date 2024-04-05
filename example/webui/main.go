@@ -12,6 +12,8 @@ import (
 
 	"github.com/donseba/go-htmx"
 	"github.com/donseba/go-htmx/sse"
+	actions "github.com/mudler/local-agent-framework/example/webui/actions"
+
 	. "github.com/mudler/local-agent-framework/agent"
 )
 
@@ -63,6 +65,7 @@ func main() {
 			)
 			return true
 		}),
+		WithActions(actions.NewSearch()),
 		WithAgentResultCallback(func(state ActionState) {
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
@@ -123,7 +126,7 @@ func main() {
 	// Server Sent Events
 	mux.Handle("GET /sse", http.HandlerFunc(app.SSE))
 
-	fmt.Print("Server started at :3210")
+	fmt.Print("Server started at http://localhost:3210")
 	err = http.ListenAndServe(":3210", mux)
 	log.Fatal(err)
 }

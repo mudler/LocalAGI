@@ -34,6 +34,7 @@ type options struct {
 
 func defaultOptions() *options {
 	return &options{
+		periodicRuns: 15 * time.Minute,
 		LLMAPI: llmOptions{
 			APIURL: "http://localhost:8080",
 			Model:  "echidna",
