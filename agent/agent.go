@@ -30,7 +30,7 @@ type Agent struct {
 	currentReasoning         string
 	currentState             *action.StateResult
 	nextAction               Action
-	currentConversation      []openai.ChatCompletionMessage
+	currentConversation      Messages
 	selfEvaluationInProgress bool
 
 	newConversations chan openai.ChatCompletionMessage
@@ -392,7 +392,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
 			return
 		}
-		if !Messages(a.currentConversation).Exist(prompt) {
+		if !a.currentConversation.Exist(prompt) {
 			a.currentConversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    "system",

@@ -181,7 +181,7 @@ func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
 		}
 		m.Send(
 			sse.NewMessage(
-				chatDiv(query, "blue"),
+				chatDiv(query, "gray"),
 			).WithEvent("messages"))
 
 		go func() {
@@ -191,11 +191,11 @@ func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("response is", res.Response)
 			m.Send(
 				sse.NewMessage(
-					chatDiv(res.Response, "red"),
+					chatDiv(res.Response, "blue"),
 				).WithEvent("messages"))
 			m.Send(
 				sse.NewMessage(
-					"<script> document.getElementById('inputMessage').disabled = false;</script>",
+					inputMessageDisabled(false), // show again the input
 				).WithEvent("message_status"))
 
 			//result := `<i>done</i>`
@@ -204,7 +204,7 @@ func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
 
 		m.Send(
 			sse.NewMessage(
-				`<div class="p-2 my-2 rounded bg-gray-100"><span class="loader"></span></div><script> document.getElementById('inputMessage').disabled = true;</script>`,
+				loader() + inputMessageDisabled(true),
 			).WithEvent("message_status"))
 	}
 }
