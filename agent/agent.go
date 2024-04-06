@@ -227,7 +227,13 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	if chosenAction == nil {
 		//job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
-		job.Result.Finish(fmt.Errorf("no action to do"))
+		//job.Result.Finish(fmt.Errorf("no action to do"))\
+		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+			Role:    "assistant",
+			Content: reasoning,
+		})
+		job.Result.SetResponse(reasoning)
+		job.Result.Finish(nil)
 		return
 	}
 
