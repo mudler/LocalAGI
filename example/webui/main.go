@@ -204,7 +204,7 @@ func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
 
 		m.Send(
 			sse.NewMessage(
-				chatDiv("...", "red") + "<script> document.getElementById('inputMessage').disabled = true;</script>",
+				`<div class="p-2 my-2 rounded bg-gray-100"><span class="loader"></span></div><script> document.getElementById('inputMessage').disabled = true;</script>`,
 			).WithEvent("message_status"))
 	}
 }
