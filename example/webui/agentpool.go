@@ -8,7 +8,16 @@ import (
 	. "github.com/mudler/local-agent-framework/agent"
 )
 
+type ConnectorConfig struct {
+	Type   string                 `json:"type"` // e.g. Slack
+	Config map[string]interface{} `json:"config"`
+}
+
+type ActionsConfig string
+
 type AgentConfig struct {
+	Connector []ConnectorConfig `json:"connector"`
+	Actions   []ActionsConfig   `json:"actions"`
 }
 
 type AgentPool struct {
