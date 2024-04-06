@@ -69,7 +69,12 @@ func main() {
 		WithAgentResultCallback(func(state ActionState) {
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
-			Result: %s`, state.Reasoning, state.ActionCurrentState.Action.Definition().Name, state.Result)
+			Parameters: %+v
+			Result: %s`,
+				state.Reasoning,
+				state.ActionCurrentState.Action.Definition().Name,
+				state.ActionCurrentState.Params,
+				state.Result)
 			sseManager.Send(
 				sse.NewMessage(
 					htmlIfy(
@@ -183,14 +188,16 @@ func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
 			res := agentInstance.Ask(
 				WithText(query),
 			)
+			fmt.Println("response is", res.Response)
 			m.Send(
 				sse.NewMessage(
 					chatDiv(res.Response, "red"),
 				).WithEvent("messages"))
-
+			result := `<i>done</i>`
+			_, _ = w.Write([]byte(result))
 		}()
 
-		result := `<i>message received</i>`
+		result := `<i>loading</i>`
 		_, _ = w.Write([]byte(result))
 	}
 }

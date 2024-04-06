@@ -226,6 +226,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	if chosenAction == nil {
+		// If no action was picked up, the reasoning is the message returned by the assistant
+		// so we can consume it as if it was a reply.
 		//job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
 		//job.Result.Finish(fmt.Errorf("no action to do"))\
 		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
