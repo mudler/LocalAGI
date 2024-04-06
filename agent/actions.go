@@ -205,10 +205,12 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 	intentionsTools := action.NewIntention(actionsID...)
+
+	//XXX: Why we add the reason here?
 	params, err := a.decision(ctx,
 		append(c, openai.ChatCompletionMessage{
-			Role:    "assistent",
-			Content: reason,
+			Role:    "system",
+			Content: "The assistant thought: " + reason,
 		}),
 		Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name)
