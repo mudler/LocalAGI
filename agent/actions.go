@@ -137,10 +137,17 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 
 func (a *Agent) systemInternalActions() Actions {
 	if a.options.enableHUD {
-		return append(a.options.userActions, action.NewState(), action.NewReply())
+		return append(a.options.userActions,
+			action.NewState(), action.NewReply())
 	}
 
-	return append(a.options.userActions, action.NewReply())
+	if a.options.initiateConversations && a.selfEvaluationInProgress { // && self-evaluation..
+		return append(a.options.userActions,
+			action.NewState(), action.NewReply(), action.NewConversation())
+	}
+
+	return append(a.options.userActions,
+		action.NewReply())
 }
 
 func (a *Agent) prepareHUD() PromptHUD {

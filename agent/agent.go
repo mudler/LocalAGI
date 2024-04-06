@@ -27,10 +27,13 @@ type Agent struct {
 	actionContext *action.ActionContext
 	context       *action.ActionContext
 
-	currentReasoning    string
-	currentState        *action.StateResult
-	nextAction          Action
-	currentConversation []openai.ChatCompletionMessage
+	currentReasoning         string
+	currentState             *action.StateResult
+	nextAction               Action
+	currentConversation      []openai.ChatCompletionMessage
+	selfEvaluationInProgress bool
+
+	newConversations chan openai.ChatCompletionMessage
 }
 
 func New(opts ...Option) (*Agent, error) {
@@ -180,12 +183,20 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// Set the action context
 	ctx, cancel := context.WithCancel(context.Background())
 	a.actionContext = action.NewContext(ctx, cancel)
+	a.selfEvaluationInProgress = selfEvaluation
 	a.Unlock()
 
-	if job.Image != "" {
-		// TODO: Use llava to explain the image content
-
+	if selfEvaluation {
+		defer func() {
+			a.Lock()
+			a.selfEvaluationInProgress = false
+			a.Unlock()
+		}()
 	}
+
+	//if job.Image != "" {
+	// TODO: Use llava to explain the image content
+	//}
 
 	if job.Text != "" {
 		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
@@ -261,6 +272,32 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	if !job.Callback(ActionCurrentState{chosenAction, params.actionParams, reasoning}) {
 		job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, params.actionParams, reasoning}, "stopped by callback"})
+		job.Result.Finish(nil)
+		return
+	}
+
+	if selfEvaluation && a.options.initiateConversations &&
+		chosenAction.Definition().Name.Is(action.ConversationActionName) {
+
+		message := action.ConversationActionResponse{}
+		if err := params.actionParams.Unmarshal(&message); err != nil {
+			job.Result.Finish(fmt.Errorf("error unmarshalling conversation response: %w", err))
+			return
+		}
+
+		a.currentConversation = []openai.ChatCompletionMessage{
+			{
+				Role:    "assistant",
+				Content: message.Message,
+			},
+		}
+		go func() {
+			a.newConversations <- openai.ChatCompletionMessage{
+				Role:    "assistant",
+				Content: message.Message,
+			}
+		}()
+		job.Result.SetResponse("decided to initiate a new conversation")
 		job.Result.Finish(nil)
 		return
 	}
@@ -411,6 +448,13 @@ func (a *Agent) consumeJob(job *Job, role string) {
 }
 
 func (a *Agent) periodicallyRun() {
+	// This is running in the background.
+
+	// TODO: Would be nice if we have a special action to
+	// contact the user. This would actually make sure that
+	// if the agent wants to initiate a conversation, it can do so.
+	// This would be a special action that would be picked up by the agent
+	// and would be used to contact the user.
 
 	if a.options.debugMode {
 		fmt.Println("START -- Periodically run is starting")

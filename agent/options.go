@@ -21,6 +21,7 @@ type options struct {
 	userActions                             Actions
 	enableHUD, standaloneJob, showCharacter bool
 	debugMode                               bool
+	initiateConversations                   bool
 	characterfile                           string
 	statefile                               string
 	context                                 context.Context
@@ -61,6 +62,11 @@ func newOptions(opts ...Option) (*options, error) {
 
 var EnableHUD = func(o *options) error {
 	o.enableHUD = true
+	return nil
+}
+
+var EnableInitiateConversations = func(o *options) error {
+	o.initiateConversations = true
 	return nil
 }
 
