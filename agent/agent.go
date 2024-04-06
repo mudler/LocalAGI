@@ -317,6 +317,14 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
+	// decode the response
+	replyResponse := action.ReplyResponse{}
+
+	if err := params.actionParams.Unmarshal(&replyResponse); err != nil {
+		job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
+		return
+	}
+
 	// If we have already a reply from the action, just return it.
 	// Otherwise generate a full conversation to get a proper message response
 	// if chosenAction.Definition().Name.Is(action.ReplyActionName) {
@@ -356,13 +364,23 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	// Generate a human-readable response
+	// resp, err := a.client.CreateChatCompletion(ctx,
+	// 	openai.ChatCompletionRequest{
+	// 		Model: a.options.LLMAPI.Model,
+	// 		Messages: append(a.currentConversation,
+	// 			openai.ChatCompletionMessage{
+	// 				Role:    "system",
+	// 				Content: "Assistant thought: " + replyResponse.Message,
+	// 			},
+	// 		),
+	// 	},
+	// )
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
 			Model:    a.options.LLMAPI.Model,
 			Messages: a.currentConversation,
 		},
 	)
-
 	if err != nil {
 		job.Result.Finish(err)
 		return
@@ -375,6 +393,15 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	// display OpenAI's response to the original question utilizing our function
 	msg := resp.Choices[0].Message
+
+	// If we didn't got any message, we can use the response from the action
+	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" {
+		if a.options.debugMode {
+			fmt.Println("No output returned from conversation, using the action response as a reply.")
+		}
+
+		msg.Content = replyResponse.Message
+	}
 
 	a.currentConversation = append(a.currentConversation, msg)
 	job.Result.SetResponse(msg.Content)
