@@ -193,12 +193,19 @@ func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
 				sse.NewMessage(
 					chatDiv(res.Response, "red"),
 				).WithEvent("messages"))
-			result := `<i>done</i>`
-			_, _ = w.Write([]byte(result))
+			m.Send(
+				sse.NewMessage(
+					"<script> document.getElementById('inputMessage').disabled = false;</script>",
+				).WithEvent("message_status"))
+
+			//result := `<i>done</i>`
+			//	_, _ = w.Write([]byte(result))
 		}()
 
-		result := `<i>loading</i>`
-		_, _ = w.Write([]byte(result))
+		m.Send(
+			sse.NewMessage(
+				chatDiv("...", "red") + "<script> document.getElementById('inputMessage').disabled = true;</script>",
+			).WithEvent("message_status"))
 	}
 }
 
