@@ -12,7 +12,9 @@ import (
 
 	"github.com/donseba/go-htmx"
 	"github.com/donseba/go-htmx/sse"
+	fiber "github.com/gofiber/fiber/v3"
 	external "github.com/mudler/local-agent-framework/external"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 
 	. "github.com/mudler/local-agent-framework/agent"
 )
@@ -24,7 +26,7 @@ type (
 )
 
 var (
-	sseManager sse.Manager
+	sseManager Manager
 )
 var testModel = os.Getenv("TEST_MODEL")
 var apiModel = os.Getenv("API_MODEL")
@@ -94,7 +96,7 @@ func main() {
 	defer agent.Stop()
 
 	agentInstance = agent
-	sseManager = sse.NewManager(5)
+	sseManager = NewManager(5)
 
 	go func() {
 		for {
@@ -105,40 +107,53 @@ func main() {
 			}
 
 			time.Sleep(1 * time.Second) // Send a message every seconds
-			sseManager.Send(sse.NewMessage(fmt.Sprintf("connected clients: %v", clientsStr)).WithEvent("clients"))
+			sseManager.Send(NewMessage(fmt.Sprintf("connected clients: %v", clientsStr)).WithEvent("clients"))
 		}
 	}()
 
 	go func() {
 		for {
 			time.Sleep(1 * time.Second) // Send a message every seconds
-			sseManager.Send(sse.NewMessage(
+			sseManager.Send(NewMessage(
 				htmlIfy(agent.State().String()),
 			).WithEvent("hud"))
 		}
 	}()
 
-	mux := http.NewServeMux()
+	// Initialize a new Fiber app
+	webapp := fiber.New()
 
-	mux.Handle("GET /", http.HandlerFunc(app.Home(agent)))
+	// Define a route for the GET method on the root path '/'
+	webapp.Get("/sse", func(c fiber.Ctx) error {
+		sseManager.Handle(c, NewClient(randStringRunes(10)))
+		return nil
+	})
+	webapp.Get("/notify", wrapHandler(http.HandlerFunc(app.Notify)))
+	webapp.Post("/chat", wrapHandler(http.HandlerFunc(app.Chat(sseManager))))
+	webapp.Get("/talk", wrapHandler(http.HandlerFunc(app.Home(agent))))
+	log.Fatal(webapp.Listen(":3000"))
 
-	// External notifications (e.g. webhook)
-	mux.Handle("POST /notify", http.HandlerFunc(app.Notify))
+	// mux := http.NewServeMux()
 
-	// User chat
-	mux.Handle("POST /chat", http.HandlerFunc(app.Chat(sseManager)))
+	// mux.Handle("GET /", http.HandlerFunc(app.Home(agent)))
 
-	// Server Sent Events
-	mux.Handle("GET /sse", http.HandlerFunc(app.SSE))
+	// // External notifications (e.g. webhook)
+	// mux.Handle("POST /notify", http.HandlerFunc(app.Notify))
 
-	fmt.Print("Server started at http://localhost:3210")
-	err = http.ListenAndServe(":3210", mux)
-	log.Fatal(err)
+	// // User chat
+	// mux.Handle("POST /chat", http.HandlerFunc(app.Chat(sseManager)))
+
+	// // Server Sent Events
+	// //mux.Handle("GET /sse", http.HandlerFunc(app.SSE))
+
+	// fmt.Print("Server started at http://localhost:3210")
+	// err = http.ListenAndServe(":3210", mux)
+	// log.Fatal(err)
 }
 
 func (a *App) Home(agent *Agent) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.ParseFiles("index.html")
+		tmpl, err := template.ParseFiles("chat.html")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -153,11 +168,10 @@ func (a *App) Home(agent *Agent) func(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *App) SSE(w http.ResponseWriter, r *http.Request) {
-	cl := sse.NewClient(randStringRunes(10))
-
-	sseManager.Handle(w, r, cl)
-}
+// func (a *App) SSE(w http.ResponseWriter, r *http.Request) {
+// 	cl := sse.NewClient(randStringRunes(10))
+// 	sseManager.Handle(w, r, cl)
+// }
 
 func (a *App) Notify(w http.ResponseWriter, r *http.Request) {
 	query := strings.ToLower(r.PostFormValue("message"))
@@ -172,7 +186,14 @@ func (a *App) Notify(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("Message sent"))
 }
 
-func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
+func wrapHandler(f func(http.ResponseWriter, *http.Request)) func(ctx fiber.Ctx) error {
+	return func(ctx fiber.Ctx) error {
+		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(f))(ctx.Context())
+		return nil
+	}
+}
+
+func (a *App) Chat(m Manager) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query := strings.ToLower(r.PostFormValue("message"))
 		if query == "" {
@@ -180,7 +201,7 @@ func (a *App) Chat(m sse.Manager) func(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		m.Send(
-			sse.NewMessage(
+			NewMessage(
 				chatDiv(query, "gray"),
 			).WithEvent("messages"))
 
