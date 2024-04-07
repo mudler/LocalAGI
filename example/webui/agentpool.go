@@ -16,8 +16,54 @@ type ConnectorConfig struct {
 type ActionsConfig string
 
 type AgentConfig struct {
-	Connector []ConnectorConfig `json:"connector"`
-	Actions   []ActionsConfig   `json:"actions"`
+	Connector     []ConnectorConfig `json:"connector"`
+	Actions       []ActionsConfig   `json:"actions"`
+	StateFile     string            `json:"state_file"`
+	CharacterFile string            `json:"character_file"`
+	// This is what needs to be part of ActionsConfig
+
+	// WithLLMAPIURL(apiModel),
+	// WithModel(testModel),
+	// EnableHUD,
+	// DebugMode,
+	// EnableStandaloneJob,
+	// WithAgentReasoningCallback(func(state ActionCurrentState) bool {
+	// 	sseManager.Send(
+	// 		sse.NewMessage(
+	// 			fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
+	// 		).WithEvent("status"),
+	// 	)
+	// 	return true
+	// }),
+	// WithActions(external.NewSearch(3)),
+	// WithAgentResultCallback(func(state ActionState) {
+	// 	text := fmt.Sprintf(`Reasoning: %s
+	// 	Action taken: %+v
+	// 	Parameters: %+v
+	// 	Result: %s`,
+	// 		state.Reasoning,
+	// 		state.ActionCurrentState.Action.Definition().Name,
+	// 		state.ActionCurrentState.Params,
+	// 		state.Result)
+	// 	sseManager.Send(
+	// 		sse.NewMessage(
+	// 			htmlIfy(
+	// 				text,
+	// 			),
+	// 		).WithEvent("status"),
+	// 	)
+	// }),
+	// WithRandomIdentity(),
+	// WithPeriodicRuns("10m"),
+
+	APIURL           string `json:"api_url"`
+	Model            string `json:"model"`
+	HUD              bool   `json:"hud"`
+	Debug            bool   `json:"debug"`
+	StandaloneJob    bool   `json:"standalone_job"`
+	RandomIdentity   bool   `json:"random_identity"`
+	IdentityGuidance string `json:"identity_guidance"`
+	PeriodicRuns     string `json:"periodic_runs"`
 }
 
 type AgentPool struct {
@@ -68,10 +114,30 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 }
 
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
-
-	agent, err := New(
-		WithModel("hermes-2-pro-mistral"),
-	)
+	opts := []Option{
+		WithModel(config.Model),
+		WithLLMAPIURL(config.APIURL),
+		WithPeriodicRuns(config.PeriodicRuns),
+		WithStateFile(config.StateFile),
+		WithCharacterFile(config.StateFile),
+	}
+	if config.HUD {
+		opts = append(opts, EnableHUD)
+	}
+	if config.Debug {
+		opts = append(opts, DebugMode)
+	}
+	if config.StandaloneJob {
+		opts = append(opts, EnableStandaloneJob)
+	}
+	if config.RandomIdentity {
+		if config.IdentityGuidance != "" {
+			opts = append(opts, WithRandomIdentity(config.IdentityGuidance))
+		} else {
+			opts = append(opts, WithRandomIdentity())
+		}
+	}
+	agent, err := New(opts...)
 	if err != nil {
 		return err
 	}

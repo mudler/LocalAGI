@@ -39,10 +39,7 @@ type Agent struct {
 func New(opts ...Option) (*Agent, error) {
 	options, err := newOptions(opts...)
 	if err != nil {
-		if err != nil {
-			err = fmt.Errorf("failed to set options: %v", err)
-		}
-		return nil, err
+		return nil, fmt.Errorf("failed to set options: %v", err)
 	}
 
 	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL)
@@ -124,6 +121,12 @@ func (a *Agent) CurrentConversation() []openai.ChatCompletionMessage {
 	a.Lock()
 	defer a.Unlock()
 	return a.currentConversation
+}
+
+func (a *Agent) SetConversation(conv []openai.ChatCompletionMessage) {
+	a.Lock()
+	defer a.Unlock()
+	a.currentConversation = conv
 }
 
 func (a *Agent) ResetConversation() {

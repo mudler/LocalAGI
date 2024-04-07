@@ -94,6 +94,20 @@ func WithLLMAPIURL(url string) Option {
 	}
 }
 
+func WithStateFile(path string) Option {
+	return func(o *options) error {
+		o.statefile = path
+		return nil
+	}
+}
+
+func WithCharacterFile(path string) Option {
+	return func(o *options) error {
+		o.characterfile = path
+		return nil
+	}
+}
+
 func WithLLMAPIKey(key string) Option {
 	return func(o *options) error {
 		o.LLMAPI.APIKey = key
