@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp"
 )
 
@@ -26,7 +26,7 @@ type (
 	// Manager defines the interface for managing clients and broadcasting messages.
 	Manager interface {
 		Send(message Envelope)
-		Handle(ctx fiber.Ctx, cl Listener)
+		Handle(ctx *fiber.Ctx, cl Listener)
 		Clients() []string
 	}
 
@@ -111,7 +111,7 @@ func (manager *broadcastManager) Send(message Envelope) {
 }
 
 // Handle sets up a new client and handles the connection.
-func (manager *broadcastManager) Handle(c fiber.Ctx, cl Listener) {
+func (manager *broadcastManager) Handle(c *fiber.Ctx, cl Listener) {
 
 	manager.register(cl)
 	ctx := c.Context()

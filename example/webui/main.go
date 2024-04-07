@@ -2,19 +2,14 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/donseba/go-htmx"
-	"github.com/donseba/go-htmx/sse"
-	fiber "github.com/gofiber/fiber/v3"
-	external "github.com/mudler/local-agent-framework/external"
-	"github.com/valyala/fasthttp/fasthttpadaptor"
+	fiber "github.com/gofiber/fiber/v2"
 
 	. "github.com/mudler/local-agent-framework/agent"
 )
@@ -22,21 +17,19 @@ import (
 type (
 	App struct {
 		htmx *htmx.HTMX
+		pool *AgentPool
 	}
 )
 
-var (
-	sseManager Manager
-)
 var testModel = os.Getenv("TEST_MODEL")
-var apiModel = os.Getenv("API_MODEL")
+var apiURL = os.Getenv("API_URL")
 
 func init() {
 	if testModel == "" {
 		testModel = "hermes-2-pro-mistral"
 	}
-	if apiModel == "" {
-		apiModel = "http://192.168.68.113:8080"
+	if apiURL == "" {
+		apiURL = "http://192.168.68.113:8080"
 	}
 }
 
@@ -46,79 +39,40 @@ func htmlIfy(s string) string {
 	return s
 }
 
-var agentInstance *Agent
-
 func main() {
-	app := &App{
-		htmx: htmx.New(),
-	}
-
-	agent, err := New(
-		WithLLMAPIURL(apiModel),
-		WithModel(testModel),
-		EnableHUD,
-		DebugMode,
-		EnableStandaloneJob,
-		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-			sseManager.Send(
-				sse.NewMessage(
-					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
-				).WithEvent("status"),
-			)
-			return true
-		}),
-		WithActions(external.NewSearch(3)),
-		WithAgentResultCallback(func(state ActionState) {
-			text := fmt.Sprintf(`Reasoning: %s
-			Action taken: %+v
-			Parameters: %+v
-			Result: %s`,
-				state.Reasoning,
-				state.ActionCurrentState.Action.Definition().Name,
-				state.ActionCurrentState.Params,
-				state.Result)
-			sseManager.Send(
-				sse.NewMessage(
-					htmlIfy(
-						text,
-					),
-				).WithEvent("status"),
-			)
-		}),
-		WithRandomIdentity(),
-		WithPeriodicRuns("10m"),
-		//WithPermanentGoal("get the weather of all the cities in italy and store the results"),
-	)
+	// current dir
+	cwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
-	go agent.Run()
-	defer agent.Stop()
+	os.MkdirAll(cwd+"/pool", 0755)
 
-	agentInstance = agent
-	sseManager = NewManager(5)
+	pool, err := NewAgentPool(testModel, apiURL, cwd+"/pool")
+	if err != nil {
+		panic(err)
 
-	go func() {
-		for {
-			clientsStr := ""
-			clients := sseManager.Clients()
-			for _, c := range clients {
-				clientsStr += c + ", "
-			}
+	}
+	app := &App{
+		htmx: htmx.New(),
+		pool: pool,
+	}
 
-			time.Sleep(1 * time.Second) // Send a message every seconds
-			sseManager.Send(NewMessage(fmt.Sprintf("connected clients: %v", clientsStr)).WithEvent("clients"))
-		}
-	}()
+	if err := pool.StartAll(); err != nil {
+		panic(err)
+	}
 
-	go func() {
-		for {
-			time.Sleep(1 * time.Second) // Send a message every seconds
-			sseManager.Send(NewMessage(
-				htmlIfy(agent.State().String()),
-			).WithEvent("hud"))
-		}
-	}()
+	// go func() {
+	// 	for {
+	// 		clientsStr := ""
+	// 		clients := sseManager.Clients()
+	// 		for _, c := range clients {
+	// 			clientsStr += c + ", "
+	// 		}
+
+	// 		time.Sleep(1 * time.Second) // Send a message every seconds
+	// 		sseManager.Send(NewMessage(fmt.Sprintf("connected clients: %v", clientsStr)).WithEvent("clients"))
+	// 	}
+	// }()
 
 	// Initialize a new Fiber app
 	webapp := fiber.New()
@@ -126,26 +80,41 @@ func main() {
 	// Serve static files
 	webapp.Static("/", "./public")
 
-	webapp.Get("/", func(c fiber.Ctx) error {
+	webapp.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("index.html", fiber.Map{
-			"Title": "Hello, World!",
+			"Agents": pool.List(),
 		})
 	})
 
-	webapp.Get("/create", func(c fiber.Ctx) error {
+	webapp.Get("/create", func(c *fiber.Ctx) error {
 		return c.Render("create.html", fiber.Map{
 			"Title": "Hello, World!",
 		})
 	})
 
 	// Define a route for the GET method on the root path '/'
-	webapp.Get("/sse", func(c fiber.Ctx) error {
-		sseManager.Handle(c, NewClient(randStringRunes(10)))
+	webapp.Get("/sse/:name", func(c *fiber.Ctx) error {
+
+		m := pool.GetManager(c.Params("name"))
+		if m == nil {
+			return c.SendStatus(404)
+		}
+
+		m.Handle(c, NewClient(randStringRunes(10)))
 		return nil
 	})
-	webapp.Get("/notify", wrapHandler(http.HandlerFunc(app.Notify)))
-	webapp.Post("/chat", wrapHandler(http.HandlerFunc(app.Chat(sseManager))))
-	webapp.Get("/talk", wrapHandler(http.HandlerFunc(app.Home(agent))))
+
+	webapp.Get("/notify/:name", app.Notify(pool))
+	webapp.Post("/chat/:name", app.Chat(pool))
+	webapp.Post("/create", app.Create(pool))
+
+	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
+		return c.Render("chat.html", fiber.Map{
+			//	"Character": agent.Character,
+			"Name": c.Params("name"),
+		})
+	})
+
 	log.Fatal(webapp.Listen(":3000"))
 
 	// mux := http.NewServeMux()
@@ -166,71 +135,94 @@ func main() {
 	// log.Fatal(err)
 }
 
-func (a *App) Home(agent *Agent) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.ParseFiles("chat.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		tmpl.Execute(w,
-			struct {
-				Character Character
-			}{
-				Character: agent.Character,
-			})
-	}
-}
-
 // func (a *App) SSE(w http.ResponseWriter, r *http.Request) {
 // 	cl := sse.NewClient(randStringRunes(10))
 // 	sseManager.Handle(w, r, cl)
 // }
 
-func (a *App) Notify(w http.ResponseWriter, r *http.Request) {
-	query := strings.ToLower(r.PostFormValue("message"))
-	if query == "" {
-		_, _ = w.Write([]byte("Please enter a message."))
-		return
-	}
+func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		payload := struct {
+			Message string `json:"message"`
+		}{}
 
-	agentInstance.Ask(
-		WithText(query),
-	)
-	_, _ = w.Write([]byte("Message sent"))
-}
+		if err := c.BodyParser(&payload); err != nil {
+			return err
+		}
 
-func wrapHandler(f func(http.ResponseWriter, *http.Request)) func(ctx fiber.Ctx) error {
-	return func(ctx fiber.Ctx) error {
-		fasthttpadaptor.NewFastHTTPHandler(http.HandlerFunc(f))(ctx.Context())
+		query := payload.Message
+		if query == "" {
+			_, _ = c.Write([]byte("Please enter a message."))
+			return nil
+		}
+
+		agent := pool.GetAgent(c.Params("name"))
+		agent.Ask(
+			WithText(query),
+		)
+		_, _ = c.Write([]byte("Message sent"))
+
 		return nil
 	}
 }
 
-func (a *App) Chat(m Manager) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		query := strings.ToLower(r.PostFormValue("message"))
-		if query == "" {
-			_, _ = w.Write([]byte("Please enter a message."))
-			return
+func (a *App) Create(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		config := AgentConfig{}
+		if err := c.BodyParser(&config); err != nil {
+			return err
 		}
-		m.Send(
+
+		if config.Name == "" {
+			c.Status(http.StatusBadRequest).SendString("Name is required")
+			return nil
+		}
+		if err := pool.CreateAgent(config.Name, &config); err != nil {
+			c.Status(http.StatusInternalServerError).SendString(err.Error())
+			return nil
+		}
+		return c.Redirect("/")
+	}
+}
+
+func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		payload := struct {
+			Message string `json:"message"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			return err
+		}
+		agentName := c.Params("name")
+		manager := pool.GetManager(agentName)
+
+		query := payload.Message
+		if query == "" {
+			_, _ = c.Write([]byte("Please enter a message."))
+			return nil
+		}
+		manager.Send(
 			NewMessage(
 				chatDiv(query, "gray"),
 			).WithEvent("messages"))
 
 		go func() {
-			res := agentInstance.Ask(
+			agent := pool.GetAgent(agentName)
+			if agent == nil {
+				fmt.Println("Agent not found in pool", c.Params("name"))
+				return
+			}
+			res := agent.Ask(
 				WithText(query),
 			)
 			fmt.Println("response is", res.Response)
-			m.Send(
-				sse.NewMessage(
+			manager.Send(
+				NewMessage(
 					chatDiv(res.Response, "blue"),
 				).WithEvent("messages"))
-			m.Send(
-				sse.NewMessage(
+			manager.Send(
+				NewMessage(
 					inputMessageDisabled(false), // show again the input
 				).WithEvent("message_status"))
 
@@ -238,10 +230,12 @@ func (a *App) Chat(m Manager) func(w http.ResponseWriter, r *http.Request) {
 			//	_, _ = w.Write([]byte(result))
 		}()
 
-		m.Send(
-			sse.NewMessage(
+		manager.Send(
+			NewMessage(
 				loader() + inputMessageDisabled(true),
 			).WithEvent("message_status"))
+
+		return nil
 	}
 }
 

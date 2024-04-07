@@ -30,13 +30,15 @@
                         </thead>
                         <tbody class="bg-gray-800 divide-y divide-gray-700">
                         <!-- Dynamic agent rows go here -->
+                        {{ range .Agents }}
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">Agent 1</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">{{.}}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">Online</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <a href="#" class="text-blue-500 hover:text-blue-400">Edit</a>
+                                <a href="/talk/{{.}}" class="text-blue-500 hover:text-blue-400">Talk</a>
                             </td>
                         </tr>
+                        {{ end }}
                         <!-- Repeat for each agent -->
                         </tbody>
                     </table>
@@ -45,7 +47,7 @@
         </div>
     </div>
     <div class="mt-6">
-        <a href="create_agent.html" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+        <a href="/create" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
             Add New Agent
         </a>
     </div>

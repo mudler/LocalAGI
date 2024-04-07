@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"time"
 
 	. "github.com/mudler/local-agent-framework/agent"
+	"github.com/mudler/local-agent-framework/external"
 )
 
 type ConnectorConfig struct {
@@ -16,13 +19,11 @@ type ConnectorConfig struct {
 type ActionsConfig string
 
 type AgentConfig struct {
-	Connector     []ConnectorConfig `json:"connector"`
-	Actions       []ActionsConfig   `json:"actions"`
-	StateFile     string            `json:"state_file"`
-	CharacterFile string            `json:"character_file"`
+	Connector []ConnectorConfig `json:"connector"`
+	Actions   []ActionsConfig   `json:"actions"`
 	// This is what needs to be part of ActionsConfig
-	APIURL           string `json:"api_url"`
 	Model            string `json:"model"`
+	Name             string `json:"name"`
 	HUD              bool   `json:"hud"`
 	Debug            bool   `json:"debug"`
 	StandaloneJob    bool   `json:"standalone_job"`
@@ -32,35 +33,47 @@ type AgentConfig struct {
 }
 
 type AgentPool struct {
-	file     string
-	pool     AgentPoolData
-	agents   map[string]*Agent
-	managers map[string]Manager
+	file          string
+	pooldir       string
+	pool          AgentPoolData
+	agents        map[string]*Agent
+	managers      map[string]Manager
+	apiURL, model string
 }
 
 type AgentPoolData map[string]AgentConfig
 
-func NewAgentPool(file string) (*AgentPool, error) {
+func NewAgentPool(model, apiURL, directory string) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
 
-	if _, err := os.Stat(file); err != nil {
+	poolfile := filepath.Join(directory, "pool.json")
+
+	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
-			file:   file,
-			agents: make(map[string]*Agent),
-			pool:   make(map[string]AgentConfig),
+			file:     poolfile,
+			pooldir:  directory,
+			apiURL:   apiURL,
+			model:    model,
+			agents:   make(map[string]*Agent),
+			pool:     make(map[string]AgentConfig),
+			managers: make(map[string]Manager),
 		}, nil
 	}
 
-	poolData, err := loadPoolFromFile(file)
+	poolData, err := loadPoolFromFile(poolfile)
 	if err != nil {
 		return nil, err
 	}
 	return &AgentPool{
-		file:   file,
-		agents: make(map[string]*Agent),
-		pool:   *poolData,
+		file:     poolfile,
+		apiURL:   apiURL,
+		pooldir:  directory,
+		model:    model,
+		agents:   make(map[string]*Agent),
+		managers: make(map[string]Manager),
+		pool:     *poolData,
 	}, nil
 }
 
@@ -91,16 +104,48 @@ func (a *AgentPool) List() []string {
 	return agents
 }
 
+func (a *AgentConfig) availableActions() []Action {
+	actions := []Action{}
+	if len(a.Actions) == 0 {
+		// Return search as default
+		return []Action{external.NewSearch(3)}
+	}
+	for _, action := range a.Actions {
+		switch action {
+		case "search":
+			actions = append(actions, external.NewSearch(3))
+		}
+	}
+
+	return actions
+}
+
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
 	manager := NewManager(5)
+	model := a.model
+	if config.Model != "" {
+		model = config.Model
+	}
+	if config.PeriodicRuns == "" {
+		config.PeriodicRuns = "10m"
+	}
+	fmt.Println("Creating agent", name)
+	fmt.Println("Model", model)
+	fmt.Println("API URL", a.apiURL)
+
+	actions := config.availableActions()
 	opts := []Option{
-		WithModel(config.Model),
-		WithLLMAPIURL(config.APIURL),
+		WithModel(model),
+		WithLLMAPIURL(a.apiURL),
 		WithPeriodicRuns(config.PeriodicRuns),
-		WithStateFile(config.StateFile),
-		WithCharacterFile(config.StateFile),
+		WithActions(
+			actions...,
+		),
+		WithStateFile(filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", name))),
+		WithCharacterFile(filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", name))),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-			sseManager.Send(
+			fmt.Println("Reasoning", state.Reasoning)
+			manager.Send(
 				NewMessage(
 					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
 				).WithEvent("status"),
@@ -108,6 +153,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 			return true
 		}),
 		WithAgentResultCallback(func(state ActionState) {
+			fmt.Println("Reasoning", state.Reasoning)
+
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
 			Parameters: %+v
@@ -116,7 +163,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 				state.ActionCurrentState.Action.Definition().Name,
 				state.ActionCurrentState.Params,
 				state.Result)
-			sseManager.Send(
+			manager.Send(
 				NewMessage(
 					htmlIfy(
 						text,
@@ -141,6 +188,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 			opts = append(opts, WithRandomIdentity())
 		}
 	}
+
+	fmt.Println("Starting agent", name)
+	fmt.Printf("Config %+v\n", config)
 	agent, err := New(opts...)
 	if err != nil {
 		return err
@@ -152,6 +202,15 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	go func() {
 		if err := agent.Run(); err != nil {
 			panic(err)
+		}
+	}()
+
+	go func() {
+		for {
+			time.Sleep(1 * time.Second) // Send a message every seconds
+			manager.Send(NewMessage(
+				htmlIfy(agent.State().String()),
+			).WithEvent("hud"))
 		}
 	}()
 

@@ -8,18 +8,44 @@
 <body class="bg-gray-900 p-4 text-white">
 <div class="max-w-md mx-auto mt-10">
     <h1 class="text-2xl font-bold text-center mb-6">Create New Agent</h1>
-    <form action="/path/to/your/form/handler" method="POST">
+    <form action="/create" method="POST">
         <div class="mb-4">
-            <label for="agentName" class="block text-sm font-medium text-gray-400">Agent Name</label>
-            <input type="text" name="agentName" id="agentName" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Agent Name">
+            <label for="connector" class="block text-sm font-medium text-gray-400">Connector Config (JSON)</label>
+            <textarea id="connector" name="connector" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='[{"...":"..."}]'></textarea>
         </div>
         <div class="mb-4">
-            <label for="agentType" class="block text-sm font-medium text-gray-400">Agent Type</label>
-            <select id="agentType" name="agentType" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-700 text-white">
-                <option>General</option>
-                <option>Support</option>
-                <option>Sales</option>
-            </select>
+            <label for="actions" class="block text-sm font-medium text-gray-400">Actions Config (JSON)</label>
+            <textarea id="actions" name="actions" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='[{"...":"..."}]'></textarea>
+        </div>
+        <!-- Adding fields for properties in ActionsConfig -->
+ 
+        <div class="mb-4">
+            <label for="name" class="block text-sm font-medium text-gray-400">Name</label>
+            <input type="text" name="name" id="name" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Name">
+        </div>
+        <div class="mb-4">
+            <label for="hud" class="block text-sm font-medium text-gray-400">HUD</label>
+            <input type="checkbox" name="hud" id="hud" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
+        </div>
+        <div class="mb-4">
+            <label for="debug" class="block text-sm font-medium text-gray-400">Debug</label>
+            <input type="checkbox" name="debug" id="debug" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
+        </div>
+        <div class="mb-4">
+            <label for="standalone_job" class="block text-sm font-medium text-gray-400">Standalone Job</label>
+            <input type="checkbox" name="standalone_job" id="standalone_job" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
+        </div>
+        <div class="mb-4">
+            <label for="random_identity" class="block text-sm font-medium text-gray-400">Random Identity</label>
+            <input type="checkbox" name="random_identity" id="random_identity" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
+        </div>
+        <div class="mb-4">
+            <label for="identity_guidance" class="block text-sm font-medium text-gray-400">Identity Guidance</label>
+            <input type="text" name="identity_guidance" id="identity_guidance" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Identity Guidance">
+        </div>
+        <div class="mb-4">
+            <label for="periodic_runs" class="block text-sm font-medium text-gray-400">Periodic Runs</label>
+            <input type="text" name="periodic_runs" id="periodic_runs" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Periodic Runs">
         </div>
         <div class="flex items-center justify-between">
             <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
