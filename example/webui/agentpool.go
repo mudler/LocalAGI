@@ -67,9 +67,10 @@ type AgentConfig struct {
 }
 
 type AgentPool struct {
-	file   string
-	pool   AgentPoolData
-	agents map[string]*Agent
+	file     string
+	pool     AgentPoolData
+	agents   map[string]*Agent
+	managers map[string]Manager
 }
 
 type AgentPoolData map[string]AgentConfig
@@ -113,13 +114,51 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 	return a.startAgentWithConfig(name, agentConfig)
 }
 
+func (a *AgentPool) GetManager(name string) Manager {
+	return a.managers[name]
+}
+
+func (a *AgentPool) List() []string {
+	var agents []string
+	for agent := range a.pool {
+		agents = append(agents, agent)
+	}
+	return agents
+}
+
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
+	manager := NewManager(5)
 	opts := []Option{
 		WithModel(config.Model),
 		WithLLMAPIURL(config.APIURL),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithStateFile(config.StateFile),
 		WithCharacterFile(config.StateFile),
+		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
+			sseManager.Send(
+				NewMessage(
+					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
+				).WithEvent("status"),
+			)
+			return true
+		}),
+		WithAgentResultCallback(func(state ActionState) {
+			text := fmt.Sprintf(`Reasoning: %s
+			Action taken: %+v
+			Parameters: %+v
+			Result: %s`,
+				state.Reasoning,
+				state.ActionCurrentState.Action.Definition().Name,
+				state.ActionCurrentState.Params,
+				state.Result)
+			sseManager.Send(
+				NewMessage(
+					htmlIfy(
+						text,
+					),
+				).WithEvent("status"),
+			)
+		}),
 	}
 	if config.HUD {
 		opts = append(opts, EnableHUD)
@@ -143,6 +182,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	}
 
 	a.agents[name] = agent
+	a.managers[name] = manager
 
 	go func() {
 		if err := agent.Run(); err != nil {
