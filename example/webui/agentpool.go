@@ -21,41 +21,6 @@ type AgentConfig struct {
 	StateFile     string            `json:"state_file"`
 	CharacterFile string            `json:"character_file"`
 	// This is what needs to be part of ActionsConfig
-
-	// WithLLMAPIURL(apiModel),
-	// WithModel(testModel),
-	// EnableHUD,
-	// DebugMode,
-	// EnableStandaloneJob,
-	// WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-	// 	sseManager.Send(
-	// 		sse.NewMessage(
-	// 			fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
-	// 		).WithEvent("status"),
-	// 	)
-	// 	return true
-	// }),
-	// WithActions(external.NewSearch(3)),
-	// WithAgentResultCallback(func(state ActionState) {
-	// 	text := fmt.Sprintf(`Reasoning: %s
-	// 	Action taken: %+v
-	// 	Parameters: %+v
-	// 	Result: %s`,
-	// 		state.Reasoning,
-	// 		state.ActionCurrentState.Action.Definition().Name,
-	// 		state.ActionCurrentState.Params,
-	// 		state.Result)
-	// 	sseManager.Send(
-	// 		sse.NewMessage(
-	// 			htmlIfy(
-	// 				text,
-	// 			),
-	// 		).WithEvent("status"),
-	// 	)
-	// }),
-	// WithRandomIdentity(),
-	// WithPeriodicRuns("10m"),
-
 	APIURL           string `json:"api_url"`
 	Model            string `json:"model"`
 	HUD              bool   `json:"hud"`
