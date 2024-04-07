@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Create New Agent</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-900 p-4 text-white">
+<div class="max-w-md mx-auto mt-10">
+    <h1 class="text-2xl font-bold text-center mb-6">Create New Agent</h1>
+    <form action="/path/to/your/form/handler" method="POST">
+        <div class="mb-4">
+            <label for="agentName" class="block text-sm font-medium text-gray-400">Agent Name</label>
+            <input type="text" name="agentName" id="agentName" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Agent Name">
+        </div>
+        <div class="mb-4">
+            <label for="agentType" class="block text-sm font-medium text-gray-400">Agent Type</label>
+            <select id="agentType" name="agentType" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md bg-gray-700 text-white">
+                <option>General</option>
+                <option>Support</option>
+                <option>Sales</option>
+            </select>
+        </div>
+        <div class="flex items-center justify-between">
+            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Create Agent
+            </button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

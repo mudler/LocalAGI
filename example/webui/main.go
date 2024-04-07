@@ -123,6 +123,21 @@ func main() {
 	// Initialize a new Fiber app
 	webapp := fiber.New()
 
+	// Serve static files
+	webapp.Static("/", "./public")
+
+	webapp.Get("/", func(c fiber.Ctx) error {
+		return c.Render("index.html", fiber.Map{
+			"Title": "Hello, World!",
+		})
+	})
+
+	webapp.Get("/create", func(c fiber.Ctx) error {
+		return c.Render("create.html", fiber.Map{
+			"Title": "Hello, World!",
+		})
+	})
+
 	// Define a route for the GET method on the root path '/'
 	webapp.Get("/sse", func(c fiber.Ctx) error {
 		sseManager.Handle(c, NewClient(randStringRunes(10)))
