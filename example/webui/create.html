@@ -9,13 +9,14 @@
     <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
 </head>
 <body class="bg-gray-900 p-4 text-white">
-<div class="max-w-md mx-auto mt-10">
-    <h1 class="text-2xl font-bold text-center mb-6">Create New Agent</h1>
-    <form action="/create" method="POST">
+    <div class="max-w-2xl mx-auto my-12 bg-gray-800 p-8 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold text-center mb-10 text-blue-400">Create New Agent</h1>
+     
+    <form action="/create" method="POST" class="space-y-6">
 
-        <div class="mb-4">
-            <label for="name" class="block text-sm font-medium text-gray-400">Name</label>
-            <input type="text" name="name" id="name" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Name">
+        <div class="mb-6">
+            <label for="name" class="block text-lg font-medium text-gray-400">Name</label>
+            <input type="text" name="name" id="name" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Name">
         </div>
 
 
@@ -34,7 +35,7 @@
                 const newConnectorHTML = `
                     <div class="connector mb-4">
                         <div class="mb-4">
-                            <label for="connectorType${newConnectorIndex}" class="block text-sm font-medium text-gray-400">Connector Type</label>
+                            <label for="connectorType${newConnectorIndex}" class="block text-lg font-medium text-gray-400">Connector Type</label>
                             <select name="connectors[${newConnectorIndex}].type" id="connectorType${newConnectorIndex}" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white">
                         {{ range .Connectors }}
                         <option value="{{.}}">{{.}}</option>
@@ -42,8 +43,8 @@
                             </select>
                         </div>
                         <div class="mb-4">
-                            <label for="connectorConfig${newConnectorIndex}" class="block text-sm font-medium text-gray-400">Connector Config (JSON)</label>
-                            <textarea id="connectorConfig${newConnectorIndex}" name="connectors[${newConnectorIndex}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"token":"..."}'></textarea>
+                            <label for="connectorConfig${newConnectorIndex}" class="block text-lg font-medium text-gray-400">Connector Config (JSON)</label>
+                            <textarea id="connectorConfig${newConnectorIndex}" name="connectors[${newConnectorIndex}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"token":"sk-mg3.."}'></textarea>
                         </div>
                     </div>
                 `;
@@ -64,15 +65,15 @@
             
                 const newConnectorHTML = `
                 <div class="action mb-4">
-                    <label for="actionsName${ii}" class="block text-sm font-medium text-gray-400">Connector Type</label>
+                    <label for="actionsName${ii}" class="block text-lg font-medium text-gray-400">Connector Type</label>
                     <select name="actions[${ii}].name" id="actionsName${ii}" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white">
                     {{ range .Actions }}
                     <option value="{{.}}">{{.}}</option>
                     {{ end }}
                     </select>
                     <div class="mb-4">
-                            <label for="actionsConfig${ii}" class="block text-sm font-medium text-gray-400">Connector Config (JSON)</label>
-                            <textarea id="actionsConfig${ii}" name="actions[${ii}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"token":"..."}'></textarea>
+                            <label for="actionsConfig${ii}" class="block text-lg font-medium text-gray-400">Connector Config (JSON)</label>
+                            <textarea id="actionsConfig${ii}" name="actions[${ii}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"results":"5"}'></textarea>
                     </div>
                 </div>
                 `;
@@ -83,28 +84,32 @@
  
      
         <div class="mb-4">
-            <label for="hud" class="block text-sm font-medium text-gray-400">HUD</label>
-            <input type="checkbox" name="hud" id="hud" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
+            <label for="hud" class="block text-lg font-medium text-gray-400">HUD</label>
+            <input type="checkbox" name="hud" id="hud" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
         </div>
         <div class="mb-4">
-            <label for="debug" class="block text-sm font-medium text-gray-400">Debug</label>
-            <input type="checkbox" name="debug" id="debug" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
         </div>
         <div class="mb-4">
-            <label for="standalone_job" class="block text-sm font-medium text-gray-400">Standalone Job</label>
-            <input type="checkbox" name="standalone_job" id="standalone_job" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
+
+            <label for="debug" class="block text-lg font-medium text-gray-400">Debug</label>
+            <input type="checkbox" name="debug" id="debug" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">  
+            <label for="standalone_job" class="block text-lg font-medium text-gray-400">Standalone Job</label>
+            <input type="checkbox" name="standalone_job" id="standalone_job" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
+
+            <label for="random_identity" class="block text-lg font-medium text-gray-400">Random Identity</label>
+            <input type="checkbox" name="random_identity" id="random_identity" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
         </div>
         <div class="mb-4">
-            <label for="random_identity" class="block text-sm font-medium text-gray-400">Random Identity</label>
-            <input type="checkbox" name="random_identity" id="random_identity" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block shadow-sm sm:text-sm border-gray-300 rounded bg-gray-700">
-        </div>
-        <div class="mb-4">
-            <label for="identity_guidance" class="block text-sm font-medium text-gray-400">Identity Guidance</label>
+            <label for="identity_guidance" class="block text-lg font-medium text-gray-400">Identity Guidance</label>
             <input type="text" name="identity_guidance" id="identity_guidance" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Identity Guidance">
         </div>
         <div class="mb-4">
-            <label for="periodic_runs" class="block text-sm font-medium text-gray-400">Periodic Runs</label>
+            <label for="periodic_runs" class="block text-lg font-medium text-gray-400">Periodic Runs</label>
             <input type="text" name="periodic_runs" id="periodic_runs" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Periodic Runs">
+        </div>
+        <div class="mb-4">
+            <label for="permanent_goal" class="block text-lg font-medium text-gray-400">Permanent goal</label>
+            <input type="text" name="permanent_goal" id="permanent_goal" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Permanent goal">
         </div>
         <div class="flex items-center justify-between">
             <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">

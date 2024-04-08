@@ -35,6 +35,7 @@ type AgentConfig struct {
 	RandomIdentity   bool   `json:"random_identity" form:"random_identity"`
 	IdentityGuidance string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns     string `json:"periodic_runs" form:"periodic_runs"`
+	PermanentGoal    string `json:"permanent_goal" form:"permanent_goal"`
 }
 
 type AgentPool struct {
@@ -205,6 +206,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
 		WithPeriodicRuns(config.PeriodicRuns),
+		WithPermanentGoal(config.PermanentGoal),
 		WithActions(
 			actions...,
 		),
