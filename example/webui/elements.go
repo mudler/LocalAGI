@@ -12,10 +12,10 @@ func loader() string {
 	return `<div class="loader"></div>`
 }
 
-func inputMessageDisabled(disabled bool) string {
+func disabledElement(id string, disabled bool) string {
 	if disabled {
-		return `<script> document.getElementById('inputMessage').disabled = true;</script>`
+		return `<script> document.getElementById('` + id + `').disabled = true;</script>`
 	}
 
-	return `<script> document.getElementById('inputMessage').disabled = false;</script>`
+	return `<script> document.getElementById('` + id + `').disabled = false;</script>`
 }

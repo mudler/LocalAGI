@@ -19,17 +19,17 @@ type ConnectorConfig struct {
 type ActionsConfig string
 
 type AgentConfig struct {
-	Connector []ConnectorConfig `json:"connector"`
-	Actions   []ActionsConfig   `json:"actions"`
+	Connector []ConnectorConfig `json:"connector" form:"connector" `
+	Actions   []ActionsConfig   `json:"actions" form:"actions"`
 	// This is what needs to be part of ActionsConfig
-	Model            string `json:"model"`
-	Name             string `json:"name"`
-	HUD              bool   `json:"hud"`
-	Debug            bool   `json:"debug"`
-	StandaloneJob    bool   `json:"standalone_job"`
-	RandomIdentity   bool   `json:"random_identity"`
-	IdentityGuidance string `json:"identity_guidance"`
-	PeriodicRuns     string `json:"periodic_runs"`
+	Model            string `json:"model" form:"model"`
+	Name             string `json:"name" form:"name"`
+	HUD              bool   `json:"hud" form:"hud"`
+	Debug            bool   `json:"debug" form:"debug"`
+	StandaloneJob    bool   `json:"standalone_job" form:"standalone_job"`
+	RandomIdentity   bool   `json:"random_identity" form:"random_identity"`
+	IdentityGuidance string `json:"identity_guidance" form:"identity_guidance"`
+	PeriodicRuns     string `json:"periodic_runs" form:"periodic_runs"`
 }
 
 type AgentPool struct {
@@ -104,13 +104,17 @@ func (a *AgentPool) List() []string {
 	return agents
 }
 
+var AvailableActions = []string{"search"}
+
 func (a *AgentConfig) availableActions() []Action {
 	actions := []Action{}
+
 	if len(a.Actions) == 0 {
 		// Return search as default
 		return []Action{external.NewSearch(3)}
 	}
 	for _, action := range a.Actions {
+		fmt.Println("Set Action", action)
 		switch action {
 		case "search":
 			actions = append(actions, external.NewSearch(3))
@@ -134,6 +138,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	fmt.Println("API URL", a.apiURL)
 
 	actions := config.availableActions()
+
+	stateFile, characterFile := a.stateFiles(name)
+
+	fmt.Println("Actions", actions)
 	opts := []Option{
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
@@ -141,8 +149,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithActions(
 			actions...,
 		),
-		WithStateFile(filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", name))),
-		WithCharacterFile(filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", name))),
+		WithStateFile(stateFile),
+		WithCharacterFile(characterFile),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
 			fmt.Println("Reasoning", state.Reasoning)
 			manager.Send(
@@ -201,7 +209,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	go func() {
 		if err := agent.Run(); err != nil {
-			panic(err)
+			fmt.Println("Agent stop: ", err.Error())
 		}
 	}()
 
@@ -253,7 +261,21 @@ func (a *AgentPool) Start(name string) error {
 	return fmt.Errorf("agent %s not found", name)
 }
 
+func (a *AgentPool) stateFiles(name string) (string, string) {
+	stateFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", name))
+	characterFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", name))
+
+	return stateFile, characterFile
+}
+
 func (a *AgentPool) Remove(name string) error {
+
+	// Cleanup character and state
+	stateFile, characterFile := a.stateFiles(name)
+
+	os.Remove(stateFile)
+	os.Remove(characterFile)
+
 	a.Stop(name)
 	delete(a.agents, name)
 	delete(a.pool, name)

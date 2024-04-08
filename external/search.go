@@ -30,7 +30,7 @@ func (a *SearchAction) Run(params action.ActionParams) (string, error) {
 	ddg := client.NewDuckDuckGoSearchClient()
 	res, err := ddg.SearchLimited(result.Query, a.results)
 	if err != nil {
-		msg := fmt.Sprintf("error: %v", err)
+		msg := fmt.Sprintf("error duckduckgo: %v", err)
 		fmt.Printf(msg)
 		return msg, err
 	}

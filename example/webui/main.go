@@ -88,7 +88,8 @@ func main() {
 
 	webapp.Get("/create", func(c *fiber.Ctx) error {
 		return c.Render("create.html", fiber.Map{
-			"Title": "Hello, World!",
+			"Title":   "Hello, World!",
+			"Actions": AvailableActions,
 		})
 	})
 
@@ -107,6 +108,7 @@ func main() {
 	webapp.Get("/notify/:name", app.Notify(pool))
 	webapp.Post("/chat/:name", app.Chat(pool))
 	webapp.Post("/create", app.Create(pool))
+	webapp.Get("/delete/:name", app.Delete(pool))
 
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
 		return c.Render("chat.html", fiber.Map{
@@ -166,12 +168,24 @@ func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
+func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		if err := pool.Remove(c.Params("name")); err != nil {
+			fmt.Println("Error removing agent", err)
+			return c.Status(http.StatusInternalServerError).SendString(err.Error())
+		}
+		return c.Redirect("/")
+	}
+}
+
 func (a *App) Create(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		config := AgentConfig{}
 		if err := c.BodyParser(&config); err != nil {
 			return err
 		}
+
+		fmt.Printf("Agent configuration: %+v\n", config)
 
 		if config.Name == "" {
 			c.Status(http.StatusBadRequest).SendString("Name is required")
@@ -223,7 +237,7 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 				).WithEvent("messages"))
 			manager.Send(
 				NewMessage(
-					inputMessageDisabled(false), // show again the input
+					disabledElement("inputMessage", false), // show again the input
 				).WithEvent("message_status"))
 
 			//result := `<i>done</i>`
@@ -232,7 +246,7 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 
 		manager.Send(
 			NewMessage(
-				loader() + inputMessageDisabled(true),
+				loader() + disabledElement("inputMessage", true),
 			).WithEvent("message_status"))
 
 		return nil

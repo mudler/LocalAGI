@@ -59,30 +59,10 @@ func New(opts ...Option) (*Agent, error) {
 		context:      action.NewContext(ctx, cancel),
 	}
 
-	if a.options.randomIdentity {
-		if err = a.generateIdentity(a.options.randomIdentityGuidance); err != nil {
-			return a, fmt.Errorf("failed to generate identity: %v", err)
-		}
-	}
-
 	if a.options.statefile != "" {
 		if _, err := os.Stat(a.options.statefile); err == nil {
 			if err = a.LoadState(a.options.statefile); err != nil {
 				return a, fmt.Errorf("failed to load state: %v", err)
-			}
-		}
-	}
-
-	if a.options.characterfile != "" {
-		if _, err := os.Stat(a.options.characterfile); err == nil {
-			// if there is a file, load the character back
-			if err = a.LoadCharacter(a.options.characterfile); err != nil {
-				return a, fmt.Errorf("failed to load character: %v", err)
-			}
-		} else {
-			// otherwise save it for next time
-			if err = a.SaveCharacter(a.options.characterfile); err != nil {
-				return a, fmt.Errorf("failed to save character: %v", err)
 			}
 		}
 	}
@@ -520,10 +500,43 @@ func (a *Agent) periodicallyRun() {
 	// a.ResetConversation()
 }
 
+func (a *Agent) prepareIdentity() error {
+
+	if a.options.characterfile != "" {
+		if _, err := os.Stat(a.options.characterfile); err == nil {
+			// if there is a file, load the character back
+			if err = a.LoadCharacter(a.options.characterfile); err != nil {
+				return fmt.Errorf("failed to load character: %v", err)
+			}
+		} else {
+			if a.options.randomIdentity {
+				if err = a.generateIdentity(a.options.randomIdentityGuidance); err != nil {
+					return fmt.Errorf("failed to generate identity: %v", err)
+				}
+			}
+
+			// otherwise save it for next time
+			if err = a.SaveCharacter(a.options.characterfile); err != nil {
+				return fmt.Errorf("failed to save character: %v", err)
+			}
+		}
+	} else {
+		if err := a.generateIdentity(a.options.randomIdentityGuidance); err != nil {
+			return fmt.Errorf("failed to generate identity: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (a *Agent) Run() error {
 	// The agent run does two things:
 	// picks up requests from a queue
 	// and generates a response/perform actions
+
+	if err := a.prepareIdentity(); err != nil {
+		return fmt.Errorf("failed to prepare identity: %v", err)
+	}
 
 	// It is also preemptive.
 	// That is, it can interrupt the current action

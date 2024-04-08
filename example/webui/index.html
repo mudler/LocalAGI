@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Agent List</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
 </head>
 <body class="bg-gray-900 p-4 text-white">
 <div class="max-w-6xl mx-auto">
@@ -24,7 +25,10 @@
                                 Status
                             </th>
                             <th scope="col" class="relative px-6 py-3">
-                                <span class="sr-only">Edit</span>
+                                <span class="sr-only">Talk</span>
+                            </th>
+                            <th scope="col" class="relative px-6 py-3">
+                                <span class="sr-only">Delete</span>
                             </th>
                         </tr>
                         </thead>
@@ -36,6 +40,9 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">Online</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <a href="/talk/{{.}}" class="text-blue-500 hover:text-blue-400">Talk</a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <a href="/delete/{{.}}" class="text-blue-500 hover:text-blue-400">Delete</a>
                             </td>
                         </tr>
                         {{ end }}
