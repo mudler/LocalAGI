@@ -18,7 +18,10 @@ type ConnectorConfig struct {
 	Config string `json:"config"`
 }
 
-type ActionsConfig string
+type ActionsConfig struct {
+	Name   string `json:"name"` // e.g. search
+	Config string `json:"config"`
+}
 
 type AgentConfig struct {
 	Connector []ConnectorConfig `json:"connectors" form:"connectors" `
@@ -123,15 +126,19 @@ var AvailableActions = []string{ActionSearch}
 func (a *AgentConfig) availableActions() []Action {
 	actions := []Action{}
 
-	if len(a.Actions) == 0 {
-		// Return search as default
-		return []Action{external.NewSearch(3)}
-	}
 	for _, action := range a.Actions {
 		fmt.Println("Set Action", action)
-		switch action {
+
+		var config map[string]string
+		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
+			fmt.Println("Error unmarshalling connector config", err)
+			continue
+		}
+		fmt.Println("Config", config)
+
+		switch action.Name {
 		case ActionSearch:
-			actions = append(actions, external.NewSearch(3))
+			actions = append(actions, external.NewSearch(config))
 		}
 	}
 
@@ -151,14 +158,16 @@ func (a *AgentConfig) availableConnectors() []Connector {
 
 	for _, c := range a.Connector {
 		fmt.Println("Set Connector", c)
+
+		var config map[string]string
+		if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
+			fmt.Println("Error unmarshalling connector config", err)
+			continue
+		}
+		fmt.Println("Config", config)
+
 		switch c.Type {
 		case ConnectorTelegram:
-			var config map[string]string
-			if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
-				fmt.Println("Error unmarshalling connector config", err)
-				continue
-			}
-			fmt.Println("Config", config)
 			cc, err := connector.NewTelegramConnector(config)
 			if err != nil {
 				fmt.Println("Error creating telegram connector", err)

@@ -8,11 +8,20 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-func NewSearch(results int) *SearchAction {
-	if results == 0 {
-		results = 3
+func NewSearch(config map[string]string) *SearchAction {
+	results := config["results"]
+	intResult := 1
+
+	// decode int from string
+	if results != "" {
+		_, err := fmt.Sscanf(results, "%d", &intResult)
+		if err != nil {
+			fmt.Printf("error: %v", err)
+		}
 	}
-	return &SearchAction{results: results}
+
+	fmt.Println("Search action with results: ", intResult)
+	return &SearchAction{results: intResult}
 }
 
 type SearchAction struct{ results int }

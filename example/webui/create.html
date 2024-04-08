@@ -53,15 +53,33 @@
             </script>
             
         <div class="mb-4" id="action_box">
-            <label for="actions" class="block text-sm font-medium text-gray-400">Agent Actions</label>
-            <select style="display: none" name="actions" id="actions" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white">
-                {{ range .Actions }}
-                <option value="{{.}}">{{.}}</option>
-                {{ end }}
-            </select>
+            <div class="action mb-4">
+            </div>
         </div>
-        <button type="button" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" hx-on:click="let actionbox=document.getElementById('actions'); let clone=actionbox.cloneNode(true); clone.style.display ='block'; actionbox.after(clone)">Add action</button>
- 
+        <button id="action_button" type="button" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Add action</button>
+        <script>
+            document.getElementById('action_button').addEventListener('click', function() {
+                const actionsSection = document.getElementById('action_box');
+                const ii = actionsSection.getElementsByClassName('connector').length;
+            
+                const newConnectorHTML = `
+                <div class="action mb-4">
+                    <label for="actionsName${ii}" class="block text-sm font-medium text-gray-400">Connector Type</label>
+                    <select name="actions[${ii}].name" id="actionsName${ii}" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white">
+                    {{ range .Actions }}
+                    <option value="{{.}}">{{.}}</option>
+                    {{ end }}
+                    </select>
+                    <div class="mb-4">
+                            <label for="actionsConfig${ii}" class="block text-sm font-medium text-gray-400">Connector Config (JSON)</label>
+                            <textarea id="actionsConfig${ii}" name="actions[${ii}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"token":"..."}'></textarea>
+                    </div>
+                </div>
+                `;
+            
+                actionsSection.insertAdjacentHTML('beforeend', newConnectorHTML);
+            });
+            </script>
  
      
         <div class="mb-4">
