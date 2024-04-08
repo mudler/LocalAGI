@@ -120,6 +120,7 @@ func (a *AgentPool) List() []string {
 
 const (
 	ConnectorTelegram = "telegram"
+	ConnectorSlack    = "slack"
 	ActionSearch      = "search"
 )
 
@@ -153,7 +154,7 @@ type Connector interface {
 	Start(a *Agent)
 }
 
-var AvailableConnectors = []string{ConnectorTelegram}
+var AvailableConnectors = []string{ConnectorTelegram, ConnectorSlack}
 
 func (a *AgentConfig) availableConnectors() []Connector {
 	connectors := []Connector{}
@@ -177,6 +178,8 @@ func (a *AgentConfig) availableConnectors() []Connector {
 			}
 
 			connectors = append(connectors, cc)
+		case ConnectorSlack:
+			connectors = append(connectors, connector.NewSlack(config))
 		}
 	}
 	return connectors
