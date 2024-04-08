@@ -12,8 +12,8 @@ import (
 )
 
 type Telegram struct {
-	Token    string
-	Conttext context.Context
+	Token      string
+	lastChatID int64
 }
 
 // Send any text message to the bot after the bot has been started
@@ -45,6 +45,7 @@ func (t *Telegram) Start(a *agent.Agent) {
 				ChatID: update.Message.Chat.ID,
 				Text:   res.Response,
 			})
+			t.lastChatID = update.Message.Chat.ID
 		}),
 	}
 
@@ -52,6 +53,18 @@ func (t *Telegram) Start(a *agent.Agent) {
 	if err != nil {
 		panic(err)
 	}
+
+	go func() {
+		for m := range a.ConversationChannel() {
+			if t.lastChatID == 0 {
+				continue
+			}
+			b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: t.lastChatID,
+				Text:   m.Content,
+			})
+		}
+	}()
 
 	b.Start(ctx)
 }

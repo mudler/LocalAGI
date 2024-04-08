@@ -91,6 +91,10 @@ func (a *Agent) Context() context.Context {
 	return a.context.Context
 }
 
+func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
+	return a.newConversations
+}
+
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Ask(opts ...JobOption) *JobResult {
