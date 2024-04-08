@@ -88,8 +88,9 @@ func main() {
 
 	webapp.Get("/create", func(c *fiber.Ctx) error {
 		return c.Render("create.html", fiber.Map{
-			"Title":   "Hello, World!",
-			"Actions": AvailableActions,
+			"Title":      "Hello, World!",
+			"Actions":    AvailableActions,
+			"Connectors": AvailableConnectors,
 		})
 	})
 

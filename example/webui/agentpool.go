@@ -7,19 +7,21 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mudler/local-agent-framework/example/webui/connector"
+
 	. "github.com/mudler/local-agent-framework/agent"
 	"github.com/mudler/local-agent-framework/external"
 )
 
 type ConnectorConfig struct {
-	Type   string                 `json:"type"` // e.g. Slack
-	Config map[string]interface{} `json:"config"`
+	Type   string `json:"type"` // e.g. Slack
+	Config string `json:"config"`
 }
 
 type ActionsConfig string
 
 type AgentConfig struct {
-	Connector []ConnectorConfig `json:"connector" form:"connector" `
+	Connector []ConnectorConfig `json:"connectors" form:"connectors" `
 	Actions   []ActionsConfig   `json:"actions" form:"actions"`
 	// This is what needs to be part of ActionsConfig
 	Model            string `json:"model" form:"model"`
@@ -111,7 +113,12 @@ func (a *AgentPool) List() []string {
 	return agents
 }
 
-var AvailableActions = []string{"search"}
+const (
+	ConnectorTelegram = "telegram"
+	ActionSearch      = "search"
+)
+
+var AvailableActions = []string{ActionSearch}
 
 func (a *AgentConfig) availableActions() []Action {
 	actions := []Action{}
@@ -123,12 +130,45 @@ func (a *AgentConfig) availableActions() []Action {
 	for _, action := range a.Actions {
 		fmt.Println("Set Action", action)
 		switch action {
-		case "search":
+		case ActionSearch:
 			actions = append(actions, external.NewSearch(3))
 		}
 	}
 
 	return actions
+}
+
+type Connector interface {
+	AgentResultCallback() func(state ActionState)
+	AgentReasoningCallback() func(state ActionCurrentState) bool
+	Start(a *Agent)
+}
+
+var AvailableConnectors = []string{ConnectorTelegram}
+
+func (a *AgentConfig) availableConnectors() []Connector {
+	connectors := []Connector{}
+
+	for _, c := range a.Connector {
+		fmt.Println("Set Connector", c)
+		switch c.Type {
+		case ConnectorTelegram:
+			var config map[string]string
+			if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
+				fmt.Println("Error unmarshalling connector config", err)
+				continue
+			}
+			fmt.Println("Config", config)
+			cc, err := connector.NewTelegramConnector(config)
+			if err != nil {
+				fmt.Println("Error creating telegram connector", err)
+				continue
+			}
+
+			connectors = append(connectors, cc)
+		}
+	}
+	return connectors
 }
 
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
@@ -140,6 +180,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	if config.PeriodicRuns == "" {
 		config.PeriodicRuns = "10m"
 	}
+
+	connectors := config.availableConnectors()
+
 	fmt.Println("Creating agent", name)
 	fmt.Println("Model", model)
 	fmt.Println("API URL", a.apiURL)
@@ -165,6 +208,12 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
 				).WithEvent("status"),
 			)
+
+			for _, c := range connectors {
+				if !c.AgentReasoningCallback()(state) {
+					return false
+				}
+			}
 			return true
 		}),
 		WithAgentResultCallback(func(state ActionState) {
@@ -185,6 +234,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 					),
 				).WithEvent("status"),
 			)
+
+			for _, c := range connectors {
+				c.AgentResultCallback()(state)
+			}
 		}),
 	}
 	if config.HUD {
@@ -219,6 +272,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 			fmt.Println("Agent stop: ", err.Error())
 		}
 	}()
+
+	for _, c := range connectors {
+		go c.Start(agent)
+	}
 
 	go func() {
 		for {
