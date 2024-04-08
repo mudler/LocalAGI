@@ -167,6 +167,9 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.actionContext = action.NewContext(ctx, cancel)
 	a.selfEvaluationInProgress = selfEvaluation
+	if len(job.conversationHistory) != 0 {
+		a.currentConversation = job.conversationHistory
+	}
 	a.Unlock()
 
 	if selfEvaluation {

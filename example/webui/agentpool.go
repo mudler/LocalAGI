@@ -43,6 +43,17 @@ type AgentPool struct {
 
 type AgentPoolData map[string]AgentConfig
 
+func loadPoolFromFile(path string) (*AgentPoolData, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	poolData := &AgentPoolData{}
+	err = json.Unmarshal(data, poolData)
+	return poolData, err
+}
+
 func NewAgentPool(model, apiURL, directory string) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
@@ -90,10 +101,6 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 	}
 
 	return a.startAgentWithConfig(name, agentConfig)
-}
-
-func (a *AgentPool) GetManager(name string) Manager {
-	return a.managers[name]
 }
 
 func (a *AgentPool) List() []string {
@@ -297,13 +304,6 @@ func (a *AgentPool) GetAgent(name string) *Agent {
 	return a.agents[name]
 }
 
-func loadPoolFromFile(path string) (*AgentPoolData, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	poolData := &AgentPoolData{}
-	err = json.Unmarshal(data, poolData)
-	return poolData, err
+func (a *AgentPool) GetManager(name string) Manager {
+	return a.managers[name]
 }
