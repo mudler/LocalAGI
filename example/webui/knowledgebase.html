@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>KnowledgeBase</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+</head>
+<body class="bg-gray-900 p-4 text-white">
+    <div class="max-w-2xl mx-auto my-12 bg-gray-800 p-8 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold text-center mb-10 text-blue-400">Knowledgebase (items: {{.KnowledgebaseItemsCount}})</h1>
+
+    <form action="/knowledgebase" method="POST" class="space-y-6">
+        Add sites to KB
+        <div class="mb-6">
+            <label for="url" class="block text-lg font-medium text-gray-400">URL</label>
+            <input type="text" name="url" id="url" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Name">
+        </div>
+
+    
+        <div class="flex items-center justify-between">
+            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Add Site
+            </button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

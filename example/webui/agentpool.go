@@ -37,6 +37,8 @@ type AgentConfig struct {
 	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
+	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
+	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
 }
 
 type AgentPool struct {
@@ -284,6 +286,14 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		} else {
 			opts = append(opts, WithRandomIdentity())
 		}
+	}
+
+	if config.EnableKnowledgeBase {
+		opts = append(opts, EnableKnowledgeBase)
+	}
+
+	if config.KnowledgeBaseResults > 0 {
+		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
 
 	fmt.Println("Starting agent", name)

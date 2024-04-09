@@ -23,6 +23,7 @@ type (
 
 var testModel = os.Getenv("TEST_MODEL")
 var apiURL = os.Getenv("API_URL")
+var apiKey = os.Getenv("API_KEY")
 
 func init() {
 	if testModel == "" {
@@ -45,13 +46,25 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	os.MkdirAll(cwd+"/pool", 0755)
 
-	pool, err := NewAgentPool(testModel, apiURL, cwd+"/pool")
+	stateDir := cwd + "/pool"
+	os.MkdirAll(stateDir, 0755)
+
+	pool, err := NewAgentPool(testModel, apiURL, stateDir)
 	if err != nil {
 		panic(err)
-
 	}
+
+	db, err := NewInMemoryDB(stateDir)
+	if err != nil {
+		panic(err)
+	}
+
+	// Reload store
+	//	if err := db.SaveToStore(apiKey, apiURL); err != nil {
+	//		fmt.Println("Error storing in the KB", err)
+	//	}
+
 	app := &App{
 		htmx: htmx.New(),
 		pool: pool,
@@ -60,19 +73,6 @@ func main() {
 	if err := pool.StartAll(); err != nil {
 		panic(err)
 	}
-
-	// go func() {
-	// 	for {
-	// 		clientsStr := ""
-	// 		clients := sseManager.Clients()
-	// 		for _, c := range clients {
-	// 			clientsStr += c + ", "
-	// 		}
-
-	// 		time.Sleep(1 * time.Second) // Send a message every seconds
-	// 		sseManager.Send(NewMessage(fmt.Sprintf("connected clients: %v", clientsStr)).WithEvent("clients"))
-	// 	}
-	// }()
 
 	// Initialize a new Fiber app
 	webapp := fiber.New()
@@ -94,6 +94,13 @@ func main() {
 		})
 	})
 
+	webapp.Get("/knowledgebase", func(c *fiber.Ctx) error {
+		return c.Render("knowledgebase.html", fiber.Map{
+			"Title":                   "Hello, World!",
+			"KnowledgebaseItemsCount": len(db.Database),
+		})
+	})
+
 	// Define a route for the GET method on the root path '/'
 	webapp.Get("/sse/:name", func(c *fiber.Ctx) error {
 
@@ -110,6 +117,7 @@ func main() {
 	webapp.Post("/chat/:name", app.Chat(pool))
 	webapp.Post("/create", app.Create(pool))
 	webapp.Get("/delete/:name", app.Delete(pool))
+	webapp.Post("/knowledgebase", app.KnowledgeBase(db))
 
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
 		return c.Render("chat.html", fiber.Map{
@@ -119,29 +127,48 @@ func main() {
 	})
 
 	log.Fatal(webapp.Listen(":3000"))
-
-	// mux := http.NewServeMux()
-
-	// mux.Handle("GET /", http.HandlerFunc(app.Home(agent)))
-
-	// // External notifications (e.g. webhook)
-	// mux.Handle("POST /notify", http.HandlerFunc(app.Notify))
-
-	// // User chat
-	// mux.Handle("POST /chat", http.HandlerFunc(app.Chat(sseManager)))
-
-	// // Server Sent Events
-	// //mux.Handle("GET /sse", http.HandlerFunc(app.SSE))
-
-	// fmt.Print("Server started at http://localhost:3210")
-	// err = http.ListenAndServe(":3210", mux)
-	// log.Fatal(err)
 }
 
-// func (a *App) SSE(w http.ResponseWriter, r *http.Request) {
-// 	cl := sse.NewClient(randStringRunes(10))
-// 	sseManager.Handle(w, r, cl)
-// }
+func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		payload := struct {
+			URL string `json:"url"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			return err
+		}
+
+		website := payload.URL
+		if website == "" {
+			return fmt.Errorf("please enter a URL")
+		}
+
+		go func() {
+			content, err := Sitemap(website)
+			if err != nil {
+				fmt.Println("Error walking sitemap for website", err)
+			}
+			fmt.Println("Found pages: ", len(content))
+
+			for _, c := range content {
+				chunks := splitParagraphIntoChunks(c, 256)
+				fmt.Println("chunks: ", len(chunks))
+				for _, chunk := range chunks {
+					db.AddEntry(chunk)
+				}
+
+				db.SaveDB()
+			}
+
+			if err := db.SaveToStore(apiKey, apiURL); err != nil {
+				fmt.Println("Error storing in the KB", err)
+			}
+		}()
+
+		return c.Redirect("/knowledgebase")
+	}
+}
 
 func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
