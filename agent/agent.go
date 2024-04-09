@@ -557,21 +557,26 @@ func (a *Agent) Run() error {
 
 	// Expose a REST API to interact with the agent to ask it things
 
-	todoTimer := time.NewTicker(a.options.periodicRuns)
+	//todoTimer := time.NewTicker(a.options.periodicRuns)
+	timer := time.NewTimer(a.options.periodicRuns)
 	for {
 		select {
 		case job := <-a.jobQueue:
 			// Consume the job and generate a response
 			// TODO: Give a short-term memory to the agent
 			a.consumeJob(job, UserRole)
+			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
-			// Agent has been canceled, return error
+			// Agent has been canceled, return error 
 			return ErrContextCanceled
-		case <-todoTimer.C:
+		case <-timer.C:
 			if !a.options.standaloneJob {
 				continue
 			}
+			// TODO: We should also do not immediately fire this timer but
+			// instead have a cool-off timer starting after we received the last job
 			a.periodicallyRun()
+			timer.Reset(a.options.periodicRuns)
 		}
 	}
 }

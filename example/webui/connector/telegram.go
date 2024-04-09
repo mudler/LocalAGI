@@ -14,22 +14,29 @@ import (
 type Telegram struct {
 	Token      string
 	lastChatID int64
+	bot        *bot.Bot
+	agent      *agent.Agent
 }
 
 // Send any text message to the bot after the bot has been started
 
 func (t *Telegram) AgentResultCallback() func(state agent.ActionState) {
 	return func(state agent.ActionState) {
-		// Send the result to the bot
+		t.bot.SetMyDescription(t.agent.Context(), &bot.SetMyDescriptionParams{
+			Description: state.Reasoning,
+		})
 	}
 }
+
 func (t *Telegram) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
 	return func(state agent.ActionCurrentState) bool {
-		// Send the reasoning to the bot
+		t.bot.SetMyDescription(t.agent.Context(), &bot.SetMyDescriptionParams{
+			Description: state.Reasoning,
+		})
 		return true
 	}
-
 }
+
 func (t *Telegram) Start(a *agent.Agent) {
 	ctx, cancel := signal.NotifyContext(a.Context(), os.Interrupt)
 	defer cancel()
@@ -53,6 +60,9 @@ func (t *Telegram) Start(a *agent.Agent) {
 	if err != nil {
 		panic(err)
 	}
+
+	t.bot = b
+	t.agent = a
 
 	go func() {
 		for m := range a.ConversationChannel() {

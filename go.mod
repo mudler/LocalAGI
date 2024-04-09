@@ -5,9 +5,11 @@ go 1.22
 toolchain go1.22.2
 
 require (
+	github.com/bwmarrin/discordgo v0.28.1
 	github.com/donseba/go-htmx v1.8.0
 	github.com/go-telegram/bot v1.2.1
 	github.com/gofiber/fiber/v2 v2.52.4
+	github.com/google/go-github/v61 v61.0.0
 	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.31.1
 	github.com/sap-nocops/duckduckgogo v0.0.0-20201102135645-176990152850
@@ -23,6 +25,7 @@ require (
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
@@ -34,6 +37,7 @@ require (
 	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
+	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

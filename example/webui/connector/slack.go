@@ -41,15 +41,15 @@ func (t *Slack) AgentReasoningCallback() func(state agent.ActionCurrentState) bo
 func (t *Slack) Start(a *agent.Agent) {
 	api := slack.New(
 		t.botToken,
-		slack.OptionDebug(true),
+		//	slack.OptionDebug(true),
 		slack.OptionLog(log.New(os.Stdout, "api: ", log.Lshortfile|log.LstdFlags)),
 		slack.OptionAppLevelToken(t.appToken),
 	)
 
 	client := socketmode.New(
 		api,
-		socketmode.OptionDebug(true),
-		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
+		//	socketmode.OptionDebug(true),
+		//socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
 	)
 	go func() {
 		for evt := range client.Events {
