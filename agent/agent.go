@@ -218,8 +218,11 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		if userMessage != "" {
 			results, err := llm.FindSimilarStrings(a.storeClient, a.client, userMessage, a.options.kbResults)
 			if err != nil {
-				job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
-				return
+				if a.options.debugMode {
+					fmt.Println("Error finding similar strings inside KB:", err)
+				}
+				//	job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
+				//	return
 			}
 
 			formatResults := ""
