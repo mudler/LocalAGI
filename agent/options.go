@@ -14,19 +14,20 @@ type llmOptions struct {
 }
 
 type options struct {
-	LLMAPI                                  llmOptions
-	character                               Character
-	randomIdentityGuidance                  string
-	randomIdentity                          bool
-	userActions                             Actions
-	enableHUD, standaloneJob, showCharacter bool
-	debugMode                               bool
-	initiateConversations                   bool
-	characterfile                           string
-	statefile                               string
-	context                                 context.Context
-	permanentGoal                           string
-	periodicRuns                            time.Duration
+	LLMAPI                                            llmOptions
+	character                                         Character
+	randomIdentityGuidance                            string
+	randomIdentity                                    bool
+	userActions                                       Actions
+	enableHUD, standaloneJob, showCharacter, enableKB bool
+	debugMode                                         bool
+	initiateConversations                             bool
+	characterfile                                     string
+	statefile                                         string
+	context                                           context.Context
+	permanentGoal                                     string
+	periodicRuns                                      time.Duration
+	kbResults                                         int
 
 	// callbacks
 	reasoningCallback func(ActionCurrentState) bool
@@ -63,6 +64,20 @@ func newOptions(opts ...Option) (*options, error) {
 var EnableHUD = func(o *options) error {
 	o.enableHUD = true
 	return nil
+}
+
+var EnableKnowledgeBase = func(o *options) error {
+	o.enableKB = true
+	o.kbResults = 5
+	return nil
+}
+
+func EnableKnowledgeBaseWithResults(results int) Option {
+	return func(o *options) error {
+		o.enableKB = true
+		o.kbResults = results
+		return nil
+	}
 }
 
 var EnableInitiateConversations = func(o *options) error {

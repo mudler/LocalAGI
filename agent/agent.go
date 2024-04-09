@@ -23,6 +23,7 @@ type Agent struct {
 	options       *options
 	Character     Character
 	client        *openai.Client
+	storeClient   *llm.StoreClient
 	jobQueue      chan *Job
 	actionContext *action.ActionContext
 	context       *action.ActionContext
@@ -43,6 +44,7 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL)
+	storeClient := llm.NewStoreClient(options.LLMAPI.APIURL, options.LLMAPI.APIKey)
 
 	c := context.Background()
 	if options.context != nil {
@@ -56,6 +58,7 @@ func New(opts ...Option) (*Agent, error) {
 		client:       client,
 		Character:    options.character,
 		currentState: &action.StateResult{},
+		storeClient:  storeClient,
 		context:      action.NewContext(ctx, cancel),
 	}
 
@@ -168,8 +171,9 @@ func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (
 }
 
 func (a *Agent) consumeJob(job *Job, role string) {
+	// We are self evaluating if we consume the job as a system role
 	selfEvaluation := role == SystemRole
-	// Consume the job and generate a response
+
 	a.Lock()
 	// Set the action context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -197,6 +201,42 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			Role:    role,
 			Content: job.Text,
 		})
+	}
+
+	// RAG
+	if a.options.enableKB {
+		// Walk conversation from bottom to top, and find the first message of the user
+		// to use it as a query to the KB
+		var userMessage string
+		for i := len(a.currentConversation) - 1; i >= 0; i-- {
+			if a.currentConversation[i].Role == "user" {
+				userMessage = a.currentConversation[i].Content
+				break
+			}
+		}
+
+		if userMessage != "" {
+			results, err := llm.FindSimilarStrings(a.storeClient, a.client, userMessage, a.options.kbResults)
+			if err != nil {
+				job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
+				return
+			}
+
+			formatResults := ""
+			for _, r := range results {
+				formatResults += fmt.Sprintf("- %s \n", r)
+			}
+			if a.options.debugMode {
+				fmt.Println("Found similar strings in KB:")
+				fmt.Println(formatResults)
+			}
+			a.currentConversation = append(a.currentConversation,
+				openai.ChatCompletionMessage{
+					Role:    "system",
+					Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+				},
+			)
+		}
 	}
 
 	var pickTemplate string
@@ -567,7 +607,7 @@ func (a *Agent) Run() error {
 			a.consumeJob(job, UserRole)
 			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
-			// Agent has been canceled, return error 
+			// Agent has been canceled, return error
 			return ErrContextCanceled
 		case <-timer.C:
 			if !a.options.standaloneJob {

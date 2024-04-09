@@ -7,10 +7,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-func StoreStringEmbeddingInVectorDB(apiHost string, openaiClient *openai.Client, s string) error {
-	// Example usage
-	client := NewStoreClient(apiHost)
-
+func StoreStringEmbeddingInVectorDB(client *StoreClient, openaiClient *openai.Client, s string) error {
 	resp, err := openaiClient.CreateEmbeddings(context.TODO(),
 		openai.EmbeddingRequestStrings{
 			Input: []string{s},
@@ -39,8 +36,7 @@ func StoreStringEmbeddingInVectorDB(apiHost string, openaiClient *openai.Client,
 	return nil
 }
 
-func FindSimilarStrings(apiHost string, openaiClient *openai.Client, s string, similarEntries int) ([]string, error) {
-	client := NewStoreClient(apiHost)
+func FindSimilarStrings(client *StoreClient, openaiClient *openai.Client, s string, similarEntries int) ([]string, error) {
 
 	resp, err := openaiClient.CreateEmbeddings(context.TODO(),
 		openai.EmbeddingRequestStrings{

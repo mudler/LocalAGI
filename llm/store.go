@@ -10,8 +10,9 @@ import (
 
 // Define a struct to hold your store API client
 type StoreClient struct {
-	BaseURL string
-	Client  *http.Client
+	BaseURL  string
+	APIToken string
+	Client   *http.Client
 }
 
 // Define request and response struct formats based on the API documentation
@@ -45,10 +46,11 @@ type FindResponse struct {
 }
 
 // Constructor for StoreClient
-func NewStoreClient(baseUrl string) *StoreClient {
+func NewStoreClient(baseUrl, apiToken string) *StoreClient {
 	return &StoreClient{
-		BaseURL: baseUrl,
-		Client:  &http.Client{},
+		BaseURL:  baseUrl,
+		APIToken: apiToken,
+		Client:   &http.Client{},
 	}
 }
 
@@ -105,6 +107,10 @@ func (c *StoreClient) doRequest(path string, data interface{}) error {
 	if err != nil {
 		return err
 	}
+	// Set Bearer token
+	if c.APIToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIToken)
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(req)
@@ -132,7 +138,10 @@ func (c *StoreClient) doRequestWithResponse(path string, data interface{}) ([]by
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-
+	// Set Bearer token
+	if c.APIToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIToken)
+	}
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		return nil, err
