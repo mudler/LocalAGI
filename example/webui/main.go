@@ -132,7 +132,8 @@ func main() {
 func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
-			URL string `json:"url"`
+			URL       string `json:"url"`
+			ChunkSize int    `json:"chunk_size"`
 		}{}
 
 		if err := c.BodyParser(&payload); err != nil {
@@ -152,7 +153,7 @@ func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 			fmt.Println("Found pages: ", len(content))
 
 			for _, c := range content {
-				chunks := splitParagraphIntoChunks(c, 256)
+				chunks := splitParagraphIntoChunks(c, payload.ChunkSize)
 				fmt.Println("chunks: ", len(chunks))
 				for _, chunk := range chunks {
 					db.AddEntry(chunk)
