@@ -81,9 +81,9 @@ func main() {
 	}
 
 	// Reload store
-	//	if err := db.SaveToStore(apiKey, apiURL); err != nil {
-	//		fmt.Println("Error storing in the KB", err)
-	//	}
+	if err := db.SaveToStore(); err != nil {
+		fmt.Println("Error storing in the KB", err)
+	}
 
 	app := &App{
 		htmx: htmx.New(),
