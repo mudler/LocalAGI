@@ -101,16 +101,18 @@ func (t *Slack) Start(a *agent.Agent) {
 						}
 
 						message := ev.Text
-						res := a.Ask(
-							agent.WithText(message),
-						)
+						go func() {
+							res := a.Ask(
+								agent.WithText(message),
+							)
 
-						_, _, err = api.PostMessage(ev.Channel,
-							slack.MsgOptionText(res.Response, false),
-							slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}))
-						if err != nil {
-							fmt.Printf("Error posting message: %v", err)
-						}
+							_, _, err = api.PostMessage(ev.Channel,
+								slack.MsgOptionText(res.Response, false),
+								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}))
+							if err != nil {
+								fmt.Printf("Error posting message: %v", err)
+							}
+						}()
 					case *slackevents.AppMentionEvent:
 
 						if b.UserID == ev.User {
@@ -123,16 +125,18 @@ func (t *Slack) Start(a *agent.Agent) {
 						message = strings.ReplaceAll(message, "<@"+b.UserID+"> ", "")
 						fmt.Println("Message", message)
 
-						res := a.Ask(
-							agent.WithText(message),
-						)
+						go func() {
+							res := a.Ask(
+								agent.WithText(message),
+							)
 
-						_, _, err = api.PostMessage(ev.Channel,
-							slack.MsgOptionText(res.Response, false),
-							slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}))
-						if err != nil {
-							fmt.Printf("Error posting message: %v", err)
-						}
+							_, _, err = api.PostMessage(ev.Channel,
+								slack.MsgOptionText(res.Response, false),
+								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}))
+							if err != nil {
+								fmt.Printf("Error posting message: %v", err)
+							}
+						}()
 					case *slackevents.MemberJoinedChannelEvent:
 						fmt.Printf("user %q joined to channel %q", ev.User, ev.Channel)
 					}
