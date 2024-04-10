@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
+	"os"
 
 	. "github.com/mudler/local-agent-framework/agent"
 
 	"github.com/donseba/go-htmx"
+	"github.com/dslipak/pdf"
 	fiber "github.com/gofiber/fiber/v2"
 )
 
@@ -16,6 +19,54 @@ type (
 		pool *AgentPool
 	}
 )
+
+func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		// https://golang.withcodeexample.com/blog/file-upload-handling-golang-fiber-guide/
+		// Handle file upload logic
+		file, err := c.FormFile("file")
+		if err != nil {
+			// Handle error
+			return err
+		}
+
+		payload := struct {
+			ChunkSize int `form:"chunk_size"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			return err
+		}
+
+		os.MkdirAll("./uploads", os.ModePerm)
+
+		destination := fmt.Sprintf("./uploads/%s", file.Filename)
+		if err := c.SaveFile(file, destination); err != nil {
+			// Handle error
+			return err
+		}
+
+		fmt.Println("File uploaded to: " + destination)
+		fmt.Printf("Payload: %+v\n", payload)
+
+		content, err := readPdf(destination) // Read local pdf file
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println("Content is", content)
+		chunkSize := defaultChunkSize
+		if payload.ChunkSize > 0 {
+			chunkSize = payload.ChunkSize
+		}
+
+		go StringsToKB(db, chunkSize, content)
+
+		_, err = c.WriteString(chatDiv("File uploaded", "gray"))
+
+		return err
+	}
+}
 
 func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
@@ -152,4 +203,18 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 
 		return nil
 	}
+}
+
+func readPdf(path string) (string, error) {
+	r, err := pdf.Open(path)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	b, err := r.GetPlainText()
+	if err != nil {
+		return "", err
+	}
+	buf.ReadFrom(b)
+	return buf.String(), nil
 }

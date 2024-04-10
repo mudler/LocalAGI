@@ -127,6 +127,10 @@ func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
 	fmt.Println("Found pages: ", len(content))
 	fmt.Println("ChunkSize: ", chunkSize)
 
+	StringsToKB(db, chunkSize, content...)
+}
+
+func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
 	for _, c := range content {
 		chunks := splitParagraphIntoChunks(c, chunkSize)
 		fmt.Println("chunks: ", len(chunks))

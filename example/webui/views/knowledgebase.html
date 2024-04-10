@@ -29,6 +29,30 @@
             </button>
         </div>
     </form>
+
+    <form id='form' hx-encoding='multipart/form-data' hx-post='/knowledgebase/upload'>
+        <div class="mb-6">
+            <label for="file" class="block text-lg font-medium text-gray-400">File</label>
+            <input type='file' name='file' id='file' class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
+        </div>
+        <div class="mb-6">
+            <label for="chunk_size" class="block text-lg font-medium text-gray-400">Chunk size</label>
+            <input type="text" name="chunk_size" id="chunk_size" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="380">
+        </div>
+        <div class="flex items-center justify-between">
+            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Upload file
+            </button>
+        </div>
+        <div class="mb-6">
+        <progress id='progress' value='0' max='100'></progress>
+        </div>
+    </form>
+    <script>
+        htmx.on('#form', 'htmx:xhr:progress', function(evt) {
+          htmx.find('#progress').setAttribute('value', evt.detail.loaded/evt.detail.total * 100)
+        });
+    </script>
 </div>
 </body>
 </html>
