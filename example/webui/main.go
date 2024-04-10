@@ -12,6 +12,8 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 
 	. "github.com/mudler/local-agent-framework/agent"
+	"github.com/mudler/local-agent-framework/llm"
+	"github.com/mudler/local-agent-framework/llm/rag"
 )
 
 type (
@@ -24,6 +26,9 @@ type (
 var testModel = os.Getenv("TEST_MODEL")
 var apiURL = os.Getenv("API_URL")
 var apiKey = os.Getenv("API_KEY")
+var vectorStore = os.Getenv("VECTOR_STORE")
+
+const defaultChunkSize = 4098
 
 func init() {
 	if testModel == "" {
@@ -50,12 +55,27 @@ func main() {
 	stateDir := cwd + "/pool"
 	os.MkdirAll(stateDir, 0755)
 
-	pool, err := NewAgentPool(testModel, apiURL, stateDir)
+	var dbStore RAGDB
+	lai := llm.NewClient(apiKey, apiURL+"/v1")
+
+	switch vectorStore {
+	case "localai":
+		laiStore := rag.NewStoreClient(apiURL, apiKey)
+		dbStore = rag.NewLocalAIRAGDB(laiStore, lai)
+	default:
+		var err error
+		dbStore, err = rag.NewChromemDB("local-agent-framework", stateDir, lai)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	pool, err := NewAgentPool(testModel, apiURL, stateDir, dbStore)
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := NewInMemoryDB(stateDir)
+	db, err := NewInMemoryDB(stateDir, dbStore)
 	if err != nil {
 		panic(err)
 	}
@@ -144,6 +164,10 @@ func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 		if website == "" {
 			return fmt.Errorf("please enter a URL")
 		}
+		chunkSize := defaultChunkSize
+		if payload.ChunkSize > 0 {
+			chunkSize = payload.ChunkSize
+		}
 
 		go func() {
 			content, err := Sitemap(website)
@@ -151,9 +175,10 @@ func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 				fmt.Println("Error walking sitemap for website", err)
 			}
 			fmt.Println("Found pages: ", len(content))
+			fmt.Println("ChunkSize: ", chunkSize)
 
 			for _, c := range content {
-				chunks := splitParagraphIntoChunks(c, payload.ChunkSize)
+				chunks := splitParagraphIntoChunks(c, chunkSize)
 				fmt.Println("chunks: ", len(chunks))
 				for _, chunk := range chunks {
 					db.AddEntry(chunk)
@@ -162,7 +187,7 @@ func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 				db.SaveDB()
 			}
 
-			if err := db.SaveToStore(apiKey, apiURL); err != nil {
+			if err := db.SaveToStore(); err != nil {
 				fmt.Println("Error storing in the KB", err)
 			}
 		}()

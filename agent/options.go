@@ -28,6 +28,7 @@ type options struct {
 	permanentGoal                                     string
 	periodicRuns                                      time.Duration
 	kbResults                                         int
+	ragdb                                             RAGDB
 
 	// callbacks
 	reasoningCallback func(ActionCurrentState) bool
@@ -100,6 +101,13 @@ var EnableStandaloneJob = func(o *options) error {
 var EnablePersonality = func(o *options) error {
 	o.showCharacter = true
 	return nil
+}
+
+func WithRAGDB(db RAGDB) Option {
+	return func(o *options) error {
+		o.ragdb = db
+		return nil
+	}
 }
 
 func WithLLMAPIURL(url string) Option {

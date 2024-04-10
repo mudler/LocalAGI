@@ -23,7 +23,6 @@ type Agent struct {
 	options       *options
 	Character     Character
 	client        *openai.Client
-	storeClient   *llm.StoreClient
 	jobQueue      chan *Job
 	actionContext *action.ActionContext
 	context       *action.ActionContext
@@ -37,6 +36,11 @@ type Agent struct {
 	newConversations chan openai.ChatCompletionMessage
 }
 
+type RAGDB interface {
+	Store(s string) error
+	Search(s string, similarEntries int) ([]string, error)
+}
+
 func New(opts ...Option) (*Agent, error) {
 	options, err := newOptions(opts...)
 	if err != nil {
@@ -44,7 +48,6 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL)
-	storeClient := llm.NewStoreClient(options.LLMAPI.APIURL, options.LLMAPI.APIKey)
 
 	c := context.Background()
 	if options.context != nil {
@@ -58,7 +61,6 @@ func New(opts ...Option) (*Agent, error) {
 		client:       client,
 		Character:    options.character,
 		currentState: &action.StateResult{},
-		storeClient:  storeClient,
 		context:      action.NewContext(ctx, cancel),
 	}
 
@@ -204,7 +206,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	// RAG
-	if a.options.enableKB {
+	if a.options.enableKB && a.options.ragdb != nil {
 		// Walk conversation from bottom to top, and find the first message of the user
 		// to use it as a query to the KB
 		var userMessage string
@@ -216,7 +218,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 
 		if userMessage != "" {
-			results, err := llm.FindSimilarStrings(a.storeClient, a.client, userMessage, a.options.kbResults)
+			results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
 			if err != nil {
 				if a.options.debugMode {
 					fmt.Println("Error finding similar strings inside KB:", err)

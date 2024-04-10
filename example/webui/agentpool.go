@@ -48,6 +48,7 @@ type AgentPool struct {
 	agents        map[string]*Agent
 	managers      map[string]Manager
 	apiURL, model string
+	ragDB         RAGDB
 }
 
 type AgentPoolData map[string]AgentConfig
@@ -63,7 +64,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 	return poolData, err
 }
 
-func NewAgentPool(model, apiURL, directory string) (*AgentPool, error) {
+func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
 
@@ -76,6 +77,7 @@ func NewAgentPool(model, apiURL, directory string) (*AgentPool, error) {
 			pooldir:  directory,
 			apiURL:   apiURL,
 			model:    model,
+			ragDB:    RagDB,
 			agents:   make(map[string]*Agent),
 			pool:     make(map[string]AgentConfig),
 			managers: make(map[string]Manager),
@@ -90,6 +92,7 @@ func NewAgentPool(model, apiURL, directory string) (*AgentPool, error) {
 		file:     poolfile,
 		apiURL:   apiURL,
 		pooldir:  directory,
+		ragDB:    RagDB,
 		model:    model,
 		agents:   make(map[string]*Agent),
 		managers: make(map[string]Manager),
@@ -229,6 +232,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		),
 		WithStateFile(stateFile),
 		WithCharacterFile(characterFile),
+		WithRAGDB(a.ragDB),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
 			fmt.Println("Reasoning", state.Reasoning)
 			manager.Send(

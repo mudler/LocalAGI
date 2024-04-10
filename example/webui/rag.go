@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
+	. "github.com/mudler/local-agent-framework/agent"
 	"jaytaylor.com/html2text"
 
-	"github.com/mudler/local-agent-framework/llm"
 	sitemap "github.com/oxffaa/gopher-parse-sitemap"
 )
 
@@ -20,6 +20,7 @@ type InMemoryDatabase struct {
 	sync.Mutex
 	Database []string
 	path     string
+	rag      RAGDB
 }
 
 func loadDB(path string) ([]string, error) {
@@ -33,7 +34,7 @@ func loadDB(path string) ([]string, error) {
 	return poolData, err
 }
 
-func NewInMemoryDB(knowledgebase string) (*InMemoryDatabase, error) {
+func NewInMemoryDB(knowledgebase string, store RAGDB) (*InMemoryDatabase, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
 
@@ -44,6 +45,7 @@ func NewInMemoryDB(knowledgebase string) (*InMemoryDatabase, error) {
 		return &InMemoryDatabase{
 			Database: []string{},
 			path:     poolfile,
+			rag:      store,
 		}, nil
 	}
 
@@ -54,15 +56,17 @@ func NewInMemoryDB(knowledgebase string) (*InMemoryDatabase, error) {
 	return &InMemoryDatabase{
 		Database: poolData,
 		path:     poolfile,
+		rag:      store,
 	}, nil
 }
 
-func (db *InMemoryDatabase) SaveToStore(apiKey string, apiURL string) error {
+func (db *InMemoryDatabase) SaveToStore() error {
 	for _, d := range db.Database {
-		lai := llm.NewClient(apiKey, apiURL+"/v1")
-		laiStore := llm.NewStoreClient(apiURL, apiKey)
-
-		err := llm.StoreStringEmbeddingInVectorDB(laiStore, lai, d)
+		if d == "" {
+			// skip empty chunks
+			continue
+		}
+		err := db.rag.Store(d)
 		if err != nil {
 			return fmt.Errorf("Error storing in the KB: %w", err)
 		}
@@ -119,8 +123,6 @@ func Sitemap(url string) (res []string, err error) {
 // and returns a slice of strings where each string is a chunk of the paragraph
 // that is at most maxChunkSize long, ensuring that words are not split.
 func splitParagraphIntoChunks(paragraph string, maxChunkSize int) []string {
-	// Check if the paragraph length is less than or equal to maxChunkSize.
-	// If so, return the paragraph as the only chunk.
 	if len(paragraph) <= maxChunkSize {
 		return []string{paragraph}
 	}
@@ -131,11 +133,14 @@ func splitParagraphIntoChunks(paragraph string, maxChunkSize int) []string {
 	words := strings.Fields(paragraph) // Splits the paragraph into words.
 
 	for _, word := range words {
-		// Check if adding the next word would exceed the maxChunkSize.
-		// If so, add the currentChunk to the chunks slice and start a new chunk.
-		if currentChunk.Len()+len(word) > maxChunkSize {
+		// If adding the next word would exceed maxChunkSize (considering a space if not the first word in a chunk),
+		// add the currentChunk to chunks, and reset currentChunk.
+		if currentChunk.Len() > 0 && currentChunk.Len()+len(word)+1 > maxChunkSize { // +1 for the space if not the first word
 			chunks = append(chunks, currentChunk.String())
 			currentChunk.Reset()
+		} else if currentChunk.Len() == 0 && len(word) > maxChunkSize { // Word itself exceeds maxChunkSize, split the word
+			chunks = append(chunks, word)
+			continue
 		}
 
 		// Add a space before the word if it's not the beginning of a new chunk.
@@ -147,7 +152,7 @@ func splitParagraphIntoChunks(paragraph string, maxChunkSize int) []string {
 		currentChunk.WriteString(word)
 	}
 
-	// Add the last chunk if it's not empty.
+	// After the loop, add any remaining content in currentChunk to chunks.
 	if currentChunk.Len() > 0 {
 		chunks = append(chunks, currentChunk.String())
 	}

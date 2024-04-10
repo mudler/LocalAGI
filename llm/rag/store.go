@@ -1,4 +1,4 @@
-package llm
+package rag
 
 import (
 	"bytes"
