@@ -30,6 +30,8 @@ type options struct {
 	kbResults                                         int
 	ragdb                                             RAGDB
 
+	systemPrompt string
+
 	// callbacks
 	reasoningCallback func(ActionCurrentState) bool
 	resultCallback    func(ActionState)
@@ -106,6 +108,13 @@ var EnablePersonality = func(o *options) error {
 func WithRAGDB(db RAGDB) Option {
 	return func(o *options) error {
 		o.ragdb = db
+		return nil
+	}
+}
+
+func WithSystemPrompt(prompt string) Option {
+	return func(o *options) error {
+		o.systemPrompt = prompt
 		return nil
 	}
 }

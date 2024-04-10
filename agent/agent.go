@@ -207,6 +207,16 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		})
 	}
 
+	if a.options.systemPrompt != "" {
+		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
+			a.currentConversation = append([]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: a.options.systemPrompt,
+				}}, a.currentConversation...)
+		}
+	}
+
 	// RAG
 	if memory {
 		// Walk conversation from bottom to top, and find the first message of the user

@@ -39,6 +39,7 @@ type AgentConfig struct {
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
+	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
 }
 
 type AgentPool struct {
@@ -248,6 +249,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 			}
 			return true
 		}),
+		WithSystemPrompt(config.SystemPrompt),
 		WithAgentResultCallback(func(state ActionState) {
 			fmt.Println("Reasoning", state.Reasoning)
 
