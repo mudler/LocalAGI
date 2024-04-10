@@ -200,13 +200,6 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// TODO: Use llava to explain the image content
 	//}
 
-	if job.Text != "" {
-		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-			Role:    role,
-			Content: job.Text,
-		})
-	}
-
 	if a.options.systemPrompt != "" {
 		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
 			a.currentConversation = append([]openai.ChatCompletionMessage{
@@ -254,6 +247,13 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				},
 			)
 		}
+	}
+
+	if job.Text != "" {
+		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+			Role:    role,
+			Content: job.Text,
+		})
 	}
 
 	var pickTemplate string
