@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"log"
 	"math/rand"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/template/html/v2"
 
 	. "github.com/mudler/local-agent-framework/agent"
 	"github.com/mudler/local-agent-framework/llm"
@@ -45,6 +47,9 @@ func htmlIfy(s string) string {
 	s = strings.ReplaceAll(s, "\n", "<br>")
 	return s
 }
+
+//go:embed views/*
+var viewsfs embed.FS
 
 func main() {
 	// current dir
@@ -96,27 +101,30 @@ func main() {
 	if err := pool.StartAll(); err != nil {
 		panic(err)
 	}
-
+	engine := html.NewFileSystem(http.FS(viewsfs), ".html")
 	// Initialize a new Fiber app
-	webapp := fiber.New()
+	// Pass the engine to the Views
+	webapp := fiber.New(fiber.Config{
+		Views: engine,
+	})
 
 	// Serve static files
 	webapp.Static("/", "./public")
 
 	webapp.Get("/", func(c *fiber.Ctx) error {
-		return c.Render("index.html", fiber.Map{
+		return c.Render("views/index", fiber.Map{
 			"Agents": pool.List(),
 		})
 	})
 
 	webapp.Get("/agents", func(c *fiber.Ctx) error {
-		return c.Render("agents.html", fiber.Map{
+		return c.Render("views/agents", fiber.Map{
 			"Agents": pool.List(),
 		})
 	})
 
 	webapp.Get("/create", func(c *fiber.Ctx) error {
-		return c.Render("create.html", fiber.Map{
+		return c.Render("views/create", fiber.Map{
 			"Title":      "Hello, World!",
 			"Actions":    AvailableActions,
 			"Connectors": AvailableConnectors,
@@ -124,7 +132,7 @@ func main() {
 	})
 
 	webapp.Get("/knowledgebase", func(c *fiber.Ctx) error {
-		return c.Render("knowledgebase.html", fiber.Map{
+		return c.Render("views/knowledgebase", fiber.Map{
 			"Title":                   "Hello, World!",
 			"KnowledgebaseItemsCount": len(db.Database),
 		})
