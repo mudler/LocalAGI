@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // TODO: switch to https://github.com/chasefleming/elem-go
 
@@ -18,4 +21,10 @@ func disabledElement(id string, disabled bool) string {
 	}
 
 	return `<script> document.getElementById('` + id + `').disabled = false;</script>`
+}
+
+func htmlIfy(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\n", "<br>")
+	return s
 }
