@@ -216,7 +216,7 @@ func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
 			fmt.Println("Error removing agent", err)
 			return c.Status(http.StatusInternalServerError).SendString(err.Error())
 		}
-		return c.Redirect("/")
+		return c.Redirect("/agents")
 	}
 }
 
@@ -237,7 +237,7 @@ func (a *App) Create(pool *AgentPool) func(c *fiber.Ctx) error {
 			c.Status(http.StatusInternalServerError).SendString(err.Error())
 			return nil
 		}
-		return c.Redirect("/")
+		return c.Redirect("/agents")
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/mudler/local-agent-framework/agent"
 
@@ -14,14 +15,18 @@ import (
 )
 
 type Slack struct {
-	appToken string
-	botToken string
+	appToken    string
+	botToken    string
+	channelID   string
+	alwaysReply bool
 }
 
 func NewSlack(config map[string]string) *Slack {
 	return &Slack{
-		appToken: config["appToken"],
-		botToken: config["botToken"],
+		appToken:    config["appToken"],
+		botToken:    config["botToken"],
+		channelID:   config["channelID"],
+		alwaysReply: config["alwaysReply"] == "true",
 	}
 }
 
@@ -48,7 +53,7 @@ func (t *Slack) Start(a *agent.Agent) {
 
 	client := socketmode.New(
 		api,
-		//	socketmode.OptionDebug(true),
+		//socketmode.OptionDebug(true),
 		//socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
 	)
 	go func() {
@@ -83,15 +88,23 @@ func (t *Slack) Start(a *agent.Agent) {
 
 					switch ev := innerEvent.Data.(type) {
 					case *slackevents.MessageEvent:
+						if t.channelID == "" && !t.alwaysReply || // If we have set alwaysReply and no channelID
+							t.channelID != ev.Channel { // If we have a channelID and it's not the same as the event channel
+							// Skip messages from other channels
+							fmt.Println("Skipping reply to channel", ev.Channel, t.channelID)
+							continue
+						}
 
 						if b.UserID == ev.User {
 							// Skip messages from ourselves
-							return
+							continue
 						}
+
 						message := ev.Text
 						res := a.Ask(
 							agent.WithText(message),
 						)
+
 						_, _, err = api.PostMessage(ev.Channel,
 							slack.MsgOptionText(res.Response, false),
 							slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}))
@@ -102,9 +115,13 @@ func (t *Slack) Start(a *agent.Agent) {
 
 						if b.UserID == ev.User {
 							// Skip messages from ourselves
-							return
+							continue
 						}
 						message := ev.Text
+
+						// strip our id from the message
+						message = strings.ReplaceAll(message, "<@"+b.UserID+"> ", "")
+						fmt.Println("Message", message)
 
 						res := a.Ask(
 							agent.WithText(message),
