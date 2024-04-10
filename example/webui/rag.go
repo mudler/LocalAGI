@@ -119,6 +119,30 @@ func Sitemap(url string) (res []string, err error) {
 	return
 }
 
+func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
+	content, err := Sitemap(website)
+	if err != nil {
+		fmt.Println("Error walking sitemap for website", err)
+	}
+	fmt.Println("Found pages: ", len(content))
+	fmt.Println("ChunkSize: ", chunkSize)
+
+	for _, c := range content {
+		chunks := splitParagraphIntoChunks(c, chunkSize)
+		fmt.Println("chunks: ", len(chunks))
+		for _, chunk := range chunks {
+			fmt.Println("Chunk size: ", len(chunk))
+			db.AddEntry(chunk)
+		}
+
+		db.SaveDB()
+	}
+
+	if err := db.SaveToStore(); err != nil {
+		fmt.Println("Error storing in the KB", err)
+	}
+}
+
 // splitParagraphIntoChunks takes a paragraph and a maxChunkSize as input,
 // and returns a slice of strings where each string is a chunk of the paragraph
 // that is at most maxChunkSize long, ensuring that words are not split.

@@ -24,7 +24,6 @@ func NewChromemDB(collection, path string, openaiClient *openai.Client) (*Chrome
 
 	embeddingFunc := chromem.EmbeddingFunc(
 		func(ctx context.Context, text string) ([]float32, error) {
-			fmt.Println("Creating embeddings")
 			resp, err := openaiClient.CreateEmbeddings(ctx,
 				openai.EmbeddingRequestStrings{
 					Input: []string{text},
@@ -64,7 +63,6 @@ func (c *ChromemDB) Store(s string) error {
 	if s == "" {
 		return fmt.Errorf("empty string")
 	}
-	fmt.Println("Trying to store", s)
 	return c.collection.AddDocuments(context.Background(), []chromem.Document{
 		{
 			Content: s,

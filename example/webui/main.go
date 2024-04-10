@@ -106,6 +106,12 @@ func main() {
 		})
 	})
 
+	webapp.Get("/agents", func(c *fiber.Ctx) error {
+		return c.Render("agents.html", fiber.Map{
+			"Agents": pool.List(),
+		})
+	})
+
 	webapp.Get("/create", func(c *fiber.Ctx) error {
 		return c.Render("create.html", fiber.Map{
 			"Title":      "Hello, World!",
@@ -152,8 +158,8 @@ func main() {
 func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
-			URL       string `json:"url"`
-			ChunkSize int    `json:"chunk_size"`
+			URL       string `form:"url"`
+			ChunkSize int    `form:"chunk_size"`
 		}{}
 
 		if err := c.BodyParser(&payload); err != nil {
@@ -169,28 +175,7 @@ func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 			chunkSize = payload.ChunkSize
 		}
 
-		go func() {
-			content, err := Sitemap(website)
-			if err != nil {
-				fmt.Println("Error walking sitemap for website", err)
-			}
-			fmt.Println("Found pages: ", len(content))
-			fmt.Println("ChunkSize: ", chunkSize)
-
-			for _, c := range content {
-				chunks := splitParagraphIntoChunks(c, chunkSize)
-				fmt.Println("chunks: ", len(chunks))
-				for _, chunk := range chunks {
-					db.AddEntry(chunk)
-				}
-
-				db.SaveDB()
-			}
-
-			if err := db.SaveToStore(); err != nil {
-				fmt.Println("Error storing in the KB", err)
-			}
-		}()
+		go WebsiteToKB(website, chunkSize, db)
 
 		return c.Redirect("/knowledgebase")
 	}
@@ -199,7 +184,7 @@ func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
-			Message string `json:"message"`
+			Message string `form:"message"`
 		}{}
 
 		if err := c.BodyParser(&payload); err != nil {

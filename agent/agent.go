@@ -176,6 +176,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// We are self evaluating if we consume the job as a system role
 	selfEvaluation := role == SystemRole
 
+	memory := a.options.enableKB && a.options.ragdb != nil
+
 	a.Lock()
 	// Set the action context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -206,7 +208,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	// RAG
-	if a.options.enableKB && a.options.ragdb != nil {
+	if memory {
 		// Walk conversation from bottom to top, and find the first message of the user
 		// to use it as a query to the KB
 		var userMessage string
