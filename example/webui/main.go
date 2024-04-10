@@ -27,6 +27,7 @@ var testModel = os.Getenv("TEST_MODEL")
 var apiURL = os.Getenv("API_URL")
 var apiKey = os.Getenv("API_KEY")
 var vectorStore = os.Getenv("VECTOR_STORE")
+var kbdisableIndexing = os.Getenv("KBDISABLEINDEX")
 
 const defaultChunkSize = 4098
 
@@ -80,9 +81,11 @@ func main() {
 		panic(err)
 	}
 
-	// Reload store
-	if err := db.SaveToStore(); err != nil {
-		fmt.Println("Error storing in the KB", err)
+	if len(db.Database) > 0 && kbdisableIndexing != "true" {
+		fmt.Println("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
+		if err := db.SaveToStore(); err != nil {
+			fmt.Println("Error storing in the KB", err)
+		}
 	}
 
 	app := &App{
