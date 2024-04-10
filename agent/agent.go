@@ -199,7 +199,19 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	//if job.Image != "" {
 	// TODO: Use llava to explain the image content
 	//}
+	// Add custom prompts
+	for _, prompt := range a.options.prompts {
+		message := prompt.Render(a)
+		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
+			a.currentConversation = append([]openai.ChatCompletionMessage{
+				{
+					Role:    prompt.Role(),
+					Content: message,
+				}}, a.currentConversation...)
+		}
+	}
 
+	// TODO: move to a Promptblock?
 	if a.options.systemPrompt != "" {
 		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
 			a.currentConversation = append([]openai.ChatCompletionMessage{
@@ -210,6 +222,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
+	// TODO: move to a promptblock?
 	// RAG
 	if memory {
 		// Walk conversation from bottom to top, and find the first message of the user

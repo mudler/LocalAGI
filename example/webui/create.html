@@ -41,7 +41,7 @@
                         </div>
                         <div class="mb-4">
                             <label for="connectorConfig${newConnectorIndex}" class="block text-lg font-medium text-gray-400">Connector Config (JSON)</label>
-                            <textarea id="connectorConfig${newConnectorIndex}" name="connectors[${newConnectorIndex}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"token":"sk-mg3.."}'></textarea>
+                            <textarea id="connectorConfig${newConnectorIndex}" name="connectors[${newConnectorIndex}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"token":"sk-mg3.."}'>{}</textarea>
                         </div>
                     </div>
                 `;
@@ -67,7 +67,7 @@
                     `+actions+`</select>
                     <div class="mb-4">
                         <label for="actionsConfig${ii}" class="block text-lg font-medium text-gray-400">Action Config (JSON)</label>
-                        <textarea id="actionsConfig${ii}" name="actions[${ii}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"results":"5"}'></textarea>
+                        <textarea id="actionsConfig${ii}" name="actions[${ii}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"results":"5"}'>{}</textarea>
                     </div>
                 </div>
                 `;

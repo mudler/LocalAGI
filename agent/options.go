@@ -30,11 +30,18 @@ type options struct {
 	kbResults                                         int
 	ragdb                                             RAGDB
 
+	prompts []PromptBlock
+
 	systemPrompt string
 
 	// callbacks
 	reasoningCallback func(ActionCurrentState) bool
 	resultCallback    func(ActionState)
+}
+
+type PromptBlock interface {
+	Render(a *Agent) string
+	Role() string
 }
 
 func defaultOptions() *options {
@@ -136,6 +143,16 @@ func WithStateFile(path string) Option {
 func WithCharacterFile(path string) Option {
 	return func(o *options) error {
 		o.characterfile = path
+		return nil
+	}
+}
+
+// WithPrompts adds additional block prompts to the agent
+// to be rendered internally in the conversation
+// when processing the conversation to the LLM
+func WithPrompts(prompts ...PromptBlock) Option {
+	return func(o *options) error {
+		o.prompts = prompts
 		return nil
 	}
 }
