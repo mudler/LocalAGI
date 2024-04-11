@@ -23,6 +23,7 @@ FROM scratch
 
 # Copy the webui binary from the builder stage to the final image
 COPY --from=builder /work/webui /webui
+COPY --from=builder /etc/ssl/ /etc/ssl/
 
 # Define the command that will be run when the container is started
 ENTRYPOINT ["/webui"]
