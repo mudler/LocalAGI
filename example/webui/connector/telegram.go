@@ -43,16 +43,18 @@ func (t *Telegram) Start(a *agent.Agent) {
 
 	opts := []bot.Option{
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {
-			res := a.Ask(
-				agent.WithText(
-					update.Message.Text,
-				),
-			)
-			b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: update.Message.Chat.ID,
-				Text:   res.Response,
-			})
-			t.lastChatID = update.Message.Chat.ID
+			go func() {
+				res := a.Ask(
+					agent.WithText(
+						update.Message.Text,
+					),
+				)
+				b.SendMessage(ctx, &bot.SendMessageParams{
+					ChatID: update.Message.Chat.ID,
+					Text:   res.Response,
+				})
+				t.lastChatID = update.Message.Chat.ID
+			}()
 		}),
 	}
 
