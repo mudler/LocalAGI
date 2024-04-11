@@ -36,6 +36,9 @@ func init() {
 //go:embed views/*
 var viewsfs embed.FS
 
+//go:embed public/*
+var embeddedFiles embed.FS
+
 func main() {
 	// current dir
 	cwd, err := os.Getwd()

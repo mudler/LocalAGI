@@ -2,14 +2,19 @@ package main
 
 import (
 	"math/rand"
+	"net/http"
 
 	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
 )
 
 func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, app *App) {
 
-	// Serve static files
-	webapp.Static("/", "./public")
+	webapp.Use("/public", filesystem.New(filesystem.Config{
+		Root:       http.FS(embeddedFiles),
+		PathPrefix: "public",
+		Browse:     true,
+	}))
 
 	webapp.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
