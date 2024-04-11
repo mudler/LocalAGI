@@ -133,13 +133,20 @@ const (
 	ConnectorGithubIssues = "github-issues"
 
 	// Actions
-	ActionSearch             = "search"
-	ActionGithubIssueLabeler = "github-issue-labeler"
-	ActionGithubIssueOpener  = "github-issue-opener"
-	ActionGithubIssueCloser  = "github-issue-closer"
+	ActionSearch              = "search"
+	ActionGithubIssueLabeler  = "github-issue-labeler"
+	ActionGithubIssueOpener   = "github-issue-opener"
+	ActionGithubIssueCloser   = "github-issue-closer"
+	ActionGithubIssueSearcher = "github-issue-searcher"
 )
 
-var AvailableActions = []string{ActionSearch, ActionGithubIssueLabeler, ActionGithubIssueOpener, ActionGithubIssueCloser}
+var AvailableActions = []string{
+	ActionSearch,
+	ActionGithubIssueLabeler,
+	ActionGithubIssueOpener,
+	ActionGithubIssueCloser,
+	ActionGithubIssueSearcher,
+}
 
 func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	actions := []Action{}
@@ -163,6 +170,8 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 			actions = append(actions, external.NewGithubIssueOpener(ctx, config))
 		case ActionGithubIssueCloser:
 			actions = append(actions, external.NewGithubIssueCloser(ctx, config))
+		case ActionGithubIssueSearcher:
+			actions = append(actions, external.NewGithubIssueSearch(ctx, config))
 		}
 	}
 

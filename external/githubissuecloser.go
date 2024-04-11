@@ -41,7 +41,7 @@ func (g *GithubIssuesCloser) Run(params action.ActionParams) (string, error) {
 	// 	g.context,
 	// 	result.Owner, result.Repository,
 	// 	result.IssueNumber, &github.IssueComment{
-	//      Body: &result.Text,
+	// 		//Body: &result.Text,
 	// 	},
 	// )
 	// if err != nil {
@@ -74,7 +74,7 @@ func (g *GithubIssuesCloser) Definition() action.ActionDefinition {
 		Properties: map[string]jsonschema.Definition{
 			"repository": {
 				Type:        jsonschema.String,
-				Description: "The repository to add the label to.",
+				Description: "The repository to close the issue in.",
 			},
 			"owner": {
 				Type:        jsonschema.String,
