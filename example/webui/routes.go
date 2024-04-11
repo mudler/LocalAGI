@@ -58,7 +58,7 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 	webapp.Post("/knowledgebase/upload", app.KnowledgeBaseFile(db))
 
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
-		return c.Render("chat.html", fiber.Map{
+		return c.Render("views/chat", fiber.Map{
 			//	"Character": agent.Character,
 			"Name": c.Params("name"),
 		})
