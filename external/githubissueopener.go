@@ -28,7 +28,7 @@ func NewGithubIssueOpener(ctx context.Context, config map[string]string) *Github
 func (g *GithubIssuesOpener) Run(params action.ActionParams) (string, error) {
 	result := struct {
 		Title      string `json:"title"`
-		Body       string `json:"body"`
+		Body       string `json:"text"`
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`
 	}{}
@@ -60,9 +60,9 @@ func (g *GithubIssuesOpener) Definition() action.ActionDefinition {
 		Name:        "create_github_issue",
 		Description: "Create a new issue on a GitHub repository.",
 		Properties: map[string]jsonschema.Definition{
-			"body": {
+			"text": {
 				Type:        jsonschema.String,
-				Description: "The number of the issue to add the label to.",
+				Description: "The text of the new issue",
 			},
 			"title": {
 				Type:        jsonschema.String,
@@ -74,9 +74,9 @@ func (g *GithubIssuesOpener) Definition() action.ActionDefinition {
 			},
 			"repository": {
 				Type:        jsonschema.String,
-				Description: "The repository to create the issue in.",
+				Description: "The repository where to create the issue.",
 			},
 		},
-		Required: []string{"title", "body", "owner", "repository"},
+		Required: []string{"title", "text", "owner", "repository"},
 	}
 }

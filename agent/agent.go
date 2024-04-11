@@ -245,20 +245,28 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				//	return
 			}
 
-			formatResults := ""
-			for _, r := range results {
-				formatResults += fmt.Sprintf("- %s \n", r)
+			if len(results) != 0 {
+
+				formatResults := ""
+				for _, r := range results {
+					formatResults += fmt.Sprintf("- %s \n", r)
+				}
+				if a.options.debugMode {
+					fmt.Println("Found similar strings in KB:")
+					fmt.Println(formatResults)
+				}
+				// a.currentConversation = append(a.currentConversation,
+				// 	openai.ChatCompletionMessage{
+				// 		Role:    "system",
+				// 		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+				// 	},
+				// )
+				a.currentConversation = append([]openai.ChatCompletionMessage{
+					{
+						Role:    "system",
+						Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+					}}, a.currentConversation...)
 			}
-			if a.options.debugMode {
-				fmt.Println("Found similar strings in KB:")
-				fmt.Println(formatResults)
-			}
-			a.currentConversation = append(a.currentConversation,
-				openai.ChatCompletionMessage{
-					Role:    "system",
-					Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-				},
-			)
 		}
 	}
 

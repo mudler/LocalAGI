@@ -19,7 +19,7 @@ type GithubIssues struct {
 	client       *github.Client
 }
 
-func NewGithub(config map[string]string) *GithubIssues {
+func NewGithubIssueWatcher(config map[string]string) *GithubIssues {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 	interval, err := time.ParseDuration(config["pollInterval"])
 	if err != nil {
@@ -57,7 +57,7 @@ func (g *GithubIssues) Start(a *agent.Agent) {
 		for {
 			select {
 			case <-ticker.C:
-				fmt.Println("Fire in da hole!")
+				fmt.Println("Looking into github issues...")
 				g.issuesService()
 			case <-a.Context().Done():
 				return
@@ -86,12 +86,27 @@ func (g *GithubIssues) issuesService() {
 		if issue.IsPullRequest() {
 			continue
 		}
-		userName := *issue.User.Name
+		labels := []string{}
+		for _, l := range issue.Labels {
+			labels = append(labels, l.GetName())
+		}
+
+		// Get user that opened the issue
+		userNameLogin := issue.GetUser().Login
+		userName := ""
+		if userNameLogin != nil {
+			userName = *userNameLogin
+		}
+
+		if userName == user.GetLogin() {
+			fmt.Println("Ignoring issue opened by the bot")
+			continue
+		}
 		messages := []openai.ChatCompletionMessage{
 			{
 				Role: "system",
 				Content: fmt.Sprintf(
-					`This is a conversation with an user ("%s") that opened a Github issue with title "%s" in the repository "%s" owned by "%s" .`, userName, issue.GetTitle(), g.repository, g.owner),
+					`This is a conversation with an user ("%s") that opened a Github issue with title "%s" in the repository "%s" owned by "%s". The issue is the issue number %d. Current labels: %+v`, userName, issue.GetTitle(), g.repository, g.owner, issue.GetNumber(), labels),
 			},
 			{
 				Role:    "user",

@@ -136,9 +136,10 @@ const (
 	ActionSearch             = "search"
 	ActionGithubIssueLabeler = "github-issue-labeler"
 	ActionGithubIssueOpener  = "github-issue-opener"
+	ActionGithubIssueCloser  = "github-issue-closer"
 )
 
-var AvailableActions = []string{ActionSearch, ActionGithubIssueLabeler, ActionGithubIssueOpener}
+var AvailableActions = []string{ActionSearch, ActionGithubIssueLabeler, ActionGithubIssueOpener, ActionGithubIssueCloser}
 
 func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	actions := []Action{}
@@ -148,7 +149,7 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 
 		var config map[string]string
 		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
-			fmt.Println("Error unmarshalling connector config", err)
+			fmt.Println("Error unmarshalling action config", err)
 			continue
 		}
 		fmt.Println("Config", config)
@@ -160,6 +161,8 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 			actions = append(actions, external.NewGithubIssueLabeler(ctx, config))
 		case ActionGithubIssueOpener:
 			actions = append(actions, external.NewGithubIssueOpener(ctx, config))
+		case ActionGithubIssueCloser:
+			actions = append(actions, external.NewGithubIssueCloser(ctx, config))
 		}
 	}
 
@@ -206,7 +209,7 @@ func (a *AgentConfig) availableConnectors() []Connector {
 		case ConnectorDiscord:
 			connectors = append(connectors, connector.NewDiscord(config))
 		case ConnectorGithubIssues:
-			connectors = append(connectors, connector.NewGithub(config))
+			connectors = append(connectors, connector.NewGithubIssueWatcher(config))
 		}
 	}
 	return connectors
@@ -407,7 +410,7 @@ func (a *AgentPool) Remove(name string) error {
 }
 
 func (a *AgentPool) Save() error {
-	data, err := json.Marshal(a.pool)
+	data, err := json.MarshalIndent(a.pool, "", "  ")
 	if err != nil {
 		return err
 	}

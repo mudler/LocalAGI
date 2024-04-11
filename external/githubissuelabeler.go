@@ -66,7 +66,7 @@ func (g *GithubIssuesLabeler) Run(params action.ActionParams) (string, error) {
 func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {
 	return action.ActionDefinition{
 		Name:        "add_label_to_github_issue",
-		Description: "Add a label to a Github issue.",
+		Description: "Add a label to a Github issue. You might want to assign labels to issues to categorize them.",
 		Properties: map[string]jsonschema.Definition{
 			"issue_number": {
 				Type:        jsonschema.Number,
