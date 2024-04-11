@@ -86,11 +86,12 @@ func (g *GithubIssues) issuesService() {
 		if issue.IsPullRequest() {
 			continue
 		}
-
+		userName := *issue.User.Name
 		messages := []openai.ChatCompletionMessage{
 			{
-				Role:    "system",
-				Content: fmt.Sprintf("This is a conversation with an user that opened a Github issue with title '%s'.", issue.GetTitle()),
+				Role: "system",
+				Content: fmt.Sprintf(
+					`This is a conversation with an user ("%s") that opened a Github issue with title "%s" in the repository "%s" owned by "%s" .`, userName, issue.GetTitle(), g.repository, g.owner),
 			},
 			{
 				Role:    "user",

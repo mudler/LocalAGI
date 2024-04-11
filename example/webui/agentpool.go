@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -125,16 +126,21 @@ func (a *AgentPool) List() []string {
 }
 
 const (
+	// Connectors
 	ConnectorTelegram     = "telegram"
 	ConnectorSlack        = "slack"
 	ConnectorDiscord      = "discord"
 	ConnectorGithubIssues = "github-issues"
-	ActionSearch          = "search"
+
+	// Actions
+	ActionSearch             = "search"
+	ActionGithubIssueLabeler = "github-issue-labeler"
+	ActionGithubIssueOpener  = "github-issue-opener"
 )
 
-var AvailableActions = []string{ActionSearch}
+var AvailableActions = []string{ActionSearch, ActionGithubIssueLabeler, ActionGithubIssueOpener}
 
-func (a *AgentConfig) availableActions() []Action {
+func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	actions := []Action{}
 
 	for _, action := range a.Actions {
@@ -150,6 +156,10 @@ func (a *AgentConfig) availableActions() []Action {
 		switch action.Name {
 		case ActionSearch:
 			actions = append(actions, external.NewSearch(config))
+		case ActionGithubIssueLabeler:
+			actions = append(actions, external.NewGithubIssueLabeler(ctx, config))
+		case ActionGithubIssueOpener:
+			actions = append(actions, external.NewGithubIssueOpener(ctx, config))
 		}
 	}
 
@@ -204,6 +214,7 @@ func (a *AgentConfig) availableConnectors() []Connector {
 
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
 	manager := NewManager(5)
+	ctx := context.Background()
 	model := a.model
 	if config.Model != "" {
 		model = config.Model
@@ -218,7 +229,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	fmt.Println("Model", model)
 	fmt.Println("API URL", a.apiURL)
 
-	actions := config.availableActions()
+	actions := config.availableActions(ctx)
 
 	stateFile, characterFile := a.stateFiles(name)
 
@@ -226,6 +237,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	opts := []Option{
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
+		WithContext(ctx),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
 		WithActions(
