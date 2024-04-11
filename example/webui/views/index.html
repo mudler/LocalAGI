@@ -4,11 +4,12 @@
     <title>Smart Assistant Dashboard</title>
     {{template "views/partials/header"}}
 </head>
-<body class="bg-gray-900 p-4 text-white">
+<body class="bg-gray-900 p-4 text-white font-sans">
+    {{template "views/partials/menu"}}
 <div class="max-w-4xl mx-auto">
-    <div class="text-center mb-6">
-        <h1 class="text-3xl font-bold">Smart Assistant Dashboard</h1>
-    </div>
+    <header class="text-center mb-8">
+        <h1 class="text-3xl md:text-5xl font-bold">Smart Agent Dashboard</h1>
+    </header>
     <div class="flex flex-col items-center space-y-4">
         <!-- Button to Agent List Page -->
         <a href="/agents" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">

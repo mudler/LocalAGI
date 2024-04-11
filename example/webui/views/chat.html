@@ -40,8 +40,10 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 p-4 text-white" hx-ext="sse" sse-connect="/sse/{{.Name}}">
+<body class="bg-gray-900 p-4 text-white font-sans" hx-ext="sse" sse-connect="/sse/{{.Name}}">
+    {{template "views/partials/menu"}}
 <div class="chat-container bg-gray-800 shadow-lg rounded-lg" >
+
     <!-- Chat Header -->
     <div class="border-b border-gray-700 p-4">
         <h1 class="text-lg font-semibold">Talk to '{{.Name}}'</h1>
