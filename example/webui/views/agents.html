@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent List</title>
     {{template "views/partials/header"}}
+    <style>
+        .button-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 8px; /* Adjusts the spacing to your liking */
+        }
+    </style>
 </head>
 <body class="bg-gray-900 p-4 text-white font-sans">
     {{template "views/partials/menu"}}
@@ -12,6 +19,11 @@
         <header class="text-center mb-8">
             <h1 class="text-3xl md:text-5xl font-bold">Smart Agent List</h1>
         </header>
+        <div class="button-container">
+            <a href="/create" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out">
+                Add New Agent
+            </a>
+        </div>
         <section class="flex flex-col">
             <div class="overflow-x-auto">
                 <div class="py-2 align-middle inline-block min-w-full">
@@ -36,9 +48,9 @@
                             <tbody class="bg-gray-800 divide-y divide-gray-700">
                                 <!-- Dynamic agent rows go here -->
                                 {{ range .Agents }}
-                                <tr>
+                                <tr hx-ext="sse" sse-connect="/sse/{{.}}">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">{{.}}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{{.}}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300"><div sse-swap="status" ></div></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                         <a href="/talk/{{.}}" class="text-indigo-500 hover:text-indigo-400">
                                             <i class="fas fa-comments"></i> Talk
@@ -58,9 +70,7 @@
                 </div>
             </section>
             <footer class="mt-8 text-center">
-                <a href="/create" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out">
-                    Add New Agent
-                </a>
+                <!-- Moved the button up for alignment with the table -->
             </footer>
         </div>
     </body>

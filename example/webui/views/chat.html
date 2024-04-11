@@ -3,13 +3,9 @@
 <head>
     <title>Smart Agent Interface</title>
     {{template "views/partials/header"}}
-    <!-- Optional: Include HTMX and SSE Extension for dynamic updates -->
-    <script src="https://unpkg.com/htmx.org"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
-    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
     <style>
         body { overflow: hidden; }
-        .chat-container { height: 100vh; display: flex; flex-direction: column; }
+        .chat-container { height: 90vh; display: flex; flex-direction: column; }
         .chat-messages { overflow-y: auto; flex-grow: 1; }
         .htmx-indicator{
                 opacity:0;

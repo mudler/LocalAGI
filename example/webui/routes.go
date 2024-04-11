@@ -40,7 +40,6 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 
 	// Define a route for the GET method on the root path '/'
 	webapp.Get("/sse/:name", func(c *fiber.Ctx) error {
-
 		m := pool.GetManager(c.Params("name"))
 		if m == nil {
 			return c.SendStatus(404)
