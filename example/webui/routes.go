@@ -24,8 +24,13 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 	})
 
 	webapp.Get("/agents", func(c *fiber.Ctx) error {
+		statuses := map[string]bool{}
+		for _, a := range pool.List() {
+			statuses[a] = !pool.GetAgent(a).Paused()
+		}
 		return c.Render("views/agents", fiber.Map{
 			"Agents": pool.List(),
+			"Status": statuses,
 		})
 	})
 
@@ -72,6 +77,8 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 	webapp.Post("/chat/:name", app.Chat(pool))
 	webapp.Post("/create", app.Create(pool))
 	webapp.Get("/delete/:name", app.Delete(pool))
+	webapp.Put("/pause/:name", app.Pause(pool))
+	webapp.Put("/start/:name", app.Start(pool))
 
 	webapp.Post("/knowledgebase", app.KnowledgeBase(db))
 	webapp.Post("/knowledgebase/upload", app.KnowledgeBaseFile(db))

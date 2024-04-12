@@ -137,6 +137,27 @@ func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
+func (a *App) Pause(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		fmt.Println("Pausing agent", c.Params("name"))
+		agent := pool.GetAgent(c.Params("name"))
+		if agent != nil {
+			agent.Pause()
+		}
+		return c.Redirect("/agents")
+	}
+}
+
+func (a *App) Start(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		agent := pool.GetAgent(c.Params("name"))
+		if agent != nil {
+			agent.Resume()
+		}
+		return c.Redirect("/agents")
+	}
+}
+
 func (a *App) Create(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		config := AgentConfig{}

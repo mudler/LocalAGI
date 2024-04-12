@@ -41,16 +41,24 @@
                                         <span class="sr-only">Talk</span>
                                     </th>
                                     <th scope="col" class="px-6 py-3 text-center">
+                                        <span class="sr-only">Start</span>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-center">
+                                        <span class="sr-only">Stop</span>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-center">
                                         <span class="sr-only">Delete</span>
                                     </th>
                                 </tr>
                             </thead>
                             <tbody class="bg-gray-800 divide-y divide-gray-700">
                                 <!-- Dynamic agent rows go here -->
+                                {{ $status := .Status }}
                                 {{ range .Agents }}
                                 <tr hx-ext="sse">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">{{.}}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                        Online: {{ index $status . }}
                                         <a href="/status/{{.}}" class="text-indigo-500 hover:text-indigo-400">
                                             <i class="fas fa-info"></i> Status
                                         </a>
@@ -59,6 +67,16 @@
                                         <a href="/talk/{{.}}" class="text-indigo-500 hover:text-indigo-400">
                                             <i class="fas fa-comments"></i> Talk
                                         </a>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                        <button hx-put="/start/{{.}}" class="text-indigo-500 hover:text-indigo-400">
+                                            Start
+                                        </button>                                          
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                        <button hx-put="/pause/{{.}}" class="text-indigo-500 hover:text-indigo-400">
+                                            Pause
+                                        </button>    
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                         <a href="/delete/{{.}}" class="text-red-500 hover:text-red-400">

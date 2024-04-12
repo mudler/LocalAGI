@@ -32,6 +32,7 @@ type Agent struct {
 	nextAction               Action
 	currentConversation      Messages
 	selfEvaluationInProgress bool
+	pause                    bool
 
 	newConversations chan openai.ChatCompletionMessage
 }
@@ -137,6 +138,24 @@ func (a *Agent) Stop() {
 	a.context.Cancel()
 }
 
+func (a *Agent) Pause() {
+	a.Lock()
+	defer a.Unlock()
+	a.pause = true
+}
+
+func (a *Agent) Resume() {
+	a.Lock()
+	defer a.Unlock()
+	a.pause = false
+}
+
+func (a *Agent) Paused() bool {
+	a.Lock()
+	defer a.Unlock()
+	return a.pause
+}
+
 func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (result string, err error) {
 	for _, action := range a.systemInternalActions() {
 		if action.Definition().Name == chosenAction.Definition().Name {
@@ -174,6 +193,18 @@ func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (
 }
 
 func (a *Agent) consumeJob(job *Job, role string) {
+	a.Lock()
+	paused := a.pause
+	a.Unlock()
+
+	if paused {
+		if a.options.debugMode {
+			fmt.Println("Agent is paused, skipping job")
+		}
+		job.Result.Finish(fmt.Errorf("agent is paused"))
+		return
+	}
+
 	// We are self evaluating if we consume the job as a system role
 	selfEvaluation := role == SystemRole
 
