@@ -6,55 +6,86 @@
     <script src="https://unpkg.com/htmx.org"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
     <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+    <style>
+        .section-box {
+            background-color: #2a2a2a; /* Darker background for the form */
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            background-color: #1a1a1a; /* Lighter overall background */
+            color: #ffffff;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        input[type="text"], input[type="file"] {
+            background-color: #333333;
+            color: white;
+        }
+
+        button {
+            background-color: #4a76a8; /* Blue color for buttons */
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #5a86b8;
+        }
+    </style>
 </head>
-<body class="bg-gray-900 p-4 text-white font-sans">
+<body>
     {{template "views/partials/menu"}}
     <header class="text-center mb-8">
         <h1 class="text-3xl md:text-5xl font-bold">Knowledgebase (items: {{.KnowledgebaseItemsCount}})</h1>
     </header>
-    <div class="max-w-2xl mx-auto my-12 bg-gray-800 p-8 rounded-lg shadow-lg">
-    <form action="/knowledgebase" method="POST" class="space-y-6">
-        Add sites to KB
-        <div class="mb-6">
-            <label for="url" class="block text-lg font-medium text-gray-400">URL</label>
-            <input type="text" name="url" id="url" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Name">
-        </div>
-        <div class="mb-6">
-            <label for="chunk_size" class="block text-lg font-medium text-gray-400">Chunk size</label>
-            <input type="text" name="chunk_size" id="chunk_size" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="380">
+    <div class="max-w-4xl mx-auto">
+        <!-- Add Site Form -->
+        <div class="section-box">
+            <form action="/knowledgebase" method="POST">
+                <h2>Add sites to KB</h2>
+                <label for="url">URL:</label>
+                <input type="text" name="url" id="url" placeholder="Enter URL here">
+                <label for="chunk_size">Chunk size:</label>
+                <input type="text" name="chunk_size" id="chunk_size" placeholder="Enter chunk size here">
+                <button type="submit">Add Site</button>
+            </form>
         </div>
 
-    
-        <div class="flex items-center justify-between">
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                Add Site
-            </button>
+        <!-- File Upload Form -->
+        <div class="section-box">
+            <form id='form' hx-encoding='multipart/form-data' hx-post='/knowledgebase/upload'>
+                <h2>Upload File</h2>
+                <label for="file">File:</label>
+                <input type='file' name='file' id='file'>
+                <label for="chunk_size">Chunk size:</label>
+                <input type="text" name="chunk_size" id="chunk_size" placeholder="Enter chunk size here">
+                <button type="submit">Upload File</button>
+                <progress id='progress' value='0' max='100'></progress>
+            </form>
         </div>
-    </form>
 
-    <form id='form' hx-encoding='multipart/form-data' hx-post='/knowledgebase/upload'>
-        <div class="mb-6">
-            <label for="file" class="block text-lg font-medium text-gray-400">File</label>
-            <input type='file' name='file' id='file' class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
+        <!-- Reset Knowledge Base -->
+        <div class="section-box">
+            <button hx-swap="none" hx-trigger="click" hx-delete="/knowledgebase/reset">Reset Knowledge Base</button>
         </div>
-        <div class="mb-6">
-            <label for="chunk_size" class="block text-lg font-medium text-gray-400">Chunk size</label>
-            <input type="text" name="chunk_size" id="chunk_size" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="380">
-        </div>
-        <div class="flex items-center justify-between">
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                Upload file
-            </button>
-        </div>
-        <div class="mb-6">
-        <progress id='progress' value='0' max='100'></progress>
-        </div>
-    </form>
+    </div>
     <script>
         htmx.on('#form', 'htmx:xhr:progress', function(evt) {
-          htmx.find('#progress').setAttribute('value', evt.detail.loaded/evt.detail.total * 100)
+            htmx.find('#progress').setAttribute('value', evt.detail.loaded / evt.detail.total * 100);
         });
     </script>
-</div>
 </body>
 </html>

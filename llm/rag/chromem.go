@@ -13,6 +13,8 @@ type ChromemDB struct {
 	collectionName string
 	collection     *chromem.Collection
 	index          int
+	client         *openai.Client
+	db             *chromem.DB
 }
 
 func NewChromemDB(collection, path string, openaiClient *openai.Client) (*ChromemDB, error) {
@@ -22,9 +24,39 @@ func NewChromemDB(collection, path string, openaiClient *openai.Client) (*Chrome
 	// }
 	db := chromem.NewDB()
 
-	embeddingFunc := chromem.EmbeddingFunc(
+	chromem := &ChromemDB{
+		collectionName: collection,
+		index:          1,
+		db:             db,
+		client:         openaiClient,
+	}
+
+	c, err := db.GetOrCreateCollection(collection, nil, chromem.embedding())
+	if err != nil {
+		return nil, err
+	}
+	chromem.collection = c
+
+	return chromem, nil
+}
+
+func (c *ChromemDB) Reset() error {
+	if err := c.db.DeleteCollection(c.collectionName); err != nil {
+		return err
+	}
+	collection, err := c.db.GetOrCreateCollection(c.collectionName, nil, c.embedding())
+	if err != nil {
+		return err
+	}
+	c.collection = collection
+
+	return nil
+}
+
+func (c *ChromemDB) embedding() chromem.EmbeddingFunc {
+	return chromem.EmbeddingFunc(
 		func(ctx context.Context, text string) ([]float32, error) {
-			resp, err := openaiClient.CreateEmbeddings(ctx,
+			resp, err := c.client.CreateEmbeddings(ctx,
 				openai.EmbeddingRequestStrings{
 					Input: []string{text},
 					Model: openai.AdaEmbeddingV2,
@@ -43,17 +75,6 @@ func NewChromemDB(collection, path string, openaiClient *openai.Client) (*Chrome
 			return embedding, nil
 		},
 	)
-
-	c, err := db.GetOrCreateCollection(collection, nil, embeddingFunc)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ChromemDB{
-		collectionName: collection,
-		collection:     c,
-		index:          1,
-	}, nil
 }
 
 func (c *ChromemDB) Store(s string) error {

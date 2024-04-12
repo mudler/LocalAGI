@@ -20,6 +20,13 @@ type (
 	}
 )
 
+func (a *App) KnowledgeBaseReset(db *InMemoryDatabase) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		db.Reset()
+		return c.Redirect("/knowledgebase")
+	}
+}
+
 func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// https://golang.withcodeexample.com/blog/file-upload-handling-golang-fiber-guide/

@@ -58,8 +58,10 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 	webapp.Post("/chat/:name", app.Chat(pool))
 	webapp.Post("/create", app.Create(pool))
 	webapp.Get("/delete/:name", app.Delete(pool))
+
 	webapp.Post("/knowledgebase", app.KnowledgeBase(db))
 	webapp.Post("/knowledgebase/upload", app.KnowledgeBaseFile(db))
+	webapp.Delete("/knowledgebase/reset", app.KnowledgeBaseReset(db))
 
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
 		return c.Render("views/chat", fiber.Map{

@@ -74,6 +74,17 @@ func (db *InMemoryDatabase) SaveToStore() error {
 
 	return nil
 }
+
+func (db *InMemoryDatabase) Reset() error {
+	db.Lock()
+	db.Database = []string{}
+	db.Unlock()
+	if err := db.rag.Reset(); err != nil {
+		return err
+	}
+	return db.SaveDB()
+}
+
 func (db *InMemoryDatabase) AddEntry(entry string) error {
 	db.Lock()
 	defer db.Unlock()

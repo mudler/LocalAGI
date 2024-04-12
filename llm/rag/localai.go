@@ -19,6 +19,10 @@ func NewLocalAIRAGDB(storeClient *StoreClient, openaiClient *openai.Client) *Loc
 	}
 }
 
+func (db *LocalAIRAGDB) Reset() error {
+	return fmt.Errorf("not implemented")
+}
+
 func (db *LocalAIRAGDB) Store(s string) error {
 	resp, err := db.openaiClient.CreateEmbeddings(context.TODO(),
 		openai.EmbeddingRequestStrings{

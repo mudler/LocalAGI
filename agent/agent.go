@@ -38,6 +38,7 @@ type Agent struct {
 
 type RAGDB interface {
 	Store(s string) error
+	Reset() error
 	Search(s string, similarEntries int) ([]string, error)
 }
 
