@@ -6,6 +6,7 @@ import (
 
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/mudler/local-agent-framework/agent"
 )
 
 func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, app *App) {
@@ -54,6 +55,19 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 		return nil
 	})
 
+	webapp.Get("/status/:name", func(c *fiber.Ctx) error {
+		history := pool.GetStatusHistory(c.Params("name"))
+		if history == nil {
+			history = &Status{results: []agent.ActionState{}}
+		}
+		// reverse history
+
+		return c.Render("views/status", fiber.Map{
+			"Name":    c.Params("name"),
+			"History": Reverse(history.Results()),
+		})
+	})
+
 	webapp.Get("/notify/:name", app.Notify(pool))
 	webapp.Post("/chat/:name", app.Chat(pool))
 	webapp.Post("/create", app.Create(pool))
@@ -80,4 +94,16 @@ func randStringRunes(n int) string {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
 	return string(b)
+}
+
+func Reverse[T any](original []T) (reversed []T) {
+	reversed = make([]T, len(original))
+	copy(reversed, original)
+
+	for i := len(reversed)/2 - 1; i >= 0; i-- {
+		tmp := len(reversed) - 1 - i
+		reversed[i], reversed[tmp] = reversed[tmp], reversed[i]
+	}
+
+	return
 }

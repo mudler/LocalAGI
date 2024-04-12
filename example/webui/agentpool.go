@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/mudler/local-agent-framework/example/webui/connector"
@@ -44,13 +45,32 @@ type AgentConfig struct {
 }
 
 type AgentPool struct {
+	sync.Mutex
 	file          string
 	pooldir       string
 	pool          AgentPoolData
 	agents        map[string]*Agent
 	managers      map[string]Manager
+	agentStatus   map[string]*Status
 	apiURL, model string
 	ragDB         RAGDB
+}
+
+type Status struct {
+	results []ActionState
+}
+
+func (s *Status) addResult(result ActionState) {
+	// If we have more than 10 results, remove the oldest one
+	if len(s.results) > 10 {
+		s.results = s.results[1:]
+	}
+
+	s.results = append(s.results, result)
+}
+
+func (s *Status) Results() []ActionState {
+	return s.results
 }
 
 type AgentPoolData map[string]AgentConfig
@@ -75,14 +95,15 @@ func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, err
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
-			file:     poolfile,
-			pooldir:  directory,
-			apiURL:   apiURL,
-			model:    model,
-			ragDB:    RagDB,
-			agents:   make(map[string]*Agent),
-			pool:     make(map[string]AgentConfig),
-			managers: make(map[string]Manager),
+			file:        poolfile,
+			pooldir:     directory,
+			apiURL:      apiURL,
+			model:       model,
+			ragDB:       RagDB,
+			agents:      make(map[string]*Agent),
+			pool:        make(map[string]AgentConfig),
+			agentStatus: make(map[string]*Status),
+			managers:    make(map[string]Manager),
 		}, nil
 	}
 
@@ -91,14 +112,15 @@ func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, err
 		return nil, err
 	}
 	return &AgentPool{
-		file:     poolfile,
-		apiURL:   apiURL,
-		pooldir:  directory,
-		ragDB:    RagDB,
-		model:    model,
-		agents:   make(map[string]*Agent),
-		managers: make(map[string]Manager),
-		pool:     *poolData,
+		file:        poolfile,
+		apiURL:      apiURL,
+		pooldir:     directory,
+		ragDB:       RagDB,
+		model:       model,
+		agents:      make(map[string]*Agent),
+		managers:    make(map[string]Manager),
+		agentStatus: map[string]*Status{},
+		pool:        *poolData,
 	}, nil
 }
 
@@ -224,6 +246,12 @@ func (a *AgentConfig) availableConnectors() []Connector {
 	return connectors
 }
 
+func (a *AgentPool) GetStatusHistory(name string) *Status {
+	a.Lock()
+	defer a.Unlock()
+	return a.agentStatus[name]
+}
+
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
 	manager := NewManager(5)
 	ctx := context.Background()
@@ -275,6 +303,13 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		}),
 		WithSystemPrompt(config.SystemPrompt),
 		WithAgentResultCallback(func(state ActionState) {
+			a.Lock()
+			if _, ok := a.agentStatus[name]; !ok {
+				a.agentStatus[name] = &Status{}
+			}
+
+			a.agentStatus[name].addResult(state)
+			a.Unlock()
 			fmt.Println("Reasoning", state.Reasoning)
 
 			text := fmt.Sprintf(`Reasoning: %s
