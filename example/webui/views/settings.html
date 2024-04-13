@@ -51,6 +51,15 @@
     <div class="max-w-4xl mx-auto">
 
         <div class="section-box">
+            <button hx-put="/start/{{.Name}}" class="text-indigo-500 hover:text-indigo-400">
+                Start
+            </button>
+            <button hx-put="/pause/{{.Name}}" class="text-indigo-500 hover:text-indigo-400">
+                Pause
+            </button>
+        </div>
+
+        <div class="section-box">
                 <h2>Export</h2>
                 <a href="/settings/export/{{.Name}}" >Export</a>
         </div>

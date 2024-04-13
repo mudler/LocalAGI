@@ -3,50 +3,8 @@
 <head>
     <title>KnowledgeBase</title>
     {{template "views/partials/header"}}
-    <script src="https://unpkg.com/htmx.org"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
-    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
-    <style>
-        .section-box {
-            background-color: #2a2a2a; /* Darker background for the form */
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        body {
-            background-color: #1a1a1a; /* Lighter overall background */
-            color: #ffffff;
-            font-family: sans-serif;
-            padding: 20px;
-        }
-
-        input, button {
-            width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            border-radius: 5px;
-            border: none;
-        }
-
-        input[type="text"], input[type="file"] {
-            background-color: #333333;
-            color: white;
-        }
-
-        button {
-            background-color: #4a76a8; /* Blue color for buttons */
-            color: white;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #5a86b8;
-        }
-    </style>
 </head>
-<body>
+<body class="bg-gray-900 p-4 text-white font-sans">
     {{template "views/partials/menu"}}
     <header class="text-center mb-8">
         <h1 class="text-3xl md:text-5xl font-bold">Knowledgebase (items: {{.KnowledgebaseItemsCount}})</h1>
