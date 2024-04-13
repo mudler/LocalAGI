@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -30,7 +31,6 @@ func (a *App) KnowledgeBaseReset(db *InMemoryDatabase) func(c *fiber.Ctx) error 
 func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// https://golang.withcodeexample.com/blog/file-upload-handling-golang-fiber-guide/
-		// Handle file upload logic
 		file, err := c.FormFile("file")
 		if err != nil {
 			// Handle error
@@ -171,6 +171,59 @@ func (a *App) Create(pool *AgentPool) func(c *fiber.Ctx) error {
 			c.Status(http.StatusBadRequest).SendString("Name is required")
 			return nil
 		}
+		if err := pool.CreateAgent(config.Name, &config); err != nil {
+			c.Status(http.StatusInternalServerError).SendString(err.Error())
+			return nil
+		}
+		return c.Redirect("/agents")
+	}
+}
+
+func (a *App) ExportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		agent := pool.GetConfig(c.Params("name"))
+		if agent == nil {
+			return c.Status(http.StatusNotFound).SendString("Agent not found")
+		}
+
+		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.json", agent.Name))
+		return c.JSON(agent)
+	}
+}
+
+func (a *App) ImportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		file, err := c.FormFile("file")
+		if err != nil {
+			// Handle error
+			return err
+		}
+
+		os.MkdirAll("./uploads", os.ModePerm)
+
+		destination := fmt.Sprintf("./uploads/%s", file.Filename)
+		if err := c.SaveFile(file, destination); err != nil {
+			// Handle error
+			return err
+		}
+
+		data, err := os.ReadFile(destination)
+		if err != nil {
+			return err
+		}
+
+		config := AgentConfig{}
+		if err := json.Unmarshal(data, &config); err != nil {
+			return err
+		}
+
+		fmt.Println("Importing agent", config.Name)
+
+		if config.Name == "" {
+			c.Status(http.StatusBadRequest).SendString("Name is required")
+			return nil
+		}
+
 		if err := pool.CreateAgent(config.Name, &config); err != nil {
 			c.Status(http.StatusInternalServerError).SendString(err.Error())
 			return nil

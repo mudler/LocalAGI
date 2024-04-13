@@ -91,6 +91,14 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 		})
 	})
 
+	webapp.Get("/settings/:name", func(c *fiber.Ctx) error {
+		return c.Render("views/settings", fiber.Map{
+			//	"Character": agent.Character,
+			"Name": c.Params("name"),
+		})
+	})
+	webapp.Post("/settings/import", app.ImportAgent(pool))
+	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

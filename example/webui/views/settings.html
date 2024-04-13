@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Agent settings {{.Name}}</title>
+    {{template "views/partials/header"}}
+    <style>
+        .section-box {
+            background-color: #2a2a2a; /* Darker background for the form */
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            background-color: #1a1a1a; /* Lighter overall background */
+            color: #ffffff;
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        input[type="text"], input[type="file"] {
+            background-color: #333333;
+            color: white;
+        }
+
+        button {
+            background-color: #4a76a8; /* Blue color for buttons */
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #5a86b8;
+        }
+    </style>
+</head>
+<body>
+    {{template "views/partials/menu"}}
+    <header class="text-center mb-8">
+        <h1 class="text-3xl md:text-5xl font-bold">Agent settings - {{.Name}}</h1>
+    </header>
+    <div class="max-w-4xl mx-auto">
+
+        <div class="section-box">
+                <h2>Export</h2>
+                <a href="/settings/export/{{.Name}}" >Export</a>
+        </div>
+
+        <div class="section-box">
+            <h2>Danger section</h2>
+            <a href="/delete/{{.}}" class="text-red-500 hover:text-red-400">
+                <i class="fas fa-trash-alt"></i> Delete
+            </a>
+        </div>
+      
+    </div>
+    <script>
+        htmx.on('#form', 'htmx:xhr:progress', function(evt) {
+            htmx.find('#progress').setAttribute('value', evt.detail.loaded / evt.detail.total * 100);
+        });
+    </script>
+</body>
+</html>

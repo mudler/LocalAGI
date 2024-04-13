@@ -465,6 +465,14 @@ func (a *AgentPool) GetAgent(name string) *Agent {
 	return a.agents[name]
 }
 
+func (a *AgentPool) GetConfig(name string) *AgentConfig {
+	agent, exists := a.pool[name]
+	if !exists {
+		return nil
+	}
+	return &agent
+}
+
 func (a *AgentPool) GetManager(name string) Manager {
 	return a.managers[name]
 }
