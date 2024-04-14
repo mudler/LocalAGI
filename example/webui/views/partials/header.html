@@ -50,4 +50,129 @@
         textarea {
             height: 200px; /* Increased height for better JSON visibility */
         }
+/* Enhancing select box styles */
+select {
+    appearance: none; /* Remove default system appearance */
+    background-color: #333; /* Darker background for the dark theme */
+    border: 2px solid #555; /* Slightly lighter border for contrast */
+    color: white; /* Text color */
+    padding: 10px; /* Padding inside the select box */
+    border-radius: 5px; /* Rounded corners */
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%23ffffff" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>'); /* Custom dropdown arrow using SVG */
+    background-repeat: no-repeat;
+    background-position: right 10px center; /* Positioning the arrow nicely */
+    background-size: 12px; /* Size of the arrow */
+    cursor: pointer; /* Cursor indicates it's clickable */
+}
+
+select:hover {
+    border-color: #777; /* Lighter border on hover for visibility */
+}
+
+select:focus {
+    outline: none; /* Remove default focus outline */
+    border-color: #1e90ff; /* Focus color similar to the hover background of buttons */
+    box-shadow: 0 0 3px #1e90ff; /* Adding a slight glow effect */
+}
+
+select {
+    /* Previous styles */
+    overflow-y: auto; /* Ensures that a scrollbar is available when needed */
+}
+
+option {
+    background-color: #333; /* Dark background for each option */
+    color: white; /* Light color for the text */
+    padding: 8px 10px; /* Padding for each option */
+}
+
+/* Adding a hover effect for options is not consistently supported across all browsers */
+select:hover option {
+    background-color: #444; /* Slightly lighter background on hover */
+}
+
+/* Custom Scrollbars for the dropdown */
+select {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #666 #333; /* Firefox: thumb and track color */
+}
+
+select::-webkit-scrollbar {
+    width: 8px; /* For WebKit browsers */
+}
+
+select::-webkit-scrollbar-track {
+    background: #333;
+}
+
+select::-webkit-scrollbar-thumb {
+    background-color: #666;
+    border-radius: 10px;
+    border: 2px solid #333;
+}
+/* Basic setup for the checkbox */
+.checkbox-custom {
+    position: relative;
+    display: inline-block;
+    width: 20px; /* Width of the checkbox */
+    height: 20px; /* Height of the checkbox */
+    margin: 5px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+/* Hide the default checkbox input */
+.checkbox-custom input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Create a custom box */
+.checkbox-custom .checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 20px;
+    width: 20px;
+    background-color: #444; /* Dark grey box */
+    border-radius: 4px; /* Rounded corners for the box */
+    border: 1px solid #777; /* Slightly lighter border */
+}
+
+/* On mouse-over, add a different border color */
+.checkbox-custom:hover .checkmark {
+    border-color: #aaa;
+}
+
+/* When the checkbox is checked, change the background and insert a checkmark */
+.checkbox-custom input:checked ~ .checkmark {
+    background-color: #1e90ff; /* Blue background for checked state */
+    border-color: #1e90ff;
+}
+
+/* Create the checkmark using a pseudo element */
+.checkbox-custom .checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+/* Show the checkmark when checked */
+.checkbox-custom input:checked ~ .checkmark:after {
+    display: block;
+}
+
+/* Style the checkmark */
+.checkbox-custom .checkmark:after {
+    left: 7px;
+    top: 3px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    transform: rotate(45deg);
+}
+
+
 </style>
