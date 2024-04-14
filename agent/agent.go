@@ -674,6 +674,10 @@ func (a *Agent) Run() error {
 		case job := <-a.jobQueue:
 			// Consume the job and generate a response
 			// TODO: Give a short-term memory to the agent
+			// stop and drain the timer
+			if !timer.Stop() {
+				<-timer.C
+			}
 			a.consumeJob(job, UserRole)
 			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
@@ -683,8 +687,6 @@ func (a *Agent) Run() error {
 			if !a.options.standaloneJob {
 				continue
 			}
-			// TODO: We should also do not immediately fire this timer but
-			// instead have a cool-off timer starting after we received the last job
 			a.periodicallyRun()
 			timer.Reset(a.options.periodicRuns)
 		}
