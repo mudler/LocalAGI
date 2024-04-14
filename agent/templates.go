@@ -40,6 +40,10 @@ func renderTemplate(templ string, hud *PromptHUD, actions Actions, reasoning str
 	return prompt.String(), nil
 }
 
+const innerMonologueTemplate = `"This is not a typical conversation between an assistant and an user.
+You are thinking out loud by yourself now, and you are evaluating the current situation.
+Considering the goal and the persistent goal, if you have one, and do something, or decide to plan something for later on. If you have the action available, you might also decide to engage a conversation with the user by notifying him."`
+
 const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}The assistant acts like an human, has a character and the replies and actions might be influenced by it.
 {{if .Character.Name}}This is the assistant name: {{.Character.Name}}
 {{end}}{{if .Character.Age}}This is the assistant age: {{.Character.Age}}

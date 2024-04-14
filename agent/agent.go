@@ -340,6 +340,14 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
+	if chosenAction.Definition().Name.Is(action.StopActionName) {
+		if a.options.debugMode {
+			fmt.Println("LLM decided to stop")
+		}
+		job.Result.Finish(nil)
+		return
+	}
+
 	if chosenAction == nil {
 		// If no action was picked up, the reasoning is the message returned by the assistant
 		// so we can consume it as if it was a reply.
@@ -410,8 +418,10 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
 		result, err := a.runAction(chosenAction, params)
 		if err != nil {
-			job.Result.Finish(fmt.Errorf("error running action: %w", err))
-			return
+			//job.Result.Finish(fmt.Errorf("error running action: %w", err))
+			//return
+			// make the LLM aware of the error of running the action instead of stopping the job here
+			result = fmt.Sprintf("Error running tool: %v", err)
 		}
 
 		stateResult := ActionState{ActionCurrentState{chosenAction, params.actionParams, reasoning}, result}
@@ -585,7 +595,7 @@ func (a *Agent) periodicallyRun() {
 
 	//	whatNext := NewJob(WithText("Decide what to do based on the state"))
 	whatNext := NewJob(
-		WithText("Decide what to based on the goal and the persistent goal."),
+		WithText(innerMonologueTemplate),
 		WithReasoningCallback(a.options.reasoningCallback),
 		WithResultCallback(a.options.resultCallback),
 	)

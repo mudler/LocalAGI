@@ -41,6 +41,7 @@ type AgentConfig struct {
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
+	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
 }
 
@@ -341,6 +342,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	}
 	if config.StandaloneJob {
 		opts = append(opts, EnableStandaloneJob)
+	}
+	if config.CanStopItself {
+		opts = append(opts, CanStopItself)
 	}
 	if config.InitiateConversations {
 		opts = append(opts, EnableInitiateConversations)

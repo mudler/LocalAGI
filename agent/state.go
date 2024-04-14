@@ -22,7 +22,7 @@ type PromptHUD struct {
 
 type Character struct {
 	Name       string   `json:"name"`
-	Age        int      `json:"age"`
+	Age        string   `json:"age"`
 	Occupation string   `json:"job_occupation"`
 	Hobbies    []string `json:"hobbies"`
 	MusicTaste []string `json:"music_taste"`
@@ -99,7 +99,7 @@ func (a *Agent) generateIdentity(guidance string) error {
 
 func (a *Agent) validCharacter() bool {
 	return a.Character.Name != "" &&
-		a.Character.Age != 0 &&
+		a.Character.Age != "" &&
 		a.Character.Occupation != "" &&
 		len(a.Character.Hobbies) != 0 &&
 		len(a.Character.MusicTaste) != 0
@@ -107,7 +107,7 @@ func (a *Agent) validCharacter() bool {
 
 const fmtT = `=====================
 Name: %s
-Age: %d
+Age: %s
 Occupation: %s
 Hobbies: %v
 Music taste: %v

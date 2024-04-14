@@ -21,6 +21,7 @@ type options struct {
 	userActions                                       Actions
 	enableHUD, standaloneJob, showCharacter, enableKB bool
 	debugMode                                         bool
+	canStopItself                                     bool
 	initiateConversations                             bool
 	characterfile                                     string
 	statefile                                         string
@@ -53,7 +54,7 @@ func defaultOptions() *options {
 		},
 		character: Character{
 			Name:       "John Doe",
-			Age:        0,
+			Age:        "",
 			Occupation: "Unemployed",
 			Hobbies:    []string{},
 			MusicTaste: []string{},
@@ -79,6 +80,11 @@ var EnableHUD = func(o *options) error {
 var EnableKnowledgeBase = func(o *options) error {
 	o.enableKB = true
 	o.kbResults = 5
+	return nil
+}
+
+var CanStopItself = func(o *options) error {
+	o.canStopItself = true
 	return nil
 }
 
