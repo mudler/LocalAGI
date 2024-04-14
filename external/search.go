@@ -2,6 +2,7 @@ package external
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/mudler/local-agent-framework/action"
 	"github.com/sap-nocops/duckduckgogo/client"
@@ -20,7 +21,7 @@ func NewSearch(config map[string]string) *SearchAction {
 		}
 	}
 
-	fmt.Println("Search action with results: ", intResult)
+	slog.Info("Search action with results: ", intResult)
 	return &SearchAction{results: intResult}
 }
 

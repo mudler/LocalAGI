@@ -2,8 +2,8 @@ package main
 
 import (
 	"embed"
-	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -75,9 +75,9 @@ func main() {
 	}
 
 	if len(db.Database) > 0 && kbdisableIndexing != "true" {
-		fmt.Println("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
+		slog.Info("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
 		if err := db.SaveToStore(); err != nil {
-			fmt.Println("Error storing in the KB", err)
+			slog.Info("Error storing in the KB", err)
 		}
 	}
 

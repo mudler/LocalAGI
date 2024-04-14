@@ -3,6 +3,7 @@ package connector
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -60,11 +61,11 @@ func (t *Slack) Start(a *agent.Agent) {
 		for evt := range client.Events {
 			switch evt.Type {
 			case socketmode.EventTypeConnecting:
-				fmt.Println("Connecting to Slack with Socket Mode...")
+				slog.Info("Connecting to Slack with Socket Mode...")
 			case socketmode.EventTypeConnectionError:
-				fmt.Println("Connection failed. Retrying later...")
+				slog.Info("Connection failed. Retrying later...")
 			case socketmode.EventTypeConnected:
-				fmt.Println("Connected to Slack with Socket Mode.")
+				slog.Info("Connected to Slack with Socket Mode.")
 			case socketmode.EventTypeEventsAPI:
 				eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
 				if !ok {
@@ -91,7 +92,7 @@ func (t *Slack) Start(a *agent.Agent) {
 						if t.channelID == "" && !t.alwaysReply || // If we have set alwaysReply and no channelID
 							t.channelID != ev.Channel { // If we have a channelID and it's not the same as the event channel
 							// Skip messages from other channels
-							fmt.Println("Skipping reply to channel", ev.Channel, t.channelID)
+							slog.Info("Skipping reply to channel", ev.Channel, t.channelID)
 							continue
 						}
 
@@ -123,7 +124,7 @@ func (t *Slack) Start(a *agent.Agent) {
 
 						// strip our id from the message
 						message = strings.ReplaceAll(message, "<@"+b.UserID+"> ", "")
-						fmt.Println("Message", message)
+						slog.Info("Message", message)
 
 						go func() {
 							res := a.Ask(

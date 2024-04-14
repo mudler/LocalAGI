@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -20,16 +21,17 @@ type options struct {
 	randomIdentity                                    bool
 	userActions                                       Actions
 	enableHUD, standaloneJob, showCharacter, enableKB bool
-	debugMode                                         bool
-	canStopItself                                     bool
-	initiateConversations                             bool
-	characterfile                                     string
-	statefile                                         string
-	context                                           context.Context
-	permanentGoal                                     string
-	periodicRuns                                      time.Duration
-	kbResults                                         int
-	ragdb                                             RAGDB
+
+	logLevel              slog.Level
+	canStopItself         bool
+	initiateConversations bool
+	characterfile         string
+	statefile             string
+	context               context.Context
+	permanentGoal         string
+	periodicRuns          time.Duration
+	kbResults             int
+	ragdb                 RAGDB
 
 	prompts []PromptBlock
 
@@ -52,6 +54,7 @@ func defaultOptions() *options {
 			APIURL: "http://localhost:8080",
 			Model:  "echidna",
 		},
+		logLevel: slog.LevelInfo,
 		character: Character{
 			Name:       "John Doe",
 			Age:        "",
@@ -88,6 +91,13 @@ var CanStopItself = func(o *options) error {
 	return nil
 }
 
+func LogLevel(level slog.Level) Option {
+	return func(o *options) error {
+		o.logLevel = level
+		return nil
+	}
+}
+
 func EnableKnowledgeBaseWithResults(results int) Option {
 	return func(o *options) error {
 		o.enableKB = true
@@ -98,11 +108,6 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 
 var EnableInitiateConversations = func(o *options) error {
 	o.initiateConversations = true
-	return nil
-}
-
-var DebugMode = func(o *options) error {
-	o.debugMode = true
 	return nil
 }
 

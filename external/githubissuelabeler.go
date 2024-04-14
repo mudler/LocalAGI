@@ -3,6 +3,7 @@ package external
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/google/go-github/v61/github"
@@ -52,7 +53,7 @@ func (g *GithubIssuesLabeler) Run(params action.ActionParams) (string, error) {
 	labels, _, err := g.client.Issues.AddLabelsToIssue(g.context, result.Owner, result.Repository, result.IssueNumber, []string{result.Label})
 	//labelsNames := []string{}
 	for _, l := range labels {
-		fmt.Println("Label added:", l.Name)
+		slog.Info("Label added:", l.Name)
 		//labelsNames = append(labelsNames, l.GetName())
 	}
 

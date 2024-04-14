@@ -2,6 +2,7 @@ package agent_test
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/mudler/local-agent-framework/action"
 	. "github.com/mudler/local-agent-framework/agent"
@@ -18,13 +19,13 @@ var _ Action = &TestAction{}
 
 var debugOptions = []JobOption{
 	WithReasoningCallback(func(state ActionCurrentState) bool {
-		fmt.Println("Reasoning", state)
+		slog.Info("Reasoning", state)
 		return true
 	}),
 	WithResultCallback(func(state ActionState) {
-		fmt.Println("Reasoning", state.Reasoning)
-		fmt.Println("Action", state.Action)
-		fmt.Println("Result", state.Result)
+		slog.Info("Reasoning", state.Reasoning)
+		slog.Info("Action", state.Action)
+		slog.Info("Result", state.Result)
 	}),
 }
 
@@ -172,7 +173,6 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
 				EnableHUD,
-				DebugMode,
 				//	EnableStandaloneJob,
 				//	WithRandomIdentity(),
 				WithPermanentGoal("I want to learn to play music"),
@@ -194,16 +194,15 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
 				EnableHUD,
-				DebugMode,
 				EnableStandaloneJob,
 				WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-					fmt.Println("Reasoning", state)
+					slog.Info("Reasoning", state)
 					return true
 				}),
 				WithAgentResultCallback(func(state ActionState) {
-					fmt.Println("Reasoning", state.Reasoning)
-					fmt.Println("Action", state.Action)
-					fmt.Println("Result", state.Result)
+					slog.Info("Reasoning", state.Reasoning)
+					slog.Info("Action", state.Action)
+					slog.Info("Result", state.Result)
 				}),
 				WithActions(
 					&FakeInternetAction{
@@ -230,14 +229,12 @@ var _ = Describe("Agent test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			go agent.Run()
 			defer agent.Stop()
-
 			Eventually(func() string {
-				fmt.Println(agent.State())
+
 				return agent.State().Goal
 			}, "10m", "10s").Should(ContainSubstring("weather"), fmt.Sprint(agent.State()))
 
 			Eventually(func() string {
-				fmt.Println(agent.State())
 				return agent.State().String()
 			}, "10m", "10s").Should(ContainSubstring("store"), fmt.Sprint(agent.State()))
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,7 +33,6 @@ type AgentConfig struct {
 	Model                 string `json:"model" form:"model"`
 	Name                  string `json:"name" form:"name"`
 	HUD                   bool   `json:"hud" form:"hud"`
-	Debug                 bool   `json:"debug" form:"debug"`
 	StandaloneJob         bool   `json:"standalone_job" form:"standalone_job"`
 	RandomIdentity        bool   `json:"random_identity" form:"random_identity"`
 	InitiateConversations bool   `json:"initiate_conversations" form:"initiate_conversations"`
@@ -175,14 +175,14 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	actions := []Action{}
 
 	for _, action := range a.Actions {
-		fmt.Println("Set Action", action)
+		slog.Info("Set Action", action)
 
 		var config map[string]string
 		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
-			fmt.Println("Error unmarshalling action config", err)
+			slog.Info("Error unmarshalling action config", err)
 			continue
 		}
-		fmt.Println("Config", config)
+		slog.Info("Config", config)
 
 		switch action.Name {
 		case ActionSearch:
@@ -218,20 +218,20 @@ func (a *AgentConfig) availableConnectors() []Connector {
 	connectors := []Connector{}
 
 	for _, c := range a.Connector {
-		fmt.Println("Set Connector", c)
+		slog.Info("Set Connector", c)
 
 		var config map[string]string
 		if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
-			fmt.Println("Error unmarshalling connector config", err)
+			slog.Info("Error unmarshalling connector config", err)
 			continue
 		}
-		fmt.Println("Config", config)
+		slog.Info("Config", config)
 
 		switch c.Type {
 		case ConnectorTelegram:
 			cc, err := connector.NewTelegramConnector(config)
 			if err != nil {
-				fmt.Println("Error creating telegram connector", err)
+				slog.Info("Error creating telegram connector", err)
 				continue
 			}
 
@@ -266,15 +266,15 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	connectors := config.availableConnectors()
 
-	fmt.Println("Creating agent", name)
-	fmt.Println("Model", model)
-	fmt.Println("API URL", a.apiURL)
+	slog.Info("Creating agent", name)
+	slog.Info("Model", model)
+	slog.Info("API URL", a.apiURL)
 
 	actions := config.availableActions(ctx)
 
 	stateFile, characterFile := a.stateFiles(name)
 
-	fmt.Println("Actions", actions)
+	slog.Info("Actions", actions)
 	opts := []Option{
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
@@ -288,7 +288,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithCharacterFile(characterFile),
 		WithRAGDB(a.ragDB),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-			fmt.Println("Reasoning", state.Reasoning)
+			slog.Info("Reasoning", state.Reasoning)
 			manager.Send(
 				NewMessage(
 					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
@@ -311,7 +311,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 			a.agentStatus[name].addResult(state)
 			a.Unlock()
-			fmt.Println("Reasoning", state.Reasoning)
+			slog.Info("Reasoning", state.Reasoning)
 
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
@@ -337,8 +337,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	if config.HUD {
 		opts = append(opts, EnableHUD)
 	}
-	if config.Debug {
-		opts = append(opts, DebugMode)
+	if os.Getenv("DEBUG") != "" {
+		opts = append(opts, LogLevel(slog.LevelDebug))
 	}
 	if config.StandaloneJob {
 		opts = append(opts, EnableStandaloneJob)
@@ -365,8 +365,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
 
-	fmt.Println("Starting agent", name)
-	fmt.Printf("Config %+v\n", config)
+	slog.Info("Starting agent", "name", name, "config", config)
 	agent, err := New(opts...)
 	if err != nil {
 		return err
@@ -377,7 +376,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	go func() {
 		if err := agent.Run(); err != nil {
-			fmt.Println("Agent stop: ", err.Error())
+			slog.Info("Agent stop: ", err.Error())
 		}
 	}()
 

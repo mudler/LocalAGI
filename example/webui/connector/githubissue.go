@@ -2,6 +2,7 @@ package connector
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -57,7 +58,7 @@ func (g *GithubIssues) Start(a *agent.Agent) {
 		for {
 			select {
 			case <-ticker.C:
-				fmt.Println("Looking into github issues...")
+				slog.Info("Looking into github issues...")
 				g.issuesService()
 			case <-a.Context().Done():
 				return
@@ -79,7 +80,7 @@ func (g *GithubIssues) issuesService() {
 		g.repository,
 		&github.IssueListByRepoOptions{})
 	if err != nil {
-		fmt.Println("Error listing issues", err)
+		slog.Info("Error listing issues", err)
 	}
 	for _, issue := range issues {
 		// Do something with the issue
@@ -99,7 +100,7 @@ func (g *GithubIssues) issuesService() {
 		}
 
 		if userName == user.GetLogin() {
-			fmt.Println("Ignoring issue opened by the bot")
+			slog.Info("Ignoring issue opened by the bot")
 			continue
 		}
 		messages := []openai.ChatCompletionMessage{
@@ -133,7 +134,7 @@ func (g *GithubIssues) issuesService() {
 			// if last comment is from the user and mentions the bot username, we must answer
 			if comment.User.GetName() != user.GetLogin() && len(comments)-1 == i {
 				if strings.Contains(comment.GetBody(), fmt.Sprintf("@%s", user.GetLogin())) {
-					fmt.Println("Bot was mentioned in the last comment")
+					slog.Info("Bot was mentioned in the last comment")
 					mustAnswer = true
 				}
 			}
@@ -141,9 +142,9 @@ func (g *GithubIssues) issuesService() {
 
 		if len(comments) == 0 || !botAnsweredAlready {
 			// if no comments, or bot didn't answer yet, we must answer
-			fmt.Println("No comments, or bot didn't answer yet")
-			fmt.Println("Comments:", len(comments))
-			fmt.Println("Bot answered already", botAnsweredAlready)
+			slog.Info("No comments, or bot didn't answer yet")
+			slog.Info("Comments:", len(comments))
+			slog.Info("Bot answered already", botAnsweredAlready)
 			mustAnswer = true
 		}
 
@@ -163,7 +164,7 @@ func (g *GithubIssues) issuesService() {
 			},
 		)
 		if err != nil {
-			fmt.Println("Error creating comment", err)
+			slog.Info("Error creating comment", err)
 		}
 	}
 }

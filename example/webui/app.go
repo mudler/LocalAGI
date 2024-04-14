@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -53,7 +54,7 @@ func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 			return err
 		}
 
-		fmt.Println("File uploaded to: " + destination)
+		slog.Info("File uploaded to: " + destination)
 		fmt.Printf("Payload: %+v\n", payload)
 
 		content, err := readPdf(destination) // Read local pdf file
@@ -61,7 +62,7 @@ func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 			panic(err)
 		}
 
-		fmt.Println("Content is", content)
+		slog.Info("Content is", content)
 		chunkSize := defaultChunkSize
 		if payload.ChunkSize > 0 {
 			chunkSize = payload.ChunkSize
@@ -130,7 +131,7 @@ func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
 func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		if err := pool.Remove(c.Params("name")); err != nil {
-			fmt.Println("Error removing agent", err)
+			slog.Info("Error removing agent", err)
 			return c.Status(http.StatusInternalServerError).SendString(err.Error())
 		}
 		return c.Redirect("/agents")
@@ -139,7 +140,7 @@ func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
 
 func (a *App) Pause(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		fmt.Println("Pausing agent", c.Params("name"))
+		slog.Info("Pausing agent", c.Params("name"))
 		agent := pool.GetAgent(c.Params("name"))
 		if agent != nil {
 			agent.Pause()
@@ -217,7 +218,7 @@ func (a *App) ImportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
 			return err
 		}
 
-		fmt.Println("Importing agent", config.Name)
+		slog.Info("Importing agent", config.Name)
 
 		if config.Name == "" {
 			c.Status(http.StatusBadRequest).SendString("Name is required")
@@ -257,13 +258,13 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 		go func() {
 			agent := pool.GetAgent(agentName)
 			if agent == nil {
-				fmt.Println("Agent not found in pool", c.Params("name"))
+				slog.Info("Agent not found in pool", c.Params("name"))
 				return
 			}
 			res := agent.Ask(
 				WithText(query),
 			)
-			fmt.Println("response is", res.Response)
+			slog.Info("response is", res.Response)
 			manager.Send(
 				NewMessage(
 					chatDiv(res.Response, "blue"),

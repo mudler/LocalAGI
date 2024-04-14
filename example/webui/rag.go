@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -120,7 +121,7 @@ func getWebPage(url string) (string, error) {
 
 func Sitemap(url string) (res []string, err error) {
 	err = sitemap.ParseFromSite(url, func(e sitemap.Entry) error {
-		fmt.Println("Sitemap page: " + e.GetLocation())
+		slog.Info("Sitemap page: " + e.GetLocation())
 		content, err := getWebPage(e.GetLocation())
 		if err == nil {
 			res = append(res, content)
@@ -133,10 +134,10 @@ func Sitemap(url string) (res []string, err error) {
 func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
 	content, err := Sitemap(website)
 	if err != nil {
-		fmt.Println("Error walking sitemap for website", err)
+		slog.Info("Error walking sitemap for website", err)
 	}
-	fmt.Println("Found pages: ", len(content))
-	fmt.Println("ChunkSize: ", chunkSize)
+	slog.Info("Found pages: ", len(content))
+	slog.Info("ChunkSize: ", chunkSize)
 
 	StringsToKB(db, chunkSize, content...)
 }
@@ -144,9 +145,9 @@ func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
 func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
 	for _, c := range content {
 		chunks := splitParagraphIntoChunks(c, chunkSize)
-		fmt.Println("chunks: ", len(chunks))
+		slog.Info("chunks: ", len(chunks))
 		for _, chunk := range chunks {
-			fmt.Println("Chunk size: ", len(chunk))
+			slog.Info("Chunk size: ", len(chunk))
 			db.AddEntry(chunk)
 		}
 
@@ -154,7 +155,7 @@ func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
 	}
 
 	if err := db.SaveToStore(); err != nil {
-		fmt.Println("Error storing in the KB", err)
+		slog.Info("Error storing in the KB", err)
 	}
 }
 

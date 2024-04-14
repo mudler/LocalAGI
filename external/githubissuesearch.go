@@ -3,6 +3,7 @@ package external
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/go-github/v61/github"
 	"github.com/mudler/local-agent-framework/action"
@@ -49,7 +50,7 @@ func (g *GithubIssueSearch) Run(params action.ActionParams) (string, error) {
 		resultString = fmt.Sprintf("Error listing issues: %v", err)
 	}
 	for _, i := range issues.Issues {
-		fmt.Println("Issue found:", i.GetTitle())
+		slog.Info("Issue found:", i.GetTitle())
 		resultString += fmt.Sprintf("Issue found: %s\n", i.GetTitle())
 		resultString += fmt.Sprintf("URL: %s\n", i.GetHTMLURL())
 		//	resultString += fmt.Sprintf("Body: %s\n", i.GetBody())

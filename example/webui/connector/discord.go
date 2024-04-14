@@ -1,7 +1,7 @@
 package connector
 
 import (
-	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -39,7 +39,7 @@ func (d *Discord) Start(a *agent.Agent) {
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New(Token)
 	if err != nil {
-		fmt.Println("error creating Discord session,", err)
+		slog.Info("error creating Discord session,", err)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (d *Discord) Start(a *agent.Agent) {
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
-		fmt.Println("error opening connection,", err)
+		slog.Info("error opening connection,", err)
 		return
 	}
 
@@ -84,7 +84,7 @@ func (d *Discord) messageCreate(a *agent.Agent) func(s *discordgo.Session, m *di
 			)
 			_, err := s.ChannelMessageSend(m.ChannelID, job.Response)
 			if err != nil {
-				fmt.Println("error sending message,", err)
+				slog.Info("error sending message,", err)
 			}
 		}
 

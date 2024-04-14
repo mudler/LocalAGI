@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ type Agent struct {
 	selfEvaluationInProgress bool
 	pause                    bool
 
+	logger           *slog.Logger
 	newConversations chan openai.ChatCompletionMessage
 }
 
@@ -74,12 +76,15 @@ func New(opts ...Option) (*Agent, error) {
 		}
 	}
 
-	if a.options.debugMode {
-		fmt.Println("=== Agent in Debug mode ===")
-		fmt.Println(a.Character.String())
-		fmt.Println(a.State().String())
-		fmt.Println("Permanent goal: ", a.options.permanentGoal)
-	}
+	var programLevel = new(slog.LevelVar) // Info by default
+	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel})
+	a.logger = slog.New(h)
+	programLevel.Set(a.options.logLevel)
+
+	a.logger.Info("Agent in Debug mode", "agent", a.Character.Name)
+	a.logger.Info("Character", "agent", a.Character.Name, "character", a.Character.String())
+	a.logger.Info("State", "agent", a.Character.Name, "state", a.State().String())
+	a.logger.Info("Permanent goal", "agent", a.Character.Name, "goal", a.options.permanentGoal)
 
 	return a, nil
 }
@@ -107,7 +112,7 @@ func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
 func (a *Agent) Ask(opts ...JobOption) *JobResult {
 	a.StopAction()
 	j := NewJob(append(opts, WithReasoningCallback(a.options.reasoningCallback), WithResultCallback(a.options.resultCallback))...)
-	//	fmt.Println("Job created", text)
+	//	slog.Info("Job created", text)
 	a.jobQueue <- j
 	return j.Result.WaitResult()
 }
@@ -165,10 +170,7 @@ func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (
 		}
 	}
 
-	if a.options.debugMode {
-		fmt.Println("Action", chosenAction.Definition().Name)
-		fmt.Println("Result", result)
-	}
+	a.logger.Info("Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name)
 
 	if chosenAction.Definition().Name.Is(action.StateActionName) {
 		// We need to store the result in the state
@@ -198,9 +200,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	a.Unlock()
 
 	if paused {
-		if a.options.debugMode {
-			fmt.Println("Agent is paused, skipping job")
-		}
+		a.logger.Info("Agent is paused, skipping job", "agent", a.Character.Name)
 		job.Result.Finish(fmt.Errorf("agent is paused"))
 		return
 	}
@@ -270,9 +270,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		if userMessage != "" {
 			results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
 			if err != nil {
-				if a.options.debugMode {
-					fmt.Println("Error finding similar strings inside KB:", err)
-				}
+				a.logger.Info("Error finding similar strings inside KB:", "error", err)
+
 				//	job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
 				//	return
 			}
@@ -283,10 +282,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				for _, r := range results {
 					formatResults += fmt.Sprintf("- %s \n", r)
 				}
-				if a.options.debugMode {
-					fmt.Println("Found similar strings in KB:")
-					fmt.Println(formatResults)
-				}
+				a.logger.Info("Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
+
 				// a.currentConversation = append(a.currentConversation,
 				// 	openai.ChatCompletionMessage{
 				// 		Role:    "system",
@@ -341,9 +338,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	if chosenAction.Definition().Name.Is(action.StopActionName) {
-		if a.options.debugMode {
-			fmt.Println("LLM decided to stop")
-		}
+		a.logger.Info("LLM decided to stop")
 		job.Result.Finish(nil)
 		return
 	}
@@ -362,9 +357,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	if a.options.debugMode {
-		fmt.Println("===> Generating parameters for", chosenAction.Definition().Name)
-	}
+	a.logger.Info("===> Generating parameters for", "action", chosenAction.Definition().Name)
 
 	params, err := a.generateParameters(ctx, pickTemplate, chosenAction, a.currentConversation, reasoning)
 	if err != nil {
@@ -372,10 +365,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	if a.options.debugMode {
-		fmt.Println("===> Generated parameters for", chosenAction.Definition().Name)
-		fmt.Println(params.actionParams.String())
-	}
+	a.logger.Info("===> Generated parameters for", "action", chosenAction.Definition().Name)
+	a.logger.Info(params.actionParams.String())
 
 	if params.actionParams == nil {
 		job.Result.Finish(fmt.Errorf("no parameters"))
@@ -549,9 +540,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	// If we didn't got any message, we can use the response from the action
 	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" {
-		if a.options.debugMode {
-			fmt.Println("No output returned from conversation, using the action response as a reply.")
-		}
+		a.logger.Info("No output returned from conversation, using the action response as a reply.")
 
 		msg.Content = replyResponse.Message
 	}
@@ -570,9 +559,7 @@ func (a *Agent) periodicallyRun() {
 	// This would be a special action that would be picked up by the agent
 	// and would be used to contact the user.
 
-	if a.options.debugMode {
-		fmt.Println("START -- Periodically run is starting")
-	}
+	a.logger.Info("START -- Periodically run is starting")
 
 	if len(a.CurrentConversation()) != 0 {
 		// Here the LLM could decide to store some part of the conversation too in the memory
@@ -602,9 +589,8 @@ func (a *Agent) periodicallyRun() {
 	a.consumeJob(whatNext, SystemRole)
 	a.ResetConversation()
 
-	if a.options.debugMode {
-		fmt.Println("STOP -- Periodically run is done")
-	}
+	a.logger.Info("STOP -- Periodically run is done")
+
 	// Save results from state
 
 	// a.ResetConversation()
