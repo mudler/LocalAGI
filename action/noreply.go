@@ -19,6 +19,6 @@ func (a *StopAction) Run(context.Context, ActionParams) (string, error) {
 func (a *StopAction) Definition() ActionDefinition {
 	return ActionDefinition{
 		Name:        StopActionName,
-		Description: "Use this tool to stop any further action and stop the conversation. You must use this when: the user wants to stop the conversation, it seems that the user does not need any additional answer, it looks like there is already a conclusion to the conversation or the topic diverged too much from the original conversation.",
+		Description: "Use this tool to stop any further action and stop the conversation. You must use this when it looks like there is a conclusion to the conversation or the topic diverged too much from the original conversation. For instance if the user offer his help and you already replied with a message, you can use this tool to stop the conversation.",
 	}
 }
