@@ -22,7 +22,7 @@ type PromptHUD struct {
 
 type Character struct {
 	Name       string   `json:"name"`
-	Age        string   `json:"age"`
+	Age        any      `json:"age"`
 	Occupation string   `json:"job_occupation"`
 	Hobbies    []string `json:"hobbies"`
 	MusicTaste []string `json:"music_taste"`

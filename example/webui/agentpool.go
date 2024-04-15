@@ -423,7 +423,12 @@ func (a *AgentPool) Stop(name string) {
 
 func (a *AgentPool) Start(name string) error {
 	if agent, ok := a.agents[name]; ok {
-		return agent.Run()
+		err := agent.Run()
+		if err != nil {
+			return fmt.Errorf("agent %s failed to start: %w", name, err)
+		}
+		slog.Info("Agent started", "name", name)
+		return nil
 	}
 	if config, ok := a.pool[name]; ok {
 		return a.startAgentWithConfig(name, &config)
