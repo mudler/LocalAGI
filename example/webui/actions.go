@@ -18,6 +18,7 @@ const (
 	ActionGithubIssueSearcher = "github-issue-searcher"
 	ActionScraper             = "scraper"
 	ActionWikipedia           = "wikipedia"
+	ActionBrowse              = "browse"
 )
 
 var AvailableActions = []string{
@@ -27,6 +28,7 @@ var AvailableActions = []string{
 	ActionGithubIssueCloser,
 	ActionGithubIssueSearcher,
 	ActionScraper,
+	ActionBrowse,
 	ActionWikipedia,
 }
 
@@ -58,6 +60,8 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 			actions = append(actions, external.NewScraper(config))
 		case ActionWikipedia:
 			actions = append(actions, external.NewWikipedia(config))
+		case ActionBrowse:
+			actions = append(actions, external.NewBrowse(config))
 		}
 	}
 

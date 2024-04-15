@@ -38,7 +38,7 @@ func (a *ScraperAction) Run(ctx context.Context, params action.ActionParams) (st
 func (a *ScraperAction) Definition() action.ActionDefinition {
 	return action.ActionDefinition{
 		Name:        "scrape",
-		Description: "Scrapes a website and returns the site data.",
+		Description: "Scrapes a full website content and returns the entire site data.",
 		Properties: map[string]jsonschema.Definition{
 			"url": {
 				Type:        jsonschema.String,
