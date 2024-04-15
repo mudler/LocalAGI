@@ -36,7 +36,7 @@ func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *Githu
 	}
 }
 
-func (g *GithubIssuesLabeler) Run(params action.ActionParams) (string, error) {
+func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParams) (string, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`

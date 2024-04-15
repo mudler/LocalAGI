@@ -264,7 +264,11 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 			res := agent.Ask(
 				WithText(query),
 			)
-			slog.Info("response is", res.Response)
+			if res.Error != nil {
+				slog.Error("Error asking agent", "agent", agentName, "error", res.Error)
+			} else {
+				slog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
+			}
 			manager.Send(
 				NewMessage(
 					chatDiv(res.Response, "blue"),

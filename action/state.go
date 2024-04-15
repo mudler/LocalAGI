@@ -1,6 +1,7 @@
 package action
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -32,7 +33,7 @@ type StateResult struct {
 	Goal        string   `json:"goal"`
 }
 
-func (a *StateAction) Run(ActionParams) (string, error) {
+func (a *StateAction) Run(context.Context, ActionParams) (string, error) {
 	return "internal state has been updated", nil
 }
 

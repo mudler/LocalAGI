@@ -18,6 +18,7 @@ type PromptHUD struct {
 	CurrentState  action.StateResult `json:"current_state"`
 	PermanentGoal string             `json:"permanent_goal"`
 	ShowCharacter bool               `json:"show_character"`
+	Time          string             `json:"time"`
 }
 
 type Character struct {

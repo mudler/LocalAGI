@@ -164,7 +164,7 @@ func (a *Agent) Paused() bool {
 func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (result string, err error) {
 	for _, action := range a.systemInternalActions() {
 		if action.Definition().Name == chosenAction.Definition().Name {
-			if result, err = action.Run(decisionResult.actionParams); err != nil {
+			if result, err = action.Run(a.context, decisionResult.actionParams); err != nil {
 				return "", fmt.Errorf("error running action: %w", err)
 			}
 		}
@@ -337,12 +337,6 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
-	if chosenAction.Definition().Name.Is(action.StopActionName) {
-		a.logger.Info("LLM decided to stop")
-		job.Result.Finish(nil)
-		return
-	}
-
 	if chosenAction == nil {
 		// If no action was picked up, the reasoning is the message returned by the assistant
 		// so we can consume it as if it was a reply.
@@ -353,6 +347,12 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			Content: reasoning,
 		})
 		job.Result.SetResponse(reasoning)
+		job.Result.Finish(nil)
+		return
+	}
+
+	if chosenAction.Definition().Name.Is(action.StopActionName) {
+		a.logger.Info("LLM decided to stop")
 		job.Result.Finish(nil)
 		return
 	}

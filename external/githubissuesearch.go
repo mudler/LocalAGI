@@ -26,7 +26,7 @@ func NewGithubIssueSearch(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssueSearch) Run(params action.ActionParams) (string, error) {
+func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams) (string, error) {
 	result := struct {
 		Query      string `json:"query"`
 		Repository string `json:"repository"`

@@ -54,6 +54,7 @@ const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}The assistant acts like 
 {{end}}
 
 This is your current state:
+Current time: {{.Time}}
 NowDoing: {{if .CurrentState.NowDoing}}{{.CurrentState.NowDoing}}{{else}}Nothing{{end}}
 DoingNext: {{if .CurrentState.DoingNext}}{{.CurrentState.DoingNext}}{{else}}Nothing{{end}}
 Your permanent goal is: {{if .PermanentGoal}}{{.PermanentGoal}}{{else}}Nothing{{end}}

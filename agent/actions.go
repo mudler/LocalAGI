@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mudler/local-agent-framework/action"
 
@@ -22,7 +23,7 @@ type ActionCurrentState struct {
 
 // Actions is something the agent can do
 type Action interface {
-	Run(action.ActionParams) (string, error)
+	Run(ctx context.Context, action action.ActionParams) (string, error)
 	Definition() action.ActionDefinition
 }
 
@@ -143,9 +144,9 @@ func (a *Agent) systemInternalActions() Actions {
 		if a.options.enableHUD {
 			acts = append(acts, action.NewState())
 		}
-		if a.options.canStopItself {
-			acts = append(acts, action.NewStop())
-		}
+		//if a.options.canStopItself {
+		//		acts = append(acts, action.NewStop())
+		//	}
 
 		return acts
 	}
@@ -171,6 +172,7 @@ func (a *Agent) prepareHUD() PromptHUD {
 		CurrentState:  *a.currentState,
 		PermanentGoal: a.options.permanentGoal,
 		ShowCharacter: a.options.showCharacter,
+		Time:          time.Now().Format(time.RFC3339),
 	}
 }
 

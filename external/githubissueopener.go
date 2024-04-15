@@ -25,7 +25,7 @@ func NewGithubIssueOpener(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesOpener) Run(params action.ActionParams) (string, error) {
+func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams) (string, error) {
 	result := struct {
 		Title      string `json:"title"`
 		Body       string `json:"text"`

@@ -1,6 +1,8 @@
 package action
 
 import (
+	"context"
+
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -16,7 +18,7 @@ type ConversationActionResponse struct {
 	Message string `json:"message"`
 }
 
-func (a *ConversationAction) Run(ActionParams) (string, error) {
+func (a *ConversationAction) Run(context.Context, ActionParams) (string, error) {
 	return "no-op", nil
 }
 

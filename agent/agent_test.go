@@ -1,6 +1,7 @@
 package agent_test
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -34,7 +35,7 @@ type TestAction struct {
 	responseN int
 }
 
-func (a *TestAction) Run(action.ActionParams) (string, error) {
+func (a *TestAction) Run(context.Context, action.ActionParams) (string, error) {
 	res := a.response[a.responseN]
 	a.responseN++
 

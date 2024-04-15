@@ -1,6 +1,8 @@
 package action
 
 import (
+	"context"
+
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -19,7 +21,7 @@ type IntentResponse struct {
 	Reasoning string `json:"reasoning"`
 }
 
-func (a *IntentAction) Run(ActionParams) (string, error) {
+func (a *IntentAction) Run(context.Context, ActionParams) (string, error) {
 	return "no-op", nil
 }
 

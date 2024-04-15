@@ -1,12 +1,13 @@
 package external
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
 	"github.com/mudler/local-agent-framework/action"
-	"github.com/sap-nocops/duckduckgogo/client"
 	"github.com/sashabaranov/go-openai/jsonschema"
+	"github.com/tmc/langchaingo/tools/duckduckgo"
 )
 
 func NewSearch(config map[string]string) *SearchAction {
@@ -21,13 +22,13 @@ func NewSearch(config map[string]string) *SearchAction {
 		}
 	}
 
-	slog.Info("Search action with results: ", intResult)
+	slog.Info("Search action with results: ", "results", intResult)
 	return &SearchAction{results: intResult}
 }
 
 type SearchAction struct{ results int }
 
-func (a *SearchAction) Run(params action.ActionParams) (string, error) {
+func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (string, error) {
 	result := struct {
 		Query string `json:"query"`
 	}{}
@@ -37,20 +38,13 @@ func (a *SearchAction) Run(params action.ActionParams) (string, error) {
 
 		return "", err
 	}
-	ddg := client.NewDuckDuckGoSearchClient()
-	res, err := ddg.SearchLimited(result.Query, a.results)
+	ddg, err := duckduckgo.New(a.results, "LocalAgent")
 	if err != nil {
-		msg := fmt.Sprintf("error duckduckgo: %v", err)
-		fmt.Printf(msg)
-		return msg, err
-	}
+		fmt.Printf("error: %v", err)
 
-	results := ""
-	for i, r := range res {
-		results += fmt.Sprintf("*********** RESULT %d\nurl:     %s\ntitle:   %s\nsnippet: %s\n", i, r.FormattedUrl, r.Title, r.Snippet)
+		return "", err
 	}
-
-	return results, nil
+	return ddg.Call(ctx, result.Query)
 }
 
 func (a *SearchAction) Definition() action.ActionDefinition {

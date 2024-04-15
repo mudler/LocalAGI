@@ -1,6 +1,8 @@
 package action
 
 import (
+	"context"
+
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -17,7 +19,7 @@ type ReasoningResponse struct {
 	Reasoning string `json:"reasoning"`
 }
 
-func (a *ReasoningAction) Run(ActionParams) (string, error) {
+func (a *ReasoningAction) Run(context.Context, ActionParams) (string, error) {
 	return "no-op", nil
 }
 

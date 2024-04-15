@@ -24,7 +24,7 @@ func NewGithubIssueCloser(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesCloser) Run(params action.ActionParams) (string, error) {
+func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams) (string, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`

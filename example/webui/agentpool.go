@@ -10,40 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mudler/local-agent-framework/example/webui/connector"
-
 	. "github.com/mudler/local-agent-framework/agent"
-	"github.com/mudler/local-agent-framework/external"
 )
-
-type ConnectorConfig struct {
-	Type   string `json:"type"` // e.g. Slack
-	Config string `json:"config"`
-}
-
-type ActionsConfig struct {
-	Name   string `json:"name"` // e.g. search
-	Config string `json:"config"`
-}
-
-type AgentConfig struct {
-	Connector []ConnectorConfig `json:"connectors" form:"connectors" `
-	Actions   []ActionsConfig   `json:"actions" form:"actions"`
-	// This is what needs to be part of ActionsConfig
-	Model                 string `json:"model" form:"model"`
-	Name                  string `json:"name" form:"name"`
-	HUD                   bool   `json:"hud" form:"hud"`
-	StandaloneJob         bool   `json:"standalone_job" form:"standalone_job"`
-	RandomIdentity        bool   `json:"random_identity" form:"random_identity"`
-	InitiateConversations bool   `json:"initiate_conversations" form:"initiate_conversations"`
-	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
-	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
-	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
-	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
-	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
-	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
-	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
-}
 
 type AgentPool struct {
 	sync.Mutex
@@ -146,105 +114,6 @@ func (a *AgentPool) List() []string {
 		agents = append(agents, agent)
 	}
 	return agents
-}
-
-const (
-	// Connectors
-	ConnectorTelegram     = "telegram"
-	ConnectorSlack        = "slack"
-	ConnectorDiscord      = "discord"
-	ConnectorGithubIssues = "github-issues"
-
-	// Actions
-	ActionSearch              = "search"
-	ActionGithubIssueLabeler  = "github-issue-labeler"
-	ActionGithubIssueOpener   = "github-issue-opener"
-	ActionGithubIssueCloser   = "github-issue-closer"
-	ActionGithubIssueSearcher = "github-issue-searcher"
-)
-
-var AvailableActions = []string{
-	ActionSearch,
-	ActionGithubIssueLabeler,
-	ActionGithubIssueOpener,
-	ActionGithubIssueCloser,
-	ActionGithubIssueSearcher,
-}
-
-func (a *AgentConfig) availableActions(ctx context.Context) []Action {
-	actions := []Action{}
-
-	for _, action := range a.Actions {
-		slog.Info("Set Action", action)
-
-		var config map[string]string
-		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
-			slog.Info("Error unmarshalling action config", err)
-			continue
-		}
-		slog.Info("Config", config)
-
-		switch action.Name {
-		case ActionSearch:
-			actions = append(actions, external.NewSearch(config))
-		case ActionGithubIssueLabeler:
-			actions = append(actions, external.NewGithubIssueLabeler(ctx, config))
-		case ActionGithubIssueOpener:
-			actions = append(actions, external.NewGithubIssueOpener(ctx, config))
-		case ActionGithubIssueCloser:
-			actions = append(actions, external.NewGithubIssueCloser(ctx, config))
-		case ActionGithubIssueSearcher:
-			actions = append(actions, external.NewGithubIssueSearch(ctx, config))
-		}
-	}
-
-	return actions
-}
-
-type Connector interface {
-	AgentResultCallback() func(state ActionState)
-	AgentReasoningCallback() func(state ActionCurrentState) bool
-	Start(a *Agent)
-}
-
-var AvailableConnectors = []string{
-	ConnectorTelegram,
-	ConnectorSlack,
-	ConnectorDiscord,
-	ConnectorGithubIssues,
-}
-
-func (a *AgentConfig) availableConnectors() []Connector {
-	connectors := []Connector{}
-
-	for _, c := range a.Connector {
-		slog.Info("Set Connector", c)
-
-		var config map[string]string
-		if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
-			slog.Info("Error unmarshalling connector config", err)
-			continue
-		}
-		slog.Info("Config", config)
-
-		switch c.Type {
-		case ConnectorTelegram:
-			cc, err := connector.NewTelegramConnector(config)
-			if err != nil {
-				slog.Info("Error creating telegram connector", err)
-				continue
-			}
-
-			connectors = append(connectors, cc)
-		case ConnectorSlack:
-			connectors = append(connectors, connector.NewSlack(config))
-		case ConnectorDiscord:
-			connectors = append(connectors, connector.NewDiscord(config))
-		case ConnectorGithubIssues:
-			connectors = append(connectors, connector.NewGithubIssueWatcher(config))
-		}
-	}
-	return connectors
 }
 
 func (a *AgentPool) GetStatusHistory(name string) *Status {
