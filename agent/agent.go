@@ -560,9 +560,12 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	// If we didn't got any message, we can use the response from the action
 	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" {
-		a.logger.Info("No output returned from conversation, using the action response as a reply.")
+		a.logger.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
 
-		msg.Content = replyResponse.Message
+		msg = openai.ChatCompletionMessage{
+			Role:    "assistant",
+			Content: replyResponse.Message,
+		}
 	}
 
 	a.currentConversation = append(a.currentConversation, msg)
