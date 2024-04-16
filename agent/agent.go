@@ -471,6 +471,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
+	// At this point can only be a reply action
+
 	// decode the response
 	replyResponse := action.ReplyResponse{}
 
@@ -493,6 +495,14 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// 		return
 	// 	}
 	// }
+
+	// Force the AI to response without using any tool
+	// Why: some models might be silly enough to attempt to call tools even if evaluated
+	// that a reply was not necessary anymore
+	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+		Role:    "system",
+		Content: "The assistant needs to reply without using any tool. " + replyResponse.Message,
+	})
 
 	// If we have a hud, display it
 	if a.options.enableHUD {
