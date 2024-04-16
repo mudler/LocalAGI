@@ -57,8 +57,10 @@ func (d *Discord) Start(a *agent.Agent) {
 	}
 
 	go func() {
+		slog.Info("Discord bot is now running.  Press CTRL-C to exit.")
 		<-a.Context().Done()
 		dg.Close()
+		slog.Info("Discord bot is now stopped.")
 	}()
 }
 
@@ -76,12 +78,18 @@ func (d *Discord) messageCreate(a *agent.Agent) func(s *discordgo.Session, m *di
 			content := m.Content
 
 			content = strings.ReplaceAll(content, "<@"+s.State.User.ID+"> ", "")
-
+			slog.Info("Received message", "content", content)
 			job := a.Ask(
 				agent.WithText(
 					content,
 				),
 			)
+			if job.Error != nil {
+				slog.Info("error asking agent,", job.Error)
+				return
+			}
+
+			slog.Info("Response", "response", job.Response)
 			_, err := s.ChannelMessageSend(m.ChannelID, job.Response)
 			if err != nil {
 				slog.Info("error sending message,", err)
@@ -91,14 +99,14 @@ func (d *Discord) messageCreate(a *agent.Agent) func(s *discordgo.Session, m *di
 		// Interact if we are mentioned
 		for _, mention := range m.Mentions {
 			if mention.ID == s.State.User.ID {
-				interact()
+				go interact()
 				return
 			}
 		}
 
 		// Or we are in the default channel (if one is set!)
 		if d.defaultChannel != "" && m.ChannelID == d.defaultChannel {
-			interact()
+			go interact()
 			return
 		}
 	}
