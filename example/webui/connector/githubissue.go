@@ -152,19 +152,25 @@ func (g *GithubIssues) issuesService() {
 			continue
 		}
 
-		res := g.agent.Ask(
-			agent.WithConversationHistory(messages),
-		)
+		go func() {
+			res := g.agent.Ask(
+				agent.WithConversationHistory(messages),
+			)
+			if res.Error != nil {
+				slog.Error("Error asking", "error", res.Error)
+				return
+			}
 
-		_, _, err := g.client.Issues.CreateComment(
-			g.agent.Context(),
-			g.owner, g.repository,
-			issue.GetNumber(), &github.IssueComment{
-				Body: github.String(res.Response),
-			},
-		)
-		if err != nil {
-			slog.Info("Error creating comment", err)
-		}
+			_, _, err := g.client.Issues.CreateComment(
+				g.agent.Context(),
+				g.owner, g.repository,
+				issue.GetNumber(), &github.IssueComment{
+					Body: github.String(res.Response),
+				},
+			)
+			if err != nil {
+				slog.Error("Error creating comment", "error", err)
+			}
+		}()
 	}
 }
