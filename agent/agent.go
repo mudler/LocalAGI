@@ -367,7 +367,11 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	a.logger.Info("===> Generating parameters for", "action", chosenAction.Definition().Name)
+	a.logger.Info("Generating parameters",
+		"agent", a.Character.Name,
+		"action", chosenAction.Definition().Name,
+		"reasoning", reasoning,
+	)
 
 	params, err := a.generateParameters(ctx, pickTemplate, chosenAction, a.currentConversation, reasoning)
 	if err != nil {
@@ -375,8 +379,13 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	a.logger.Info("===> Generated parameters for", "action", chosenAction.Definition().Name)
-	a.logger.Info(params.actionParams.String())
+	a.logger.Info(
+		"Generated parameters",
+		"agent", a.Character.Name,
+		"action", chosenAction.Definition().Name,
+		"reasoning", reasoning,
+		"params", params.actionParams.String(),
+	)
 
 	if params.actionParams == nil {
 		job.Result.Finish(fmt.Errorf("no parameters"))

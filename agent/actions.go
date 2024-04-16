@@ -72,7 +72,7 @@ func (a *Agent) decision(
 	}
 
 	if len(resp.Choices) != 1 {
-		return nil, fmt.Errorf("no choices")
+		return nil, fmt.Errorf("no choices: %d", len(resp.Choices))
 	}
 
 	msg := resp.Choices[0].Message
@@ -131,7 +131,10 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	}
 
 	return a.decision(ctx,
-		conversation,
+		append(conversation, openai.ChatCompletionMessage{
+			Role:    "system",
+			Content: fmt.Sprintf("The agent decided to use the tool %s with the following reasoning: %s", act.Definition().Name, reasoning),
+		}),
 		a.systemInternalActions().ToTools(),
 		openai.ToolChoice{
 			Type:     openai.ToolTypeFunction,
