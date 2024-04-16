@@ -21,6 +21,7 @@ var apiURL = os.Getenv("API_URL")
 var apiKey = os.Getenv("API_KEY")
 var vectorStore = os.Getenv("VECTOR_STORE")
 var kbdisableIndexing = os.Getenv("KBDISABLEINDEX")
+var timeout = os.Getenv("TIMEOUT")
 
 const defaultChunkSize = 4098
 
@@ -30,6 +31,9 @@ func init() {
 	}
 	if apiURL == "" {
 		apiURL = "http://192.168.68.113:8080"
+	}
+	if timeout == "" {
+		timeout = "5m"
 	}
 }
 
@@ -50,7 +54,7 @@ func main() {
 	os.MkdirAll(stateDir, 0755)
 
 	var dbStore RAGDB
-	lai := llm.NewClient(apiKey, apiURL+"/v1")
+	lai := llm.NewClient(apiKey, apiURL+"/v1", timeout)
 
 	switch vectorStore {
 	case "localai":

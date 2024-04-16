@@ -29,6 +29,7 @@ type options struct {
 	statefile             string
 	context               context.Context
 	permanentGoal         string
+	timeout               string
 	periodicRuns          time.Duration
 	kbResults             int
 	ragdb                 RAGDB
@@ -94,6 +95,13 @@ var CanStopItself = func(o *options) error {
 func LogLevel(level slog.Level) Option {
 	return func(o *options) error {
 		o.logLevel = level
+		return nil
+	}
+}
+
+func WithTimeout(timeout string) Option {
+	return func(o *options) error {
+		o.timeout = timeout
 		return nil
 	}
 }

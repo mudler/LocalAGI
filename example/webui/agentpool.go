@@ -155,6 +155,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		),
 		WithStateFile(stateFile),
 		WithCharacterFile(characterFile),
+		WithTimeout(timeout),
 		WithRAGDB(a.ragDB),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
 			slog.Info("Reasoning", state.Reasoning)

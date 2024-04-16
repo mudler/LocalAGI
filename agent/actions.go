@@ -67,8 +67,12 @@ func (a *Agent) decision(
 		ToolChoice: toolchoice,
 	}
 	resp, err := a.client.CreateChatCompletion(ctx, decision)
-	if err != nil || len(resp.Choices) != 1 {
+	if err != nil {
 		return nil, err
+	}
+
+	if len(resp.Choices) != 1 {
+		return nil, fmt.Errorf("no choices")
 	}
 
 	msg := resp.Choices[0].Message

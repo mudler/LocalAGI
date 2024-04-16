@@ -61,6 +61,7 @@ func (g *GithubIssues) Start(a *agent.Agent) {
 				slog.Info("Looking into github issues...")
 				g.issuesService()
 			case <-a.Context().Done():
+				slog.Info("GithubIssues connector is now stopping")
 				return
 			}
 		}
@@ -152,25 +153,23 @@ func (g *GithubIssues) issuesService() {
 			continue
 		}
 
-		go func() {
-			res := g.agent.Ask(
-				agent.WithConversationHistory(messages),
-			)
-			if res.Error != nil {
-				slog.Error("Error asking", "error", res.Error)
-				return
-			}
+		res := g.agent.Ask(
+			agent.WithConversationHistory(messages),
+		)
+		if res.Error != nil {
+			slog.Error("Error asking", "error", res.Error)
+			return
+		}
 
-			_, _, err := g.client.Issues.CreateComment(
-				g.agent.Context(),
-				g.owner, g.repository,
-				issue.GetNumber(), &github.IssueComment{
-					Body: github.String(res.Response),
-				},
-			)
-			if err != nil {
-				slog.Error("Error creating comment", "error", err)
-			}
-		}()
+		_, _, err := g.client.Issues.CreateComment(
+			g.agent.Context(),
+			g.owner, g.repository,
+			issue.GetNumber(), &github.IssueComment{
+				Body: github.String(res.Response),
+			},
+		)
+		if err != nil {
+			slog.Error("Error creating comment", "error", err)
+		}
 	}
 }

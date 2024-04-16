@@ -51,7 +51,7 @@ func New(opts ...Option) (*Agent, error) {
 		return nil, fmt.Errorf("failed to set options: %v", err)
 	}
 
-	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL)
+	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL, options.timeout)
 
 	c := context.Background()
 	if options.context != nil {
@@ -103,6 +103,10 @@ func (a *Agent) Context() context.Context {
 	return a.context.Context
 }
 
+func (a *Agent) ActionContext() context.Context {
+	return a.actionContext.Context
+}
+
 func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
 	return a.newConversations
 }
@@ -111,7 +115,13 @@ func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
 // It discards any other computation.
 func (a *Agent) Ask(opts ...JobOption) *JobResult {
 	a.StopAction()
-	j := NewJob(append(opts, WithReasoningCallback(a.options.reasoningCallback), WithResultCallback(a.options.resultCallback))...)
+	j := NewJob(
+		append(
+			opts,
+			WithReasoningCallback(a.options.reasoningCallback),
+			WithResultCallback(a.options.resultCallback),
+		)...,
+	)
 	//	slog.Info("Job created", text)
 	a.jobQueue <- j
 	return j.Result.WaitResult()
@@ -164,7 +174,7 @@ func (a *Agent) Paused() bool {
 func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (result string, err error) {
 	for _, action := range a.systemInternalActions() {
 		if action.Definition().Name == chosenAction.Definition().Name {
-			if result, err = action.Run(a.context, decisionResult.actionParams); err != nil {
+			if result, err = action.Run(a.actionContext, decisionResult.actionParams); err != nil {
 				return "", fmt.Errorf("error running action: %w", err)
 			}
 		}
