@@ -505,14 +505,6 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// 	}
 	// }
 
-	// Force the AI to response without using any tool
-	// Why: some models might be silly enough to attempt to call tools even if evaluated
-	// that a reply was not necessary anymore
-	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-		Role:    "system",
-		Content: "The assistant needs to reply without using any tool. " + replyResponse.Message,
-	})
-
 	// If we have a hud, display it
 	if a.options.enableHUD {
 		var promptHUD *PromptHUD
@@ -550,8 +542,14 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// )
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
-			Model:    a.options.LLMAPI.Model,
-			Messages: a.currentConversation,
+			Model: a.options.LLMAPI.Model,
+			// Force the AI to response without using any tool
+			// Why: some models might be silly enough to attempt to call tools even if evaluated
+			// that a reply was not necessary anymore
+			Messages: append(a.currentConversation, openai.ChatCompletionMessage{
+				Role:    "system",
+				Content: "The assistant needs to reply without using any tool. " + replyResponse.Message,
+			}),
 		},
 	)
 	if err != nil {
