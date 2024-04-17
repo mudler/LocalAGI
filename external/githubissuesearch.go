@@ -48,6 +48,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 	})
 	if err != nil {
 		resultString = fmt.Sprintf("Error listing issues: %v", err)
+		return resultString, err
 	}
 	for _, i := range issues.Issues {
 		slog.Info("Issue found:", i.GetTitle())

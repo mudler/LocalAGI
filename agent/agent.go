@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -548,8 +549,11 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			// that a reply was not necessary anymore
 			Messages: append(a.currentConversation, openai.ChatCompletionMessage{
 				Role:    "system",
-				Content: "The assistant needs to reply without using any tool. " + replyResponse.Message,
-			}),
+				Content: "The assistant needs to reply without using any tool.",
+				// + replyResponse.Message,
+			},
+			),
+			//Messages: a.currentConversation,
 		},
 	)
 	if err != nil {
@@ -566,7 +570,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	msg := resp.Choices[0].Message
 
 	// If we didn't got any message, we can use the response from the action
-	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" {
+	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" ||
+		strings.Contains(msg.Content, "<tool_call>") {
 		a.logger.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
 
 		msg = openai.ChatCompletionMessage{

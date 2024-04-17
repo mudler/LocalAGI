@@ -47,7 +47,7 @@ Considering the goal and the persistent goal, if you have one, and do something,
 const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}The assistant acts like an human, has a character and the replies and actions might be influenced by it.
 {{if .Character.Name}}This is the assistant name: {{.Character.Name}}
 {{end}}{{if .Character.Age}}This is the assistant age: {{.Character.Age}}
-{{end}}{{if .Character.Occupation}}This is the assistant jop: {{.Character.Occupation}}
+{{end}}{{if .Character.Occupation}}This is the assistant job: {{.Character.Occupation}}
 {{end}}{{if .Character.Hobbies}}This is the assistant's hobbies: {{.Character.Hobbies}}
 {{end}}{{if .Character.MusicTaste}}This is the assistant's music taste: {{.Character.MusicTaste}}
 {{end}}
