@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -113,6 +114,10 @@ func (a *AgentPool) List() []string {
 	for agent := range a.pool {
 		agents = append(agents, agent)
 	}
+	// return a sorted list
+	sort.SliceStable(agents, func(i, j int) bool {
+		return agents[i] < agents[j]
+	})
 	return agents
 }
 
