@@ -141,15 +141,28 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	connectors := config.availableConnectors()
 
-	xlog.Info("Creating agent", name)
-	xlog.Info("Model", model)
-	xlog.Info("API URL", a.apiURL)
-
 	actions := config.availableActions(ctx)
 
 	stateFile, characterFile := a.stateFiles(name)
 
-	xlog.Info("Actions", actions)
+	actionsLog := []string{}
+	for _, action := range actions {
+		actionsLog = append(actionsLog, action.Definition().Name.String())
+	}
+	connectorLog := []string{}
+	for _, connector := range connectors {
+		connectorLog = append(connectorLog, fmt.Sprintf("%+v", connector))
+	}
+
+	xlog.Info(
+		"Creating agent",
+		"name", name,
+		"model", model,
+		"api_url", a.apiURL,
+		"actions", actionsLog,
+		"connectors", connectorLog,
+	)
+
 	opts := []Option{
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),

@@ -82,10 +82,13 @@ func New(opts ...Option) (*Agent, error) {
 	// xlog = xlog.New(h)
 	//programLevel.Set(a.options.logLevel)
 
-	xlog.Info("Agent in Debug mode", "agent", a.Character.Name)
-	xlog.Info("Character", "agent", a.Character.Name, "character", a.Character.String())
-	xlog.Info("State", "agent", a.Character.Name, "state", a.State().String())
-	xlog.Info("Permanent goal", "agent", a.Character.Name, "goal", a.options.permanentGoal)
+	xlog.Info(
+		"Agent created",
+		"agent", a.Character.Name,
+		"character", a.Character.String(),
+		"state", a.State().String(),
+		"goal", a.options.permanentGoal,
+	)
 
 	return a, nil
 }

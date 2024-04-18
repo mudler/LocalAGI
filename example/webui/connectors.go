@@ -35,15 +35,11 @@ func (a *AgentConfig) availableConnectors() []Connector {
 	connectors := []Connector{}
 
 	for _, c := range a.Connector {
-		xlog.Info("Set Connector", c)
-
 		var config map[string]string
 		if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
 			xlog.Info("Error unmarshalling connector config", err)
 			continue
 		}
-		xlog.Info("Config", config)
-
 		switch c.Type {
 		case ConnectorTelegram:
 			cc, err := connector.NewTelegramConnector(config)

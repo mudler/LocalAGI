@@ -37,14 +37,11 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	actions := []Action{}
 
 	for _, action := range a.Actions {
-		xlog.Info("Set Action", action)
-
 		var config map[string]string
 		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
 			xlog.Info("Error unmarshalling action config", err)
 			continue
 		}
-		xlog.Info("Config", config)
 
 		switch action.Name {
 		case ActionSearch:
