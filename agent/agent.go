@@ -96,6 +96,7 @@ func (a *Agent) StopAction() {
 	a.Lock()
 	defer a.Unlock()
 	if a.actionContext != nil {
+		xlog.Debug("Stopping current action", "agent", a.Character.Name)
 		a.actionContext.Cancel()
 	}
 }
@@ -115,6 +116,11 @@ func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Ask(opts ...JobOption) *JobResult {
+	xlog.Debug("Agent is being asked", "agent", a.Character.Name)
+	defer func() {
+		xlog.Debug("Agent has finished being asked", "agent", a.Character.Name)
+	}()
+
 	a.StopAction()
 	j := NewJob(
 		append(
@@ -123,8 +129,9 @@ func (a *Agent) Ask(opts ...JobOption) *JobResult {
 			WithResultCallback(a.options.resultCallback),
 		)...,
 	)
-	//	xlog.Info("Job created", text)
+	xlog.Debug("Job created", "agent", a.Character.Name, "job", j)
 	a.jobQueue <- j
+	xlog.Debug("Waiting result", "agent", a.Character.Name, "job", j)
 	return j.Result.WaitResult()
 }
 
