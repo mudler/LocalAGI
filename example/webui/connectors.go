@@ -2,7 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"log/slog"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	. "github.com/mudler/local-agent-framework/agent"
 
@@ -34,20 +35,20 @@ func (a *AgentConfig) availableConnectors() []Connector {
 	connectors := []Connector{}
 
 	for _, c := range a.Connector {
-		slog.Info("Set Connector", c)
+		xlog.Info("Set Connector", c)
 
 		var config map[string]string
 		if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
-			slog.Info("Error unmarshalling connector config", err)
+			xlog.Info("Error unmarshalling connector config", err)
 			continue
 		}
-		slog.Info("Config", config)
+		xlog.Info("Config", config)
 
 		switch c.Type {
 		case ConnectorTelegram:
 			cc, err := connector.NewTelegramConnector(config)
 			if err != nil {
-				slog.Info("Error creating telegram connector", err)
+				xlog.Info("Error creating telegram connector", err)
 				continue
 			}
 

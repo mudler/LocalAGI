@@ -3,9 +3,10 @@ package main
 import (
 	"embed"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
@@ -79,9 +80,9 @@ func main() {
 	}
 
 	if len(db.Database) > 0 && kbdisableIndexing != "true" {
-		slog.Info("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
+		xlog.Info("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
 		if err := db.SaveToStore(); err != nil {
-			slog.Info("Error storing in the KB", err)
+			xlog.Info("Error storing in the KB", err)
 		}
 	}
 

@@ -3,9 +3,10 @@ package connector
 import (
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	"github.com/mudler/local-agent-framework/agent"
 
@@ -61,11 +62,11 @@ func (t *Slack) Start(a *agent.Agent) {
 		for evt := range client.Events {
 			switch evt.Type {
 			case socketmode.EventTypeConnecting:
-				slog.Info("Connecting to Slack with Socket Mode...")
+				xlog.Info("Connecting to Slack with Socket Mode...")
 			case socketmode.EventTypeConnectionError:
-				slog.Info("Connection failed. Retrying later...")
+				xlog.Info("Connection failed. Retrying later...")
 			case socketmode.EventTypeConnected:
-				slog.Info("Connected to Slack with Socket Mode.")
+				xlog.Info("Connected to Slack with Socket Mode.")
 			case socketmode.EventTypeEventsAPI:
 				eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
 				if !ok {
@@ -92,7 +93,7 @@ func (t *Slack) Start(a *agent.Agent) {
 						if t.channelID == "" && !t.alwaysReply || // If we have set alwaysReply and no channelID
 							t.channelID != ev.Channel { // If we have a channelID and it's not the same as the event channel
 							// Skip messages from other channels
-							slog.Info("Skipping reply to channel", ev.Channel, t.channelID)
+							xlog.Info("Skipping reply to channel", ev.Channel, t.channelID)
 							continue
 						}
 
@@ -124,7 +125,7 @@ func (t *Slack) Start(a *agent.Agent) {
 
 						// strip our id from the message
 						message = strings.ReplaceAll(message, "<@"+b.UserID+"> ", "")
-						slog.Info("Message", message)
+						xlog.Info("Message", message)
 
 						go func() {
 							res := a.Ask(

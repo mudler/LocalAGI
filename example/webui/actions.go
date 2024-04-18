@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	. "github.com/mudler/local-agent-framework/agent"
 	"github.com/mudler/local-agent-framework/external"
@@ -36,14 +37,14 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	actions := []Action{}
 
 	for _, action := range a.Actions {
-		slog.Info("Set Action", action)
+		xlog.Info("Set Action", action)
 
 		var config map[string]string
 		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
-			slog.Info("Error unmarshalling action config", err)
+			xlog.Info("Error unmarshalling action config", err)
 			continue
 		}
-		slog.Info("Config", config)
+		xlog.Info("Config", config)
 
 		switch action.Name {
 		case ActionSearch:

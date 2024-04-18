@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"log/slog"
 	"strings"
 	"time"
 )
@@ -22,7 +21,6 @@ type options struct {
 	userActions                                       Actions
 	enableHUD, standaloneJob, showCharacter, enableKB bool
 
-	logLevel              slog.Level
 	canStopItself         bool
 	initiateConversations bool
 	characterfile         string
@@ -55,7 +53,6 @@ func defaultOptions() *options {
 			APIURL: "http://localhost:8080",
 			Model:  "echidna",
 		},
-		logLevel: slog.LevelInfo,
 		character: Character{
 			Name:       "John Doe",
 			Age:        "",
@@ -90,13 +87,6 @@ var EnableKnowledgeBase = func(o *options) error {
 var CanStopItself = func(o *options) error {
 	o.canStopItself = true
 	return nil
-}
-
-func LogLevel(level slog.Level) Option {
-	return func(o *options) error {
-		o.logLevel = level
-		return nil
-	}
 }
 
 func WithTimeout(timeout string) Option {

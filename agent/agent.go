@@ -3,11 +3,12 @@ package agent
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	"github.com/mudler/local-agent-framework/action"
 	"github.com/mudler/local-agent-framework/llm"
@@ -36,7 +37,6 @@ type Agent struct {
 	selfEvaluationInProgress bool
 	pause                    bool
 
-	logger           *slog.Logger
 	newConversations chan openai.ChatCompletionMessage
 }
 
@@ -77,15 +77,15 @@ func New(opts ...Option) (*Agent, error) {
 		}
 	}
 
-	var programLevel = new(slog.LevelVar) // Info by default
-	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: programLevel})
-	a.logger = slog.New(h)
-	programLevel.Set(a.options.logLevel)
+	// var programLevel = new(xlog.LevelVar) // Info by default
+	// h := xlog.NewTextHandler(os.Stdout, &xlog.HandlerOptions{Level: programLevel})
+	// xlog = xlog.New(h)
+	//programLevel.Set(a.options.logLevel)
 
-	a.logger.Info("Agent in Debug mode", "agent", a.Character.Name)
-	a.logger.Info("Character", "agent", a.Character.Name, "character", a.Character.String())
-	a.logger.Info("State", "agent", a.Character.Name, "state", a.State().String())
-	a.logger.Info("Permanent goal", "agent", a.Character.Name, "goal", a.options.permanentGoal)
+	xlog.Info("Agent in Debug mode", "agent", a.Character.Name)
+	xlog.Info("Character", "agent", a.Character.Name, "character", a.Character.String())
+	xlog.Info("State", "agent", a.Character.Name, "state", a.State().String())
+	xlog.Info("Permanent goal", "agent", a.Character.Name, "goal", a.options.permanentGoal)
 
 	return a, nil
 }
@@ -123,7 +123,7 @@ func (a *Agent) Ask(opts ...JobOption) *JobResult {
 			WithResultCallback(a.options.resultCallback),
 		)...,
 	)
-	//	slog.Info("Job created", text)
+	//	xlog.Info("Job created", text)
 	a.jobQueue <- j
 	return j.Result.WaitResult()
 }
@@ -181,7 +181,7 @@ func (a *Agent) runAction(chosenAction Action, decisionResult *decisionResult) (
 		}
 	}
 
-	a.logger.Info("Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name)
+	xlog.Info("Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name)
 
 	if chosenAction.Definition().Name.Is(action.StateActionName) {
 		// We need to store the result in the state
@@ -211,7 +211,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	a.Unlock()
 
 	if paused {
-		a.logger.Info("Agent is paused, skipping job", "agent", a.Character.Name)
+		xlog.Info("Agent is paused, skipping job", "agent", a.Character.Name)
 		job.Result.Finish(fmt.Errorf("agent is paused"))
 		return
 	}
@@ -281,7 +281,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		if userMessage != "" {
 			results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
 			if err != nil {
-				a.logger.Info("Error finding similar strings inside KB:", "error", err)
+				xlog.Info("Error finding similar strings inside KB:", "error", err)
 
 				//	job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
 				//	return
@@ -293,7 +293,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				for _, r := range results {
 					formatResults += fmt.Sprintf("- %s \n", r)
 				}
-				a.logger.Info("Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
+				xlog.Info("Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
 
 				// a.currentConversation = append(a.currentConversation,
 				// 	openai.ChatCompletionMessage{
@@ -363,12 +363,12 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	if chosenAction.Definition().Name.Is(action.StopActionName) {
-		a.logger.Info("LLM decided to stop")
+		xlog.Info("LLM decided to stop")
 		job.Result.Finish(nil)
 		return
 	}
 
-	a.logger.Info("Generating parameters",
+	xlog.Info("Generating parameters",
 		"agent", a.Character.Name,
 		"action", chosenAction.Definition().Name,
 		"reasoning", reasoning,
@@ -380,7 +380,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	a.logger.Info(
+	xlog.Info(
 		"Generated parameters",
 		"agent", a.Character.Name,
 		"action", chosenAction.Definition().Name,
@@ -572,7 +572,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// If we didn't got any message, we can use the response from the action
 	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" ||
 		strings.Contains(msg.Content, "<tool_call>") {
-		a.logger.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
+		xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
 
 		msg = openai.ChatCompletionMessage{
 			Role:    "assistant",
@@ -594,7 +594,7 @@ func (a *Agent) periodicallyRun() {
 	// This would be a special action that would be picked up by the agent
 	// and would be used to contact the user.
 
-	a.logger.Info("START -- Periodically run is starting")
+	xlog.Info("START -- Periodically run is starting")
 
 	if len(a.CurrentConversation()) != 0 {
 		// Here the LLM could decide to store some part of the conversation too in the memory
@@ -624,7 +624,7 @@ func (a *Agent) periodicallyRun() {
 	a.consumeJob(whatNext, SystemRole)
 	a.ResetConversation()
 
-	a.logger.Info("STOP -- Periodically run is done")
+	xlog.Info("STOP -- Periodically run is done")
 
 	// Save results from state
 

@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	. "github.com/mudler/local-agent-framework/agent"
 
@@ -54,7 +55,7 @@ func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 			return err
 		}
 
-		slog.Info("File uploaded to: " + destination)
+		xlog.Info("File uploaded to: " + destination)
 		fmt.Printf("Payload: %+v\n", payload)
 
 		content, err := readPdf(destination) // Read local pdf file
@@ -62,7 +63,7 @@ func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 			panic(err)
 		}
 
-		slog.Info("Content is", content)
+		xlog.Info("Content is", content)
 		chunkSize := defaultChunkSize
 		if payload.ChunkSize > 0 {
 			chunkSize = payload.ChunkSize
@@ -131,7 +132,7 @@ func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
 func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		if err := pool.Remove(c.Params("name")); err != nil {
-			slog.Info("Error removing agent", err)
+			xlog.Info("Error removing agent", err)
 			return c.Status(http.StatusInternalServerError).SendString(err.Error())
 		}
 		return c.Redirect("/agents")
@@ -140,7 +141,7 @@ func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
 
 func (a *App) Pause(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		slog.Info("Pausing agent", c.Params("name"))
+		xlog.Info("Pausing agent", c.Params("name"))
 		agent := pool.GetAgent(c.Params("name"))
 		if agent != nil {
 			agent.Pause()
@@ -218,7 +219,7 @@ func (a *App) ImportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
 			return err
 		}
 
-		slog.Info("Importing agent", config.Name)
+		xlog.Info("Importing agent", config.Name)
 
 		if config.Name == "" {
 			c.Status(http.StatusBadRequest).SendString("Name is required")
@@ -258,16 +259,16 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 		go func() {
 			agent := pool.GetAgent(agentName)
 			if agent == nil {
-				slog.Info("Agent not found in pool", c.Params("name"))
+				xlog.Info("Agent not found in pool", c.Params("name"))
 				return
 			}
 			res := agent.Ask(
 				WithText(query),
 			)
 			if res.Error != nil {
-				slog.Error("Error asking agent", "agent", agentName, "error", res.Error)
+				xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
 			} else {
-				slog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
+				xlog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
 			}
 			manager.Send(
 				NewMessage(

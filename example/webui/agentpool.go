@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	. "github.com/mudler/local-agent-framework/agent"
 )
@@ -140,15 +141,15 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	connectors := config.availableConnectors()
 
-	slog.Info("Creating agent", name)
-	slog.Info("Model", model)
-	slog.Info("API URL", a.apiURL)
+	xlog.Info("Creating agent", name)
+	xlog.Info("Model", model)
+	xlog.Info("API URL", a.apiURL)
 
 	actions := config.availableActions(ctx)
 
 	stateFile, characterFile := a.stateFiles(name)
 
-	slog.Info("Actions", actions)
+	xlog.Info("Actions", actions)
 	opts := []Option{
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
@@ -163,7 +164,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithTimeout(timeout),
 		WithRAGDB(a.ragDB),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-			slog.Info("Reasoning", state.Reasoning)
+			xlog.Info("Reasoning", state.Reasoning)
 			manager.Send(
 				NewMessage(
 					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
@@ -186,7 +187,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 			a.agentStatus[name].addResult(state)
 			a.Unlock()
-			slog.Info("Reasoning", state.Reasoning)
+			xlog.Info("Reasoning", state.Reasoning)
 
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
@@ -212,9 +213,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	if config.HUD {
 		opts = append(opts, EnableHUD)
 	}
-	if os.Getenv("DEBUG") != "" {
-		opts = append(opts, LogLevel(slog.LevelDebug))
-	}
+
 	if config.StandaloneJob {
 		opts = append(opts, EnableStandaloneJob)
 	}
@@ -240,7 +239,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
 
-	slog.Info("Starting agent", "name", name, "config", config)
+	xlog.Info("Starting agent", "name", name, "config", config)
 	agent, err := New(opts...)
 	if err != nil {
 		return err
@@ -251,7 +250,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	go func() {
 		if err := agent.Run(); err != nil {
-			slog.Info("Agent stop: ", err.Error())
+			xlog.Info("Agent stop: ", err.Error())
 		}
 	}()
 
@@ -302,7 +301,7 @@ func (a *AgentPool) Start(name string) error {
 		if err != nil {
 			return fmt.Errorf("agent %s failed to start: %w", name, err)
 		}
-		slog.Info("Agent started", "name", name)
+		xlog.Info("Agent started", "name", name)
 		return nil
 	}
 	if config, ok := a.pool[name]; ok {

@@ -3,7 +3,8 @@ package agent_test
 import (
 	"context"
 	"fmt"
-	"log/slog"
+
+	"github.com/mudler/local-agent-framework/xlog"
 
 	"github.com/mudler/local-agent-framework/action"
 	. "github.com/mudler/local-agent-framework/agent"
@@ -20,13 +21,13 @@ var _ Action = &TestAction{}
 
 var debugOptions = []JobOption{
 	WithReasoningCallback(func(state ActionCurrentState) bool {
-		slog.Info("Reasoning", state)
+		xlog.Info("Reasoning", state)
 		return true
 	}),
 	WithResultCallback(func(state ActionState) {
-		slog.Info("Reasoning", state.Reasoning)
-		slog.Info("Action", state.Action)
-		slog.Info("Result", state.Result)
+		xlog.Info("Reasoning", state.Reasoning)
+		xlog.Info("Action", state.Action)
+		xlog.Info("Result", state.Result)
 	}),
 }
 
@@ -197,13 +198,13 @@ var _ = Describe("Agent test", func() {
 				EnableHUD,
 				EnableStandaloneJob,
 				WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-					slog.Info("Reasoning", state)
+					xlog.Info("Reasoning", state)
 					return true
 				}),
 				WithAgentResultCallback(func(state ActionState) {
-					slog.Info("Reasoning", state.Reasoning)
-					slog.Info("Action", state.Action)
-					slog.Info("Result", state.Result)
+					xlog.Info("Reasoning", state.Reasoning)
+					xlog.Info("Action", state.Action)
+					xlog.Info("Result", state.Result)
 				}),
 				WithActions(
 					&FakeInternetAction{

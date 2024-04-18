@@ -1,11 +1,11 @@
 package connector
 
 import (
-	"log/slog"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/mudler/local-agent-framework/agent"
+	"github.com/mudler/local-agent-framework/xlog"
 )
 
 type Discord struct {
@@ -39,7 +39,7 @@ func (d *Discord) Start(a *agent.Agent) {
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New(Token)
 	if err != nil {
-		slog.Info("error creating Discord session,", err)
+		xlog.Info("error creating Discord session,", err)
 		return
 	}
 
@@ -52,15 +52,15 @@ func (d *Discord) Start(a *agent.Agent) {
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
-		slog.Info("error opening connection,", err)
+		xlog.Info("error opening connection,", err)
 		return
 	}
 
 	go func() {
-		slog.Info("Discord bot is now running.  Press CTRL-C to exit.")
+		xlog.Info("Discord bot is now running.  Press CTRL-C to exit.")
 		<-a.Context().Done()
 		dg.Close()
-		slog.Info("Discord bot is now stopped.")
+		xlog.Info("Discord bot is now stopped.")
 	}()
 }
 
@@ -78,21 +78,21 @@ func (d *Discord) messageCreate(a *agent.Agent) func(s *discordgo.Session, m *di
 			content := m.Content
 
 			content = strings.ReplaceAll(content, "<@"+s.State.User.ID+"> ", "")
-			slog.Info("Received message", "content", content)
+			xlog.Info("Received message", "content", content)
 			job := a.Ask(
 				agent.WithText(
 					content,
 				),
 			)
 			if job.Error != nil {
-				slog.Info("error asking agent,", job.Error)
+				xlog.Info("error asking agent,", job.Error)
 				return
 			}
 
-			slog.Info("Response", "response", job.Response)
+			xlog.Info("Response", "response", job.Response)
 			_, err := s.ChannelMessageSend(m.ChannelID, job.Response)
 			if err != nil {
-				slog.Info("error sending message,", err)
+				xlog.Info("error sending message,", err)
 			}
 		}
 

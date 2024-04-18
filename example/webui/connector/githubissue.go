@@ -2,12 +2,13 @@ package connector
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/google/go-github/v61/github"
 	"github.com/mudler/local-agent-framework/agent"
+	"github.com/mudler/local-agent-framework/xlog"
+
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -58,10 +59,10 @@ func (g *GithubIssues) Start(a *agent.Agent) {
 		for {
 			select {
 			case <-ticker.C:
-				slog.Info("Looking into github issues...")
+				xlog.Info("Looking into github issues...")
 				g.issuesService()
 			case <-a.Context().Done():
-				slog.Info("GithubIssues connector is now stopping")
+				xlog.Info("GithubIssues connector is now stopping")
 				return
 			}
 		}
@@ -81,7 +82,7 @@ func (g *GithubIssues) issuesService() {
 		g.repository,
 		&github.IssueListByRepoOptions{})
 	if err != nil {
-		slog.Info("Error listing issues", err)
+		xlog.Info("Error listing issues", err)
 	}
 	for _, issue := range issues {
 		// Do something with the issue
@@ -101,7 +102,7 @@ func (g *GithubIssues) issuesService() {
 		}
 
 		if userName == user.GetLogin() {
-			slog.Info("Ignoring issue opened by the bot")
+			xlog.Info("Ignoring issue opened by the bot")
 			continue
 		}
 		messages := []openai.ChatCompletionMessage{
@@ -135,7 +136,7 @@ func (g *GithubIssues) issuesService() {
 			// if last comment is from the user and mentions the bot username, we must answer
 			if comment.User.GetName() != user.GetLogin() && len(comments)-1 == i {
 				if strings.Contains(comment.GetBody(), fmt.Sprintf("@%s", user.GetLogin())) {
-					slog.Info("Bot was mentioned in the last comment")
+					xlog.Info("Bot was mentioned in the last comment")
 					mustAnswer = true
 				}
 			}
@@ -143,9 +144,9 @@ func (g *GithubIssues) issuesService() {
 
 		if len(comments) == 0 || !botAnsweredAlready {
 			// if no comments, or bot didn't answer yet, we must answer
-			slog.Info("No comments, or bot didn't answer yet")
-			slog.Info("Comments:", len(comments))
-			slog.Info("Bot answered already", botAnsweredAlready)
+			xlog.Info("No comments, or bot didn't answer yet")
+			xlog.Info("Comments:", len(comments))
+			xlog.Info("Bot answered already", botAnsweredAlready)
 			mustAnswer = true
 		}
 
@@ -157,7 +158,7 @@ func (g *GithubIssues) issuesService() {
 			agent.WithConversationHistory(messages),
 		)
 		if res.Error != nil {
-			slog.Error("Error asking", "error", res.Error)
+			xlog.Error("Error asking", "error", res.Error)
 			return
 		}
 
@@ -169,7 +170,7 @@ func (g *GithubIssues) issuesService() {
 			},
 		)
 		if err != nil {
-			slog.Error("Error creating comment", "error", err)
+			xlog.Error("Error creating comment", "error", err)
 		}
 	}
 }

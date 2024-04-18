@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
+
+	"github.com/mudler/local-agent-framework/xlog"
+
 	"net/http"
 	"os"
 	"path/filepath"
@@ -121,7 +123,7 @@ func getWebPage(url string) (string, error) {
 
 func Sitemap(url string) (res []string, err error) {
 	err = sitemap.ParseFromSite(url, func(e sitemap.Entry) error {
-		slog.Info("Sitemap page: " + e.GetLocation())
+		xlog.Info("Sitemap page: " + e.GetLocation())
 		content, err := getWebPage(e.GetLocation())
 		if err == nil {
 			res = append(res, content)
@@ -134,10 +136,10 @@ func Sitemap(url string) (res []string, err error) {
 func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
 	content, err := Sitemap(website)
 	if err != nil {
-		slog.Info("Error walking sitemap for website", err)
+		xlog.Info("Error walking sitemap for website", err)
 	}
-	slog.Info("Found pages: ", len(content))
-	slog.Info("ChunkSize: ", chunkSize)
+	xlog.Info("Found pages: ", len(content))
+	xlog.Info("ChunkSize: ", chunkSize)
 
 	StringsToKB(db, chunkSize, content...)
 }
@@ -145,9 +147,9 @@ func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
 func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
 	for _, c := range content {
 		chunks := splitParagraphIntoChunks(c, chunkSize)
-		slog.Info("chunks: ", len(chunks))
+		xlog.Info("chunks: ", len(chunks))
 		for _, chunk := range chunks {
-			slog.Info("Chunk size: ", len(chunk))
+			xlog.Info("Chunk size: ", len(chunk))
 			db.AddEntry(chunk)
 		}
 
@@ -155,7 +157,7 @@ func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
 	}
 
 	if err := db.SaveToStore(); err != nil {
-		slog.Info("Error storing in the KB", err)
+		xlog.Info("Error storing in the KB", err)
 	}
 }
 
