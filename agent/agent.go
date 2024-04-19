@@ -241,6 +241,13 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 	a.Unlock()
 
+	defer func() {
+		a.Lock()
+		a.actionContext.Cancel()
+		a.actionContext = nil
+		a.Unlock()
+	}()
+
 	if selfEvaluation {
 		defer func() {
 			a.Lock()
@@ -711,6 +718,7 @@ func (a *Agent) Run() error {
 	//todoTimer := time.NewTicker(a.options.periodicRuns)
 	timer := time.NewTimer(a.options.periodicRuns)
 	for {
+		xlog.Debug("Agent is waiting for a job", "agent", a.Character.Name)
 		select {
 		case job := <-a.jobQueue:
 			// Consume the job and generate a response
@@ -719,15 +727,18 @@ func (a *Agent) Run() error {
 			if !timer.Stop() {
 				<-timer.C
 			}
+			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
 			a.consumeJob(job, UserRole)
 			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
 			// Agent has been canceled, return error
+			xlog.Warn("Agent has been canceled", "agent", a.Character.Name)
 			return ErrContextCanceled
 		case <-timer.C:
 			if !a.options.standaloneJob {
 				continue
 			}
+			xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 			a.periodicallyRun()
 			timer.Reset(a.options.periodicRuns)
 		}

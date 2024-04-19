@@ -39,7 +39,7 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	for _, action := range a.Actions {
 		var config map[string]string
 		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
-			xlog.Info("Error unmarshalling action config", err)
+			xlog.Info("Error unmarshalling action config", "error", err)
 			continue
 		}
 

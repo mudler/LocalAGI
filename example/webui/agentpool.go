@@ -181,7 +181,14 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithTimeout(timeout),
 		WithRAGDB(a.ragDB),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
-			xlog.Info("Reasoning", state.Reasoning)
+			xlog.Info(
+				"Agent is thinking",
+				"agent", name,
+				"reasoning", state.Reasoning,
+				"action", state.Action.Definition().Name,
+				"params", state.Params,
+			)
+
 			manager.Send(
 				NewMessage(
 					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
@@ -204,7 +211,14 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 			a.agentStatus[name].addResult(state)
 			a.Unlock()
-			xlog.Info("Reasoning", state.Reasoning)
+			xlog.Info(
+				"Agent executed an action",
+				"agent", name,
+				"reasoning", state.Reasoning,
+				"action", state.ActionCurrentState.Action.Definition().Name,
+				"params", state.ActionCurrentState.Params,
+				"result", state.Result,
+			)
 
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
@@ -267,7 +281,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	go func() {
 		if err := agent.Run(); err != nil {
-			xlog.Info("Agent stop: ", err.Error())
+			xlog.Error("Agent stopped", "error", err.Error())
 		}
 	}()
 

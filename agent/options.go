@@ -51,12 +51,12 @@ func defaultOptions() *options {
 		periodicRuns: 15 * time.Minute,
 		LLMAPI: llmOptions{
 			APIURL: "http://localhost:8080",
-			Model:  "echidna",
+			Model:  "gpt-4",
 		},
 		character: Character{
-			Name:       "John Doe",
+			Name:       "",
 			Age:        "",
-			Occupation: "Unemployed",
+			Occupation: "",
 			Hobbies:    []string{},
 			MusicTaste: []string{},
 		},
