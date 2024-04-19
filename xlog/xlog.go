@@ -60,7 +60,6 @@ func Info(msg string, args ...any) {
 
 func Debug(msg string, args ...any) {
 	_log(slog.LevelDebug, msg, args...)
-	logger.Debug(msg, args...)
 }
 
 func Error(msg string, args ...any) {

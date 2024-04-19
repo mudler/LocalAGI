@@ -13,6 +13,10 @@ type Discord struct {
 	defaultChannel string
 }
 
+// NewDiscord creates a new Discord connector
+// with the given configuration
+// - token: Discord token
+// - defaultChannel: Discord channel to always answer even if not mentioned
 func NewDiscord(config map[string]string) *Discord {
 	return &Discord{
 		token:          config["token"],

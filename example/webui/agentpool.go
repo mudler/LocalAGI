@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mudler/local-agent-framework/agent"
 	"github.com/mudler/local-agent-framework/xlog"
 
 	. "github.com/mudler/local-agent-framework/agent"
@@ -169,6 +170,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithContext(ctx),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
+		WithCharacter(agent.Character{
+			Name: name,
+		}),
 		WithActions(
 			actions...,
 		),

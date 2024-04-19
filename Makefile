@@ -12,3 +12,6 @@ webui:
 
 webui-image:
 	docker build -t $(IMAGE_NAME) -f Dockerfile.webui .
+
+webui-push:
+	docker push $(IMAGE_NAME)

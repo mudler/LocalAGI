@@ -13,27 +13,40 @@ import (
 )
 
 type GithubIssues struct {
-	token        string
-	repository   string
-	owner        string
-	agent        *agent.Agent
-	pollInterval time.Duration
-	client       *github.Client
+	token            string
+	repository       string
+	owner            string
+	replyIfNoReplies bool
+	agent            *agent.Agent
+	pollInterval     time.Duration
+	client           *github.Client
 }
 
+// NewGithubIssueWatcher creates a new GithubIssues connector
+// with the given configuration
+// - token: Github token
+// - repository: Github repository name
+// - owner: Github repository owner
+// - replyIfNoReplies: If true, the bot will reply to issues with no comments
 func NewGithubIssueWatcher(config map[string]string) *GithubIssues {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
+	replyIfNoReplies := false
+	if config["replyIfNoReplies"] == "true" {
+		replyIfNoReplies = true
+	}
+
 	interval, err := time.ParseDuration(config["pollInterval"])
 	if err != nil {
-		interval = 1 * time.Minute
+		interval = 10 * time.Minute
 	}
 
 	return &GithubIssues{
-		client:       client,
-		token:        config["token"],
-		repository:   config["repository"],
-		owner:        config["owner"],
-		pollInterval: interval,
+		client:           client,
+		token:            config["token"],
+		repository:       config["repository"],
+		owner:            config["owner"],
+		replyIfNoReplies: replyIfNoReplies,
+		pollInterval:     interval,
 	}
 }
 
@@ -144,10 +157,17 @@ func (g *GithubIssues) issuesService() {
 
 		if len(comments) == 0 || !botAnsweredAlready {
 			// if no comments, or bot didn't answer yet, we must answer
-			xlog.Info("No comments, or bot didn't answer yet")
-			xlog.Info("Comments:", len(comments))
-			xlog.Info("Bot answered already", botAnsweredAlready)
+			xlog.Info("No comments, or bot didn't answer yet",
+				"comments", len(comments),
+				"botAnsweredAlready", botAnsweredAlready,
+				"agent", g.agent.Character.Name,
+			)
 			mustAnswer = true
+		}
+
+		if len(comments) != 0 && g.replyIfNoReplies {
+			xlog.Info("Ignoring issue with comments", "issue", issue.GetNumber(), "agent", g.agent.Character.Name)
+			mustAnswer = false
 		}
 
 		if !mustAnswer {
@@ -158,7 +178,7 @@ func (g *GithubIssues) issuesService() {
 			agent.WithConversationHistory(messages),
 		)
 		if res.Error != nil {
-			xlog.Error("Error asking", "error", res.Error)
+			xlog.Error("Error asking", "error", res.Error, "agent", g.agent.Character.Name)
 			return
 		}
 
@@ -170,7 +190,7 @@ func (g *GithubIssues) issuesService() {
 			},
 		)
 		if err != nil {
-			xlog.Error("Error creating comment", "error", err)
+			xlog.Error("Error creating comment", "error", err, "agent", g.agent.Character.Name)
 		}
 	}
 }
