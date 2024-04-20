@@ -243,8 +243,10 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	defer func() {
 		a.Lock()
-		a.actionContext.Cancel()
-		a.actionContext = nil
+		if a.actionContext != nil {
+			a.actionContext.Cancel()
+			a.actionContext = nil
+		}
 		a.Unlock()
 	}()
 
