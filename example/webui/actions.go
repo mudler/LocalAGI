@@ -20,6 +20,7 @@ const (
 	ActionScraper             = "scraper"
 	ActionWikipedia           = "wikipedia"
 	ActionBrowse              = "browse"
+	ActionSendMail            = "send_mail"
 )
 
 var AvailableActions = []string{
@@ -31,6 +32,7 @@ var AvailableActions = []string{
 	ActionScraper,
 	ActionBrowse,
 	ActionWikipedia,
+	ActionSendMail,
 }
 
 func (a *AgentConfig) availableActions(ctx context.Context) []Action {
@@ -60,6 +62,8 @@ func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 			actions = append(actions, external.NewWikipedia(config))
 		case ActionBrowse:
 			actions = append(actions, external.NewBrowse(config))
+		case ActionSendMail:
+			actions = append(actions, external.NewSendMail(config))
 		}
 	}
 
