@@ -14,7 +14,9 @@ type ActionContext struct {
 }
 
 func (ac *ActionContext) Cancel() {
-	ac.cancelFunc()
+	if ac.cancelFunc == nil {
+		ac.cancelFunc()
+	}
 }
 
 func NewContext(ctx context.Context, cancel context.CancelFunc) *ActionContext {

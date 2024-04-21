@@ -124,7 +124,7 @@ func (a *Agent) Ask(opts ...JobOption) *JobResult {
 		xlog.Debug("Agent has finished being asked", "agent", a.Character.Name)
 	}()
 
-	a.StopAction()
+	//a.StopAction()
 	j := NewJob(
 		append(
 			opts,
@@ -730,6 +730,7 @@ func (a *Agent) Run() error {
 				<-timer.C
 			}
 			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
+			a.StopAction()
 			a.consumeJob(job, UserRole)
 			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
@@ -740,6 +741,7 @@ func (a *Agent) Run() error {
 			if !a.options.standaloneJob {
 				continue
 			}
+			a.StopAction()
 			xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 			a.periodicallyRun()
 			timer.Reset(a.options.periodicRuns)

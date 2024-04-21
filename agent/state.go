@@ -26,7 +26,7 @@ type Character struct {
 	Age        any      `json:"age"`
 	Occupation string   `json:"job_occupation"`
 	Hobbies    []string `json:"hobbies"`
-	MusicTaste []string `json:"music_taste"`
+	MusicTaste []string `json:"favorites_music_genres"`
 	Sex        string   `json:"sex"`
 }
 
