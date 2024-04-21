@@ -604,8 +604,14 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	job.Result.Finish(nil)
 }
 
-func (a *Agent) periodicallyRun() {
+func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// This is running in the background.
+	defer timer.Reset(a.options.periodicRuns)
+	if !a.options.standaloneJob {
+		return
+	}
+	a.StopAction()
+	xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 
 	// TODO: Would be nice if we have a special action to
 	// contact the user. This would actually make sure that
@@ -723,28 +729,26 @@ func (a *Agent) Run() error {
 		xlog.Debug("Agent is waiting for a job", "agent", a.Character.Name)
 		select {
 		case job := <-a.jobQueue:
-			// Consume the job and generate a response
-			// TODO: Give a short-term memory to the agent
-			// stop and drain the timer
-			if !timer.Stop() {
-				<-timer.C
-			}
-			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
-			a.StopAction()
-			a.consumeJob(job, UserRole)
-			timer.Reset(a.options.periodicRuns)
+			a.loop(timer, job)
 		case <-a.context.Done():
 			// Agent has been canceled, return error
 			xlog.Warn("Agent has been canceled", "agent", a.Character.Name)
 			return ErrContextCanceled
 		case <-timer.C:
-			if !a.options.standaloneJob {
-				continue
-			}
-			a.StopAction()
-			xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
-			a.periodicallyRun()
-			timer.Reset(a.options.periodicRuns)
+			a.periodicallyRun(timer)
 		}
 	}
+}
+
+func (a *Agent) loop(timer *time.Timer, job *Job) {
+	defer timer.Reset(a.options.periodicRuns)
+	// Consume the job and generate a response
+	// TODO: Give a short-term memory to the agent
+	// stop and drain the timer
+	if !timer.Stop() {
+		<-timer.C
+	}
+	xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
+	a.StopAction()
+	a.consumeJob(job, UserRole)
 }
