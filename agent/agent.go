@@ -604,9 +604,11 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	job.Result.Finish(nil)
 }
 
+// This is running in the background.
 func (a *Agent) periodicallyRun(timer *time.Timer) {
-	// This is running in the background.
+	// Remember always to reset the timer - if we don't the agent will stop..
 	defer timer.Reset(a.options.periodicRuns)
+
 	if !a.options.standaloneJob {
 		return
 	}
@@ -741,6 +743,7 @@ func (a *Agent) Run() error {
 }
 
 func (a *Agent) loop(timer *time.Timer, job *Job) {
+	// Remember always to reset the timer - if we don't the agent will stop..
 	defer timer.Reset(a.options.periodicRuns)
 	// Consume the job and generate a response
 	// TODO: Give a short-term memory to the agent
