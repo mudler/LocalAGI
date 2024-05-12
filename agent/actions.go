@@ -150,7 +150,8 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 }
 
 func (a *Agent) systemInternalActions() Actions {
-	defaultActions := append(a.options.userActions, action.NewReply())
+	//	defaultActions := append(a.options.userActions, action.NewReply())
+	defaultActions := a.options.userActions
 
 	if a.options.initiateConversations && a.selfEvaluationInProgress { // && self-evaluation..
 		acts := append(defaultActions, action.NewConversation())
@@ -206,7 +207,9 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		// Find the action
 		chosenAction := a.systemInternalActions().Find(thought.actioName)
 		if chosenAction == nil {
-			return nil, "", fmt.Errorf("no action found for intent:" + thought.actioName)
+			// LLM replied with an answer?
+			//fmt.Errorf("no action found for intent:" + thought.actioName)
+			return action.NewReply(), thought.message, nil
 		}
 		return chosenAction, thought.message, nil
 	}
