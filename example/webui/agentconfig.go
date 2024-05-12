@@ -24,6 +24,7 @@ type AgentConfig struct {
 	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
+	EnableReasoning       bool   `json:"enable_reasoning" form:"enable_reasoning"`
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
 	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`

@@ -23,6 +23,7 @@ type options struct {
 
 	canStopItself         bool
 	initiateConversations bool
+	forceReasoning        bool
 	characterfile         string
 	statefile             string
 	context               context.Context
@@ -75,6 +76,11 @@ func newOptions(opts ...Option) (*options, error) {
 
 var EnableHUD = func(o *options) error {
 	o.enableHUD = true
+	return nil
+}
+
+var EnableForceReasoning = func(o *options) error {
+	o.forceReasoning = true
 	return nil
 }
 

@@ -52,6 +52,7 @@ func (a Actions) Find(name string) Action {
 type decisionResult struct {
 	actionParams action.ActionParams
 	message      string
+	actioName    string
 }
 
 // decision forces the agent to take one of the available actions
@@ -85,7 +86,7 @@ func (a *Agent) decision(
 		return nil, err
 	}
 
-	return &decisionResult{actionParams: params}, nil
+	return &decisionResult{actionParams: params, actioName: msg.ToolCalls[0].Function.Name}, nil
 }
 
 type Messages []openai.ChatCompletionMessage
@@ -130,11 +131,16 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 		}, conversation...)
 	}
 
-	return a.decision(ctx,
-		append(conversation, openai.ChatCompletionMessage{
+	cc := conversation
+	if a.options.forceReasoning {
+		cc = append(conversation, openai.ChatCompletionMessage{
 			Role:    "system",
 			Content: fmt.Sprintf("The agent decided to use the tool %s with the following reasoning: %s", act.Definition().Name, reasoning),
-		}),
+		})
+	}
+
+	return a.decision(ctx,
+		cc,
 		a.systemInternalActions().ToTools(),
 		openai.ToolChoice{
 			Type:     openai.ToolTypeFunction,
@@ -186,6 +192,24 @@ func (a *Agent) prepareHUD() PromptHUD {
 // pickAction picks an action based on the conversation
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
 	c := messages
+
+	if !a.options.forceReasoning {
+		// We also could avoid to use functions here and get just a reply from the LLM
+		// and then use the reply to get the action
+		thought, err := a.decision(ctx,
+			messages,
+			a.systemInternalActions().ToTools(),
+			nil)
+		if err != nil {
+			return nil, "", err
+		}
+		// Find the action
+		chosenAction := a.systemInternalActions().Find(thought.actioName)
+		if chosenAction == nil {
+			return nil, "", fmt.Errorf("no action found for intent:" + thought.actioName)
+		}
+		return chosenAction, thought.message, nil
+	}
 
 	var promptHUD *PromptHUD
 	if a.options.enableHUD {
@@ -241,7 +265,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	params, err := a.decision(ctx,
 		append(c, openai.ChatCompletionMessage{
 			Role:    "system",
-			Content: "The assistant thought: " + reason,
+			Content: "Given the assistant thought, pick the relevant action: " + reason,
 		}),
 		Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name)

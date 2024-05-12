@@ -265,6 +265,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	if config.EnableKnowledgeBase {
 		opts = append(opts, EnableKnowledgeBase)
 	}
+	if config.EnableReasoning {
+		opts = append(opts, EnableForceReasoning)
+	}
 
 	if config.KnowledgeBaseResults > 0 {
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))

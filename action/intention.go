@@ -35,8 +35,9 @@ func (a *IntentAction) Definition() ActionDefinition {
 				Description: "A detailed reasoning on why you want to call this tool.",
 			},
 			"tool": {
-				Type: jsonschema.String,
-				Enum: a.tools,
+				Type:        jsonschema.String,
+				Description: "The tool you want to use",
+				Enum:        a.tools,
 			},
 		},
 		Required: []string{"tool", "reasoning"},

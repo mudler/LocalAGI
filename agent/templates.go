@@ -84,12 +84,12 @@ const reSelfEvalTemplate = pickSelfTemplate + `
 We already have called other tools. Evaluate the current situation and decide if we need to execute other tools.`
 
 const pickActionTemplate = hudTemplate + `
-You can take any of the following tools: 
+When deciding what to do, consider that you can take any of the following tools: 
 
 {{range .Actions -}}
 - {{.Name}}: {{.Description }}
 {{ end }}
-To answer back to the user, use the "reply" tool.
+To answer back to the user, use the "reply" or the "answer" tool.
 Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
 
 {{if .Reasoning}}Reasoning: {{.Reasoning}}{{end}}
