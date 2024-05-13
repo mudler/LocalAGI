@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/mudler/local-agent-framework/xlog"
 
@@ -246,7 +247,7 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 		agentName := c.Params("name")
 		manager := pool.GetManager(agentName)
 
-		query := payload.Message
+		query := strings.Clone(payload.Message)
 		if query == "" {
 			_, _ = c.Write([]byte("Please enter a message."))
 			return nil

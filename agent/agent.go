@@ -362,16 +362,20 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		var err error
 		chosenAction, reasoning, err = a.pickAction(ctx, pickTemplate, a.currentConversation)
 		if err != nil {
+			xlog.Error("Error picking action", "error", err)
 			job.Result.Finish(err)
 			return
 		}
 	}
 
+	//xlog.Debug("Picked action", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "reasoning", reasoning)
 	if chosenAction == nil {
 		// If no action was picked up, the reasoning is the message returned by the assistant
 		// so we can consume it as if it was a reply.
 		//job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
 		//job.Result.Finish(fmt.Errorf("no action to do"))\
+		xlog.Info("No action to do, just reply", "agent", a.Character.Name, "reasoning", reasoning)
+
 		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 			Role:    "assistant",
 			Content: reasoning,
@@ -497,6 +501,18 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			job.Text = ""
 			a.consumeJob(job, role)
 			return
+		} else if followingAction == nil {
+			if !a.options.forceReasoning {
+				msg := openai.ChatCompletionMessage{
+					Role:    "assistant",
+					Content: reasoning,
+				}
+
+				a.currentConversation = append(a.currentConversation, msg)
+				job.Result.SetResponse(msg.Content)
+				job.Result.Finish(nil)
+				return
+			}
 		}
 	}
 
@@ -560,6 +576,19 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// 		),
 	// 	},
 	// )
+
+	if !a.options.forceReasoning {
+		msg := openai.ChatCompletionMessage{
+			Role:    "assistant",
+			Content: replyResponse.Message,
+		}
+
+		a.currentConversation = append(a.currentConversation, msg)
+		job.Result.SetResponse(msg.Content)
+		job.Result.Finish(nil)
+		return
+	}
+
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
 			Model: a.options.LLMAPI.Model,

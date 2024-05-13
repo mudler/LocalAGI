@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mudler/local-agent-framework/action"
+	"github.com/mudler/local-agent-framework/xlog"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -204,13 +205,19 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		if err != nil {
 			return nil, "", err
 		}
+		xlog.Debug(fmt.Sprintf("thought action Name: %v", thought.actioName))
+		xlog.Debug(fmt.Sprintf("thought message: %v", thought.message))
+
 		// Find the action
 		chosenAction := a.systemInternalActions().Find(thought.actioName)
-		if chosenAction == nil {
+		if chosenAction == nil || thought.actioName == "" {
+			xlog.Debug(fmt.Sprintf("no answer"))
+
 			// LLM replied with an answer?
 			//fmt.Errorf("no action found for intent:" + thought.actioName)
-			return action.NewReply(), thought.message, nil
+			return nil, thought.message, nil
 		}
+		xlog.Debug(fmt.Sprintf("chosenAction: %v", chosenAction.Definition().Name))
 		return chosenAction, thought.message, nil
 	}
 
