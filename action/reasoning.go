@@ -25,8 +25,8 @@ func (a *ReasoningAction) Run(context.Context, ActionParams) (string, error) {
 
 func (a *ReasoningAction) Definition() ActionDefinition {
 	return ActionDefinition{
-		Name:        "think",
-		Description: "try to understand what's the best thing to do",
+		Name:        "pick_action",
+		Description: "try to understand what's the best thing to do and pick an action with a reasoning",
 		Properties: map[string]jsonschema.Definition{
 			"reasoning": {
 				Type:        jsonschema.String,

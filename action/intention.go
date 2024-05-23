@@ -27,8 +27,8 @@ func (a *IntentAction) Run(context.Context, ActionParams) (string, error) {
 
 func (a *IntentAction) Definition() ActionDefinition {
 	return ActionDefinition{
-		Name:        "intent",
-		Description: "detect user intent",
+		Name:        "pick_tool",
+		Description: "Pick a tool",
 		Properties: map[string]jsonschema.Definition{
 			"reasoning": {
 				Type:        jsonschema.String,

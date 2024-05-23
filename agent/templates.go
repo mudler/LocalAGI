@@ -84,7 +84,7 @@ const reSelfEvalTemplate = pickSelfTemplate + `
 We already have called other tools. Evaluate the current situation and decide if we need to execute other tools.`
 
 const pickActionTemplate = hudTemplate + `
-When deciding what to do, consider that you can take any of the following tools: 
+When you have to pick a tool in the reasoning explain how you would use the tools you'd pick from: 
 
 {{range .Actions -}}
 - {{.Name}}: {{.Description }}
