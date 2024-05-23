@@ -192,7 +192,7 @@ func (a *Agent) prepareHUD() PromptHUD {
 }
 
 // pickAction picks an action based on the conversation
-func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, string, error) {
+func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, action.ActionParams, string, error) {
 	c := messages
 
 	if !a.options.forceReasoning {
@@ -203,8 +203,9 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 			a.systemInternalActions().ToTools(),
 			nil)
 		if err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
+
 		xlog.Debug(fmt.Sprintf("thought action Name: %v", thought.actioName))
 		xlog.Debug(fmt.Sprintf("thought message: %v", thought.message))
 
@@ -215,10 +216,10 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 
 			// LLM replied with an answer?
 			//fmt.Errorf("no action found for intent:" + thought.actioName)
-			return nil, thought.message, nil
+			return nil, nil, thought.message, nil
 		}
 		xlog.Debug(fmt.Sprintf("chosenAction: %v", chosenAction.Definition().Name))
-		return chosenAction, thought.message, nil
+		return chosenAction, thought.actionParams, thought.message, nil
 	}
 
 	var promptHUD *PromptHUD
@@ -229,7 +230,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 
 	prompt, err := renderTemplate(templ, promptHUD, a.systemInternalActions(), "")
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
 	// Get the LLM to think on what to do
 	// and have a thought
@@ -249,13 +250,13 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		Actions{action.NewReasoning()}.ToTools(),
 		action.NewReasoning().Definition().Name)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
 	reason := ""
 	response := &action.ReasoningResponse{}
 	if thought.actionParams != nil {
 		if err := thought.actionParams.Unmarshal(response); err != nil {
-			return nil, "", err
+			return nil, nil, "", err
 		}
 		reason = response.Reasoning
 	}
@@ -280,29 +281,29 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)
+		return nil, nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)
 	}
 
 	actionChoice := action.IntentResponse{}
 
 	if params.actionParams == nil {
-		return nil, params.message, nil
+		return nil, nil, params.message, nil
 	}
 
 	err = params.actionParams.Unmarshal(&actionChoice)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
 
 	if actionChoice.Tool == "" || actionChoice.Tool == "none" {
-		return nil, "", fmt.Errorf("no intent detected")
+		return nil, nil, "", fmt.Errorf("no intent detected")
 	}
 
 	// Find the action
 	chosenAction := a.systemInternalActions().Find(actionChoice.Tool)
 	if chosenAction == nil {
-		return nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
+		return nil, nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	}
 
-	return chosenAction, actionChoice.Reasoning, nil
+	return chosenAction, nil, actionChoice.Reasoning, nil
 }
