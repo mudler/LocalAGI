@@ -87,7 +87,7 @@ func (a *Agent) decision(
 		return nil, err
 	}
 
-	return &decisionResult{actionParams: params, actioName: msg.ToolCalls[0].Function.Name}, nil
+	return &decisionResult{actionParams: params, actioName: msg.ToolCalls[0].Function.Name, message: msg.Content}, nil
 }
 
 type Messages []openai.ChatCompletionMessage
