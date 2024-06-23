@@ -155,7 +155,7 @@ chroma_client = Chroma(collection_name="memories", persist_directory="db", embed
 
 # Function to create images with LocalAI
 def display_avatar(agi, input_text=STABLEDIFFUSION_PROMPT, model=STABLEDIFFUSION_MODEL):
-    image_url = agi.get_avatar(input_text, model)
+    image_url = agi.get_avatar(input_text)
     # convert the image to ascii art
     my_art = AsciiArt.from_url(image_url)
     my_art.to_terminal()
