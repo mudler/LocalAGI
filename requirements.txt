@@ -6,4 +6,4 @@ pysqlite3-binary
 requests
 ascii-magic
 loguru
-duckduckgo_search==4.1.1
+duckduckgo_search==6.1.7

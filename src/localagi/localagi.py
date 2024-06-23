@@ -74,7 +74,7 @@ class LocalAGI:
             prompt=input_text,
             n=1,
             size="128x128",
-            api_base=self.sta+"/v1"
+            api_base=self.stablediffusion_api_base+"/v1"
         )
         return response['data'][0]['url']
 
