@@ -1,4 +1,5 @@
 langchain
+langchain-community
 openai==0.28
 chromadb
 pysqlite3-binary
