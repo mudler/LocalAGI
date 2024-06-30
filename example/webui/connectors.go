@@ -16,6 +16,7 @@ const (
 	ConnectorSlack        = "slack"
 	ConnectorDiscord      = "discord"
 	ConnectorGithubIssues = "github-issues"
+	ConnectorGithubPRs    = "github-prs"
 )
 
 type Connector interface {
@@ -29,6 +30,7 @@ var AvailableConnectors = []string{
 	ConnectorSlack,
 	ConnectorDiscord,
 	ConnectorGithubIssues,
+	ConnectorGithubPRs,
 }
 
 func (a *AgentConfig) availableConnectors() []Connector {
@@ -55,6 +57,8 @@ func (a *AgentConfig) availableConnectors() []Connector {
 			connectors = append(connectors, connector.NewDiscord(config))
 		case ConnectorGithubIssues:
 			connectors = append(connectors, connector.NewGithubIssueWatcher(config))
+		case ConnectorGithubPRs:
+			connectors = append(connectors, connector.NewGithubPRWatcher(config))
 		}
 	}
 	return connectors
