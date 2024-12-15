@@ -154,6 +154,18 @@ func (a *Agent) SetConversation(conv []openai.ChatCompletionMessage) {
 func (a *Agent) ResetConversation() {
 	a.Lock()
 	defer a.Unlock()
+
+	// store into memory the conversation before pruning it
+	if a.options.enableKB {
+		for _, message := range a.currentConversation {
+			if message.Role == "user" {
+				if err := a.options.ragdb.Store(message.Content); err != nil {
+					xlog.Error("Error storing into memory", "error", err)
+				}
+			}
+		}
+	}
+
 	a.currentConversation = []openai.ChatCompletionMessage{}
 }
 
