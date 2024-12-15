@@ -156,6 +156,8 @@ func (a *Agent) ResetConversation() {
 	defer a.Unlock()
 
 	// store into memory the conversation before pruning it
+	// TODO: Shall we summarize the conversation into a bullet list of highlights
+	// using the LLM instead?
 	if a.options.enableKB {
 		for _, message := range a.currentConversation {
 			if message.Role == "user" {
