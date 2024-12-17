@@ -20,10 +20,10 @@ import (
 )
 
 type InMemoryDatabase struct {
+	RAGDB
 	sync.Mutex
 	Database []string
 	path     string
-	rag      RAGDB
 }
 
 func loadDB(path string) ([]string, error) {
@@ -48,7 +48,7 @@ func NewInMemoryDB(knowledgebase string, store RAGDB) (*InMemoryDatabase, error)
 		return &InMemoryDatabase{
 			Database: []string{},
 			path:     poolfile,
-			rag:      store,
+			RAGDB:    store,
 		}, nil
 	}
 
@@ -57,21 +57,21 @@ func NewInMemoryDB(knowledgebase string, store RAGDB) (*InMemoryDatabase, error)
 		return nil, err
 	}
 	return &InMemoryDatabase{
+		RAGDB:    store,
 		Database: poolData,
 		path:     poolfile,
-		rag:      store,
 	}, nil
 }
 
-func (db *InMemoryDatabase) SaveToStore() error {
+func (db *InMemoryDatabase) SaveAllToStore() error {
 	for _, d := range db.Database {
 		if d == "" {
 			// skip empty chunks
 			continue
 		}
-		err := db.rag.Store(d)
+		err := db.Store(d)
 		if err != nil {
-			return fmt.Errorf("Error storing in the KB: %w", err)
+			return fmt.Errorf("error storing in the KB: %w", err)
 		}
 	}
 
@@ -82,17 +82,17 @@ func (db *InMemoryDatabase) Reset() error {
 	db.Lock()
 	db.Database = []string{}
 	db.Unlock()
-	if err := db.rag.Reset(); err != nil {
+	if err := db.RAGDB.Reset(); err != nil {
 		return err
 	}
 	return db.SaveDB()
 }
 
-func (db *InMemoryDatabase) AddEntry(entry string) error {
+func (db *InMemoryDatabase) Store(entry string) error {
 	db.Lock()
 	defer db.Unlock()
 	db.Database = append(db.Database, entry)
-	return nil
+	return db.RAGDB.Store(entry)
 }
 
 func (db *InMemoryDatabase) SaveDB() error {
@@ -150,14 +150,10 @@ func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
 		xlog.Info("chunks: ", len(chunks))
 		for _, chunk := range chunks {
 			xlog.Info("Chunk size: ", len(chunk))
-			db.AddEntry(chunk)
+			db.Store(chunk)
 		}
 
 		db.SaveDB()
-	}
-
-	if err := db.SaveToStore(); err != nil {
-		xlog.Info("Error storing in the KB", err)
 	}
 }
 

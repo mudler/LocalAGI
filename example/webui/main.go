@@ -55,34 +55,34 @@ func main() {
 	stateDir := cwd + "/pool"
 	os.MkdirAll(stateDir, 0755)
 
-	var dbStore RAGDB
+	var ragDB RAGDB
 	lai := llm.NewClient(apiKey, apiURL+"/v1", timeout)
 
 	switch vectorStore {
 	case "localai":
 		laiStore := rag.NewStoreClient(apiURL, apiKey)
-		dbStore = rag.NewLocalAIRAGDB(laiStore, lai)
+		ragDB = rag.NewLocalAIRAGDB(laiStore, lai)
 	default:
 		var err error
-		dbStore, err = rag.NewChromemDB("local-agent-framework", stateDir, lai, embeddingModel)
+		ragDB, err = rag.NewChromemDB("local-agent-framework", stateDir, lai, embeddingModel)
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	pool, err := NewAgentPool(testModel, apiURL, stateDir, dbStore)
+	db, err := NewInMemoryDB(stateDir, ragDB)
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := NewInMemoryDB(stateDir, dbStore)
+	pool, err := NewAgentPool(testModel, apiURL, stateDir, db)
 	if err != nil {
 		panic(err)
 	}
 
 	if len(db.Database) > 0 && kbdisableIndexing != "true" {
 		xlog.Info("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
-		if err := db.SaveToStore(); err != nil {
+		if err := db.SaveAllToStore(); err != nil {
 			xlog.Info("Error storing in the KB", err)
 		}
 	}
