@@ -1,14 +1,21 @@
-version: "3.9"
 services:
   api:
-    image: localai/localai:latest-aio-cpu
+    # See https://localai.io/basics/getting_started/#container-images for
+    # a list of available container images (or build your own with the provided Dockerfile)
+    # Available images with CUDA, ROCm, SYCL, Vulkan
+    # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
+    # Image list (dockerhub): https://hub.docker.com/r/localai/localai
+    image: localai/localai:latest-cpu
+    command: 
+    - marco-o1
+    - bert-embeddings
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
       interval: 10s
       timeout: 20m
       retries: 20
-    # ports:
-    #   - 8080:8080
+    ports:
+    - 8081:8080
     environment:
       - DEBUG=true
     volumes:
@@ -25,18 +32,14 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    # See https://localai.io/basics/getting_started/#container-images for
-    # a list of available container images (or build your own with the provided Dockerfile)
-    # Available images with CUDA, ROCm, SYCL
-    # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
-    # Image list (dockerhub): https://hub.docker.com/r/localai/localai
     build:
       context: .
       dockerfile: Dockerfile.webui
     ports:
       - 8080:3000
     environment:
-      - TEST_MODEL=gpt-4
+      - TEST_MODEL=marco-o1
+      - EMBEDDING_MODEL=bert-embeddings
       - API_URL=http://api:8080
     volumes:
       - ./data/:/pool
