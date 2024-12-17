@@ -181,7 +181,7 @@ func (a *Agent) ResetConversation() {
 	if a.options.enableLongTermMemory {
 		xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(a.currentConversation))
 
-		if a.options.enableSummaryMemory {
+		if a.options.enableSummaryMemory && len(a.currentConversation) > 0 {
 
 			msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
 				Role:    "user",
