@@ -248,6 +248,15 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	if config.StandaloneJob {
 		opts = append(opts, EnableStandaloneJob)
 	}
+
+	if config.LongTermMemory {
+		opts = append(opts, EnableLongTermMemory)
+	}
+
+	if config.SummaryLongTermMemory {
+		opts = append(opts, EnableSummaryMemory)
+	}
+
 	if config.CanStopItself {
 		opts = append(opts, CanStopItself)
 	}

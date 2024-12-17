@@ -151,21 +151,59 @@ func (a *Agent) SetConversation(conv []openai.ChatCompletionMessage) {
 	a.currentConversation = conv
 }
 
+func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletionMessage) (openai.ChatCompletionMessage, error) {
+	resp, err := a.client.CreateChatCompletion(ctx,
+		openai.ChatCompletionRequest{
+			Model:    a.options.LLMAPI.Model,
+			Messages: conversation,
+		},
+	)
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	if len(resp.Choices) != 1 {
+		return openai.ChatCompletionMessage{}, fmt.Errorf("no enough choices: %w", err)
+	}
+
+	return resp.Choices[0].Message, nil
+}
+
 func (a *Agent) ResetConversation() {
 	a.Lock()
 	defer a.Unlock()
 
+	xlog.Info("Resetting conversation", "agent", a.Character.Name)
+
 	// store into memory the conversation before pruning it
 	// TODO: Shall we summarize the conversation into a bullet list of highlights
 	// using the LLM instead?
-	if a.options.enableKB {
-		for _, message := range a.currentConversation {
-			if message.Role == "user" {
-				if err := a.options.ragdb.Store(message.Content); err != nil {
-					xlog.Error("Error storing into memory", "error", err)
+	if a.options.enableLongTermMemory {
+		xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(a.currentConversation))
+
+		if a.options.enableSummaryMemory {
+
+			msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
+				Role:    "user",
+				Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(a.currentConversation).String(),
+			}})
+			if err != nil {
+				xlog.Error("Error summarizing conversation", "error", err)
+			}
+
+			if err := a.options.ragdb.Store(msg.Content); err != nil {
+				xlog.Error("Error storing into memory", "error", err)
+			}
+		} else {
+			for _, message := range a.currentConversation {
+				if message.Role == "user" {
+					if err := a.options.ragdb.Store(message.Content); err != nil {
+						xlog.Error("Error storing into memory", "error", err)
+					}
 				}
 			}
 		}
+
 	}
 
 	a.currentConversation = []openai.ChatCompletionMessage{}
@@ -612,33 +650,14 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	resp, err := a.client.CreateChatCompletion(ctx,
-		openai.ChatCompletionRequest{
-			Model: a.options.LLMAPI.Model,
-			// Force the AI to response without using any tool
-			// Why: some models might be silly enough to attempt to call tools even if evaluated
-			// that a reply was not necessary anymore
-			Messages: append(a.currentConversation, openai.ChatCompletionMessage{
-				Role:    "system",
-				Content: "The assistant needs to reply without using any tool.",
-				// + replyResponse.Message,
-			},
-			),
-			//Messages: a.currentConversation,
-		},
-	)
+	msg, err := a.askLLM(ctx, append(a.currentConversation, openai.ChatCompletionMessage{
+		Role:    "system",
+		Content: "The assistant needs to reply without using any tool.",
+	}))
 	if err != nil {
 		job.Result.Finish(err)
 		return
 	}
-
-	if len(resp.Choices) != 1 {
-		job.Result.Finish(fmt.Errorf("no enough choices: %w", err))
-		return
-	}
-
-	// display OpenAI's response to the original question utilizing our function
-	msg := resp.Choices[0].Message
 
 	// If we didn't got any message, we can use the response from the action
 	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" ||
@@ -661,9 +680,6 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// Remember always to reset the timer - if we don't the agent will stop..
 	defer timer.Reset(a.options.periodicRuns)
 
-	if !a.options.standaloneJob {
-		return
-	}
 	a.StopAction()
 	xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 
@@ -675,18 +691,24 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 
 	xlog.Info("START -- Periodically run is starting")
 
-	if len(a.CurrentConversation()) != 0 {
-		// Here the LLM could decide to store some part of the conversation too in the memory
-		evaluateMemory := NewJob(
-			WithText(
-				`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
-			),
-			WithReasoningCallback(a.options.reasoningCallback),
-			WithResultCallback(a.options.resultCallback),
-		)
-		a.consumeJob(evaluateMemory, SystemRole)
+	// if len(a.CurrentConversation()) != 0 {
+	// 	// Here the LLM could decide to store some part of the conversation too in the memory
+	// 	evaluateMemory := NewJob(
+	// 		WithText(
+	// 			`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
+	// 		),
+	// 		WithReasoningCallback(a.options.reasoningCallback),
+	// 		WithResultCallback(a.options.resultCallback),
+	// 	)
+	// 	a.consumeJob(evaluateMemory, SystemRole)
 
+	// 	a.ResetConversation()
+	// }
+
+	if !a.options.standaloneJob {
 		a.ResetConversation()
+
+		return
 	}
 
 	// Here we go in a loop of

@@ -14,12 +14,12 @@ type llmOptions struct {
 }
 
 type options struct {
-	LLMAPI                                            llmOptions
-	character                                         Character
-	randomIdentityGuidance                            string
-	randomIdentity                                    bool
-	userActions                                       Actions
-	enableHUD, standaloneJob, showCharacter, enableKB bool
+	LLMAPI                                                                                       llmOptions
+	character                                                                                    Character
+	randomIdentityGuidance                                                                       string
+	randomIdentity                                                                               bool
+	userActions                                                                                  Actions
+	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
 
 	canStopItself         bool
 	initiateConversations bool
@@ -124,6 +124,16 @@ var EnableStandaloneJob = func(o *options) error {
 
 var EnablePersonality = func(o *options) error {
 	o.showCharacter = true
+	return nil
+}
+
+var EnableSummaryMemory = func(o *options) error {
+	o.enableSummaryMemory = true
+	return nil
+}
+
+var EnableLongTermMemory = func(o *options) error {
+	o.enableLongTermMemory = true
 	return nil
 }
 

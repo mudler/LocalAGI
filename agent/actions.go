@@ -68,6 +68,7 @@ func (a *Agent) decision(
 		Tools:      tools,
 		ToolChoice: toolchoice,
 	}
+
 	resp, err := a.client.CreateChatCompletion(ctx, decision)
 	if err != nil {
 		return nil, err
@@ -94,6 +95,14 @@ type Messages []openai.ChatCompletionMessage
 
 func (m Messages) ToOpenAI() []openai.ChatCompletionMessage {
 	return []openai.ChatCompletionMessage(m)
+}
+
+func (m Messages) String() string {
+	s := ""
+	for _, cc := range m {
+		s += cc.Role + ": " + cc.Content + "\n"
+	}
+	return s
 }
 
 func (m Messages) Exist(content string) bool {
