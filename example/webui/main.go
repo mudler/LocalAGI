@@ -23,6 +23,7 @@ var apiKey = os.Getenv("API_KEY")
 var vectorStore = os.Getenv("VECTOR_STORE")
 var kbdisableIndexing = os.Getenv("KBDISABLEINDEX")
 var timeout = os.Getenv("TIMEOUT")
+var embeddingModel = os.Getenv("EMBEDDING_MODEL")
 
 const defaultChunkSize = 4098
 
@@ -63,7 +64,7 @@ func main() {
 		dbStore = rag.NewLocalAIRAGDB(laiStore, lai)
 	default:
 		var err error
-		dbStore, err = rag.NewChromemDB("local-agent-framework", stateDir, lai)
+		dbStore, err = rag.NewChromemDB("local-agent-framework", stateDir, lai, embeddingModel)
 		if err != nil {
 			panic(err)
 		}

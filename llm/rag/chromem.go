@@ -10,14 +10,15 @@ import (
 )
 
 type ChromemDB struct {
-	collectionName string
-	collection     *chromem.Collection
-	index          int
-	client         *openai.Client
-	db             *chromem.DB
+	collectionName  string
+	collection      *chromem.Collection
+	index           int
+	client          *openai.Client
+	db              *chromem.DB
+	embeddingsModel string
 }
 
-func NewChromemDB(collection, path string, openaiClient *openai.Client) (*ChromemDB, error) {
+func NewChromemDB(collection, path string, openaiClient *openai.Client, embeddingsModel string) (*ChromemDB, error) {
 	// db, err := chromem.NewPersistentDB(path, true)
 	// if err != nil {
 	// 	return nil, err
@@ -25,10 +26,11 @@ func NewChromemDB(collection, path string, openaiClient *openai.Client) (*Chrome
 	db := chromem.NewDB()
 
 	chromem := &ChromemDB{
-		collectionName: collection,
-		index:          1,
-		db:             db,
-		client:         openaiClient,
+		collectionName:  collection,
+		index:           1,
+		db:              db,
+		client:          openaiClient,
+		embeddingsModel: embeddingsModel,
 	}
 
 	c, err := db.GetOrCreateCollection(collection, nil, chromem.embedding())
@@ -59,7 +61,7 @@ func (c *ChromemDB) embedding() chromem.EmbeddingFunc {
 			resp, err := c.client.CreateEmbeddings(ctx,
 				openai.EmbeddingRequestStrings{
 					Input: []string{text},
-					Model: openai.AdaEmbeddingV2,
+					Model: openai.EmbeddingModel(c.embeddingsModel),
 				},
 			)
 			if err != nil {
