@@ -348,7 +348,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		// Walk conversation from bottom to top, and find the first message of the user
 		// to use it as a query to the KB
 		var userMessage string
-		for i := len(a.currentConversation); i == 0; i-- {
+		for i := len(a.currentConversation) - 1; i >= 0; i-- {
 			xlog.Info("[Long term memory] Conversation", "role", a.currentConversation[i].Role, "Content", a.currentConversation[i].Content)
 			if a.currentConversation[i].Role == "user" {
 				userMessage = a.currentConversation[i].Content
