@@ -63,13 +63,13 @@ func NewInMemoryDB(knowledgebase string, store RAGDB) (*InMemoryDatabase, error)
 	}, nil
 }
 
-func (db *InMemoryDatabase) SaveAllToStore() error {
+func (db *InMemoryDatabase) PopulateRAGDB() error {
 	for _, d := range db.Database {
 		if d == "" {
 			// skip empty chunks
 			continue
 		}
-		err := db.Store(d)
+		err := db.RAGDB.Store(d)
 		if err != nil {
 			return fmt.Errorf("error storing in the KB: %w", err)
 		}

@@ -82,7 +82,7 @@ func main() {
 
 	if len(db.Database) > 0 && kbdisableIndexing != "true" {
 		xlog.Info("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
-		if err := db.SaveAllToStore(); err != nil {
+		if err := db.PopulateRAGDB(); err != nil {
 			xlog.Info("Error storing in the KB", err)
 		}
 	}

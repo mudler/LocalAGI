@@ -282,8 +282,6 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// We are self evaluating if we consume the job as a system role
 	selfEvaluation := role == SystemRole
 
-	memory := a.options.enableKB && a.options.ragdb != nil
-
 	a.Lock()
 	// Set the action context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -337,18 +335,27 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 	}
 
+	if job.Text != "" {
+		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+			Role:    role,
+			Content: job.Text,
+		})
+	}
+
 	// TODO: move to a promptblock?
 	// RAG
-	if memory {
+	if a.options.enableLongTermMemory && len(a.currentConversation) > 0 {
 		// Walk conversation from bottom to top, and find the first message of the user
 		// to use it as a query to the KB
 		var userMessage string
-		for i := len(a.currentConversation) - 1; i >= 0; i-- {
+		for i := len(a.currentConversation); i == 0; i-- {
+			xlog.Info("[Long term memory] Conversation", "role", a.currentConversation[i].Role, "Content", a.currentConversation[i].Content)
 			if a.currentConversation[i].Role == "user" {
 				userMessage = a.currentConversation[i].Content
 				break
 			}
 		}
+		xlog.Info("[Long term memory] User message", "agent", a.Character.Name, "message", userMessage)
 
 		if userMessage != "" {
 			results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
@@ -380,13 +387,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 					}}, a.currentConversation...)
 			}
 		}
-	}
-
-	if job.Text != "" {
-		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-			Role:    role,
-			Content: job.Text,
-		})
+	} else {
+		xlog.Info("[Long term memory] No conversation available", "agent", a.Character.Name)
 	}
 
 	var pickTemplate string
