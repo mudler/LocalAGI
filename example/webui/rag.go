@@ -88,23 +88,29 @@ func (db *InMemoryDatabase) Reset() error {
 	return db.SaveDB()
 }
 
-func (db *InMemoryDatabase) Store(entry string) error {
-	db.Lock()
-	defer db.Unlock()
-	db.Database = append(db.Database, entry)
-	return db.RAGDB.Store(entry)
-}
-
-func (db *InMemoryDatabase) SaveDB() error {
-	db.Lock()
-	defer db.Unlock()
+func (db *InMemoryDatabase) save() error {
 	data, err := json.Marshal(db.Database)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile(db.path, data, 0644)
-	return err
+	return os.WriteFile(db.path, data, 0644)
+}
+
+func (db *InMemoryDatabase) Store(entry string) error {
+	db.Lock()
+	defer db.Unlock()
+	db.Database = append(db.Database, entry)
+	if err := db.RAGDB.Store(entry); err != nil {
+		return err
+	}
+	return db.save()
+}
+
+func (db *InMemoryDatabase) SaveDB() error {
+	db.Lock()
+	defer db.Unlock()
+	return db.save()
 }
 
 func getWebPage(url string) (string, error) {
@@ -121,7 +127,7 @@ func getWebPage(url string) (string, error) {
 	return html2text.FromString(string(body), html2text.Options{PrettyTables: true})
 }
 
-func Sitemap(url string) (res []string, err error) {
+func getWebSitemap(url string) (res []string, err error) {
 	err = sitemap.ParseFromSite(url, func(e sitemap.Entry) error {
 		xlog.Info("Sitemap page: " + e.GetLocation())
 		content, err := getWebPage(e.GetLocation())
@@ -134,7 +140,7 @@ func Sitemap(url string) (res []string, err error) {
 }
 
 func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
-	content, err := Sitemap(website)
+	content, err := getWebSitemap(website)
 	if err != nil {
 		xlog.Info("Error walking sitemap for website", err)
 	}
@@ -152,8 +158,6 @@ func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
 			xlog.Info("Chunk size: ", len(chunk))
 			db.Store(chunk)
 		}
-
-		db.SaveDB()
 	}
 }
 
