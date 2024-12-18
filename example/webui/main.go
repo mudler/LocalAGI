@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/mudler/local-agent-framework/xlog"
-
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
@@ -21,7 +19,6 @@ var testModel = os.Getenv("TEST_MODEL")
 var apiURL = os.Getenv("API_URL")
 var apiKey = os.Getenv("API_KEY")
 var vectorStore = os.Getenv("VECTOR_STORE")
-var kbdisableIndexing = os.Getenv("KBDISABLEINDEX")
 var timeout = os.Getenv("TIMEOUT")
 var embeddingModel = os.Getenv("EMBEDDING_MODEL")
 
@@ -70,21 +67,9 @@ func main() {
 		}
 	}
 
-	db, err := NewInMemoryDB(stateDir, ragDB)
+	pool, err := NewAgentPool(testModel, apiURL, stateDir, ragDB)
 	if err != nil {
 		panic(err)
-	}
-
-	pool, err := NewAgentPool(testModel, apiURL, stateDir, db)
-	if err != nil {
-		panic(err)
-	}
-
-	if len(db.Database) > 0 && kbdisableIndexing != "true" {
-		xlog.Info("Loading knowledgebase from disk, to skip run with KBDISABLEINDEX=true")
-		if err := db.PopulateRAGDB(); err != nil {
-			xlog.Info("Error storing in the KB", err)
-		}
 	}
 
 	app := &App{
@@ -102,7 +87,7 @@ func main() {
 		Views: engine,
 	})
 
-	RegisterRoutes(webapp, pool, db, app)
+	RegisterRoutes(webapp, pool, app)
 
 	log.Fatal(webapp.Listen(":3000"))
 }

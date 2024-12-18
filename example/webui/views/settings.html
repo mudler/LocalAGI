@@ -49,7 +49,12 @@
         <h1 class="text-3xl md:text-5xl font-bold">Agent settings - {{.Name}}</h1>
     </header>
     <div class="max-w-4xl mx-auto">
-
+        <a href="/knowledgebase/{{.Name}}" class="card-link">
+            <div class="card">
+                <h2>Manage Knowledgebase</h2>
+                <p>Access and update your knowledgebase to improve agent responses and efficiency.</p>
+            </div>
+        </a>
         <div class="section-box">
             <button hx-put="/start/{{.Name}}" class="text-indigo-500 hover:text-indigo-400">
                 Start

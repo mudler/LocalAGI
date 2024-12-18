@@ -45,6 +45,7 @@ type RAGDB interface {
 	Store(s string) error
 	Reset() error
 	Search(s string, similarEntries int) ([]string, error)
+	Count() int
 }
 
 func New(opts ...Option) (*Agent, error) {
@@ -233,6 +234,10 @@ func (a *Agent) Paused() bool {
 	a.Lock()
 	defer a.Unlock()
 	return a.pause
+}
+
+func (a *Agent) Memory() RAGDB {
+	return a.options.ragdb
 }
 
 func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (result string, err error) {

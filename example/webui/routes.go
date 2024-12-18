@@ -9,7 +9,7 @@ import (
 	"github.com/mudler/local-agent-framework/agent"
 )
 
-func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, app *App) {
+func RegisterRoutes(webapp *fiber.App, pool *AgentPool, app *App) {
 
 	webapp.Use("/public", filesystem.New(filesystem.Config{
 		Root:       http.FS(embeddedFiles),
@@ -36,17 +36,20 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 
 	webapp.Get("/create", func(c *fiber.Ctx) error {
 		return c.Render("views/create", fiber.Map{
-			"Title":      "Hello, World!",
 			"Actions":    AvailableActions,
 			"Connectors": AvailableConnectors,
 		})
 	})
 
-	webapp.Get("/knowledgebase", func(c *fiber.Ctx) error {
-		return c.Render("views/knowledgebase", fiber.Map{
-			"Title":                   "Hello, World!",
-			"KnowledgebaseItemsCount": len(db.Database),
-		})
+	webapp.Get("/knowledgebase/:name", func(c *fiber.Ctx) error {
+		db := pool.GetAgentMemory(c.Params("name"))
+		return c.Render(
+			"views/knowledgebase",
+			fiber.Map{
+				"KnowledgebaseItemsCount": db.Count(),
+				"Name":                    c.Params("name"),
+			},
+		)
 	})
 
 	// Define a route for the GET method on the root path '/'
@@ -80,9 +83,11 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, db *InMemoryDatabase, ap
 	webapp.Put("/pause/:name", app.Pause(pool))
 	webapp.Put("/start/:name", app.Start(pool))
 
-	webapp.Post("/knowledgebase", app.KnowledgeBase(db))
-	webapp.Post("/knowledgebase/upload", app.KnowledgeBaseFile(db))
-	webapp.Delete("/knowledgebase/reset", app.KnowledgeBaseReset(db))
+	webapp.Post("/knowledgebase/:name", app.KnowledgeBase(pool))
+	webapp.Post("/knowledgebase/:name/upload", app.KnowledgeBaseFile(pool))
+	webapp.Delete("/knowledgebase/:name/reset", app.KnowledgeBaseReset(pool))
+	webapp.Post("/knowledgebase/:name/import", app.KnowledgeBaseImport(pool))
+	webapp.Get("/knowledgebase/:name/export", app.KnowledgeBaseExport(pool))
 
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
 		return c.Render("views/chat", fiber.Map{

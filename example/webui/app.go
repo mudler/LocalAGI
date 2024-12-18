@@ -24,15 +24,72 @@ type (
 	}
 )
 
-func (a *App) KnowledgeBaseReset(db *InMemoryDatabase) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBaseReset(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		db := pool.GetAgentMemory(c.Params("name"))
 		db.Reset()
-		return c.Redirect("/knowledgebase")
+		return c.Redirect("/knowledgebase/" + c.Params("name"))
 	}
 }
 
-func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBaseExport(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		db := pool.GetAgentMemory(c.Params("name"))
+		knowledgeBase := db.Data()
+
+		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.knowledgebase.json", c.Params("name")))
+		return c.JSON(knowledgeBase)
+	}
+}
+
+func (a *App) KnowledgeBaseImport(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		file, err := c.FormFile("file")
+		if err != nil {
+			// Handle error
+			return err
+		}
+
+		os.MkdirAll("./uploads", os.ModePerm)
+
+		destination := fmt.Sprintf("./uploads/%s", file.Filename)
+		if err := c.SaveFile(file, destination); err != nil {
+			// Handle error
+			return err
+		}
+
+		data, err := os.ReadFile(destination)
+		if err != nil {
+			return err
+		}
+
+		knowledge := []string{}
+		if err := json.Unmarshal(data, &knowledge); err != nil {
+			return err
+		}
+
+		if len(knowledge) > 0 {
+			xlog.Info("Importing agent KB")
+			db := pool.GetAgentMemory(c.Params("name"))
+			db.Reset()
+
+			for _, k := range knowledge {
+				db.Store(k)
+			}
+
+		} else {
+			return fmt.Errorf("Empty knowledge base")
+		}
+
+		return c.Redirect("/agents")
+	}
+}
+
+func (a *App) KnowledgeBaseFile(pool *AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		agent := pool.GetAgent(c.Params("name"))
+		db := agent.Memory()
+
 		// https://golang.withcodeexample.com/blog/file-upload-handling-golang-fiber-guide/
 		file, err := c.FormFile("file")
 		if err != nil {
@@ -78,8 +135,11 @@ func (a *App) KnowledgeBaseFile(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBase(pool *AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		agent := pool.GetAgent(c.Params("name"))
+		db := agent.Memory()
+
 		payload := struct {
 			URL       string `form:"url"`
 			ChunkSize int    `form:"chunk_size"`
@@ -100,7 +160,7 @@ func (a *App) KnowledgeBase(db *InMemoryDatabase) func(c *fiber.Ctx) error {
 
 		go WebsiteToKB(website, chunkSize, db)
 
-		return c.Redirect("/knowledgebase")
+		return c.Redirect("/knowledgebase/" + c.Params("name"))
 	}
 }
 

@@ -4,47 +4,7 @@
     <title>Smart Assistant Dashboard</title>
     {{template "views/partials/header"}}
     <style>
-        .container {
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-        }
-        .card-link {
-            text-decoration: none; /* Removes underline from links */
-        }
-        .card {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px auto;
-            text-align: left;
-            width: 90%;
-            transition: transform 0.3s ease, box-shadow 0.3s ease; /* Smooth transition for hover effects */
-            display: block; /* Ensures the link fills the card */
-        }
-        .card:hover {
-            transform: translateY(-5px); /* Slight lift effect */
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); /* Shadow for depth */
-        }
-        .card h2 {
-            font-size: 1.5em; /* Larger and more prominent */
-            font-weight: bold; /* Ensures boldness */
-            color: white; /* Ensures visibility against the card's background */
-            margin-bottom: 0.5em; /* Space below the heading */
-        }
-        .card a,
-        .card p {
-            color: white; /* Ensures text color is consistent */
-        }
-        .card p {
-            font-size: 1em;
-        }
-        .image-container {
-            display: flex;
-            justify-content: center;
-            margin: 20px 0;
-        }
+        
     </style>
 </head>
 <body class="bg-gray-900 p-4 text-white font-sans">
@@ -60,11 +20,10 @@
                 <p>View and manage your list of agents, including detailed profiles and statistics.</p>
             </div>
         </a>
-        <!-- Card for Knowledgebase Management Page -->
-        <a href="/knowledgebase" class="card-link">
+        <a href="/create" class="card-link">
             <div class="card">
-                <h2>Manage Knowledgebase</h2>
-                <p>Access and update your knowledgebase to improve agent responses and efficiency.</p>
+                <h2>Create</h2>
+                <p>Create a new agent.</p>
             </div>
         </a>
     </div>

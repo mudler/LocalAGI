@@ -24,6 +24,7 @@ type AgentPool struct {
 	agents        map[string]*Agent
 	managers      map[string]Manager
 	agentStatus   map[string]*Status
+	agentMemory   map[string]*InMemoryDatabase
 	apiURL, model string
 	ragDB         RAGDB
 }
@@ -76,6 +77,7 @@ func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, err
 			pool:        make(map[string]AgentConfig),
 			agentStatus: make(map[string]*Status),
 			managers:    make(map[string]Manager),
+			agentMemory: make(map[string]*InMemoryDatabase),
 		}, nil
 	}
 
@@ -92,6 +94,7 @@ func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, err
 		agents:      make(map[string]*Agent),
 		managers:    make(map[string]Manager),
 		agentStatus: map[string]*Status{},
+		agentMemory: map[string]*InMemoryDatabase{},
 		pool:        *poolData,
 	}, nil
 }
@@ -144,7 +147,14 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	actions := config.availableActions(ctx)
 
-	stateFile, characterFile := a.stateFiles(name)
+	stateFile, characterFile, knowledgeBase := a.stateFiles(name)
+
+	agentDB, err := NewInMemoryDB(knowledgeBase, a.ragDB)
+	if err != nil {
+		return err
+	}
+
+	a.agentMemory[name] = agentDB
 
 	actionsLog := []string{}
 	for _, action := range actions {
@@ -179,7 +189,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithStateFile(stateFile),
 		WithCharacterFile(characterFile),
 		WithTimeout(timeout),
-		WithRAGDB(a.ragDB),
+		WithRAGDB(agentDB),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",
@@ -355,20 +365,22 @@ func (a *AgentPool) Start(name string) error {
 	return fmt.Errorf("agent %s not found", name)
 }
 
-func (a *AgentPool) stateFiles(name string) (string, string) {
+func (a *AgentPool) stateFiles(name string) (string, string, string) {
 	stateFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", name))
 	characterFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", name))
+	knowledgeBaseFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.knowledgebase.json", name))
 
-	return stateFile, characterFile
+	return stateFile, characterFile, knowledgeBaseFile
 }
 
 func (a *AgentPool) Remove(name string) error {
 
 	// Cleanup character and state
-	stateFile, characterFile := a.stateFiles(name)
+	stateFile, characterFile, knowledgeBaseFile := a.stateFiles(name)
 
 	os.Remove(stateFile)
 	os.Remove(characterFile)
+	os.Remove(knowledgeBaseFile)
 
 	a.Stop(name)
 	delete(a.agents, name)
@@ -389,6 +401,10 @@ func (a *AgentPool) Save() error {
 
 func (a *AgentPool) GetAgent(name string) *Agent {
 	return a.agents[name]
+}
+
+func (a *AgentPool) GetAgentMemory(name string) *InMemoryDatabase {
+	return a.agentMemory[name]
 }
 
 func (a *AgentPool) GetConfig(name string) *AgentConfig {

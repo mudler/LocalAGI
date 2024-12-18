@@ -9,7 +9,6 @@ import (
 
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -37,11 +36,9 @@ func loadDB(path string) ([]string, error) {
 	return poolData, err
 }
 
-func NewInMemoryDB(knowledgebase string, store RAGDB) (*InMemoryDatabase, error) {
+func NewInMemoryDB(poolfile string, store RAGDB) (*InMemoryDatabase, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
-
-	poolfile := filepath.Join(knowledgebase, "knowledgebase.json")
 
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, return a new pool
@@ -56,14 +53,26 @@ func NewInMemoryDB(knowledgebase string, store RAGDB) (*InMemoryDatabase, error)
 	if err != nil {
 		return nil, err
 	}
-	return &InMemoryDatabase{
+	db := &InMemoryDatabase{
 		RAGDB:    store,
 		Database: poolData,
 		path:     poolfile,
-	}, nil
+	}
+
+	if err := db.populateRAGDB(); err != nil {
+		return nil, fmt.Errorf("error populating RAGDB: %w", err)
+	}
+
+	return db, nil
 }
 
-func (db *InMemoryDatabase) PopulateRAGDB() error {
+func (db *InMemoryDatabase) Data() []string {
+	db.Lock()
+	defer db.Unlock()
+	return db.Database
+}
+
+func (db *InMemoryDatabase) populateRAGDB() error {
 	for _, d := range db.Database {
 		if d == "" {
 			// skip empty chunks
@@ -139,7 +148,7 @@ func getWebSitemap(url string) (res []string, err error) {
 	return
 }
 
-func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
+func WebsiteToKB(website string, chunkSize int, db RAGDB) {
 	content, err := getWebSitemap(website)
 	if err != nil {
 		xlog.Info("Error walking sitemap for website", err)
@@ -150,7 +159,7 @@ func WebsiteToKB(website string, chunkSize int, db *InMemoryDatabase) {
 	StringsToKB(db, chunkSize, content...)
 }
 
-func StringsToKB(db *InMemoryDatabase, chunkSize int, content ...string) {
+func StringsToKB(db RAGDB, chunkSize int, content ...string) {
 	for _, c := range content {
 		chunks := splitParagraphIntoChunks(c, chunkSize)
 		xlog.Info("chunks: ", len(chunks))

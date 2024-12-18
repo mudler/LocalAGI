@@ -42,6 +42,10 @@ func NewChromemDB(collection, path string, openaiClient *openai.Client, embeddin
 	return chromem, nil
 }
 
+func (c *ChromemDB) Count() int {
+	return c.collection.Count()
+}
+
 func (c *ChromemDB) Reset() error {
 	if err := c.db.DeleteCollection(c.collectionName); err != nil {
 		return err

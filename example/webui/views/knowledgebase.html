@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>KnowledgeBase</title>
+    <title>Knowledgebase for {{.Name}}</title>
     {{template "views/partials/header"}}
 </head>
 <body class="bg-gray-900 p-4 text-white font-sans">
@@ -12,7 +12,7 @@
     <div class="max-w-4xl mx-auto">
         <!-- Add Site Form -->
         <div class="section-box">
-            <form action="/knowledgebase" method="POST">
+            <form action="/knowledgebase/{{.Name}}" method="POST">
                 <h2>Add sites to KB</h2>
                 <label for="url">URL:</label>
                 <input type="text" name="url" id="url" placeholder="Enter URL here">
@@ -24,7 +24,7 @@
 
         <!-- File Upload Form -->
         <div class="section-box">
-            <form id='form' hx-encoding='multipart/form-data' hx-post='/knowledgebase/upload'>
+            <form id='form' hx-encoding='multipart/form-data' hx-post='/knowledgebase/{{.Name}}/upload'>
                 <h2>Upload File</h2>
                 <label for="file">File:</label>
                 <input type='file' name='file' id='file'>
@@ -37,7 +37,22 @@
 
         <!-- Reset Knowledge Base -->
         <div class="section-box">
-            <button hx-swap="none" hx-trigger="click" hx-delete="/knowledgebase/reset">Reset Knowledge Base</button>
+            <button hx-swap="none" hx-trigger="click" hx-delete="/knowledgebase/{{.Name}}/reset">Reset Knowledge Base</button>
+        </div>
+
+        <div class="section-box">
+            <h2>Export</h2>
+            <a href="/knowledgebase/{{.Name}}/export" >Export</a>
+        </div>
+
+        <div class="section-box">
+            <form id='form' hx-encoding='multipart/form-data' hx-post='/knowledgebase/{{.Name}}/import'>
+                <h2>Import</h2>
+                <label for="file">File:</label>
+                <input type='file' name='file' id='file'>
+                <button type="submit">Upload File</button>
+                <progress id='progress' value='0' max='100'></progress>
+            </form>
         </div>
     </div>
     <script>
