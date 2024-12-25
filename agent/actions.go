@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/mudler/local-agent-framework/action"
 	"github.com/mudler/local-agent-framework/xlog"
@@ -196,7 +195,6 @@ func (a *Agent) prepareHUD() PromptHUD {
 		CurrentState:  *a.currentState,
 		PermanentGoal: a.options.permanentGoal,
 		ShowCharacter: a.options.showCharacter,
-		Time:          time.Now().Format(time.RFC3339),
 	}
 }
 

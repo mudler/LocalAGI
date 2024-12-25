@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"html/template"
+	"time"
 
 	"github.com/mudler/local-agent-framework/action"
 	"github.com/sashabaranov/go-openai"
@@ -28,10 +29,12 @@ func renderTemplate(templ string, hud *PromptHUD, actions Actions, reasoning str
 		Actions   []action.ActionDefinition
 		Reasoning string
 		Messages  []openai.ChatCompletionMessage
+		Time      string
 	}{
 		Actions:   definitions,
 		HUD:       hud,
 		Reasoning: reasoning,
+		Time:      time.Now().Format(time.RFC3339),
 	})
 	if err != nil {
 		return "", err
@@ -42,7 +45,7 @@ func renderTemplate(templ string, hud *PromptHUD, actions Actions, reasoning str
 
 const innerMonologueTemplate = `"This is not a typical conversation between an assistant and an user.
 You are thinking out loud by yourself now, and you are evaluating the current situation.
-Considering the goal and the persistent goal, if you have one, and do something, or decide to plan something for later on. If you have the action available, you might also decide to engage a conversation with the user by notifying him."`
+Considering the goal and the persistent goal (if you have one) do an action or decide to plan something for later on. If possible for you, you might also decide to engage a conversation with the user by notifying him."`
 
 const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}The assistant acts like an human, has a character and the replies and actions might be influenced by it.
 {{if .Character.Name}}This is the assistant name: {{.Character.Name}}
@@ -54,13 +57,13 @@ const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}The assistant acts like 
 {{end}}
 
 This is your current state:
-Current time: {{.Time}}
 NowDoing: {{if .CurrentState.NowDoing}}{{.CurrentState.NowDoing}}{{else}}Nothing{{end}}
 DoingNext: {{if .CurrentState.DoingNext}}{{.CurrentState.DoingNext}}{{else}}Nothing{{end}}
 Your permanent goal is: {{if .PermanentGoal}}{{.PermanentGoal}}{{else}}Nothing{{end}}
 Your current goal is: {{if .CurrentState.Goal}}{{.CurrentState.Goal}}{{else}}Nothing{{end}}
 You have done: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
-You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}{{end}}`
+You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}{{end}}
+Current time: is {{.Time}}`
 
 const pickSelfTemplate = `You can take any of the following tools: 
 
