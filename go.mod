@@ -20,6 +20,7 @@ require (
 	github.com/sashabaranov/go-openai v1.18.3
 	github.com/slack-go/slack v0.12.5
 	github.com/tmc/langchaingo v0.1.8
+	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.52.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
 )
