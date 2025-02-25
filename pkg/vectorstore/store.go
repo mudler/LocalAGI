@@ -1,4 +1,4 @@
-package rag
+package vectorstore
 
 import (
 	"bytes"

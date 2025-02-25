@@ -6,7 +6,7 @@ import (
 	"github.com/mudler/local-agent-framework/pkg/xlog"
 	"github.com/mudler/local-agent-framework/services/connectors"
 
-	. "github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/core/state"
 )
 
 const (
@@ -18,12 +18,6 @@ const (
 	ConnectorGithubPRs    = "github-prs"
 )
 
-type Connector interface {
-	AgentResultCallback() func(state ActionState)
-	AgentReasoningCallback() func(state ActionCurrentState) bool
-	Start(a *Agent)
-}
-
 var AvailableConnectors = []string{
 	ConnectorTelegram,
 	ConnectorSlack,
@@ -32,8 +26,8 @@ var AvailableConnectors = []string{
 	ConnectorGithubPRs,
 }
 
-func (a *AgentConfig) availableConnectors() []Connector {
-	conns := []Connector{}
+func Connectors(a *state.AgentConfig) []state.Connector {
+	conns := []state.Connector{}
 
 	for _, c := range a.Connector {
 		var config map[string]string

@@ -7,9 +7,11 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/core/sse"
+	"github.com/mudler/local-agent-framework/core/state"
 )
 
-func RegisterRoutes(webapp *fiber.App, pool *AgentPool, app *App) {
+func RegisterRoutes(webapp *fiber.App, pool *state.AgentPool, app *App) {
 
 	webapp.Use("/public", filesystem.New(filesystem.Config{
 		Root:       http.FS(embeddedFiles),
@@ -59,14 +61,14 @@ func RegisterRoutes(webapp *fiber.App, pool *AgentPool, app *App) {
 			return c.SendStatus(404)
 		}
 
-		m.Handle(c, NewClient(randStringRunes(10)))
+		m.Handle(c, sse.NewClient(randStringRunes(10)))
 		return nil
 	})
 
 	webapp.Get("/status/:name", func(c *fiber.Ctx) error {
 		history := pool.GetStatusHistory(c.Params("name"))
 		if history == nil {
-			history = &Status{results: []agent.ActionState{}}
+			history = &state.Status{ActionResults: []agent.ActionState{}}
 		}
 		// reverse history
 

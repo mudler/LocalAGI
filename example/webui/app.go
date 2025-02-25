@@ -10,7 +10,9 @@ import (
 
 	"github.com/mudler/local-agent-framework/pkg/xlog"
 
-	. "github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/core/sse"
+	"github.com/mudler/local-agent-framework/core/state"
 
 	"github.com/donseba/go-htmx"
 	"github.com/dslipak/pdf"
@@ -20,11 +22,11 @@ import (
 type (
 	App struct {
 		htmx *htmx.HTMX
-		pool *AgentPool
+		pool *state.AgentPool
 	}
 )
 
-func (a *App) KnowledgeBaseReset(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBaseReset(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		db := pool.GetAgentMemory(c.Params("name"))
 		db.Reset()
@@ -32,7 +34,7 @@ func (a *App) KnowledgeBaseReset(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) KnowledgeBaseExport(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBaseExport(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		db := pool.GetAgentMemory(c.Params("name"))
 		knowledgeBase := db.Data()
@@ -42,7 +44,7 @@ func (a *App) KnowledgeBaseExport(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) KnowledgeBaseImport(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBaseImport(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		file, err := c.FormFile("file")
 		if err != nil {
@@ -85,7 +87,7 @@ func (a *App) KnowledgeBaseImport(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) KnowledgeBaseFile(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBaseFile(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		agent := pool.GetAgent(c.Params("name"))
 		db := agent.Memory()
@@ -127,7 +129,7 @@ func (a *App) KnowledgeBaseFile(pool *AgentPool) func(c *fiber.Ctx) error {
 			chunkSize = payload.ChunkSize
 		}
 
-		go StringsToKB(db, chunkSize, content)
+		go state.StringsToKB(db, chunkSize, content)
 
 		_, err = c.WriteString(chatDiv("File uploaded", "gray"))
 
@@ -135,7 +137,7 @@ func (a *App) KnowledgeBaseFile(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) KnowledgeBase(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) KnowledgeBase(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		agent := pool.GetAgent(c.Params("name"))
 		db := agent.Memory()
@@ -158,13 +160,13 @@ func (a *App) KnowledgeBase(pool *AgentPool) func(c *fiber.Ctx) error {
 			chunkSize = payload.ChunkSize
 		}
 
-		go WebsiteToKB(website, chunkSize, db)
+		go state.WebsiteToKB(website, chunkSize, db)
 
 		return c.Redirect("/knowledgebase/" + c.Params("name"))
 	}
 }
 
-func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Notify(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
 			Message string `form:"message"`
@@ -180,9 +182,9 @@ func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
 			return nil
 		}
 
-		agent := pool.GetAgent(c.Params("name"))
-		agent.Ask(
-			WithText(query),
+		a := pool.GetAgent(c.Params("name"))
+		a.Ask(
+			agent.WithText(query),
 		)
 		_, _ = c.Write([]byte("Message sent"))
 
@@ -190,7 +192,7 @@ func (a *App) Notify(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Delete(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		if err := pool.Remove(c.Params("name")); err != nil {
 			xlog.Info("Error removing agent", err)
@@ -200,7 +202,7 @@ func (a *App) Delete(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Pause(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Pause(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		xlog.Info("Pausing agent", c.Params("name"))
 		agent := pool.GetAgent(c.Params("name"))
@@ -211,7 +213,7 @@ func (a *App) Pause(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Start(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Start(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		agent := pool.GetAgent(c.Params("name"))
 		if agent != nil {
@@ -221,9 +223,9 @@ func (a *App) Start(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Create(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		config := AgentConfig{}
+		config := state.AgentConfig{}
 		if err := c.BodyParser(&config); err != nil {
 			return err
 		}
@@ -242,7 +244,7 @@ func (a *App) Create(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) ExportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) ExportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		agent := pool.GetConfig(c.Params("name"))
 		if agent == nil {
@@ -254,7 +256,7 @@ func (a *App) ExportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) ImportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		file, err := c.FormFile("file")
 		if err != nil {
@@ -275,7 +277,7 @@ func (a *App) ImportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
 			return err
 		}
 
-		config := AgentConfig{}
+		config := state.AgentConfig{}
 		if err := json.Unmarshal(data, &config); err != nil {
 			return err
 		}
@@ -295,7 +297,7 @@ func (a *App) ImportAgent(pool *AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
 			Message string `json:"message"`
@@ -313,18 +315,18 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 			return nil
 		}
 		manager.Send(
-			NewMessage(
+			sse.NewMessage(
 				chatDiv(query, "gray"),
 			).WithEvent("messages"))
 
 		go func() {
-			agent := pool.GetAgent(agentName)
-			if agent == nil {
+			a := pool.GetAgent(agentName)
+			if a == nil {
 				xlog.Info("Agent not found in pool", c.Params("name"))
 				return
 			}
-			res := agent.Ask(
-				WithText(query),
+			res := a.Ask(
+				agent.WithText(query),
 			)
 			if res.Error != nil {
 				xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
@@ -332,11 +334,11 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 				xlog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
 			}
 			manager.Send(
-				NewMessage(
+				sse.NewMessage(
 					chatDiv(res.Response, "blue"),
 				).WithEvent("messages"))
 			manager.Send(
-				NewMessage(
+				sse.NewMessage(
 					disabledElement("inputMessage", false), // show again the input
 				).WithEvent("message_status"))
 
@@ -345,7 +347,7 @@ func (a *App) Chat(pool *AgentPool) func(c *fiber.Ctx) error {
 		}()
 
 		manager.Send(
-			NewMessage(
+			sse.NewMessage(
 				loader() + disabledElement("inputMessage", true),
 			).WithEvent("message_status"))
 

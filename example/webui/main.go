@@ -10,9 +10,10 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
 
-	. "github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/core/state"
 	"github.com/mudler/local-agent-framework/pkg/llm"
-	"github.com/mudler/local-agent-framework/pkg/llm/rag"
+	rag "github.com/mudler/local-agent-framework/pkg/vectorstore"
 )
 
 var testModel = os.Getenv("TEST_MODEL")
@@ -52,7 +53,7 @@ func main() {
 	stateDir := cwd + "/pool"
 	os.MkdirAll(stateDir, 0755)
 
-	var ragDB RAGDB
+	var ragDB agent.RAGDB
 	lai := llm.NewClient(apiKey, apiURL+"/v1", timeout)
 
 	switch vectorStore {
@@ -67,7 +68,7 @@ func main() {
 		}
 	}
 
-	pool, err := NewAgentPool(testModel, apiURL, stateDir, ragDB)
+	pool, err := state.NewAgentPool(testModel, apiURL, stateDir, ragDB, Actions, Connectors, timeout)
 	if err != nil {
 		panic(err)
 	}

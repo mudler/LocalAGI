@@ -1,4 +1,4 @@
-package main
+package state
 
 import (
 	"context"
@@ -11,39 +11,44 @@ import (
 	"time"
 
 	"github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/pkg/xlog"
-
 	. "github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/core/sse"
+	"github.com/mudler/local-agent-framework/pkg/utils"
+
+	"github.com/mudler/local-agent-framework/pkg/xlog"
 )
 
 type AgentPool struct {
 	sync.Mutex
-	file          string
-	pooldir       string
-	pool          AgentPoolData
-	agents        map[string]*Agent
-	managers      map[string]Manager
-	agentStatus   map[string]*Status
-	agentMemory   map[string]*InMemoryDatabase
-	apiURL, model string
-	ragDB         RAGDB
+	file             string
+	pooldir          string
+	pool             AgentPoolData
+	agents           map[string]*Agent
+	managers         map[string]sse.Manager
+	agentStatus      map[string]*Status
+	agentMemory      map[string]*InMemoryDatabase
+	apiURL, model    string
+	ragDB            RAGDB
+	availableActions func(*AgentConfig) func(ctx context.Context) []Action
+	connectors       func(*AgentConfig) []Connector
+	timeout          string
 }
 
 type Status struct {
-	results []ActionState
+	ActionResults []ActionState
 }
 
 func (s *Status) addResult(result ActionState) {
 	// If we have more than 10 results, remove the oldest one
-	if len(s.results) > 10 {
-		s.results = s.results[1:]
+	if len(s.ActionResults) > 10 {
+		s.ActionResults = s.ActionResults[1:]
 	}
 
-	s.results = append(s.results, result)
+	s.ActionResults = append(s.ActionResults, result)
 }
 
 func (s *Status) Results() []ActionState {
-	return s.results
+	return s.ActionResults
 }
 
 type AgentPoolData map[string]AgentConfig
@@ -59,7 +64,13 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 	return poolData, err
 }
 
-func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, error) {
+func NewAgentPool(
+	model, apiURL, directory string,
+	RagDB RAGDB,
+	availableActions func(*AgentConfig) func(ctx context.Context) []agent.Action,
+	connectors func(*AgentConfig) []Connector,
+	timeout string,
+) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
 
@@ -68,16 +79,19 @@ func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, err
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
-			file:        poolfile,
-			pooldir:     directory,
-			apiURL:      apiURL,
-			model:       model,
-			ragDB:       RagDB,
-			agents:      make(map[string]*Agent),
-			pool:        make(map[string]AgentConfig),
-			agentStatus: make(map[string]*Status),
-			managers:    make(map[string]Manager),
-			agentMemory: make(map[string]*InMemoryDatabase),
+			file:             poolfile,
+			pooldir:          directory,
+			apiURL:           apiURL,
+			model:            model,
+			ragDB:            RagDB,
+			agents:           make(map[string]*Agent),
+			pool:             make(map[string]AgentConfig),
+			agentStatus:      make(map[string]*Status),
+			managers:         make(map[string]sse.Manager),
+			agentMemory:      make(map[string]*InMemoryDatabase),
+			connectors:       connectors,
+			availableActions: availableActions,
+			timeout:          timeout,
 		}, nil
 	}
 
@@ -86,16 +100,19 @@ func NewAgentPool(model, apiURL, directory string, RagDB RAGDB) (*AgentPool, err
 		return nil, err
 	}
 	return &AgentPool{
-		file:        poolfile,
-		apiURL:      apiURL,
-		pooldir:     directory,
-		ragDB:       RagDB,
-		model:       model,
-		agents:      make(map[string]*Agent),
-		managers:    make(map[string]Manager),
-		agentStatus: map[string]*Status{},
-		agentMemory: map[string]*InMemoryDatabase{},
-		pool:        *poolData,
+		file:             poolfile,
+		apiURL:           apiURL,
+		pooldir:          directory,
+		ragDB:            RagDB,
+		model:            model,
+		agents:           make(map[string]*Agent),
+		managers:         make(map[string]sse.Manager),
+		agentStatus:      map[string]*Status{},
+		agentMemory:      map[string]*InMemoryDatabase{},
+		pool:             *poolData,
+		connectors:       connectors,
+		availableActions: availableActions,
+		timeout:          timeout,
 	}, nil
 }
 
@@ -133,7 +150,7 @@ func (a *AgentPool) GetStatusHistory(name string) *Status {
 }
 
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
-	manager := NewManager(5)
+	manager := sse.NewManager(5)
 	ctx := context.Background()
 	model := a.model
 	if config.Model != "" {
@@ -143,9 +160,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		config.PeriodicRuns = "10m"
 	}
 
-	connectors := config.availableConnectors()
+	connectors := a.connectors(config)
 
-	actions := config.availableActions(ctx)
+	actions := a.availableActions(config)(ctx)
 
 	stateFile, characterFile, knowledgeBase := a.stateFiles(name)
 
@@ -180,7 +197,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithContext(ctx),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
-		WithCharacter(agent.Character{
+		WithCharacter(Character{
 			Name: name,
 		}),
 		WithActions(
@@ -188,7 +205,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		),
 		WithStateFile(stateFile),
 		WithCharacterFile(characterFile),
-		WithTimeout(timeout),
+		WithTimeout(a.timeout),
 		WithRAGDB(agentDB),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
 			xlog.Info(
@@ -200,8 +217,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 			)
 
 			manager.Send(
-				NewMessage(
-					fmt.Sprintf(`Thinking: %s`, htmlIfy(state.Reasoning)),
+				sse.NewMessage(
+					fmt.Sprintf(`Thinking: %s`, utils.HTMLify(state.Reasoning)),
 				).WithEvent("status"),
 			)
 
@@ -239,8 +256,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 				state.ActionCurrentState.Params,
 				state.Result)
 			manager.Send(
-				NewMessage(
-					htmlIfy(
+				sse.NewMessage(
+					utils.HTMLify(
 						text,
 					),
 				).WithEvent("status"),
@@ -315,8 +332,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	go func() {
 		for {
 			time.Sleep(1 * time.Second) // Send a message every seconds
-			manager.Send(NewMessage(
-				htmlIfy(agent.State().String()),
+			manager.Send(sse.NewMessage(
+				utils.HTMLify(agent.State().String()),
 			).WithEvent("hud"))
 		}
 	}()
@@ -415,6 +432,6 @@ func (a *AgentPool) GetConfig(name string) *AgentConfig {
 	return &agent
 }
 
-func (a *AgentPool) GetManager(name string) Manager {
+func (a *AgentPool) GetManager(name string) sse.Manager {
 	return a.managers[name]
 }

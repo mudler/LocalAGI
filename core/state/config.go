@@ -1,4 +1,8 @@
-package main
+package state
+
+import (
+	"github.com/mudler/local-agent-framework/core/agent"
+)
 
 type ConnectorConfig struct {
 	Type   string `json:"type"` // e.g. Slack
@@ -30,4 +34,10 @@ type AgentConfig struct {
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
 	LongTermMemory        bool   `json:"long_term_memory" form:"long_term_memory"`
 	SummaryLongTermMemory bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
+}
+
+type Connector interface {
+	AgentResultCallback() func(state agent.ActionState)
+	AgentReasoningCallback() func(state agent.ActionCurrentState) bool
+	Start(a *agent.Agent)
 }
