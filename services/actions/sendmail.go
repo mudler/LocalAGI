@@ -1,11 +1,11 @@
-package external
+package actions
 
 import (
 	"context"
 	"fmt"
 	"net/smtp"
 
-	"github.com/mudler/local-agent-framework/action"
+	"github.com/mudler/local-agent-framework/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 

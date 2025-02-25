@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mudler/local-agent-framework/xlog"
+	"github.com/mudler/local-agent-framework/pkg/xlog"
 
-	. "github.com/mudler/local-agent-framework/agent"
+	. "github.com/mudler/local-agent-framework/core/agent"
 
 	"github.com/donseba/go-htmx"
 	"github.com/dslipak/pdf"

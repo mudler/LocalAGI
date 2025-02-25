@@ -1,4 +1,4 @@
-package connector
+package connectors
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	"github.com/mudler/local-agent-framework/agent"
+	"github.com/mudler/local-agent-framework/core/agent"
 )
 
 type Telegram struct {

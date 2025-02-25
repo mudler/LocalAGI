@@ -1,4 +1,4 @@
-package connector
+package connectors
 
 import (
 	"fmt"
@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/google/go-github/v61/github"
-	"github.com/mudler/local-agent-framework/agent"
-	"github.com/mudler/local-agent-framework/xlog"
+	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
 )
 
-type GithubPRs struct {
+type GithubIssues struct {
 	token            string
 	repository       string
 	owner            string
@@ -22,13 +22,13 @@ type GithubPRs struct {
 	client           *github.Client
 }
 
-// NewGithubIssueWatcher creates a new GithubPRs connector
+// NewGithubIssueWatcher creates a new GithubIssues connector
 // with the given configuration
 // - token: Github token
 // - repository: Github repository name
 // - owner: Github repository owner
 // - replyIfNoReplies: If true, the bot will reply to issues with no comments
-func NewGithubPRWatcher(config map[string]string) *GithubPRs {
+func NewGithubIssueWatcher(config map[string]string) *GithubIssues {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 	replyIfNoReplies := false
 	if config["replyIfNoReplies"] == "true" {
@@ -40,7 +40,7 @@ func NewGithubPRWatcher(config map[string]string) *GithubPRs {
 		interval = 10 * time.Minute
 	}
 
-	return &GithubPRs{
+	return &GithubIssues{
 		client:           client,
 		token:            config["token"],
 		repository:       config["repository"],
@@ -50,20 +50,20 @@ func NewGithubPRWatcher(config map[string]string) *GithubPRs {
 	}
 }
 
-func (g *GithubPRs) AgentResultCallback() func(state agent.ActionState) {
+func (g *GithubIssues) AgentResultCallback() func(state agent.ActionState) {
 	return func(state agent.ActionState) {
 		// Send the result to the bot
 	}
 }
 
-func (g *GithubPRs) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
+func (g *GithubIssues) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
 	return func(state agent.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
 	}
 }
 
-func (g *GithubPRs) Start(a *agent.Agent) {
+func (g *GithubIssues) Start(a *agent.Agent) {
 	// Start the connector
 	g.agent = a
 
@@ -72,17 +72,17 @@ func (g *GithubPRs) Start(a *agent.Agent) {
 		for {
 			select {
 			case <-ticker.C:
-				xlog.Info("Looking into github Prs...")
-				g.prService()
+				xlog.Info("Looking into github issues...")
+				g.issuesService()
 			case <-a.Context().Done():
-				xlog.Info("GithubPRs connector is now stopping")
+				xlog.Info("GithubIssues connector is now stopping")
 				return
 			}
 		}
 	}()
 }
 
-func (g *GithubPRs) prService() {
+func (g *GithubIssues) issuesService() {
 	user, _, err := g.client.Users.Get(g.agent.Context(), "")
 	if err != nil {
 		fmt.Printf("\nerror: %v\n", err)
@@ -98,8 +98,8 @@ func (g *GithubPRs) prService() {
 		xlog.Info("Error listing issues", err)
 	}
 	for _, issue := range issues {
-		// Do something if not an PR
-		if !issue.IsPullRequest() {
+		// Do something with the issue
+		if issue.IsPullRequest() {
 			continue
 		}
 		labels := []string{}

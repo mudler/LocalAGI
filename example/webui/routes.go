@@ -6,7 +6,7 @@ import (
 
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
-	"github.com/mudler/local-agent-framework/agent"
+	"github.com/mudler/local-agent-framework/core/agent"
 )
 
 func RegisterRoutes(webapp *fiber.App, pool *AgentPool, app *App) {

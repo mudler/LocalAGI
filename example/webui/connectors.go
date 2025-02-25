@@ -3,11 +3,10 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/mudler/local-agent-framework/xlog"
+	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/local-agent-framework/services/connectors"
 
-	. "github.com/mudler/local-agent-framework/agent"
-
-	"github.com/mudler/local-agent-framework/example/webui/connector"
+	. "github.com/mudler/local-agent-framework/core/agent"
 )
 
 const (
@@ -34,7 +33,7 @@ var AvailableConnectors = []string{
 }
 
 func (a *AgentConfig) availableConnectors() []Connector {
-	connectors := []Connector{}
+	conns := []Connector{}
 
 	for _, c := range a.Connector {
 		var config map[string]string
@@ -44,22 +43,22 @@ func (a *AgentConfig) availableConnectors() []Connector {
 		}
 		switch c.Type {
 		case ConnectorTelegram:
-			cc, err := connector.NewTelegramConnector(config)
+			cc, err := connectors.NewTelegramConnector(config)
 			if err != nil {
 				xlog.Info("Error creating telegram connector", err)
 				continue
 			}
 
-			connectors = append(connectors, cc)
+			conns = append(conns, cc)
 		case ConnectorSlack:
-			connectors = append(connectors, connector.NewSlack(config))
+			conns = append(conns, connectors.NewSlack(config))
 		case ConnectorDiscord:
-			connectors = append(connectors, connector.NewDiscord(config))
+			conns = append(conns, connectors.NewDiscord(config))
 		case ConnectorGithubIssues:
-			connectors = append(connectors, connector.NewGithubIssueWatcher(config))
+			conns = append(conns, connectors.NewGithubIssueWatcher(config))
 		case ConnectorGithubPRs:
-			connectors = append(connectors, connector.NewGithubPRWatcher(config))
+			conns = append(conns, connectors.NewGithubPRWatcher(config))
 		}
 	}
-	return connectors
+	return conns
 }

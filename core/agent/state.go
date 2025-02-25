@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mudler/local-agent-framework/action"
-	"github.com/mudler/local-agent-framework/llm"
+	"github.com/mudler/local-agent-framework/core/action"
+	"github.com/mudler/local-agent-framework/pkg/llm"
 )
 
 // PromptHUD contains

@@ -1,11 +1,11 @@
-package connector
+package connectors
 
 import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/mudler/local-agent-framework/agent"
-	"github.com/mudler/local-agent-framework/xlog"
+	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/pkg/xlog"
 )
 
 type Discord struct {

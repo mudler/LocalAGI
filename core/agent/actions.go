@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/local-agent-framework/action"
-	"github.com/mudler/local-agent-framework/xlog"
+	"github.com/mudler/local-agent-framework/core/action"
+	"github.com/mudler/local-agent-framework/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
 )

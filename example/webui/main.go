@@ -10,9 +10,9 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
 
-	. "github.com/mudler/local-agent-framework/agent"
-	"github.com/mudler/local-agent-framework/llm"
-	"github.com/mudler/local-agent-framework/llm/rag"
+	. "github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/local-agent-framework/pkg/llm"
+	"github.com/mudler/local-agent-framework/pkg/llm/rag"
 )
 
 var testModel = os.Getenv("TEST_MODEL")

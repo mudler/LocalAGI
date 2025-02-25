@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mudler/local-agent-framework/xlog"
+	"github.com/mudler/local-agent-framework/pkg/xlog"
 
-	"github.com/mudler/local-agent-framework/action"
-	"github.com/mudler/local-agent-framework/llm"
+	"github.com/mudler/local-agent-framework/core/action"
+	"github.com/mudler/local-agent-framework/pkg/llm"
 	"github.com/sashabaranov/go-openai"
 )
 

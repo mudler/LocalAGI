@@ -1,4 +1,4 @@
-package external
+package actions
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/mudler/local-agent-framework/action"
+	"github.com/mudler/local-agent-framework/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"jaytaylor.com/html2text"
 )

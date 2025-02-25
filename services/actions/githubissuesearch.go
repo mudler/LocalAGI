@@ -1,4 +1,4 @@
-package external
+package actions
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/google/go-github/v61/github"
-	"github.com/mudler/local-agent-framework/action"
+	"github.com/mudler/local-agent-framework/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
