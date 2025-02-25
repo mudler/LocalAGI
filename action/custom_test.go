@@ -1,10 +1,9 @@
-package agent_test
+package action_test
 
 import (
 	"context"
 
-	"github.com/mudler/local-agent-framework/action"
-	. "github.com/mudler/local-agent-framework/agent"
+	. "github.com/mudler/local-agent-framework/action"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -64,7 +63,7 @@ return []string{"foo"}
 			Expect(err).ToNot(HaveOccurred())
 
 			definition := customAction.Definition()
-			Expect(definition).To(Equal(action.ActionDefinition{
+			Expect(definition).To(Equal(ActionDefinition{
 				Properties: map[string]jsonschema.Definition{
 					"foo": {
 						Type:        jsonschema.String,
@@ -76,7 +75,7 @@ return []string{"foo"}
 				Description: "A test action",
 			}))
 
-			runResult, err := customAction.Run(context.Background(), action.ActionParams{
+			runResult, err := customAction.Run(context.Background(), ActionParams{
 				"Foo": "bar",
 			})
 			Expect(err).ToNot(HaveOccurred())

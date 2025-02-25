@@ -106,7 +106,7 @@ func (a *FakeInternetAction) Definition() action.ActionDefinition {
 
 var _ = Describe("Agent test", func() {
 	Context("jobs", func() {
-		FIt("pick the correct action", func() {
+		It("pick the correct action", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiModel),
 				WithModel(testModel),
