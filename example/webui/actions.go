@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/mudler/local-agent-framework/action"
 	"github.com/mudler/local-agent-framework/xlog"
 
 	. "github.com/mudler/local-agent-framework/agent"
@@ -13,6 +14,7 @@ import (
 const (
 	// Actions
 	ActionSearch              = "search"
+	ActionCustom              = "custom"
 	ActionGithubIssueLabeler  = "github-issue-labeler"
 	ActionGithubIssueOpener   = "github-issue-opener"
 	ActionGithubIssueCloser   = "github-issue-closer"
@@ -25,6 +27,7 @@ const (
 
 var AvailableActions = []string{
 	ActionSearch,
+	ActionCustom,
 	ActionGithubIssueLabeler,
 	ActionGithubIssueOpener,
 	ActionGithubIssueCloser,
@@ -38,14 +41,21 @@ var AvailableActions = []string{
 func (a *AgentConfig) availableActions(ctx context.Context) []Action {
 	actions := []Action{}
 
-	for _, action := range a.Actions {
+	for _, a := range a.Actions {
 		var config map[string]string
-		if err := json.Unmarshal([]byte(action.Config), &config); err != nil {
-			xlog.Info("Error unmarshalling action config", "error", err)
+		if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
+			xlog.Error("Error unmarshalling action config", "error", err)
 			continue
 		}
 
-		switch action.Name {
+		switch a.Name {
+		case ActionCustom:
+			customAction, err := action.NewCustom(config, "")
+			if err != nil {
+				xlog.Error("Error creating custom action", "error", err)
+				continue
+			}
+			actions = append(actions, customAction)
 		case ActionSearch:
 			actions = append(actions, external.NewSearch(config))
 		case ActionGithubIssueLabeler:
