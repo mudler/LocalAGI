@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/traefik/yaegi/interp"
 	"github.com/traefik/yaegi/stdlib"

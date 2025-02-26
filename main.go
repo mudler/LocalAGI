@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/core/state"
-	"github.com/mudler/local-agent-framework/pkg/llm"
-	rag "github.com/mudler/local-agent-framework/pkg/vectorstore"
-	"github.com/mudler/local-agent-framework/webui"
+	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/pkg/llm"
+	rag "github.com/mudler/LocalAgent/pkg/vectorstore"
+	"github.com/mudler/LocalAgent/webui"
 )
 
 var testModel = os.Getenv("TEST_MODEL")

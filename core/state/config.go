@@ -1,7 +1,7 @@
 package state
 
 import (
-	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/LocalAgent/core/agent"
 )
 
 type ConnectorConfig struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 
-	"github.com/mudler/local-agent-framework/core/action"
-	. "github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/LocalAgent/core/action"
+	. "github.com/mudler/LocalAgent/core/agent"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sashabaranov/go-openai/jsonschema"

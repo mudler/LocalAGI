@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 
-	. "github.com/mudler/local-agent-framework/core/agent"
+	. "github.com/mudler/LocalAgent/core/agent"
 	"jaytaylor.com/html2text"
 
 	sitemap "github.com/oxffaa/gopher-parse-sitemap"

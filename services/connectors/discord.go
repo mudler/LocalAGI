@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 )
 
 type Discord struct {

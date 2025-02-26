@@ -8,11 +8,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 
-	"github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/core/sse"
-	"github.com/mudler/local-agent-framework/core/state"
+	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/sse"
+	"github.com/mudler/LocalAgent/core/state"
 
 	"github.com/donseba/go-htmx"
 	"github.com/dslipak/pdf"

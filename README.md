@@ -1,4 +1,4 @@
-![](https://github.com/mudler/local-agent-framework/assets/2420543/1f9a974e-3d57-45bd-9e80-709622a48964)
+![](https://github.com/mudler/LocalAgent/assets/2420543/1f9a974e-3d57-45bd-9e80-709622a48964)
 
 ## Connectors
 

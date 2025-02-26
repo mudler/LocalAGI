@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v61/github"
-	"github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
 )

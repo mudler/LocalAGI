@@ -3,10 +3,10 @@ package webui
 import (
 	"encoding/json"
 
-	"github.com/mudler/local-agent-framework/pkg/xlog"
-	"github.com/mudler/local-agent-framework/services/connectors"
+	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAgent/services/connectors"
 
-	"github.com/mudler/local-agent-framework/core/state"
+	"github.com/mudler/LocalAgent/core/state"
 )
 
 const (

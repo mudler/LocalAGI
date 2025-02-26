@@ -3,7 +3,7 @@ package action_test
 import (
 	"context"
 
-	. "github.com/mudler/local-agent-framework/core/action"
+	. "github.com/mudler/LocalAgent/core/action"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 

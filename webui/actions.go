@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/mudler/local-agent-framework/core/action"
-	"github.com/mudler/local-agent-framework/core/state"
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 
-	"github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/services/actions"
+	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/services/actions"
 )
 
 const (

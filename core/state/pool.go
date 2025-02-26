@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mudler/local-agent-framework/core/agent"
-	. "github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/core/sse"
-	"github.com/mudler/local-agent-framework/pkg/utils"
+	"github.com/mudler/LocalAgent/core/agent"
+	. "github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/sse"
+	"github.com/mudler/LocalAgent/pkg/utils"
 
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 )
 
 type AgentPool struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/LocalAgent/core/agent"
 )
 
 type Telegram struct {

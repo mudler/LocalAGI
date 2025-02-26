@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mudler/local-agent-framework/pkg/xlog"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 
-	"github.com/mudler/local-agent-framework/core/agent"
+	"github.com/mudler/LocalAgent/core/agent"
 
 	"github.com/slack-go/slack/socketmode"
 

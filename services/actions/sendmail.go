@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/smtp"
 
-	"github.com/mudler/local-agent-framework/core/action"
+	"github.com/mudler/LocalAgent/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 

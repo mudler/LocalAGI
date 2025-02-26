@@ -1,6 +1,6 @@
 package webui
 
-import "github.com/mudler/local-agent-framework/core/state"
+import "github.com/mudler/LocalAgent/core/state"
 
 type Config struct {
 	DefaultChunkSize int

@@ -7,9 +7,9 @@ import (
 
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
-	"github.com/mudler/local-agent-framework/core/agent"
-	"github.com/mudler/local-agent-framework/core/sse"
-	"github.com/mudler/local-agent-framework/core/state"
+	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/sse"
+	"github.com/mudler/LocalAgent/core/state"
 )
 
 //go:embed views/*
