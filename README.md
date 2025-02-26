@@ -1,4 +1,5 @@
-![](https://github.com/mudler/LocalAgent/assets/2420543/1f9a974e-3d57-45bd-9e80-709622a48964)
+
+![b644008916041](https://github.com/user-attachments/assets/304ad402-5ddc-441b-a4b9-55ff9eec72be)
 
 
 Check also:
