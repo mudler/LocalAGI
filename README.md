@@ -1,5 +1,11 @@
 ![](https://github.com/mudler/LocalAgent/assets/2420543/1f9a974e-3d57-45bd-9e80-709622a48964)
 
+
+Check also:
+
+- [LocalAI](https://github.com/mudler/LocalAI)
+- [LocalRAG](https://github.com/mudler/LocalRAG)
+
 ## Connectors
 
 ### Github (issues)
