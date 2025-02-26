@@ -1,6 +1,7 @@
-package main
+package webui
 
 import (
+	"embed"
 	"math/rand"
 	"net/http"
 
@@ -11,7 +12,13 @@ import (
 	"github.com/mudler/local-agent-framework/core/state"
 )
 
-func RegisterRoutes(webapp *fiber.App, pool *state.AgentPool, app *App) {
+//go:embed views/*
+var viewsfs embed.FS
+
+//go:embed public/*
+var embeddedFiles embed.FS
+
+func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Use("/public", filesystem.New(filesystem.Config{
 		Root:       http.FS(embeddedFiles),
@@ -106,6 +113,8 @@ func RegisterRoutes(webapp *fiber.App, pool *state.AgentPool, app *App) {
 	})
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
+
+	return
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

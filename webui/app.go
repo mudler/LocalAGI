@@ -1,4 +1,4 @@
-package main
+package webui
 
 import (
 	"bytes"
@@ -17,14 +17,37 @@ import (
 	"github.com/donseba/go-htmx"
 	"github.com/dslipak/pdf"
 	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/template/html/v2"
 )
 
 type (
 	App struct {
-		htmx *htmx.HTMX
-		pool *state.AgentPool
+		htmx   *htmx.HTMX
+		config *Config
+		*fiber.App
 	}
 )
+
+func NewApp(opts ...Option) *App {
+	config := NewConfig(opts...)
+	engine := html.NewFileSystem(http.FS(viewsfs), ".html")
+
+	// Initialize a new Fiber app
+	// Pass the engine to the Views
+	webapp := fiber.New(fiber.Config{
+		Views: engine,
+	})
+
+	a := &App{
+		htmx:   htmx.New(),
+		config: config,
+		App:    webapp,
+	}
+
+	a.registerRoutes(config.Pool, webapp)
+
+	return a
+}
 
 func (a *App) KnowledgeBaseReset(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
@@ -124,7 +147,7 @@ func (a *App) KnowledgeBaseFile(pool *state.AgentPool) func(c *fiber.Ctx) error 
 		}
 
 		xlog.Info("Content is", content)
-		chunkSize := defaultChunkSize
+		chunkSize := a.config.DefaultChunkSize
 		if payload.ChunkSize > 0 {
 			chunkSize = payload.ChunkSize
 		}
@@ -155,7 +178,7 @@ func (a *App) KnowledgeBase(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		if website == "" {
 			return fmt.Errorf("please enter a URL")
 		}
-		chunkSize := defaultChunkSize
+		chunkSize := a.config.DefaultChunkSize
 		if payload.ChunkSize > 0 {
 			chunkSize = payload.ChunkSize
 		}

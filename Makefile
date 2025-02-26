@@ -7,8 +7,9 @@ tests:
 webui-nokb:
 	$(MAKE) webui KBDISABLEINDEX=true
 
+.PHONY: webui
 webui:
-	cd example/webui && $(GOCMD) run ./
+	$(GOCMD) run ./
 
 webui-image:
 	docker build -t $(IMAGE_NAME) -f Dockerfile.webui .

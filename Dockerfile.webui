@@ -17,7 +17,7 @@ COPY . /work
 # Set the current work directory inside the container
 WORKDIR /work
 
-RUN go build -ldflags="$LDFLAGS" -o webui ./example/webui
+RUN go build -ldflags="$LDFLAGS" -o localagent ./
 
 FROM scratch
 
@@ -26,4 +26,4 @@ COPY --from=builder /work/webui /webui
 COPY --from=builder /etc/ssl/ /etc/ssl/
 
 # Define the command that will be run when the container is started
-ENTRYPOINT ["/webui"]
+ENTRYPOINT ["/localagent"]

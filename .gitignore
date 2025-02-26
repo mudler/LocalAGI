@@ -1,4 +1,6 @@
 models/
 data/
-example/webui/pool
+pool
 uploads/
+local-agent-framework
+localagent
