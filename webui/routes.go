@@ -50,17 +50,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
-	webapp.Get("/knowledgebase/:name", func(c *fiber.Ctx) error {
-		db := pool.GetAgentMemory(c.Params("name"))
-		return c.Render(
-			"views/knowledgebase",
-			fiber.Map{
-				"KnowledgebaseItemsCount": db.Count(),
-				"Name":                    c.Params("name"),
-			},
-		)
-	})
-
 	// Define a route for the GET method on the root path '/'
 	webapp.Get("/sse/:name", func(c *fiber.Ctx) error {
 		m := pool.GetManager(c.Params("name"))
@@ -91,12 +80,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Get("/delete/:name", app.Delete(pool))
 	webapp.Put("/pause/:name", app.Pause(pool))
 	webapp.Put("/start/:name", app.Start(pool))
-
-	webapp.Post("/knowledgebase/:name", app.KnowledgeBase(pool))
-	webapp.Post("/knowledgebase/:name/upload", app.KnowledgeBaseFile(pool))
-	webapp.Delete("/knowledgebase/:name/reset", app.KnowledgeBaseReset(pool))
-	webapp.Post("/knowledgebase/:name/import", app.KnowledgeBaseImport(pool))
-	webapp.Get("/knowledgebase/:name/export", app.KnowledgeBaseExport(pool))
 
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
 		return c.Render("views/chat", fiber.Map{

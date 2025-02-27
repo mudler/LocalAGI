@@ -1,8 +1,10 @@
 // TODO: this is a duplicate of LocalRAG/pkg/client
-package client
+package localrag
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +12,72 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
+
+	"github.com/mudler/LocalAgent/core/agent"
 )
+
+var _ agent.RAGDB = &WrappedClient{}
+
+type WrappedClient struct {
+	*Client
+	collection string
+}
+
+func NewWrappedClient(baseURL, collection string) *WrappedClient {
+	return &WrappedClient{
+		Client:     NewClient(baseURL),
+		collection: collection,
+	}
+}
+
+func (c *WrappedClient) Count() int {
+	entries, err := c.ListEntries(c.collection)
+	if err != nil {
+		return 0
+	}
+	return len(entries)
+}
+
+func (c *WrappedClient) Reset() error {
+	return c.Client.Reset(c.collection)
+}
+
+func (c *WrappedClient) Search(s string, similarity int) ([]string, error) {
+	results, err := c.Client.Search(c.collection, s, similarity)
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, r := range results {
+		res = append(res, fmt.Sprintf("%s (%+v)", r.Content, r.Metadata))
+	}
+	return res, nil
+}
+
+func (c *WrappedClient) Store(s string) error {
+	// the Client API of LocalRAG takes only files at the moment.
+	// So we take the string that we want to store, write it to a file, and then store the file.
+
+	hash := md5.Sum([]byte(s))
+	fileName := hex.EncodeToString(hash[:]) + ".txt"
+
+	tempdir, err := os.MkdirTemp("", "localrag")
+	if err != nil {
+		return err
+	}
+
+	defer os.RemoveAll(tempdir)
+
+	f := filepath.Join(tempdir, fileName)
+	err = os.WriteFile(f, []byte(s), 0644)
+	if err != nil {
+		return err
+	}
+
+	defer os.Remove(f)
+	return c.Client.Store(c.collection, f)
+}
 
 // Result represents a single result from a query.
 type Result struct {
