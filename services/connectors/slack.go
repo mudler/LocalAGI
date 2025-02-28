@@ -107,10 +107,12 @@ func (t *Slack) Start(a *agent.Agent) {
 							res := a.Ask(
 								agent.WithText(message),
 							)
+							ts := ev.ThreadTimeStamp
 
 							_, _, err = api.PostMessage(ev.Channel,
 								slack.MsgOptionText(res.Response, false),
-								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}))
+								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}),
+								slack.MsgOptionTS(ts))
 							if err != nil {
 								fmt.Printf("Error posting message: %v", err)
 							}
@@ -132,9 +134,19 @@ func (t *Slack) Start(a *agent.Agent) {
 								agent.WithText(message),
 							)
 
-							_, _, err = api.PostMessage(ev.Channel,
-								slack.MsgOptionText(res.Response, false),
-								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}))
+							ts := ev.ThreadTimeStamp
+
+							if ts != "" {
+								_, _, err = api.PostMessage(ev.Channel,
+									slack.MsgOptionText(res.Response, false),
+									slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}),
+									slack.MsgOptionTS(ts))
+							} else {
+								_, _, err = api.PostMessage(ev.Channel,
+									slack.MsgOptionText(res.Response, false),
+									slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}),
+									slack.MsgOptionTS(ev.TimeStamp))
+							}
 							if err != nil {
 								fmt.Printf("Error posting message: %v", err)
 							}
