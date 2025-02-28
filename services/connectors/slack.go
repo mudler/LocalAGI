@@ -47,7 +47,10 @@ func (t *Slack) AgentReasoningCallback() func(state agent.ActionCurrentState) bo
 }
 
 func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) string {
-	return strings.ReplaceAll(message, "<@"+b.BotID+">", "")
+	cleaned := strings.ReplaceAll(message, "<@"+b.UserID+">", "")
+	cleaned = strings.ReplaceAll(message, "<@"+b.BotID+">", "")
+	cleaned = strings.TrimSpace(cleaned)
+	return cleaned
 }
 
 func (t *Slack) Start(a *agent.Agent) {
@@ -105,8 +108,7 @@ func (t *Slack) Start(a *agent.Agent) {
 							continue
 						}
 
-						message := ev.Text
-						message = cleanUpUsernameFromMessage(message, b)
+						message := cleanUpUsernameFromMessage(ev.Text, b)
 						go func() {
 
 							ts := ev.ThreadTimeStamp
@@ -129,10 +131,9 @@ func (t *Slack) Start(a *agent.Agent) {
 							// Skip messages from ourselves
 							continue
 						}
-						message := ev.Text
+						message := cleanUpUsernameFromMessage(ev.Text, b)
 
 						// strip our id from the message
-						message = cleanUpUsernameFromMessage(message, b)
 						xlog.Info("Message", message)
 
 						go func() {
