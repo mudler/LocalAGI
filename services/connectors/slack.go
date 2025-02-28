@@ -63,6 +63,11 @@ func (t *Slack) Start(a *agent.Agent) {
 		slack.OptionAppLevelToken(t.appToken),
 	)
 
+	postMessageParams := slack.PostMessageParameters{
+		LinkNames: 1,
+		Markdown:  true,
+	}
+
 	client := socketmode.New(
 		api,
 		//socketmode.OptionDebug(true),
@@ -113,7 +118,7 @@ func (t *Slack) Start(a *agent.Agent) {
 						message := cleanUpUsernameFromMessage(ev.Text, b)
 						go func() {
 
-							ts := ev.ThreadTimeStamp
+							//ts := ev.ThreadTimeStamp
 
 							res := a.Ask(
 								agent.WithText(message),
@@ -123,8 +128,9 @@ func (t *Slack) Start(a *agent.Agent) {
 
 							_, _, err = api.PostMessage(ev.Channel,
 								slack.MsgOptionText(res.Response, false),
-								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1, Markdown: true}),
-								slack.MsgOptionTS(ts))
+								slack.MsgOptionPostMessageParameters(postMessageParams),
+							//	slack.MsgOptionTS(ts),
+							)
 							if err != nil {
 								xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 							}
@@ -185,12 +191,16 @@ func (t *Slack) Start(a *agent.Agent) {
 							if ts != "" {
 								_, _, err = api.PostMessage(ev.Channel,
 									slack.MsgOptionText(res.Response, false),
-									slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1, Markdown: true}),
+									slack.MsgOptionPostMessageParameters(
+										postMessageParams,
+									),
 									slack.MsgOptionTS(ts))
 							} else {
 								_, _, err = api.PostMessage(ev.Channel,
 									slack.MsgOptionText(res.Response, false),
-									slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1, Markdown: true}),
+									slack.MsgOptionPostMessageParameters(
+										postMessageParams,
+									),
 									slack.MsgOptionTS(ev.TimeStamp))
 							}
 							if err != nil {
