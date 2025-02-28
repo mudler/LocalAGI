@@ -48,7 +48,7 @@ func (t *Slack) AgentReasoningCallback() func(state agent.ActionCurrentState) bo
 
 func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) string {
 	cleaned := strings.ReplaceAll(message, "<@"+b.UserID+">", "")
-	cleaned = strings.ReplaceAll(message, "<@"+b.BotID+">", "")
+	cleaned = strings.ReplaceAll(cleaned, "<@"+b.BotID+">", "")
 	cleaned = strings.TrimSpace(cleaned)
 	return cleaned
 }
