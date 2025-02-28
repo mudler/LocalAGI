@@ -121,7 +121,7 @@ func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Ask(opts ...JobOption) *JobResult {
-	xlog.Debug("Agent is being asked", "agent", a.Character.Name)
+	xlog.Debug("Agent Ask()", "agent", a.Character.Name)
 	defer func() {
 		xlog.Debug("Agent has finished being asked", "agent", a.Character.Name)
 	}()
@@ -134,9 +134,7 @@ func (a *Agent) Ask(opts ...JobOption) *JobResult {
 			WithResultCallback(a.options.resultCallback),
 		)...,
 	)
-	xlog.Debug("Job created", "agent", a.Character.Name, "job", j)
 	a.jobQueue <- j
-	xlog.Debug("Waiting result", "agent", a.Character.Name, "job", j)
 	return j.Result.WaitResult()
 }
 
