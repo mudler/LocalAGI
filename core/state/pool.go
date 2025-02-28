@@ -13,6 +13,7 @@ import (
 	"github.com/mudler/LocalAgent/core/agent"
 	. "github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
+	"github.com/mudler/LocalAgent/pkg/localrag"
 	"github.com/mudler/LocalAgent/pkg/utils"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
@@ -20,18 +21,16 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	file             string
-	pooldir          string
-	pool             AgentPoolData
-	agents           map[string]*Agent
-	managers         map[string]sse.Manager
-	agentStatus      map[string]*Status
-	agentMemory      map[string]*InMemoryDatabase
-	apiURL, model    string
-	ragDB            RAGDB
-	availableActions func(*AgentConfig) func(ctx context.Context) []Action
-	connectors       func(*AgentConfig) []Connector
-	timeout          string
+	file                               string
+	pooldir                            string
+	pool                               AgentPoolData
+	agents                             map[string]*Agent
+	managers                           map[string]sse.Manager
+	agentStatus                        map[string]*Status
+	apiURL, model, localRAGAPI, apiKey string
+	availableActions                   func(*AgentConfig) func(ctx context.Context) []Action
+	connectors                         func(*AgentConfig) []Connector
+	timeout                            string
 }
 
 type Status struct {
@@ -65,8 +64,8 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	model, apiURL, directory string,
-	RagDB RAGDB,
+	model, apiURL, apiKey, directory string,
+	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context) []agent.Action,
 	connectors func(*AgentConfig) []Connector,
 	timeout string,
@@ -83,12 +82,12 @@ func NewAgentPool(
 			pooldir:          directory,
 			apiURL:           apiURL,
 			model:            model,
-			ragDB:            RagDB,
+			localRAGAPI:      LocalRAGAPI,
+			apiKey:           apiKey,
 			agents:           make(map[string]*Agent),
 			pool:             make(map[string]AgentConfig),
 			agentStatus:      make(map[string]*Status),
 			managers:         make(map[string]sse.Manager),
-			agentMemory:      make(map[string]*InMemoryDatabase),
 			connectors:       connectors,
 			availableActions: availableActions,
 			timeout:          timeout,
@@ -103,14 +102,14 @@ func NewAgentPool(
 		file:             poolfile,
 		apiURL:           apiURL,
 		pooldir:          directory,
-		ragDB:            RagDB,
 		model:            model,
+		apiKey:           apiKey,
 		agents:           make(map[string]*Agent),
 		managers:         make(map[string]sse.Manager),
 		agentStatus:      map[string]*Status{},
-		agentMemory:      map[string]*InMemoryDatabase{},
 		pool:             *poolData,
 		connectors:       connectors,
+		localRAGAPI:      LocalRAGAPI,
 		availableActions: availableActions,
 		timeout:          timeout,
 	}, nil
@@ -164,14 +163,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	actions := a.availableActions(config)(ctx)
 
-	stateFile, characterFile, knowledgeBase := a.stateFiles(name)
-
-	agentDB, err := NewInMemoryDB(knowledgeBase, a.ragDB)
-	if err != nil {
-		return err
-	}
-
-	a.agentMemory[name] = agentDB
+	stateFile, characterFile := a.stateFiles(name)
 
 	actionsLog := []string{}
 	for _, action := range actions {
@@ -205,8 +197,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		),
 		WithStateFile(stateFile),
 		WithCharacterFile(characterFile),
+		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
-		WithRAGDB(agentDB),
+		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, name)),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",
@@ -382,22 +375,20 @@ func (a *AgentPool) Start(name string) error {
 	return fmt.Errorf("agent %s not found", name)
 }
 
-func (a *AgentPool) stateFiles(name string) (string, string, string) {
+func (a *AgentPool) stateFiles(name string) (string, string) {
 	stateFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", name))
 	characterFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", name))
-	knowledgeBaseFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.knowledgebase.json", name))
 
-	return stateFile, characterFile, knowledgeBaseFile
+	return stateFile, characterFile
 }
 
 func (a *AgentPool) Remove(name string) error {
 
 	// Cleanup character and state
-	stateFile, characterFile, knowledgeBaseFile := a.stateFiles(name)
+	stateFile, characterFile := a.stateFiles(name)
 
 	os.Remove(stateFile)
 	os.Remove(characterFile)
-	os.Remove(knowledgeBaseFile)
 
 	a.Stop(name)
 	delete(a.agents, name)
@@ -418,10 +409,6 @@ func (a *AgentPool) Save() error {
 
 func (a *AgentPool) GetAgent(name string) *Agent {
 	return a.agents[name]
-}
-
-func (a *AgentPool) GetAgentMemory(name string) *InMemoryDatabase {
-	return a.agentMemory[name]
 }
 
 func (a *AgentPool) GetConfig(name string) *AgentConfig {
