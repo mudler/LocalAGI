@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/sashabaranov/go-openai"
 
 	"github.com/mudler/LocalAgent/core/agent"
 
@@ -104,10 +105,12 @@ func (t *Slack) Start(a *agent.Agent) {
 
 						message := ev.Text
 						go func() {
+
+							ts := ev.ThreadTimeStamp
+
 							res := a.Ask(
 								agent.WithText(message),
 							)
-							ts := ev.ThreadTimeStamp
 
 							_, _, err = api.PostMessage(ev.Channel,
 								slack.MsgOptionText(res.Response, false),
@@ -130,11 +133,47 @@ func (t *Slack) Start(a *agent.Agent) {
 						xlog.Info("Message", message)
 
 						go func() {
-							res := a.Ask(
-								agent.WithText(message),
-							)
-
 							ts := ev.ThreadTimeStamp
+
+							var threadMessages []openai.ChatCompletionMessage
+
+							if ts != "" {
+								// Fetch the thread messages
+								messages, _, _, err := api.GetConversationReplies(&slack.GetConversationRepliesParameters{
+									ChannelID: ev.Channel,
+									Timestamp: ts,
+								})
+								if err != nil {
+									fmt.Printf("Error fetching thread messages: %v", err)
+								} else {
+									fmt.Println("Found messages", len(messages))
+									for _, msg := range messages {
+										role := "assistant"
+										if msg.User != b.UserID {
+											role = "user"
+										}
+										threadMessages = append(threadMessages,
+											openai.ChatCompletionMessage{
+												Role:    role,
+												Content: msg.Text,
+											},
+										)
+
+									}
+								}
+							} else {
+								threadMessages = append(threadMessages, openai.ChatCompletionMessage{
+									Role:    "user",
+									Content: message,
+								})
+							}
+
+							fmt.Println("THREADS", threadMessages)
+
+							res := a.Ask(
+								//	agent.WithText(message),
+								agent.WithConversationHistory(threadMessages),
+							)
 
 							if ts != "" {
 								_, _, err = api.PostMessage(ev.Channel,
