@@ -565,6 +565,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		if followingAction != nil &&
 			!followingAction.Definition().Name.Is(action.ReplyActionName) &&
 			!chosenAction.Definition().Name.Is(action.ReplyActionName) {
+			xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
+
 			// We need to do another action (?)
 			// The agent decided to do another action
 			// call ourselves again
@@ -575,7 +577,11 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			a.consumeJob(job, role)
 			return
 		} else if followingAction == nil {
+			xlog.Info("Not following another action", "agent", a.Character.Name)
+
 			if !a.options.forceReasoning {
+				xlog.Info("Finish conversation with reasoning", "reasoning", reasoning, "agent", a.Character.Name)
+
 				msg := openai.ChatCompletionMessage{
 					Role:    "assistant",
 					Content: reasoning,
@@ -590,6 +596,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	// At this point can only be a reply action
+	xlog.Info("Computing reply", "agent", a.Character.Name)
 
 	// decode the response
 	replyResponse := action.ReplyResponse{}
@@ -645,6 +652,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// )
 
 	if !a.options.forceReasoning {
+		xlog.Info("No reasoning, return reply message", "reply", replyResponse.Message, "agent", a.Character.Name)
+
 		msg := openai.ChatCompletionMessage{
 			Role:    "assistant",
 			Content: replyResponse.Message,
@@ -656,6 +665,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
+	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
+	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", a.currentConversation))
 	msg, err := a.askLLM(ctx, append(a.currentConversation, openai.ChatCompletionMessage{
 		Role:    "system",
 		Content: "The assistant needs to reply without using any tool.",
@@ -678,6 +689,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	a.currentConversation = append(a.currentConversation, msg)
 	job.Result.SetResponse(msg.Content)
+	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
+
 	job.Result.Finish(nil)
 }
 

@@ -231,13 +231,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 			a.agentStatus[name].addResult(state)
 			a.Unlock()
-			xlog.Info(
-				"Agent executed an action",
-				"agent", name,
-				"reasoning", state.Reasoning,
-				"action", state.ActionCurrentState.Action.Definition().Name,
-				"params", state.ActionCurrentState.Params,
-				"result", state.Result,
+			xlog.Debug(
+				"Calling agent result callback",
 			)
 
 			text := fmt.Sprintf(`Reasoning: %s
