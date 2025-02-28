@@ -115,13 +115,7 @@ func (m Messages) Exist(content string) bool {
 
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
 
-	var promptHUD *PromptHUD
-	if a.options.enableHUD {
-		h := a.prepareHUD()
-		promptHUD = &h
-	}
-
-	stateHUD, err := renderTemplate(pickTemplate, promptHUD, a.systemInternalActions(), reasoning)
+	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.systemInternalActions(), reasoning)
 	if err != nil {
 		return nil, err
 	}
@@ -189,8 +183,12 @@ func (a *Agent) systemInternalActions() Actions {
 	return defaultActions
 }
 
-func (a *Agent) prepareHUD() PromptHUD {
-	return PromptHUD{
+func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {
+	if !a.options.enableHUD {
+		return nil
+	}
+
+	return &PromptHUD{
 		Character:     a.Character,
 		CurrentState:  *a.currentState,
 		PermanentGoal: a.options.permanentGoal,
@@ -219,7 +217,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		// Find the action
 		chosenAction := a.systemInternalActions().Find(thought.actioName)
 		if chosenAction == nil || thought.actioName == "" {
-			xlog.Debug(fmt.Sprintf("no answer"))
+			xlog.Debug("no answer")
 
 			// LLM replied with an answer?
 			//fmt.Errorf("no action found for intent:" + thought.actioName)
@@ -229,13 +227,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return chosenAction, thought.actionParams, thought.message, nil
 	}
 
-	var promptHUD *PromptHUD
-	if a.options.enableHUD {
-		h := a.prepareHUD()
-		promptHUD = &h
-	}
-
-	prompt, err := renderTemplate(templ, promptHUD, a.systemInternalActions(), "")
+	prompt, err := renderTemplate(templ, a.prepareHUD(), a.systemInternalActions(), "")
 	if err != nil {
 		return nil, nil, "", err
 	}

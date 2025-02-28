@@ -46,6 +46,10 @@ func (t *Slack) AgentReasoningCallback() func(state agent.ActionCurrentState) bo
 	}
 }
 
+func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) string {
+	return strings.ReplaceAll(message, "<@"+b.BotID+">", "")
+}
+
 func (t *Slack) Start(a *agent.Agent) {
 	api := slack.New(
 		t.botToken,
@@ -71,12 +75,10 @@ func (t *Slack) Start(a *agent.Agent) {
 			case socketmode.EventTypeEventsAPI:
 				eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
 				if !ok {
-					fmt.Printf("Ignored %+v\n", evt)
+					xlog.Debug(fmt.Sprintf("Ignored %+v\n", evt))
 
 					continue
 				}
-
-				fmt.Printf("Event received: %+v\n", eventsAPIEvent)
 
 				client.Ack(*evt.Request)
 
@@ -104,6 +106,7 @@ func (t *Slack) Start(a *agent.Agent) {
 						}
 
 						message := ev.Text
+						message = cleanUpUsernameFromMessage(message, b)
 						go func() {
 
 							ts := ev.ThreadTimeStamp
@@ -117,7 +120,7 @@ func (t *Slack) Start(a *agent.Agent) {
 								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1}),
 								slack.MsgOptionTS(ts))
 							if err != nil {
-								fmt.Printf("Error posting message: %v", err)
+								xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 							}
 						}()
 					case *slackevents.AppMentionEvent:
@@ -129,7 +132,7 @@ func (t *Slack) Start(a *agent.Agent) {
 						message := ev.Text
 
 						// strip our id from the message
-						message = strings.ReplaceAll(message, "<@"+b.UserID+"> ", "")
+						message = cleanUpUsernameFromMessage(message, b)
 						xlog.Info("Message", message)
 
 						go func() {
@@ -144,9 +147,8 @@ func (t *Slack) Start(a *agent.Agent) {
 									Timestamp: ts,
 								})
 								if err != nil {
-									fmt.Printf("Error fetching thread messages: %v", err)
+									xlog.Error(fmt.Sprintf("Error fetching thread messages: %v", err))
 								} else {
-									fmt.Println("Found messages", len(messages))
 									for _, msg := range messages {
 										role := "assistant"
 										if msg.User != b.UserID {
@@ -155,7 +157,7 @@ func (t *Slack) Start(a *agent.Agent) {
 										threadMessages = append(threadMessages,
 											openai.ChatCompletionMessage{
 												Role:    role,
-												Content: msg.Text,
+												Content: cleanUpUsernameFromMessage(msg.Text, b),
 											},
 										)
 
@@ -164,11 +166,9 @@ func (t *Slack) Start(a *agent.Agent) {
 							} else {
 								threadMessages = append(threadMessages, openai.ChatCompletionMessage{
 									Role:    "user",
-									Content: message,
+									Content: cleanUpUsernameFromMessage(message, b),
 								})
 							}
-
-							fmt.Println("THREADS", threadMessages)
 
 							res := a.Ask(
 								//	agent.WithText(message),
@@ -187,17 +187,17 @@ func (t *Slack) Start(a *agent.Agent) {
 									slack.MsgOptionTS(ev.TimeStamp))
 							}
 							if err != nil {
-								fmt.Printf("Error posting message: %v", err)
+								xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 							}
 						}()
 					case *slackevents.MemberJoinedChannelEvent:
-						fmt.Printf("user %q joined to channel %q", ev.User, ev.Channel)
+						xlog.Error(fmt.Sprintf("user %q joined to channel %q", ev.User, ev.Channel))
 					}
 				default:
 					client.Debugf("unsupported Events API event received")
 				}
 			default:
-				fmt.Fprintf(os.Stderr, "Unexpected event type received: %s\n", evt.Type)
+				xlog.Error(fmt.Sprintf("Unexpected event type received: %s", evt.Type))
 			}
 		}
 	}()

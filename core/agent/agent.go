@@ -222,6 +222,7 @@ func (a *Agent) Pause() {
 	a.Lock()
 	defer a.Unlock()
 	a.pause = true
+
 }
 
 func (a *Agent) Resume() {
@@ -609,15 +610,9 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	// 	}
 	// }
 
-	// If we have a hud, display it
+	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {
-		var promptHUD *PromptHUD
-		if a.options.enableHUD {
-			h := a.prepareHUD()
-			promptHUD = &h
-		}
-
-		prompt, err := renderTemplate(hudTemplate, promptHUD, a.systemInternalActions(), reasoning)
+		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.systemInternalActions(), reasoning)
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
 			return
