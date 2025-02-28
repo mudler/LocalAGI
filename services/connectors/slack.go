@@ -127,7 +127,7 @@ func (t *Slack) Start(a *agent.Agent) {
 							res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
 							_, _, err = api.PostMessage(ev.Channel,
-								slack.MsgOptionText(res.Response, false),
+								slack.MsgOptionText(res.Response, true),
 								slack.MsgOptionPostMessageParameters(postMessageParams),
 							//	slack.MsgOptionTS(ts),
 							)
@@ -190,14 +190,14 @@ func (t *Slack) Start(a *agent.Agent) {
 
 							if ts != "" {
 								_, _, err = api.PostMessage(ev.Channel,
-									slack.MsgOptionText(res.Response, false),
+									slack.MsgOptionText(res.Response, true),
 									slack.MsgOptionPostMessageParameters(
 										postMessageParams,
 									),
 									slack.MsgOptionTS(ts))
 							} else {
 								_, _, err = api.PostMessage(ev.Channel,
-									slack.MsgOptionText(res.Response, false),
+									slack.MsgOptionText(res.Response, true),
 									slack.MsgOptionPostMessageParameters(
 										postMessageParams,
 									),
