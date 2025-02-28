@@ -527,13 +527,19 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		stateResult := ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, result}
 		job.Result.SetResult(stateResult)
 		job.CallbackWithResult(stateResult)
+		xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
 
 		// calling the function
 		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 			Role: "assistant",
-			FunctionCall: &openai.FunctionCall{
-				Name:      chosenAction.Definition().Name.String(),
-				Arguments: actionParams.String(),
+			ToolCalls: []openai.ToolCall{
+				{
+					Type: openai.ToolTypeFunction,
+					Function: openai.FunctionCall{
+						Name:      chosenAction.Definition().Name.String(),
+						Arguments: actionParams.String(),
+					},
+				},
 			},
 		})
 
