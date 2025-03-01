@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 )
 
 var _ agent.RAGDB = &WrappedClient{}
@@ -61,6 +62,8 @@ func (c *WrappedClient) Store(s string) error {
 
 	hash := md5.Sum([]byte(s))
 	fileName := hex.EncodeToString(hash[:]) + ".txt"
+
+	xlog.Debug("Storing string in LocalRAG", "collection", c.collection, "fileName", fileName)
 
 	tempdir, err := os.MkdirTemp("", "localrag")
 	if err != nil {
