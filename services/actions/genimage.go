@@ -9,6 +9,10 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
+const (
+	MetadataImages = "images_url"
+)
+
 func NewGenImage(config map[string]string) *GenImageAction {
 	defaultConfig := openai.DefaultConfig(config["apiKey"])
 	defaultConfig.BaseURL = config["apiURL"]
@@ -65,7 +69,7 @@ func (a *GenImageAction) Run(ctx context.Context, params action.ActionParams) (a
 
 	return action.ActionResult{
 		Result: fmt.Sprintf("The image was generated and available at: %s", resp.Data[0].URL), Metadata: map[string]interface{}{
-			"url": resp.Data[0].URL,
+			MetadataImages: []string{resp.Data[0].URL},
 		}}, nil
 }
 

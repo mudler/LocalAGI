@@ -25,7 +25,7 @@ type StateAction struct{}
 // TODO: A special action is then used to let the LLM itself update its memory
 // periodically during self-processing, and the same action is ALSO exposed
 // during the conversation to let the user put for example, a new goal to the agent.
-type StateResult struct {
+type AgentInternalState struct {
 	NowDoing    string   `json:"doing_now"`
 	DoingNext   string   `json:"doing_next"`
 	DoneHistory []string `json:"done_history"`
@@ -81,7 +81,7 @@ You have a short memory with: %+v
 =====================
 `
 
-func (c StateResult) String() string {
+func (c AgentInternalState) String() string {
 	return fmt.Sprintf(
 		fmtT,
 		c.NowDoing,

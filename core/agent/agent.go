@@ -31,7 +31,7 @@ type Agent struct {
 	context       *action.ActionContext
 
 	currentReasoning         string
-	currentState             *action.StateResult
+	currentState             *action.AgentInternalState
 	nextAction               Action
 	nextActionParams         *action.ActionParams
 	currentConversation      Messages
@@ -67,7 +67,7 @@ func New(opts ...Option) (*Agent, error) {
 		options:      options,
 		client:       client,
 		Character:    options.character,
-		currentState: &action.StateResult{},
+		currentState: &action.AgentInternalState{},
 		context:      action.NewContext(ctx, cancel),
 	}
 
@@ -239,15 +239,15 @@ func (a *Agent) Memory() RAGDB {
 	return a.options.ragdb
 }
 
-func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (result string, err error) {
-	for _, action := range a.systemInternalActions() {
-		if action.Definition().Name == chosenAction.Definition().Name {
-			res, err := action.Run(a.actionContext, params)
+func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (result action.ActionResult, err error) {
+	for _, act := range a.systemInternalActions() {
+		if act.Definition().Name == chosenAction.Definition().Name {
+			res, err := act.Run(a.actionContext, params)
 			if err != nil {
-				return "", fmt.Errorf("error running action: %w", err)
+				return action.ActionResult{}, fmt.Errorf("error running action: %w", err)
 			}
 
-			result = res.Result
+			result = res
 		}
 	}
 
@@ -255,11 +255,11 @@ func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (resu
 
 	if chosenAction.Definition().Name.Is(action.StateActionName) {
 		// We need to store the result in the state
-		state := action.StateResult{}
+		state := action.AgentInternalState{}
 
 		err = params.Unmarshal(&state)
 		if err != nil {
-			return "", fmt.Errorf("error unmarshalling state of the agent: %w", err)
+			return action.ActionResult{}, fmt.Errorf("error unmarshalling state of the agent: %w", err)
 		}
 		// update the current state with the one we just got from the action
 		a.currentState = &state
@@ -267,7 +267,7 @@ func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (resu
 		// update the state file
 		if a.options.statefile != "" {
 			if err := a.SaveState(a.options.statefile); err != nil {
-				return "", err
+				return action.ActionResult{}, err
 			}
 		}
 	}
@@ -445,6 +445,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			Role:    "assistant",
 			Content: reasoning,
 		})
+		job.Result.Conversation = a.currentConversation
 		job.Result.SetResponse(reasoning)
 		job.Result.Finish(nil)
 		return
@@ -486,7 +487,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	if !job.Callback(ActionCurrentState{chosenAction, actionParams, reasoning}) {
-		job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, "stopped by callback"})
+		job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, action.ActionResult{Result: "stopped by callback"}})
+		job.Result.Conversation = a.currentConversation
 		job.Result.Finish(nil)
 		return
 	}
@@ -512,6 +514,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				Content: message.Message,
 			}
 		}()
+		job.Result.Conversation = a.currentConversation
 		job.Result.SetResponse("decided to initiate a new conversation")
 		job.Result.Finish(nil)
 		return
@@ -524,7 +527,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			//job.Result.Finish(fmt.Errorf("error running action: %w", err))
 			//return
 			// make the LLM aware of the error of running the action instead of stopping the job here
-			result = fmt.Sprintf("Error running tool: %v", err)
+			result.Result = fmt.Sprintf("Error running tool: %v", err)
 		}
 
 		stateResult := ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, result}
@@ -549,7 +552,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		// result of calling the function
 		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 			Role:       openai.ChatMessageRoleTool,
-			Content:    result,
+			Content:    result.Result,
 			Name:       chosenAction.Definition().Name.String(),
 			ToolCallID: chosenAction.Definition().Name.String(),
 		})
@@ -561,6 +564,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		// to continue using another tool given the result
 		followingAction, followingParams, reasoning, err := a.pickAction(ctx, reEvaluationTemplate, a.currentConversation)
 		if err != nil {
+			job.Result.Conversation = a.currentConversation
 			job.Result.Finish(fmt.Errorf("error picking action: %w", err))
 			return
 		}
@@ -592,11 +596,14 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 				a.currentConversation = append(a.currentConversation, msg)
 				job.Result.SetResponse(msg.Content)
+				job.Result.Conversation = a.currentConversation
 				job.Result.Finish(nil)
 				return
 			}
 		}
 	}
+
+	job.Result.Conversation = a.currentConversation
 
 	// At this point can only be a reply action
 	xlog.Info("Computing reply", "agent", a.Character.Name)
@@ -605,6 +612,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	replyResponse := action.ReplyResponse{}
 
 	if err := actionParams.Unmarshal(&replyResponse); err != nil {
+		job.Result.Conversation = a.currentConversation
 		job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
 		return
 	}
@@ -628,6 +636,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	if a.options.enableHUD {
 		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.systemInternalActions(), reasoning)
 		if err != nil {
+			job.Result.Conversation = a.currentConversation
 			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
 			return
 		}
@@ -663,6 +672,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}
 
 		a.currentConversation = append(a.currentConversation, msg)
+		job.Result.Conversation = a.currentConversation
 		job.Result.SetResponse(msg.Content)
 		job.Result.Finish(nil)
 		return
@@ -672,6 +682,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", a.currentConversation))
 	msg, err := a.askLLM(ctx, a.currentConversation)
 	if err != nil {
+		job.Result.Conversation = a.currentConversation
 		job.Result.Finish(err)
 		return
 	}
@@ -690,7 +701,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	a.currentConversation = append(a.currentConversation, msg)
 	job.Result.SetResponse(msg.Content)
 	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
-
+	job.Result.Conversation = a.currentConversation
 	job.Result.Finish(nil)
 }
 

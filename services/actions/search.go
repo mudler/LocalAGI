@@ -8,6 +8,11 @@ import (
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/tools/duckduckgo"
+	"mvdan.cc/xurls/v2"
+)
+
+const (
+	MetadataUrls = "urls"
 )
 
 func NewSearch(config map[string]string) *SearchAction {
@@ -50,7 +55,11 @@ func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (act
 
 		return action.ActionResult{}, err
 	}
-	return action.ActionResult{Result: res}, nil
+
+	rxStrict := xurls.Strict()
+	urls := rxStrict.FindAllString(res, -1)
+
+	return action.ActionResult{Result: res, Metadata: map[string]interface{}{MetadataUrls: urls}}, nil
 }
 
 func (a *SearchAction) Definition() action.ActionDefinition {

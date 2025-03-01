@@ -14,10 +14,10 @@ import (
 // all information that should be displayed to the LLM
 // in the prompts
 type PromptHUD struct {
-	Character     Character          `json:"character"`
-	CurrentState  action.StateResult `json:"current_state"`
-	PermanentGoal string             `json:"permanent_goal"`
-	ShowCharacter bool               `json:"show_character"`
+	Character     Character                 `json:"character"`
+	CurrentState  action.AgentInternalState `json:"current_state"`
+	PermanentGoal string                    `json:"permanent_goal"`
+	ShowCharacter bool                      `json:"show_character"`
 }
 
 type Character struct {
@@ -42,7 +42,7 @@ func Load(path string) (*Character, error) {
 	return &c, nil
 }
 
-func (a *Agent) State() action.StateResult {
+func (a *Agent) State() action.AgentInternalState {
 	return *a.currentState
 }
 

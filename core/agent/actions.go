@@ -12,7 +12,7 @@ import (
 
 type ActionState struct {
 	ActionCurrentState
-	Result string
+	action.ActionResult
 }
 
 type ActionCurrentState struct {

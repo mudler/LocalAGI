@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAgent/services/actions"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/mudler/LocalAgent/core/agent"
@@ -53,6 +54,35 @@ func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) strin
 	cleaned = strings.ReplaceAll(cleaned, "<@"+b.BotID+">", "")
 	cleaned = strings.TrimSpace(cleaned)
 	return cleaned
+}
+
+func generateAttachmentsFromJobResponse(j *agent.JobResult) (attachments []slack.Attachment) {
+	for _, state := range j.State {
+		// coming from the search action
+		if urls, exists := state.Metadata[actions.MetadataUrls]; exists {
+			for _, url := range urls.([]string) {
+				attachment := slack.Attachment{
+					Title:     "URL",
+					TitleLink: url,
+					Text:      url,
+				}
+				attachments = append(attachments, attachment)
+			}
+		}
+
+		// coming from the gen image actions
+		if imagesUrls, exists := state.Metadata[actions.MetadataImages]; exists {
+			for _, url := range imagesUrls.([]string) {
+				attachment := slack.Attachment{
+					Title:     "Image",
+					TitleLink: url,
+					ImageURL:  url,
+				}
+				attachments = append(attachments, attachment)
+			}
+		}
+	}
+	return
 }
 
 func (t *Slack) Start(a *agent.Agent) {
@@ -129,6 +159,7 @@ func (t *Slack) Start(a *agent.Agent) {
 							_, _, err = api.PostMessage(ev.Channel,
 								slack.MsgOptionText(res.Response, true),
 								slack.MsgOptionPostMessageParameters(postMessageParams),
+								slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
 							//	slack.MsgOptionTS(ts),
 							)
 							if err != nil {
@@ -194,10 +225,12 @@ func (t *Slack) Start(a *agent.Agent) {
 									slack.MsgOptionPostMessageParameters(
 										postMessageParams,
 									),
+									slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
 									slack.MsgOptionTS(ts))
 							} else {
 								_, _, err = api.PostMessage(ev.Channel,
 									slack.MsgOptionText(res.Response, true),
+									slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
 									slack.MsgOptionPostMessageParameters(
 										postMessageParams,
 									),
