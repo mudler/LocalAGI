@@ -14,6 +14,8 @@ import (
 	"github.com/slack-go/slack/socketmode"
 
 	"github.com/slack-go/slack"
+
+	"github.com/eritikass/githubmarkdownconvertergo"
 	"github.com/slack-go/slack/slackevents"
 )
 
@@ -117,6 +119,8 @@ func (t *Slack) Start(a *agent.Agent) {
 								agent.WithText(message),
 							)
 
+							res.Response = githubmarkdownconvertergo.Slack(res.Response)
+
 							_, _, err = api.PostMessage(ev.Channel,
 								slack.MsgOptionText(res.Response, false),
 								slack.MsgOptionPostMessageParameters(slack.PostMessageParameters{LinkNames: 1, Markdown: true}),
@@ -175,6 +179,8 @@ func (t *Slack) Start(a *agent.Agent) {
 								//	agent.WithText(message),
 								agent.WithConversationHistory(threadMessages),
 							)
+
+							res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
 							if ts != "" {
 								_, _, err = api.PostMessage(ev.Channel,
