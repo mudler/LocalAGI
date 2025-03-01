@@ -168,6 +168,36 @@ func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletion
 	return resp.Choices[0].Message, nil
 }
 
+func (a *Agent) saveCurrentConversationInMemory() {
+	if !a.options.enableLongTermMemory {
+		return
+	}
+
+	xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(a.currentConversation))
+
+	if a.options.enableSummaryMemory && len(a.currentConversation) > 0 {
+		msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
+			Role:    "user",
+			Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(a.currentConversation).String(),
+		}})
+		if err != nil {
+			xlog.Error("Error summarizing conversation", "error", err)
+		}
+
+		if err := a.options.ragdb.Store(msg.Content); err != nil {
+			xlog.Error("Error storing into memory", "error", err)
+		}
+	} else {
+		for _, message := range a.currentConversation {
+			if message.Role == "user" {
+				if err := a.options.ragdb.Store(message.Content); err != nil {
+					xlog.Error("Error storing into memory", "error", err)
+				}
+			}
+		}
+	}
+}
+
 func (a *Agent) ResetConversation() {
 	a.Lock()
 	defer a.Unlock()
@@ -177,33 +207,7 @@ func (a *Agent) ResetConversation() {
 	// store into memory the conversation before pruning it
 	// TODO: Shall we summarize the conversation into a bullet list of highlights
 	// using the LLM instead?
-	if a.options.enableLongTermMemory {
-		xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(a.currentConversation))
-
-		if a.options.enableSummaryMemory && len(a.currentConversation) > 0 {
-
-			msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
-				Role:    "user",
-				Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(a.currentConversation).String(),
-			}})
-			if err != nil {
-				xlog.Error("Error summarizing conversation", "error", err)
-			}
-
-			if err := a.options.ragdb.Store(msg.Content); err != nil {
-				xlog.Error("Error storing into memory", "error", err)
-			}
-		} else {
-			for _, message := range a.currentConversation {
-				if message.Role == "user" {
-					if err := a.options.ragdb.Store(message.Content); err != nil {
-						xlog.Error("Error storing into memory", "error", err)
-					}
-				}
-			}
-		}
-
-	}
+	a.saveCurrentConversationInMemory()
 
 	a.currentConversation = []openai.ChatCompletionMessage{}
 }
@@ -702,6 +706,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	job.Result.SetResponse(msg.Content)
 	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
 	job.Result.Conversation = a.currentConversation
+	a.saveCurrentConversationInMemory()
 	job.Result.Finish(nil)
 }
 
