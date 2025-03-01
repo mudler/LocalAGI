@@ -24,6 +24,7 @@ const (
 	ActionWikipedia           = "wikipedia"
 	ActionBrowse              = "browse"
 	ActionSendMail            = "send_mail"
+	ActionGenerateImage       = "generate_image"
 )
 
 var AvailableActions = []string{
@@ -37,6 +38,7 @@ var AvailableActions = []string{
 	ActionBrowse,
 	ActionWikipedia,
 	ActionSendMail,
+	ActionGenerateImage,
 }
 
 func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
@@ -58,6 +60,8 @@ func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
 					continue
 				}
 				allActions = append(allActions, customAction)
+			case ActionGenerateImage:
+				allActions = append(allActions, actions.NewGenImage(config))
 			case ActionSearch:
 				allActions = append(allActions, actions.NewSearch(config))
 			case ActionGithubIssueLabeler:
