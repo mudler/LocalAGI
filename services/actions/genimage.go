@@ -63,7 +63,7 @@ func (a *GenImageAction) Run(ctx context.Context, params action.ActionParams) (s
 		return "Failed to generate image", nil
 	}
 
-	return resp.Data[0].URL, nil
+	return fmt.Sprintf("The image was generated and available at: %s", resp.Data[0].URL), nil
 }
 
 func (a *GenImageAction) Definition() action.ActionDefinition {

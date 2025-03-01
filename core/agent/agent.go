@@ -667,10 +667,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", a.currentConversation))
-	msg, err := a.askLLM(ctx, append(a.currentConversation, openai.ChatCompletionMessage{
-		Role:    "system",
-		Content: "The assistant needs to reply without using any tool.",
-	}))
+	msg, err := a.askLLM(ctx, a.currentConversation)
 	if err != nil {
 		job.Result.Finish(err)
 		return
