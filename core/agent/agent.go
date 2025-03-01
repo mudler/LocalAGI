@@ -170,6 +170,7 @@ func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletion
 
 func (a *Agent) saveCurrentConversationInMemory() {
 	if !a.options.enableLongTermMemory {
+		xlog.Debug("Long term memory is disabled", "agent", a.Character.Name)
 		return
 	}
 
@@ -678,6 +679,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		a.currentConversation = append(a.currentConversation, msg)
 		job.Result.Conversation = a.currentConversation
 		job.Result.SetResponse(msg.Content)
+		a.saveCurrentConversationInMemory()
 		job.Result.Finish(nil)
 		return
 	}
@@ -688,6 +690,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	if err != nil {
 		job.Result.Conversation = a.currentConversation
 		job.Result.Finish(err)
+		xlog.Error("Error asking LLM for a reply", "error", err)
 		return
 	}
 
