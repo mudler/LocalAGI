@@ -31,13 +31,16 @@ func (a *GenImageAction) Run(ctx context.Context, params action.ActionParams) (s
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
-		fmt.Printf("error: %v", err)
-
 		return "", err
+	}
+
+	if result.Prompt == "" {
+		return "", fmt.Errorf("prompt is required")
 	}
 
 	req := openai.ImageRequest{
 		Prompt: result.Prompt,
+		Model:  a.imageModel,
 	}
 
 	switch result.Size {

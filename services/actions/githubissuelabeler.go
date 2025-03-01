@@ -3,11 +3,11 @@ package actions
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/google/go-github/v61/github"
 	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -53,7 +53,7 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 	labels, _, err := g.client.Issues.AddLabelsToIssue(g.context, result.Owner, result.Repository, result.IssueNumber, []string{result.Label})
 	//labelsNames := []string{}
 	for _, l := range labels {
-		slog.Info("Label added:", l.Name)
+		xlog.Info("Label added", "label", l.Name)
 		//labelsNames = append(labelsNames, l.GetName())
 	}
 

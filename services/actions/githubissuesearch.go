@@ -3,10 +3,10 @@ package actions
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/google/go-github/v61/github"
 	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -51,7 +51,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 		return resultString, err
 	}
 	for _, i := range issues.Issues {
-		slog.Info("Issue found:", i.GetTitle())
+		xlog.Info("Issue found", "title", i.GetTitle())
 		resultString += fmt.Sprintf("Issue found: %s\n", i.GetTitle())
 		resultString += fmt.Sprintf("URL: %s\n", i.GetHTMLURL())
 		//	resultString += fmt.Sprintf("Body: %s\n", i.GetBody())
