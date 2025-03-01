@@ -56,11 +56,23 @@ func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) strin
 	return cleaned
 }
 
+func uniqueStringSlice(s []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range s {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
+}
+
 func generateAttachmentsFromJobResponse(j *agent.JobResult) (attachments []slack.Attachment) {
 	for _, state := range j.State {
 		// coming from the search action
 		if urls, exists := state.Metadata[actions.MetadataUrls]; exists {
-			for _, url := range urls.([]string) {
+			for _, url := range uniqueStringSlice(urls.([]string)) {
 				attachment := slack.Attachment{
 					Title:     "URL",
 					TitleLink: url,
@@ -72,7 +84,7 @@ func generateAttachmentsFromJobResponse(j *agent.JobResult) (attachments []slack
 
 		// coming from the gen image actions
 		if imagesUrls, exists := state.Metadata[actions.MetadataImages]; exists {
-			for _, url := range imagesUrls.([]string) {
+			for _, url := range uniqueStringSlice(imagesUrls.([]string)) {
 				attachment := slack.Attachment{
 					Title:     "Image",
 					TitleLink: url,
