@@ -15,7 +15,7 @@ func NewWikipedia(config map[string]string) *WikipediaAction {
 
 type WikipediaAction struct{}
 
-func (a *WikipediaAction) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (a *WikipediaAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		Query string `json:"query"`
 	}{}
@@ -23,10 +23,16 @@ func (a *WikipediaAction) Run(ctx context.Context, params action.ActionParams) (
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 	wiki := wikipedia.New("LocalAgent")
-	return wiki.Call(ctx, result.Query)
+	res, err := wiki.Call(ctx, result.Query)
+	if err != nil {
+		fmt.Printf("error: %v", err)
+
+		return action.ActionResult{}, err
+	}
+	return action.ActionResult{Result: res}, nil
 }
 
 func (a *WikipediaAction) Definition() action.ActionDefinition {

@@ -16,7 +16,7 @@ func NewScraper(config map[string]string) *ScraperAction {
 
 type ScraperAction struct{}
 
-func (a *ScraperAction) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (a *ScraperAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		URL string `json:"url"`
 	}{}
@@ -24,15 +24,21 @@ func (a *ScraperAction) Run(ctx context.Context, params action.ActionParams) (st
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 	scraper, err := scraper.New()
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
-	return scraper.Call(ctx, result.URL)
+	res, err := scraper.Call(ctx, result.URL)
+	if err != nil {
+		fmt.Printf("error: %v", err)
+
+		return action.ActionResult{}, err
+	}
+	return action.ActionResult{Result: res}, nil
 }
 
 func (a *ScraperAction) Definition() action.ActionDefinition {

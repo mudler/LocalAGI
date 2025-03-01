@@ -18,8 +18,8 @@ type ConversationActionResponse struct {
 	Message string `json:"message"`
 }
 
-func (a *ConversationAction) Run(context.Context, ActionParams) (string, error) {
-	return "no-op", nil
+func (a *ConversationAction) Run(context.Context, ActionParams) (ActionResult, error) {
+	return ActionResult{}, nil
 }
 
 func (a *ConversationAction) Definition() ActionDefinition {

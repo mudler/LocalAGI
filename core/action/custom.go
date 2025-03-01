@@ -75,15 +75,16 @@ func (a *CustomAction) initializeInterpreter() error {
 	return nil
 }
 
-func (a *CustomAction) Run(ctx context.Context, params ActionParams) (string, error) {
+func (a *CustomAction) Run(ctx context.Context, params ActionParams) (ActionResult, error) {
 	v, err := a.i.Eval(fmt.Sprintf("%s.Run", a.config["name"]))
 	if err != nil {
-		return "", err
+		return ActionResult{}, err
 	}
 
-	run := v.Interface().(func(map[string]interface{}) (string, error))
+	run := v.Interface().(func(map[string]interface{}) (string, map[string]interface{}, error))
 
-	return run(params)
+	res, meta, err := run(params)
+	return ActionResult{Result: res, Metadata: meta}, err
 }
 
 func (a *CustomAction) Definition() ActionDefinition {

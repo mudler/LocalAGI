@@ -36,7 +36,7 @@ func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *Githu
 	}
 }
 
-func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
@@ -45,9 +45,7 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
-		fmt.Printf("error: %v", err)
-
-		return "", err
+		return action.ActionResult{}, err
 	}
 
 	labels, _, err := g.client.Issues.AddLabelsToIssue(g.context, result.Owner, result.Repository, result.IssueNumber, []string{result.Label})
@@ -61,7 +59,7 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 	if err != nil {
 		resultString = fmt.Sprintf("Error adding label '%s' to issue %d in repository %s/%s: %v", result.Label, result.IssueNumber, result.Owner, result.Repository, err)
 	}
-	return resultString, err
+	return action.ActionResult{Result: resultString}, err
 }
 
 func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {

@@ -28,6 +28,11 @@ func NewContext(ctx context.Context, cancel context.CancelFunc) *ActionContext {
 
 type ActionParams map[string]interface{}
 
+type ActionResult struct {
+	Result   string
+	Metadata map[string]interface{}
+}
+
 func (ap ActionParams) Read(s string) error {
 	err := json.Unmarshal([]byte(s), &ap)
 	return err

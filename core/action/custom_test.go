@@ -23,18 +23,18 @@ type Params struct {
 	Foo string
 }
 
-func Run(config map[string]interface{}) (string, error) {
+func Run(config map[string]interface{}) (string, map[string]interface{}, error) {
 
 p := Params{}
 b, err := json.Marshal(config)
 	if err != nil {
-		return "", err
+		return "",map[string]interface{}{}, err
 	}
 if err := json.Unmarshal(b, &p); err != nil {
-	return "", err
+	return "",map[string]interface{}{}, err
 }
 
-return p.Foo, nil
+return p.Foo,map[string]interface{}{}, nil
 }
 
 func Definition() map[string][]string {
@@ -79,7 +79,7 @@ return []string{"foo"}
 				"Foo": "bar",
 			})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(runResult).To(Equal("bar"))
+			Expect(runResult.Result).To(Equal("bar"))
 
 		})
 	})

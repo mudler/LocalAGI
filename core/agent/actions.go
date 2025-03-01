@@ -23,7 +23,7 @@ type ActionCurrentState struct {
 
 // Actions is something the agent can do
 type Action interface {
-	Run(ctx context.Context, action action.ActionParams) (string, error)
+	Run(ctx context.Context, action action.ActionParams) (action.ActionResult, error)
 	Definition() action.ActionDefinition
 }
 

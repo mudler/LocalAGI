@@ -26,7 +26,7 @@ func NewGithubIssueSearch(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		Query      string `json:"query"`
 		Repository string `json:"repository"`
@@ -36,7 +36,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 
 	query := fmt.Sprintf("%s in:%s user:%s", result.Query, result.Repository, result.Owner)
@@ -48,7 +48,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 	})
 	if err != nil {
 		resultString = fmt.Sprintf("Error listing issues: %v", err)
-		return resultString, err
+		return action.ActionResult{Result: resultString}, err
 	}
 	for _, i := range issues.Issues {
 		xlog.Info("Issue found", "title", i.GetTitle())
@@ -57,7 +57,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 		//	resultString += fmt.Sprintf("Body: %s\n", i.GetBody())
 	}
 
-	return resultString, err
+	return action.ActionResult{Result: resultString}, err
 }
 
 func (g *GithubIssueSearch) Definition() action.ActionDefinition {

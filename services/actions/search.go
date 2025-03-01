@@ -28,7 +28,7 @@ func NewSearch(config map[string]string) *SearchAction {
 
 type SearchAction struct{ results int }
 
-func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		Query string `json:"query"`
 	}{}
@@ -36,15 +36,21 @@ func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (str
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 	ddg, err := duckduckgo.New(a.results, "LocalAgent")
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
-	return ddg.Call(ctx, result.Query)
+	res, err := ddg.Call(ctx, result.Query)
+	if err != nil {
+		fmt.Printf("error: %v", err)
+
+		return action.ActionResult{}, err
+	}
+	return action.ActionResult{Result: res}, nil
 }
 
 func (a *SearchAction) Definition() action.ActionDefinition {

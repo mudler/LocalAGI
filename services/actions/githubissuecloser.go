@@ -24,7 +24,7 @@ func NewGithubIssueCloser(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
@@ -34,7 +34,7 @@ func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 
 	// _, _, err = g.client.Issues.CreateComment(
@@ -57,14 +57,14 @@ func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 
 	resultString := fmt.Sprintf("Closed issue %d in repository %s/%s", result.IssueNumber, result.Owner, result.Repository)
 	if err != nil {
 		resultString = fmt.Sprintf("Error closing issue %d in repository %s/%s: %v", result.IssueNumber, result.Owner, result.Repository, err)
 	}
-	return resultString, err
+	return action.ActionResult{Result: resultString}, err
 }
 
 func (g *GithubIssuesCloser) Definition() action.ActionDefinition {

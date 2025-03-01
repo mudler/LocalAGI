@@ -242,9 +242,12 @@ func (a *Agent) Memory() RAGDB {
 func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (result string, err error) {
 	for _, action := range a.systemInternalActions() {
 		if action.Definition().Name == chosenAction.Definition().Name {
-			if result, err = action.Run(a.actionContext, params); err != nil {
+			res, err := action.Run(a.actionContext, params)
+			if err != nil {
 				return "", fmt.Errorf("error running action: %w", err)
 			}
+
+			result = res.Result
 		}
 	}
 

@@ -18,7 +18,7 @@ func NewBrowse(config map[string]string) *BrowseAction {
 
 type BrowseAction struct{}
 
-func (a *BrowseAction) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (a *BrowseAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		URL string `json:"url"`
 	}{}
@@ -26,31 +26,31 @@ func (a *BrowseAction) Run(ctx context.Context, params action.ActionParams) (str
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 	// download page with http.Client
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", result.URL, nil)
 	if err != nil {
-		return "", err
+		return action.ActionResult{}, err
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return action.ActionResult{}, err
 	}
 	defer resp.Body.Close()
 	pagebyte, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return action.ActionResult{}, err
 	}
 
 	rendered, err := html2text.FromString(string(pagebyte), html2text.Options{PrettyTables: true})
 
 	if err != nil {
-		return "", err
+		return action.ActionResult{}, err
 	}
 
-	return fmt.Sprintf("The webpage '%s' content is:\n%s", result.URL, rendered), nil
+	return action.ActionResult{Result: fmt.Sprintf("The webpage '%s' content is:\n%s", result.URL, rendered)}, nil
 }
 
 func (a *BrowseAction) Definition() action.ActionDefinition {

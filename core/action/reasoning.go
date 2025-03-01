@@ -19,8 +19,8 @@ type ReasoningResponse struct {
 	Reasoning string `json:"reasoning"`
 }
 
-func (a *ReasoningAction) Run(context.Context, ActionParams) (string, error) {
-	return "no-op", nil
+func (a *ReasoningAction) Run(context.Context, ActionParams) (ActionResult, error) {
+	return ActionResult{}, nil
 }
 
 func (a *ReasoningAction) Definition() ActionDefinition {

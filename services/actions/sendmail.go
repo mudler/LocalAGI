@@ -27,7 +27,7 @@ type SendMailAction struct {
 	smtpPort string
 }
 
-func (a *SendMailAction) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (a *SendMailAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		Message string `json:"message"`
 		To      string `json:"to"`
@@ -37,7 +37,7 @@ func (a *SendMailAction) Run(ctx context.Context, params action.ActionParams) (s
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 
 	// Authentication.
@@ -50,9 +50,9 @@ func (a *SendMailAction) Run(ctx context.Context, params action.ActionParams) (s
 			result.To,
 		}, []byte(result.Message))
 	if err != nil {
-		return "", err
+		return action.ActionResult{}, err
 	}
-	return fmt.Sprintf("Email sent to %s", result.To), nil
+	return action.ActionResult{Result: fmt.Sprintf("Email sent to %s", result.To)}, nil
 }
 
 func (a *SendMailAction) Definition() action.ActionDefinition {

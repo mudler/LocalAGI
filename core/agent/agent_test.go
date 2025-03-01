@@ -36,7 +36,7 @@ type TestAction struct {
 	responseN int
 }
 
-func (a *TestAction) Run(context.Context, action.ActionParams) (string, error) {
+func (a *TestAction) Run(context.Context, action.ActionParams) (action.ActionResult, error) {
 	res := a.response[a.responseN]
 	a.responseN++
 
@@ -44,7 +44,7 @@ func (a *TestAction) Run(context.Context, action.ActionParams) (string, error) {
 		a.responseN = 0
 	}
 
-	return res, nil
+	return action.ActionResult{Result: res}, nil
 }
 
 func (a *TestAction) Definition() action.ActionDefinition {

@@ -25,7 +25,7 @@ func NewGithubIssueOpener(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams) (string, error) {
+func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
 		Title      string `json:"title"`
 		Body       string `json:"text"`
@@ -36,7 +36,7 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return "", err
+		return action.ActionResult{}, err
 	}
 
 	issue := &github.IssueRequest{
@@ -52,7 +52,7 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 		resultString = fmt.Sprintf("Created issue %d in repository %s/%s", createdIssue.GetNumber(), result.Owner, result.Repository)
 	}
 
-	return resultString, err
+	return action.ActionResult{Result: resultString}, err
 }
 
 func (g *GithubIssuesOpener) Definition() action.ActionDefinition {

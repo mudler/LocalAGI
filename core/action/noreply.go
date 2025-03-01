@@ -12,8 +12,8 @@ func NewStop() *StopAction {
 
 type StopAction struct{}
 
-func (a *StopAction) Run(context.Context, ActionParams) (string, error) {
-	return "no-op", nil
+func (a *StopAction) Run(context.Context, ActionParams) (ActionResult, error) {
+	return ActionResult{}, nil
 }
 
 func (a *StopAction) Definition() ActionDefinition {
