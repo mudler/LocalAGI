@@ -10,6 +10,7 @@ import (
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
 	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/services"
 )
 
 //go:embed views/*
@@ -45,9 +46,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Get("/create", func(c *fiber.Ctx) error {
 		return c.Render("views/create", fiber.Map{
-			"Actions":      AvailableActions,
-			"Connectors":   AvailableConnectors,
-			"PromptBlocks": AvailableBlockPrompts,
+			"Actions":      services.AvailableActions,
+			"Connectors":   services.AvailableConnectors,
+			"PromptBlocks": services.AvailableBlockPrompts,
 		})
 	})
 
@@ -97,8 +98,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
-
-	return
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

@@ -1,4 +1,4 @@
-package webui
+package services
 
 import (
 	"context"

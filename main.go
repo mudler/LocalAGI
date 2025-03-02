@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/services"
 	"github.com/mudler/LocalAgent/webui"
 )
 
@@ -47,9 +48,9 @@ func main() {
 		apiKey,
 		stateDir,
 		localRAG,
-		webui.Actions,
-		webui.Connectors,
-		webui.PromptBlocks,
+		services.Actions,
+		services.Connectors,
+		services.PromptBlocks,
 		timeout,
 	)
 	if err != nil {
