@@ -299,36 +299,38 @@ func (a *Agent) knowledgeBaseLookup() {
 	}
 	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage)
 
-	if userMessage != "" {
-		results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
-		if err != nil {
-			xlog.Info("Error finding similar strings inside KB:", "error", err)
-
-			//	job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
-			//	return
-		}
-
-		if len(results) != 0 {
-
-			formatResults := ""
-			for _, r := range results {
-				formatResults += fmt.Sprintf("- %s \n", r)
-			}
-			xlog.Info("[Knowledge Base Lookup] Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
-
-			// a.currentConversation = append(a.currentConversation,
-			// 	openai.ChatCompletionMessage{
-			// 		Role:    "system",
-			// 		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-			// 	},
-			// )
-			a.currentConversation = append([]openai.ChatCompletionMessage{
-				{
-					Role:    "system",
-					Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-				}}, a.currentConversation...)
-		}
+	if userMessage == "" {
+		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)
+		return
 	}
+
+	results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
+	if err != nil {
+		xlog.Info("Error finding similar strings inside KB:", "error", err)
+	}
+
+	if len(results) == 0 {
+		xlog.Info("[Knowledge Base Lookup] No similar strings found in KB", "agent", a.Character.Name)
+		return
+	}
+
+	formatResults := ""
+	for _, r := range results {
+		formatResults += fmt.Sprintf("- %s \n", r)
+	}
+	xlog.Info("[Knowledge Base Lookup] Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
+
+	// a.currentConversation = append(a.currentConversation,
+	// 	openai.ChatCompletionMessage{
+	// 		Role:    "system",
+	// 		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+	// 	},
+	// )
+	a.currentConversation = append([]openai.ChatCompletionMessage{
+		{
+			Role:    "system",
+			Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+		}}, a.currentConversation...)
 }
 
 func (a *Agent) consumeJob(job *Job, role string) {
