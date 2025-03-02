@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/pkg/xlog"
@@ -64,8 +65,11 @@ func (c *WrappedClient) Store(s string) error {
 	// the Client API of LocalRAG takes only files at the moment.
 	// So we take the string that we want to store, write it to a file, and then store the file.
 
+	// get current date and time for file name
+	t := time.Now()
+	dateTime := t.Format("2006-01-02-15-04-05")
 	hash := md5.Sum([]byte(s))
-	fileName := hex.EncodeToString(hash[:]) + ".txt"
+	fileName := fmt.Sprintf("%s-%s.%s", dateTime, hex.EncodeToString(hash[:]), "txt")
 
 	xlog.Debug("Storing string in LocalRAG", "collection", c.collection, "fileName", fileName)
 
