@@ -169,7 +169,7 @@ func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletion
 }
 
 func (a *Agent) saveCurrentConversationInMemory() {
-	if !a.options.enableLongTermMemory {
+	if !a.options.enableLongTermMemory && !a.options.enableSummaryMemory {
 		xlog.Debug("Long term memory is disabled", "agent", a.Character.Name)
 		return
 	}
@@ -280,6 +280,57 @@ func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (resu
 	return result, nil
 }
 
+func (a *Agent) knowledgeBaseLookup() {
+	if (!a.options.enableKB && !a.options.enableLongTermMemory && !a.options.enableSummaryMemory) ||
+		len(a.currentConversation) <= 0 {
+		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
+		return
+	}
+
+	// Walk conversation from bottom to top, and find the first message of the user
+	// to use it as a query to the KB
+	var userMessage string
+	for i := len(a.currentConversation) - 1; i >= 0; i-- {
+		xlog.Info("[Knowledge Base Lookup] Conversation", "role", a.currentConversation[i].Role, "Content", a.currentConversation[i].Content)
+		if a.currentConversation[i].Role == "user" {
+			userMessage = a.currentConversation[i].Content
+			break
+		}
+	}
+	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage)
+
+	if userMessage != "" {
+		results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
+		if err != nil {
+			xlog.Info("Error finding similar strings inside KB:", "error", err)
+
+			//	job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
+			//	return
+		}
+
+		if len(results) != 0 {
+
+			formatResults := ""
+			for _, r := range results {
+				formatResults += fmt.Sprintf("- %s \n", r)
+			}
+			xlog.Info("[Knowledge Base Lookup] Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
+
+			// a.currentConversation = append(a.currentConversation,
+			// 	openai.ChatCompletionMessage{
+			// 		Role:    "system",
+			// 		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+			// 	},
+			// )
+			a.currentConversation = append([]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+				}}, a.currentConversation...)
+		}
+	}
+}
+
 func (a *Agent) consumeJob(job *Job, role string) {
 	a.Lock()
 	paused := a.pause
@@ -354,54 +405,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		})
 	}
 
-	// TODO: move to a promptblock?
 	// RAG
-	if a.options.enableLongTermMemory && len(a.currentConversation) > 0 {
-		// Walk conversation from bottom to top, and find the first message of the user
-		// to use it as a query to the KB
-		var userMessage string
-		for i := len(a.currentConversation) - 1; i >= 0; i-- {
-			xlog.Info("[Long term memory] Conversation", "role", a.currentConversation[i].Role, "Content", a.currentConversation[i].Content)
-			if a.currentConversation[i].Role == "user" {
-				userMessage = a.currentConversation[i].Content
-				break
-			}
-		}
-		xlog.Info("[Long term memory] User message", "agent", a.Character.Name, "message", userMessage)
-
-		if userMessage != "" {
-			results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
-			if err != nil {
-				xlog.Info("Error finding similar strings inside KB:", "error", err)
-
-				//	job.Result.Finish(fmt.Errorf("error finding similar strings inside KB: %w", err))
-				//	return
-			}
-
-			if len(results) != 0 {
-
-				formatResults := ""
-				for _, r := range results {
-					formatResults += fmt.Sprintf("- %s \n", r)
-				}
-				xlog.Info("Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
-
-				// a.currentConversation = append(a.currentConversation,
-				// 	openai.ChatCompletionMessage{
-				// 		Role:    "system",
-				// 		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-				// 	},
-				// )
-				a.currentConversation = append([]openai.ChatCompletionMessage{
-					{
-						Role:    "system",
-						Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-					}}, a.currentConversation...)
-			}
-		}
-	} else {
-		xlog.Info("[Long term memory] No conversation available", "agent", a.Character.Name)
-	}
+	a.knowledgeBaseLookup()
 
 	var pickTemplate string
 	var reEvaluationTemplate string
@@ -451,6 +456,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			Content: reasoning,
 		})
 		job.Result.Conversation = a.currentConversation
+		a.saveCurrentConversationInMemory()
 		job.Result.SetResponse(reasoning)
 		job.Result.Finish(nil)
 		return
@@ -600,6 +606,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				}
 
 				a.currentConversation = append(a.currentConversation, msg)
+				a.saveCurrentConversationInMemory()
 				job.Result.SetResponse(msg.Content)
 				job.Result.Conversation = a.currentConversation
 				job.Result.Finish(nil)

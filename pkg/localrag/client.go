@@ -26,10 +26,14 @@ type WrappedClient struct {
 }
 
 func NewWrappedClient(baseURL, collection string) *WrappedClient {
-	return &WrappedClient{
+	wc := &WrappedClient{
 		Client:     NewClient(baseURL),
 		collection: collection,
 	}
+
+	wc.CreateCollection(collection)
+
+	return wc
 }
 
 func (c *WrappedClient) Count() int {
