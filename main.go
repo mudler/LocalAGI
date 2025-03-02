@@ -41,7 +41,17 @@ func main() {
 	os.MkdirAll(stateDir, 0755)
 
 	// Create the agent pool
-	pool, err := state.NewAgentPool(testModel, apiURL, apiKey, stateDir, localRAG, webui.Actions, webui.Connectors, timeout)
+	pool, err := state.NewAgentPool(
+		testModel,
+		apiURL,
+		apiKey,
+		stateDir,
+		localRAG,
+		webui.Actions,
+		webui.Connectors,
+		webui.PromptBlocks,
+		timeout,
+	)
 	if err != nil {
 		panic(err)
 	}

@@ -1,6 +1,8 @@
 package state
 
 import (
+	"encoding/json"
+
 	"github.com/mudler/LocalAgent/core/agent"
 )
 
@@ -14,9 +16,22 @@ type ActionsConfig struct {
 	Config string `json:"config"`
 }
 
+type PromptBlocksConfig struct {
+	Type   string `json:"type"`
+	Config string `json:"config"`
+}
+
+func (d PromptBlocksConfig) ToMap() map[string]string {
+	config := map[string]string{}
+	json.Unmarshal([]byte(d.Config), &config)
+	return config
+}
+
 type AgentConfig struct {
-	Connector []ConnectorConfig `json:"connectors" form:"connectors" `
-	Actions   []ActionsConfig   `json:"actions" form:"actions"`
+	Connector    []ConnectorConfig    `json:"connectors" form:"connectors" `
+	Actions      []ActionsConfig      `json:"actions" form:"actions"`
+	PromptBlocks []PromptBlocksConfig `json:"promptblocks" form:"promptblocks"`
+
 	// This is what needs to be part of ActionsConfig
 	Model                 string `json:"model" form:"model"`
 	Name                  string `json:"name" form:"name"`

@@ -42,11 +42,6 @@ type options struct {
 	resultCallback    func(ActionState)
 }
 
-type PromptBlock interface {
-	Render(a *Agent) string
-	Role() string
-}
-
 func defaultOptions() *options {
 	return &options{
 		periodicRuns: 15 * time.Minute,
@@ -181,6 +176,22 @@ func WithPrompts(prompts ...PromptBlock) Option {
 		return nil
 	}
 }
+
+// WithDynamicPrompts is a helper function to create dynamic prompts
+// Dynamic prompts contains golang code which is executed dynamically
+// // to render a prompt to the LLM
+// func WithDynamicPrompts(prompts ...map[string]string) Option {
+// 	return func(o *options) error {
+// 		for _, p := range prompts {
+// 			prompt, err := NewDynamicPrompt(p, "")
+// 			if err != nil {
+// 				return err
+// 			}
+// 			o.prompts = append(o.prompts, prompt)
+// 		}
+// 		return nil
+// 	}
+// }
 
 func WithLLMAPIKey(key string) Option {
 	return func(o *options) error {

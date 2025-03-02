@@ -379,7 +379,15 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	//}
 	// Add custom prompts
 	for _, prompt := range a.options.prompts {
-		message := prompt.Render(a)
+		message, err := prompt.Render(a)
+		if err != nil {
+			xlog.Error("Error rendering prompt", "error", err)
+			continue
+		}
+		if message == "" {
+			xlog.Debug("Prompt is empty, skipping", "agent", a.Character.Name)
+			continue
+		}
 		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
 			a.currentConversation = append([]openai.ChatCompletionMessage{
 				{

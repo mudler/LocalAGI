@@ -30,6 +30,7 @@ type AgentPool struct {
 	apiURL, model, localRAGAPI, apiKey string
 	availableActions                   func(*AgentConfig) func(ctx context.Context) []Action
 	connectors                         func(*AgentConfig) []Connector
+	promptBlocks                       func(*AgentConfig) []PromptBlock
 	timeout                            string
 }
 
@@ -68,6 +69,7 @@ func NewAgentPool(
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context) []agent.Action,
 	connectors func(*AgentConfig) []Connector,
+	promptBlocks func(*AgentConfig) []PromptBlock,
 	timeout string,
 ) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
@@ -160,6 +162,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	}
 
 	connectors := a.connectors(config)
+	promptBlocks := a.promptBlocks(config)
 
 	actions := a.availableActions(config)(ctx)
 
@@ -183,12 +186,19 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		"connectors", connectorLog,
 	)
 
+	// dynamicPrompts := []map[string]string{}
+	// for _, p := range config.DynamicPrompts {
+	// 	dynamicPrompts = append(dynamicPrompts, p.ToMap())
+	// }
+
 	opts := []Option{
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
 		WithContext(ctx),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
+		WithPrompts(promptBlocks...),
+		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
 			Name: name,
 		}),
@@ -313,6 +323,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		}
 	}()
 
+	xlog.Info("Starting connectors", "name", name, "config", config)
 	for _, c := range connectors {
 		go c.Start(agent)
 	}

@@ -25,6 +25,7 @@ type JobResult struct {
 	// The result of a job
 	State        []ActionState
 	Conversation []openai.ChatCompletionMessage
+	
 	Response     string
 	Error        error
 	ready        chan bool
