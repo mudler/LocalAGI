@@ -3,105 +3,6 @@
 <head>
     <title>Agent settings {{.Name}}</title>
     {{template "views/partials/header"}}
-    <style>
-        .section-box {
-            background-color: #2a2a2a; /* Darker background for the form */
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        body {
-            background-color: #1a1a1a; /* Lighter overall background */
-            color: #ffffff;
-            font-family: sans-serif;
-            padding: 20px;
-        }
-
-        input, button {
-            width: 100%;
-            padding: 10px;
-            margin-top: 5px;
-            border-radius: 5px;
-            border: none;
-        }
-
-        input[type="text"], input[type="file"] {
-            background-color: #333333;
-            color: white;
-        }
-
-        button {
-            background-color: #4a76a8; /* Blue color for buttons */
-            color: white;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #5a86b8;
-        }
-        
-        /* Toast notification styles */
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            max-width: 350px;
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .toast-success {
-            background-color: #10b981;
-            color: white;
-        }
-        .toast-error {
-            background-color: #ef4444;
-            color: white;
-        }
-        .toast-visible {
-            opacity: 1;
-        }
-        
-        /* Action button styles */
-        .action-button {
-            margin-bottom: 10px;
-            display: inline-block;
-            width: auto;
-            margin-right: 10px;
-        }
-        
-        .start-button {
-            background-color: #10b981; /* Green */
-        }
-        .start-button:hover {
-            background-color: #059669;
-        }
-        
-        .pause-button {
-            background-color: #f59e0b; /* Orange */
-        }
-        .pause-button:hover {
-            background-color: #d97706;
-        }
-        
-        .delete-button {
-            background-color: #ef4444; /* Red */
-            color: white;
-            padding: 10px 15px;
-            border-radius: 5px;
-            text-decoration: none;
-            display: inline-block;
-            cursor: pointer;
-        }
-        .delete-button:hover {
-            background-color: #dc2626;
-        }
-    </style>
 </head>
 <body>
     {{template "views/partials/menu"}}
@@ -111,62 +12,77 @@
         <span id="toast-message"></span>
     </div>
     
-    <header class="text-center mb-8">
-        <h1 class="text-3xl md:text-5xl font-bold">Agent settings - {{.Name}}</h1>
-    </header>
-    <div class="max-w-4xl mx-auto">
-        <div class="section-box">
-            <h2 class="mb-4">Agent Control</h2>
-            <button 
-                class="action-button start-button" 
-                hx-put="/start/{{.Name}}" 
-                hx-swap="none"
-                data-action="start"
-                data-agent="{{.Name}}">
-                Start Agent
-            </button>
-            <button 
-                class="action-button pause-button" 
-                hx-put="/pause/{{.Name}}" 
-                hx-swap="none"
-                data-action="pause"
-                data-agent="{{.Name}}">
-                Pause Agent
-            </button>
-        </div>
+    <div class="container">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-5xl font-bold">Agent settings - {{.Name}}</h1>
+        </header>
+        
+        <div class="max-w-4xl mx-auto">
+            <div class="section-box">
+                <h2>Agent Control</h2>
+                <div class="button-container">
+                    <button 
+                        class="action-btn start-btn" 
+                        hx-put="/start/{{.Name}}" 
+                        hx-swap="none"
+                        data-action="start"
+                        data-agent="{{.Name}}">
+                        <i class="fas fa-play"></i> Start Agent
+                    </button>
+                    <button 
+                        class="action-btn pause-btn" 
+                        hx-put="/pause/{{.Name}}" 
+                        hx-swap="none"
+                        data-action="pause"
+                        data-agent="{{.Name}}">
+                        <i class="fas fa-pause"></i> Pause Agent
+                    </button>
+                </div>
+            </div>
 
-        <div class="section-box">
-            <h2>Export</h2>
-            <a href="/settings/export/{{.Name}}" class="action-button">Export</a>
-        </div>
+            <div class="section-box">
+                <h2>Export Data</h2>
+                <p class="mb-4">Export your agent configuration for backup or transfer.</p>
+                <button 
+                    class="action-btn" 
+                    onclick="window.location.href='/settings/export/{{.Name}}'">
+                    <i class="fas fa-file-export"></i> Export Configuration
+                </button>
+            </div>
 
-        <div class="section-box">
-            <h2>Danger section</h2>
-            <button 
-                class="delete-button" 
-                hx-delete="/delete/{{.Name}}"
-                hx-swap="none"
-                data-action="delete"
-                data-agent="{{.Name}}">
-                <i class="fas fa-trash-alt"></i> Delete Agent
-            </button>
+            <div class="section-box">
+                <h2>Danger Zone</h2>
+                <p class="mb-4">Permanently delete this agent and all associated data. This action cannot be undone.</p>
+                <button 
+                    class="action-btn"
+                    style="background: linear-gradient(135deg, #ff4545, var(--secondary)); color: white;"
+                    hx-delete="/delete/{{.Name}}"
+                    hx-swap="none"
+                    data-action="delete"
+                    data-agent="{{.Name}}">
+                    <i class="fas fa-trash-alt"></i> Delete Agent
+                </button>
+            </div>
+          
+            <div class="user-info">
+                <span>Agent: {{.Name}}</span>
+                <span class="timestamp">Last modified: <span id="current-date"></span></span>
+            </div>
         </div>
-      
     </div>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Add event listeners for action buttons (Start, Pause)
-            document.querySelectorAll('.action-button').forEach(button => {
+            document.querySelectorAll('[data-action]').forEach(button => {
                 button.addEventListener('htmx:afterRequest', function(event) {
                     handleActionResponse(event, this);
                 });
             });
             
-            // Add event listener for delete button
-            document.querySelector('.delete-button').addEventListener('htmx:afterRequest', function(event) {
-                handleActionResponse(event, this);
-            });
+            // Set current date for timestamp
+            const now = new Date();
+            document.getElementById('current-date').textContent = now.toISOString().split('T')[0];
         });
         
         // Function to handle API responses for all actions
@@ -192,6 +108,10 @@
                                 break;
                             case 'delete':
                                 message = `Agent "${agent}" deleted successfully`;
+                                // Redirect to agent list page after short delay for delete
+                                setTimeout(() => {
+                                    window.location.href = "/agents";
+                                }, 2000);
                                 break;
                             default:
                                 message = "Operation completed successfully";
@@ -199,11 +119,6 @@
                         
                         // Show success message
                         showToast(message, 'success');
-                        
-                        // Redirect to agent list page after short delay
-                        setTimeout(() => {
-                            window.location.href = "/agents";
-                        }, 2000);
                         
                     } else if (response.error) {
                         // Show error message
@@ -218,8 +133,6 @@
                 showToast(`Server error: ${xhr.status}`, 'error');
             }
         }
-        
-      
     </script>
 </body>
 </html>

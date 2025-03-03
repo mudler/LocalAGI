@@ -61,6 +61,8 @@ func (a *Agent) knowledgeBaseLookup() {
 }
 
 func (a *Agent) saveCurrentConversationInMemory() {
+
+	
 	if !a.options.enableLongTermMemory && !a.options.enableSummaryMemory {
 		xlog.Debug("Long term memory is disabled", "agent", a.Character.Name)
 		return
