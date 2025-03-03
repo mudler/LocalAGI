@@ -92,6 +92,7 @@ func NewAgentPool(
 			managers:         make(map[string]sse.Manager),
 			connectors:       connectors,
 			availableActions: availableActions,
+			promptBlocks:     promptBlocks,
 			timeout:          timeout,
 		}, nil
 	}
@@ -112,6 +113,7 @@ func NewAgentPool(
 		pool:             *poolData,
 		connectors:       connectors,
 		localRAGAPI:      LocalRAGAPI,
+		promptBlocks:     promptBlocks,
 		availableActions: availableActions,
 		timeout:          timeout,
 	}, nil
