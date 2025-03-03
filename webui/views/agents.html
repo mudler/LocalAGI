@@ -6,93 +6,133 @@
     <title>Agent List</title>
     {{template "views/partials/header"}}
 </head>
-<body class="bg-gray-900 p-4 text-white font-sans">
+<body>
     {{template "views/partials/menu"}}
+    
     <!-- Toast for notifications -->
     <div id="toast" class="toast">
         <span id="toast-message"></span>
     </div>
 
-    <div class="max-w-6xl mx-auto">
+    <div class="container mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-4xl md:text-6xl font-bold text-primary">Smart Agent List</h1>
+            <h1 class="text-4xl md:text-6xl font-bold">Smart Agent List</h1>
+            <p class="mt-4 text-gray-400">Manage and interact with your AI agents</p>
         </header>
+        
         <div class="button-container justify-center mb-6">
-            <a href="/create" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out">
-                Add New Agent
+            <a href="/create" class="action-btn start-btn">
+                <i class="fas fa-plus-circle"></i> Add New Agent
             </a>
-            <button id="toggle-import" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out ml-4">
-                Import Agent
+            <button id="toggle-import" class="action-btn" style="background: linear-gradient(135deg, var(--tertiary), #4a76a8);">
+                <i class="fas fa-file-import"></i> Import Agent
             </button>
         </div>
+        
         <section id="import-section" class="hidden mb-8">
             <div class="section-box">
-                <h2 class="text-2xl font-bold mb-4">Import Agent</h2>
+                <h2>Import Agent</h2>
+                
                 <!-- Response Messages Container -->
                 <div id="response-container">
                     <!-- Success Alert -->
-                    <div id="success-alert" class="alert alert-success">
+                    <div id="success-alert" class="alert alert-success" style="display: none;">
                         Agent imported successfully! The page will refresh in a moment.
                     </div>
+                    
                     <!-- Error Alert -->
-                    <div id="error-alert" class="alert alert-error">
+                    <div id="error-alert" class="alert alert-error" style="display: none;">
                         <span id="error-message">Error importing agent.</span>
                     </div>
                 </div>
+                
                 <form id='import-form' hx-encoding='multipart/form-data' hx-post='/settings/import' hx-target="#response-container" hx-swap="none">
                     <div class="mb-4">
-                        <label for="file" class="block text-gray-300 mb-2">Select Agent File:</label>
-                        <input type='file' name='file' id='file' class="bg-gray-700 text-white rounded p-2 w-full">
+                        <label for="file" class="block mb-2">Select Agent File:</label>
+                        <input type='file' name='file' id='file'>
                     </div>
                     <div class="flex items-center">
-                        <button id="import-button" type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-300 ease-in-out">
-                            Import Agent
+                        <button id="import-button" type="submit" class="action-btn">
+                            <i class="fas fa-cloud-upload-alt"></i> Import Agent
                         </button>
                         <progress id='progress' value='0' max='100' class="ml-4"></progress>
                     </div>
                 </form>
             </div>
         </section>
+        
         <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {{ $status := .Status }}
             {{ range .Agents }}
-            <div class="card relative flex flex-col items-center text-center p-6 bg-gray-800 rounded-lg shadow-md">
-                <img src="/public/agent_{{.}}.png" alt="{{.}}" class="w-24 h-24 rounded-full mb-4">
-                <h2 class="text-xl font-bold mb-2">{{.}}</h2>
-                <p class="text-gray-400 mb-4">Online: {{ index $status . }}</p>
-                <div class="flex justify-center space-x-4">
-                    <a href="/status/{{.}}" class="text-indigo-500 hover:text-indigo-400">
-                        <i class="fas fa-info-circle"></i> Status
-                    </a>
-                    <a href="/talk/{{.}}" class="text-indigo-500 hover:text-indigo-400">
-                        <i class="fas fa-comments"></i> Talk
-                    </a>
-                    <button class="action-btn start-btn" hx-put="/start/{{.}}" hx-swap="none" hx-ext="json-enc" data-action="start" data-agent="{{.}}">
-                        Start
-                    </button>
-                    <button class="action-btn pause-btn" hx-put="/pause/{{.}}" hx-swap="none" hx-ext="json-enc" data-action="pause" data-agent="{{.}}">
-                        Pause
-                    </button>
-                    <a href="/settings/{{.}}" class="text-indigo-500 hover:text-indigo-400">
-                        <i class="fas fa-cog"></i> Settings
-                    </a>
+            <div hx-ext="sse" data-agent-name="{{.}}" class="card">
+                <div class="flex flex-col items-center text-center p-4">
+                    <!--<img src="/public/agent_{{.}}.png" alt="{{.}}" class="w-24 h-24 rounded-full mb-4" 
+                         style="border: 2px solid var(--primary); box-shadow: var(--neon-glow);">-->
+                    <h2>{{.}}</h2>
+                    <div class="mb-4 flex items-center justify-center">
+                        <span class="badge {{ if eq (index $status .) true }}badge-primary{{ else }}badge-secondary{{ end }} mr-2">
+                            {{ if eq (index $status .) true }}Active{{ else }}Inactive{{ end }}
+                        </span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 w-full mb-4">
+                        <a href="/status/{{.}}" class="action-btn flex items-center justify-center" 
+                           style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
+                            <i class="fas fa-info-circle mr-2"></i> Status
+                        </a>
+                        <a href="/talk/{{.}}" class="action-btn flex items-center justify-center"
+                           style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
+                            <i class="fas fa-comments mr-2"></i> Talk
+                        </a>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-2 w-full">
+                        <button class="action-btn start-btn col-span-1" 
+                                hx-put="/start/{{.}}" hx-swap="none" hx-ext="json-enc" 
+                                data-action="start" data-agent="{{.}}">
+                            <i class="fas fa-play"></i> 
+                        </button>
+                        <button class="action-btn pause-btn col-span-1" 
+                                hx-put="/pause/{{.}}" hx-swap="none" hx-ext="json-enc" 
+                                data-action="pause" data-agent="{{.}}">
+                            <i class="fas fa-pause"></i> 
+                        </button>
+                        <a href="/settings/{{.}}" class="action-btn col-span-1 flex items-center justify-center"
+                           style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
+                            <i class="fas fa-cog"></i> 
+                        </a>
+                    </div>
                 </div>
             </div>
             {{ end }}
         </section>
-        <footer class="mt-8 text-center">
-            <p>&copy; 2025 Smart Agent List. All rights reserved.</p>
+        
+        <div class="user-info mt-8 mb-4">
+            <span></span>
+            <span class="timestamp"></span>
+        </div>
+        
+        <footer class="text-center text-gray-500 text-sm mb-8">
+            <p>&copy; 2025 LocalAgent.</p>
         </footer>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+    
             const importSection = document.getElementById('import-section');
             const toggleImport = document.getElementById('toggle-import');
 
             // Toggle import section visibility
             toggleImport.addEventListener('click', function() {
                 importSection.classList.toggle('hidden');
+                // Add glitch effect when showing
+                if (!importSection.classList.contains('hidden')) {
+                    importSection.style.animation = 'glitch 0.3s';
+                    setTimeout(() => {
+                        importSection.style.animation = '';
+                    }, 300);
+                }
             });
 
             // Handle import form submission
@@ -113,6 +153,7 @@
                         if (response.status === "ok") {
                             // Show success message
                             successAlert.style.display = 'block';
+                            showToast("Agent imported successfully!", "success");
                             
                             // Refresh the page after a short delay
                             setTimeout(() => {
@@ -122,25 +163,34 @@
                             // Show error message
                             errorMessage.textContent = response.error;
                             errorAlert.style.display = 'block';
+                            showToast("Import failed: " + response.error, "error");
                         }
                     } catch (e) {
                         // Handle parsing error
                         errorMessage.textContent = "Invalid response format";
                         errorAlert.style.display = 'block';
+                        showToast("Invalid response format", "error");
                     }
                 } else {
                     // Handle HTTP error
                     errorMessage.textContent = "Server error: " + xhr.status;
                     errorAlert.style.display = 'block';
+                    showToast("Server error: " + xhr.status, "error");
                 }
             });
 
             // Add event listeners for Start and Pause buttons
-            document.querySelectorAll('.action-btn').forEach(button => {
+            document.querySelectorAll('.action-btn[data-action]').forEach(button => {
+                button.addEventListener('htmx:beforeRequest', function() {
+                    this.style.animation = 'pulse 0.5s';
+                });
+                
                 button.addEventListener('htmx:afterRequest', function(event) {
                     const xhr = event.detail.xhr;
                     const action = this.getAttribute('data-action');
                     const agent = this.getAttribute('data-agent');
+                    
+                    this.style.animation = '';
                     
                     if (xhr.status === 200) {
                         try {
@@ -175,9 +225,15 @@
             cards.forEach(card => {
                 const agentTitle = card.querySelector('h2').textContent;
                 if (agentTitle === agentName) {
-                    // Update the "Online:" text
-                    const statusText = card.querySelector('p');
-                    statusText.textContent = `Online: ${isOnline}`;
+                    // Update the badge
+                    const badge = card.querySelector('.badge');
+                    if (isOnline) {
+                        badge.className = 'badge badge-primary mr-2';
+                        badge.textContent = 'Active';
+                    } else {
+                        badge.className = 'badge badge-secondary mr-2';
+                        badge.textContent = 'Inactive';
+                    }
                 }
             });
         }

@@ -3,206 +3,276 @@
 <head>
     <title>Create New Agent</title>
     {{template "views/partials/header"}}
-    <script src="https://unpkg.com/htmx.org"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
-    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
-    <style>
-        .alert {
-            padding: 12px 16px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        .alert-success {
-            background-color: rgba(16, 185, 129, 0.2);
-            border: 1px solid #10b981;
-            color: #10b981;
-        }
-        .alert-error {
-            background-color: rgba(239, 68, 68, 0.2);
-            border: 1px solid #ef4444;
-            color: #ef4444;
-        }
-    </style>
 </head>
-<body class="bg-gray-900 p-4 text-white font-sans">
+<body>
     {{template "views/partials/menu"}}
-    <div class="max-w-2xl mx-auto my-12 bg-gray-800 p-8 rounded-lg shadow-lg">
-        <h1 class="text-3xl font-bold text-center mb-6 text-blue-400">Create New Agent</h1>
+    <div class="container">
+        <div class="section-box">
+            <h1>Create New Agent</h1>
+            
+            <form id="create-agent-form" action="/create" method="POST">
+                <div class="mb-4">
+                    <label for="name">Name</label>
+                    <input type="text" name="name" id="name" placeholder="Name">
+                </div>
+
+                <div id="connectorsSection">
+                    <!-- Connectors will be added here dynamically -->
+                </div>
+                
+                <div class="button-container">
+                    <button type="button" id="addConnectorButton" class="action-btn">
+                        <i class="fas fa-plus-circle"></i> Add Connector
+                    </button>
+                </div>
+
+                <div class="mb-4" id="action_box">
+                    <!-- Actions will be added here dynamically -->
+                </div>
+                
+                <div class="button-container">
+                    <button id="action_button" type="button" class="action-btn">
+                        <i class="fas fa-plus-circle"></i> Add Action
+                    </button>
+                </div>
+           
+                <div class="mb-4" id="dynamic_box">
+                    <!-- Dynamic prompts will be added here dynamically -->
+                </div>
+                
+                <div class="button-container">
+                    <button id="dynamic_button" type="button" class="action-btn">
+                        <i class="fas fa-plus-circle"></i> Add Dynamic Prompt
+                    </button>
+                </div>
+             
+                <div class="mb-4">
+                    <label for="hud" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="hud" id="hud">
+                            <span class="checkmark"></span>
+                        </span>
+                        HUD
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <label for="enable_kb" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="enable_kb" id="enable_kb">
+                            <span class="checkmark"></span>
+                        </span>
+                        Enable Knowledge Base
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <label for="enable_reasoning" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="enable_reasoning" id="enable_reasoning">
+                            <span class="checkmark"></span>
+                        </span>
+                        Enable Reasoning
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <label for="kb_results">Knowledge Base Results</label>
+                    <input type="text" name="kb_results" id="kb_results" placeholder="3">
+                </div>
         
-      
-     
-    <form id="create-agent-form" action="/create" method="POST" class="space-y-6">
-
-        <div class="mb-6">
-            <label for="name" class="block text-lg font-medium text-gray-400">Name</label>
-            <input type="text" name="name" id="name" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Name">
-        </div>
-
-        <div id="connectorsSection">
-        </div>
-        <button type="button" id="addConnectorButton" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-            Add Connector
-        </button>
-
-        <script>
-            const actions = `{{ range .Actions }}<option value="{{.}}">{{.}}</option>{{ end }}`;
-            const connectors = `{{ range .Connectors }}<option value="{{.}}">{{.}}</option>{{ end }}`;
-
-            document.getElementById('addConnectorButton').addEventListener('click', function() {
-                const connectorsSection = document.getElementById('connectorsSection');
-                const newConnectorIndex = connectorsSection.getElementsByClassName('connector').length;
-                const newConnectorHTML = `
-                    <div class="connector mb-4">
-                        <div class="mb-4">
-                            <label for="connectorType${newConnectorIndex}" class="block text-lg font-medium text-gray-400">Connector Type</label>
-                            <select name="connectors[${newConnectorIndex}].type" id="connectorType${newConnectorIndex}" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white">
-                                `+connectors+`                            </select>
-                        </div>
-                        <div class="mb-4">
-                            <label for="connectorConfig${newConnectorIndex}" class="block text-lg font-medium text-gray-400">Connector Config (JSON)</label>
-                            <textarea id="connectorConfig${newConnectorIndex}" name="connectors[${newConnectorIndex}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"token":"sk-mg3.."}'>{}</textarea>
-                        </div>
-                    </div>
-                `;
-            
-                connectorsSection.insertAdjacentHTML('beforeend', newConnectorHTML);
-            });
-            </script>
-            
-        <div class="mb-4" id="action_box">
-        </div>
-        <button id="action_button" type="button" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Add action</button>
-   
-        <script>
-            document.getElementById('action_button').addEventListener('click', function() {
-                const actionsSection = document.getElementById('action_box');
-                const ii = actionsSection.getElementsByClassName('action').length;
-
-                const newActionHTML = `
-                <div class="action mb-4">
-                    <label for="actionsName${ii}" class="block text-lg font-medium text-gray-400">Action</label>
-                    <select name="actions[${ii}].name" id="actionsName${ii}" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white">
-                    `+actions+`</select>
-                    <div class="mb-4">
-                        <label for="actionsConfig${ii}" class="block text-lg font-medium text-gray-400">Action Config (JSON)</label>
-                        <textarea id="actionsConfig${ii}" name="actions[${ii}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"results":"5"}'>{}</textarea>
-                    </div>
+                <div class="mb-4">
+                    <label for="standalone_job" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="standalone_job" id="standalone_job">
+                            <span class="checkmark"></span>
+                        </span>
+                        Standalone Job
+                    </label>
                 </div>
-                `;
-            
-                actionsSection.insertAdjacentHTML('beforeend', newActionHTML);
-            });
-        </script>
- 
-        <div class="mb-4" id="dynamic_box">
-        </div>
-        <button id="dynamic_button" type="button" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Add Dynamic prompt</button>
 
-        <script>
-            const promptBlocks = `{{ range .PromptBlocks }}<option value="{{.}}">{{.}}</option>{{ end }}`;
-
-            document.getElementById('dynamic_button').addEventListener('click', function() {
-                const actionsSection = document.getElementById('dynamic_box');
-                const ii = actionsSection.getElementsByClassName('promptBlock').length;
-
-                const newActionHTML = `
-                <div class="promptBlock mb-4">
-                    <label for="promptName${ii}" class="block text-lg font-medium text-gray-400">Block Prompt</label>
-                    <select name="promptblocks[${ii}].name" id="promptName${ii}" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white">
-                    `+promptBlocks+`</select>
-                    <div class="mb-4">
-                        <label for="promptConfig${ii}" class="block text-lg font-medium text-gray-400">Prompt Config (JSON)</label>
-                        <textarea id="promptConfig${ii}" name="promptblocks[${ii}].config" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder='{"results":"5"}'>{}</textarea>
-                    </div>
+                <div class="mb-4">
+                    <label for="initiate_conversations" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="initiate_conversations" id="initiate_conversations">
+                            <span class="checkmark"></span>
+                        </span>
+                        Initiate Conversations
+                    </label>
                 </div>
-                `;
-            
-                actionsSection.insertAdjacentHTML('beforeend', newActionHTML);
-            });
-        </script>
-     
-        <div class="mb-4">
-            <label for="hud" class="block text-lg font-medium text-gray-400">HUD</label>
-            <input type="checkbox" name="hud" id="hud" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
+
+                <div class="mb-4">
+                    <label for="can_stop_itself" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="can_stop_itself" id="can_stop_itself">
+                            <span class="checkmark"></span>
+                        </span>
+                        Can Stop Itself
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <label for="random_identity" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="random_identity" id="random_identity">
+                            <span class="checkmark"></span>
+                        </span>
+                        Random Identity
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <label for="long_term_memory" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="long_term_memory" id="long_term_memory">
+                            <span class="checkmark"></span>
+                        </span>
+                        Long Term Memory
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <label for="summary_long_term_memory" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" name="summary_long_term_memory" id="summary_long_term_memory">
+                            <span class="checkmark"></span>
+                        </span>
+                        Long Term Memory (Summarize!)
+                    </label>
+                </div>
+
+                <div class="mb-4">
+                    <label for="identity_guidance">Identity Guidance</label>
+                    <textarea name="identity_guidance" id="identity_guidance" placeholder="Identity Guidance"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="periodic_runs">Periodic Runs</label>
+                    <input type="text" name="periodic_runs" id="periodic_runs" placeholder="Periodic Runs">
+                </div>
+
+                <div class="mb-4">
+                    <label for="permanent_goal">Permanent Goal</label>
+                    <textarea name="permanent_goal" id="permanent_goal" placeholder="Permanent goal"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="system_prompt">System Prompt</label>
+                    <textarea name="system_prompt" id="system_prompt" placeholder="System prompt"></textarea>
+                </div>
+
+                <button type="submit" id="create-button">
+                    <i class="fas fa-robot"></i> Create Agent
+                </button>
+            </form>
         </div>
-        <div class="mb-4">
-        </div>
-        <div class="mb-4">
-            <label for="enable_kb" class="block text-lg font-medium text-gray-400">Enable Knowledge Base</label>
-            <input type="checkbox" name="enable_kb" id="enable_kb" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">  
-            <label for="enable_reasoning" class="block text-lg font-medium text-gray-400">Enable Reasoning</label>
-            <input type="checkbox" name="enable_reasoning" id="enable_reasoning" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">  
-            <div class="mb-6">
-                <label for="kb_results" class="block text-lg font-medium text-gray-400">Knowledge base results</label>
-                <input type="text" name="kb_results" id="kb_results" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="3">
+
+        <!-- Response Messages Container -->
+        <div id="response-container">
+            <!-- Alert messages will be shown here -->
+            <div id="success-alert" class="alert alert-success" style="display: none;">
+                Agent created successfully! Redirecting to agent list...
             </div>
-    
-            <label for="standalone_job" class="block text-lg font-medium text-gray-400">Standalone Job</label>
-            <input type="checkbox" name="standalone_job" id="standalone_job" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
-
-            <label for="initiate_conversations" class="block text-lg font-medium text-gray-400">Initiate conversations</label>
-            <input type="checkbox" name="random_identity" id="initiate_conversations" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
-
-            <label for="can_stop_itself" class="block text-lg font-medium text-gray-400">Can stop itself</label>
-            <input type="checkbox" name="can_stop_itself" id="can_stop_itself" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
-
-            <label for="random_identity" class="block text-lg font-medium text-gray-400">Random Identity</label>
-            <input type="checkbox" name="random_identity" id="random_identity" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
-
-            <label for="long_term_memory" class="block text-lg font-medium text-gray-400">Long term memory</label>
-            <input type="checkbox" name="long_term_memory" id="long_term_memory" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
-            <label for="summary_long_term_memory" class="block text-lg font-medium text-gray-400">Long term memory (summarize!)</label>
-            <input type="checkbox" name="summary_long_term_memory" id="summary_long_term_memory" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white">
-        </div>
-        <div class="mb-4">
-            <label for="identity_guidance" class="block text-lg font-medium text-gray-400">Identity Guidance</label>
-            <textarea name="identity_guidance" id="identity_guidance" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-lg border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Identity Guidance"></textarea>
-        </div>
-        <div class="mb-4">
-            <label for="periodic_runs" class="block text-lg font-medium text-gray-400">Periodic Runs</label>
-            <input type="text" name="periodic_runs" id="periodic_runs" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Periodic Runs">
-        </div>
-        <div class="mb-4">
-            <label for="permanent_goal" class="block text-lg font-medium text-gray-400">Permanent goal</label>
-            <textarea name="permanent_goal" id="permanent_goal" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="Permanent goal"></textarea>
-        </div>
-        <div class="mb-4">
-            <label for="system_prompt" class="block text-lg font-medium text-gray-400">System prompt</label>
-            <textarea name="system_prompt" id="system_prompt" class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md bg-gray-700 text-white" placeholder="System prompt"></textarea>
-        </div>
-
-        <div class="flex items-center justify-between">
-            <button type="submit" id="create-button" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                Create Agent
-            </button>
-
-        </div>
-    </form>
-    </div>
-    <!-- Response Messages Container -->
-    <div id="response-container">
-        <!-- Success Alert -->
-        <div id="success-alert" class="alert alert-success">
-            Agent created successfully! Redirecting to agent list...
-        </div>
-        
-        <!-- Error Alert -->
-        <div id="error-alert" class="alert alert-error">
-            <span id="error-message">Error creating agent.</span>
-        </div>
-    </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Convert regular form to use HTMX
-            const form = document.getElementById('create-agent-form');
             
-            // Add HTMX attributes to the form
-            form.setAttribute('hx-post', '/create');
-            form.setAttribute('hx-swap', 'none');
+            <div id="error-alert" class="alert alert-error" style="display: none;">
+                <span id="error-message">Error creating agent.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification container -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        const actions = `{{ range .Actions }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        const connectors = `{{ range .Connectors }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        const promptBlocks = `{{ range .PromptBlocks }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+
+        // Add connector functionality
+        document.getElementById('addConnectorButton').addEventListener('click', function() {
+            const connectorsSection = document.getElementById('connectorsSection');
+            const newConnectorIndex = connectorsSection.getElementsByClassName('connector').length;
+            const newConnectorHTML = `
+                <div class="connector mb-4 section-box" style="margin-top: 15px; padding: 15px;">
+                    <h2>Connector ${newConnectorIndex + 1}</h2>
+                    <div class="mb-4">
+                        <label for="connectorType${newConnectorIndex}">Connector Type</label>
+                        <select name="connectors[${newConnectorIndex}].type" id="connectorType${newConnectorIndex}">
+                            ${connectors}
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label for="connectorConfig${newConnectorIndex}">Connector Config (JSON)</label>
+                        <textarea id="connectorConfig${newConnectorIndex}" name="connectors[${newConnectorIndex}].config" placeholder='{"token":"sk-mg3.."}'>{}</textarea>
+                    </div>
+                </div>
+            `;
+        
+            connectorsSection.insertAdjacentHTML('beforeend', newConnectorHTML);
+        });
+
+        // Add action functionality
+        document.getElementById('action_button').addEventListener('click', function() {
+            const actionsSection = document.getElementById('action_box');
+            const ii = actionsSection.getElementsByClassName('action').length;
+
+            const newActionHTML = `
+            <div class="action mb-4 section-box" style="margin-top: 15px; padding: 15px;">
+                <h2>Action ${ii + 1}</h2>
+                <div class="mb-4">
+                    <label for="actionsName${ii}">Action</label>
+                    <select name="actions[${ii}].name" id="actionsName${ii}">
+                        ${actions}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="actionsConfig${ii}">Action Config (JSON)</label>
+                    <textarea id="actionsConfig${ii}" name="actions[${ii}].config" placeholder='{"results":"5"}'>{}</textarea>
+                </div>
+            </div>
+            `;
+        
+            actionsSection.insertAdjacentHTML('beforeend', newActionHTML);
+        });
+
+        // Add dynamic prompt functionality
+        document.getElementById('dynamic_button').addEventListener('click', function() {
+            const promptsSection = document.getElementById('dynamic_box');
+            const ii = promptsSection.getElementsByClassName('promptBlock').length;
+
+            const newPromptHTML = `
+            <div class="promptBlock mb-4 section-box" style="margin-top: 15px; padding: 15px;">
+                <h2>Prompt Block ${ii + 1}</h2>
+                <div class="mb-4">
+                    <label for="promptName${ii}">Block Prompt</label>
+                    <select name="promptblocks[${ii}].name" id="promptName${ii}">
+                        ${promptBlocks}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="promptConfig${ii}">Prompt Config (JSON)</label>
+                    <textarea id="promptConfig${ii}" name="promptblocks[${ii}].config" placeholder='{"results":"5"}'>{}</textarea>
+                </div>
+            </div>
+            `;
+        
+            promptsSection.insertAdjacentHTML('beforeend', newPromptHTML);
+        });
+
+        // Form submission handling
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('create-agent-form');
             
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
+                
+                // Show a loading state
+                const createButton = document.getElementById('create-button');
+                const originalButtonText = createButton.innerHTML;
+                createButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+                createButton.disabled = true;
                 
                 // Get form data
                 const formData = new FormData(form);
@@ -223,6 +293,9 @@
                     errorAlert.style.display = 'none';
                     
                     if (data.status === "ok") {
+                        // Show success toast
+                        showToast('Agent created successfully!', 'success');
+                        
                         // Show success message
                         successAlert.style.display = 'block';
                         
@@ -231,31 +304,60 @@
                             window.location.href = '/';
                         }, 2000);
                     } else if (data.error) {
+                        // Show error toast
+                        showToast('Error: ' + data.error, 'error');
+                        
                         // Show error message
                         errorMessage.textContent = data.error;
                         errorAlert.style.display = 'block';
                         
-                        // Scroll to the error message
-                        errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Restore button state
+                        createButton.innerHTML = originalButtonText;
+                        createButton.disabled = false;
                     } else {
                         // Handle unexpected response format
+                        showToast('Unexpected response format', 'error');
                         errorMessage.textContent = "Unexpected response format";
                         errorAlert.style.display = 'block';
+                        
+                        // Restore button state
+                        createButton.innerHTML = originalButtonText;
+                        createButton.disabled = false;
                     }
                 })
                 .catch(error => {
                     // Handle network or other errors
+                    showToast('Network error: ' + error.message, 'error');
                     const errorAlert = document.getElementById('error-alert');
                     const errorMessage = document.getElementById('error-message');
                     
                     errorMessage.textContent = "Network error: " + error.message;
                     errorAlert.style.display = 'block';
-                    errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Restore button state
+                    createButton.innerHTML = originalButtonText;
+                    createButton.disabled = false;
                 });
             });
         });
+
+        // Add additional CSS for checkbox labels
+        document.addEventListener('DOMContentLoaded', function() {
+            const style = document.createElement('style');
+            style.textContent = `
+                .checkbox-label {
+                    display: flex;
+                    align-items: center;
+                    cursor: pointer;
+                    margin-bottom: 10px;
+                }
+                
+                .checkbox-label .checkbox-custom {
+                    margin-right: 10px;
+                }
+            `;
+            document.head.appendChild(style);
+        });
     </script>
-    </div>
 </body>
 </html>
-

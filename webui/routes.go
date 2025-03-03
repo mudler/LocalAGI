@@ -29,7 +29,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
-			"Agents": pool.List(),
+			"Agents":     pool.List(),
+			"AgentCount": len(pool.List()),
+			"Actions":    len(services.AvailableActions),
 		})
 	})
 
