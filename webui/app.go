@@ -1,7 +1,6 @@
 package webui
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"github.com/mudler/LocalAgent/core/state"
 
 	"github.com/donseba/go-htmx"
-	"github.com/dslipak/pdf"
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
 )
@@ -79,10 +77,22 @@ func (a *App) Delete(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		if err := pool.Remove(c.Params("name")); err != nil {
 			xlog.Info("Error removing agent", err)
-			return c.Status(http.StatusInternalServerError).SendString(err.Error())
+			return errorJSONMessage(c, err.Error())
 		}
-		return c.Redirect("/agents")
+		return statusJSONMessage(c, "ok")
 	}
+}
+
+func errorJSONMessage(c *fiber.Ctx, message string) error {
+	return c.Status(http.StatusInternalServerError).JSON(struct {
+		Error string `json:"error"`
+	}{Error: message})
+}
+
+func statusJSONMessage(c *fiber.Ctx, message string) error {
+	return c.JSON(struct {
+		Status string `json:"status"`
+	}{Status: message})
 }
 
 func (a *App) Pause(pool *state.AgentPool) func(c *fiber.Ctx) error {
@@ -92,7 +102,7 @@ func (a *App) Pause(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		if agent != nil {
 			agent.Pause()
 		}
-		return c.Redirect("/agents")
+		return statusJSONMessage(c, "ok")
 	}
 }
 
@@ -102,7 +112,7 @@ func (a *App) Start(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		if agent != nil {
 			agent.Resume()
 		}
-		return c.Redirect("/agents")
+		return statusJSONMessage(c, "ok")
 	}
 }
 
@@ -110,20 +120,18 @@ func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		config := state.AgentConfig{}
 		if err := c.BodyParser(&config); err != nil {
-			return err
+			return errorJSONMessage(c, err.Error())
 		}
 
 		fmt.Printf("Agent configuration: %+v\n", config)
 
 		if config.Name == "" {
-			c.Status(http.StatusBadRequest).SendString("Name is required")
-			return nil
+			return errorJSONMessage(c, "Name is required")
 		}
 		if err := pool.CreateAgent(config.Name, &config); err != nil {
-			c.Status(http.StatusInternalServerError).SendString(err.Error())
-			return nil
+			return errorJSONMessage(c, err.Error())
 		}
-		return c.Redirect("/agents")
+		return statusJSONMessage(c, "ok")
 	}
 }
 
@@ -131,7 +139,7 @@ func (a *App) ExportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		agent := pool.GetConfig(c.Params("name"))
 		if agent == nil {
-			return c.Status(http.StatusNotFound).SendString("Agent not found")
+			return errorJSONMessage(c, "Agent not found")
 		}
 
 		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.json", agent.Name))
@@ -168,15 +176,13 @@ func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		xlog.Info("Importing agent", config.Name)
 
 		if config.Name == "" {
-			c.Status(http.StatusBadRequest).SendString("Name is required")
-			return nil
+			return errorJSONMessage(c, "Name is required")
 		}
 
 		if err := pool.CreateAgent(config.Name, &config); err != nil {
-			c.Status(http.StatusInternalServerError).SendString(err.Error())
-			return nil
+			return errorJSONMessage(c, err.Error())
 		}
-		return c.Redirect("/agents")
+		return statusJSONMessage(c, "ok")
 	}
 }
 
@@ -236,18 +242,4 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		return nil
 	}
-}
-
-func readPdf(path string) (string, error) {
-	r, err := pdf.Open(path)
-	if err != nil {
-		return "", err
-	}
-	var buf bytes.Buffer
-	b, err := r.GetPlainText()
-	if err != nil {
-		return "", err
-	}
-	buf.ReadFrom(b)
-	return buf.String(), nil
 }

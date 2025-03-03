@@ -41,46 +41,185 @@
         button:hover {
             background-color: #5a86b8;
         }
+        
+        /* Toast notification styles */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            max-width: 350px;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .toast-success {
+            background-color: #10b981;
+            color: white;
+        }
+        .toast-error {
+            background-color: #ef4444;
+            color: white;
+        }
+        .toast-visible {
+            opacity: 1;
+        }
+        
+        /* Action button styles */
+        .action-button {
+            margin-bottom: 10px;
+            display: inline-block;
+            width: auto;
+            margin-right: 10px;
+        }
+        
+        .start-button {
+            background-color: #10b981; /* Green */
+        }
+        .start-button:hover {
+            background-color: #059669;
+        }
+        
+        .pause-button {
+            background-color: #f59e0b; /* Orange */
+        }
+        .pause-button:hover {
+            background-color: #d97706;
+        }
+        
+        .delete-button {
+            background-color: #ef4444; /* Red */
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            cursor: pointer;
+        }
+        .delete-button:hover {
+            background-color: #dc2626;
+        }
     </style>
 </head>
 <body>
     {{template "views/partials/menu"}}
+    
+    <!-- Toast for notifications -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+    
     <header class="text-center mb-8">
         <h1 class="text-3xl md:text-5xl font-bold">Agent settings - {{.Name}}</h1>
     </header>
     <div class="max-w-4xl mx-auto">
-        <a href="/knowledgebase/{{.Name}}" class="card-link">
-            <div class="card">
-                <h2>Manage Knowledgebase</h2>
-                <p>Access and update your knowledgebase to improve agent responses and efficiency.</p>
-            </div>
-        </a>
         <div class="section-box">
-            <button hx-put="/start/{{.Name}}" class="text-indigo-500 hover:text-indigo-400">
-                Start
+            <h2 class="mb-4">Agent Control</h2>
+            <button 
+                class="action-button start-button" 
+                hx-put="/start/{{.Name}}" 
+                hx-swap="none"
+                data-action="start"
+                data-agent="{{.Name}}">
+                Start Agent
             </button>
-            <button hx-put="/pause/{{.Name}}" class="text-indigo-500 hover:text-indigo-400">
-                Pause
+            <button 
+                class="action-button pause-button" 
+                hx-put="/pause/{{.Name}}" 
+                hx-swap="none"
+                data-action="pause"
+                data-agent="{{.Name}}">
+                Pause Agent
             </button>
         </div>
 
         <div class="section-box">
-                <h2>Export</h2>
-                <a href="/settings/export/{{.Name}}" >Export</a>
+            <h2>Export</h2>
+            <a href="/settings/export/{{.Name}}" class="action-button">Export</a>
         </div>
 
         <div class="section-box">
             <h2>Danger section</h2>
-            <a href="/delete/{{.Name}}" class="text-red-500 hover:text-red-400">
-                <i class="fas fa-trash-alt"></i> Delete
-            </a>
+            <button 
+                class="delete-button" 
+                hx-delete="/delete/{{.Name}}"
+                hx-swap="none"
+                data-action="delete"
+                data-agent="{{.Name}}">
+                <i class="fas fa-trash-alt"></i> Delete Agent
+            </button>
         </div>
       
     </div>
+    
     <script>
-        htmx.on('#form', 'htmx:xhr:progress', function(evt) {
-            htmx.find('#progress').setAttribute('value', evt.detail.loaded / evt.detail.total * 100);
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners for action buttons (Start, Pause)
+            document.querySelectorAll('.action-button').forEach(button => {
+                button.addEventListener('htmx:afterRequest', function(event) {
+                    handleActionResponse(event, this);
+                });
+            });
+            
+            // Add event listener for delete button
+            document.querySelector('.delete-button').addEventListener('htmx:afterRequest', function(event) {
+                handleActionResponse(event, this);
+            });
         });
+        
+        // Function to handle API responses for all actions
+        function handleActionResponse(event, button) {
+            const xhr = event.detail.xhr;
+            const action = button.getAttribute('data-action');
+            const agent = button.getAttribute('data-agent');
+            
+            if (xhr.status === 200) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    
+                    if (response.status === "ok") {
+                        // Action successful
+                        let message = "";
+                        
+                        switch(action) {
+                            case 'start':
+                                message = `Agent "${agent}" started successfully`;
+                                break;
+                            case 'pause':
+                                message = `Agent "${agent}" paused successfully`;
+                                break;
+                            case 'delete':
+                                message = `Agent "${agent}" deleted successfully`;
+                                break;
+                            default:
+                                message = "Operation completed successfully";
+                        }
+                        
+                        // Show success message
+                        showToast(message, 'success');
+                        
+                        // Redirect to agent list page after short delay
+                        setTimeout(() => {
+                            window.location.href = "/agents";
+                        }, 2000);
+                        
+                    } else if (response.error) {
+                        // Show error message
+                        showToast(`Error: ${response.error}`, 'error');
+                    }
+                } catch (e) {
+                    // Handle JSON parsing error
+                    showToast("Invalid response format", 'error');
+                }
+            } else {
+                // Handle HTTP error
+                showToast(`Server error: ${xhr.status}`, 'error');
+            }
+        }
+        
+      
     </script>
 </body>
 </html>

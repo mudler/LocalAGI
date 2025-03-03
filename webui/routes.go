@@ -79,7 +79,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Get("/notify/:name", app.Notify(pool))
 	webapp.Post("/chat/:name", app.Chat(pool))
 	webapp.Post("/create", app.Create(pool))
-	webapp.Get("/delete/:name", app.Delete(pool))
+	webapp.Delete("/delete/:name", app.Delete(pool))
 	webapp.Put("/pause/:name", app.Pause(pool))
 	webapp.Put("/start/:name", app.Start(pool))
 

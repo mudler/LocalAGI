@@ -221,3 +221,28 @@ select::-webkit-scrollbar-thumb {
 
         
 </style>
+
+<script>
+  // Function to show toast notifications
+  function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            // Set message
+            toastMessage.textContent = message;
+            
+            // Set toast type (success/error)
+            toast.className = 'toast';
+            toast.classList.add(type === 'success' ? 'toast-success' : 'toast-error');
+            
+            // Show toast
+            setTimeout(() => {
+                toast.classList.add('toast-visible');
+            }, 100);
+            
+            // Hide toast after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('toast-visible');
+            }, 3000);
+        }
+</script>

@@ -6,13 +6,33 @@
     <script src="https://unpkg.com/htmx.org"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
     <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+    <style>
+        .alert {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert-success {
+            background-color: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            color: #10b981;
+        }
+        .alert-error {
+            background-color: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #ef4444;
+        }
+    </style>
 </head>
 <body class="bg-gray-900 p-4 text-white font-sans">
     {{template "views/partials/menu"}}
     <div class="max-w-2xl mx-auto my-12 bg-gray-800 p-8 rounded-lg shadow-lg">
-        <h1 class="text-3xl font-bold text-center mb-10 text-blue-400">Create New Agent</h1>
+        <h1 class="text-3xl font-bold text-center mb-6 text-blue-400">Create New Agent</h1>
+        
+      
      
-    <form action="/create" method="POST" class="space-y-6">
+    <form id="create-agent-form" action="/create" method="POST" class="space-y-6">
 
         <div class="mb-6">
             <label for="name" class="block text-lg font-medium text-gray-400">Name</label>
@@ -153,11 +173,89 @@
         </div>
 
         <div class="flex items-center justify-between">
-            <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <button type="submit" id="create-button" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                 Create Agent
             </button>
+
         </div>
     </form>
-</div>
+    </div>
+    <!-- Response Messages Container -->
+    <div id="response-container">
+        <!-- Success Alert -->
+        <div id="success-alert" class="alert alert-success">
+            Agent created successfully! Redirecting to agent list...
+        </div>
+        
+        <!-- Error Alert -->
+        <div id="error-alert" class="alert alert-error">
+            <span id="error-message">Error creating agent.</span>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Convert regular form to use HTMX
+            const form = document.getElementById('create-agent-form');
+            
+            // Add HTMX attributes to the form
+            form.setAttribute('hx-post', '/create');
+            form.setAttribute('hx-swap', 'none');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Get form data
+                const formData = new FormData(form);
+                
+                // Send the form data using fetch API
+                fetch('/create', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const successAlert = document.getElementById('success-alert');
+                    const errorAlert = document.getElementById('error-alert');
+                    const errorMessage = document.getElementById('error-message');
+                    
+                    // Hide both alerts initially
+                    successAlert.style.display = 'none';
+                    errorAlert.style.display = 'none';
+                    
+                    if (data.status === "ok") {
+                        // Show success message
+                        successAlert.style.display = 'block';
+                        
+                        // Redirect to agent list page after a delay
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 2000);
+                    } else if (data.error) {
+                        // Show error message
+                        errorMessage.textContent = data.error;
+                        errorAlert.style.display = 'block';
+                        
+                        // Scroll to the error message
+                        errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                        // Handle unexpected response format
+                        errorMessage.textContent = "Unexpected response format";
+                        errorAlert.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    // Handle network or other errors
+                    const errorAlert = document.getElementById('error-alert');
+                    const errorMessage = document.getElementById('error-message');
+                    
+                    errorMessage.textContent = "Network error: " + error.message;
+                    errorAlert.style.display = 'block';
+                    errorAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            });
+        });
+    </script>
+    </div>
 </body>
 </html>
+

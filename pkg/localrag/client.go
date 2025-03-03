@@ -64,8 +64,6 @@ func (c *WrappedClient) Search(s string, similarity int) ([]string, error) {
 func (c *WrappedClient) Store(s string) error {
 	// the Client API of LocalRAG takes only files at the moment.
 	// So we take the string that we want to store, write it to a file, and then store the file.
-
-	// get current date and time for file name
 	t := time.Now()
 	dateTime := t.Format("2006-01-02-15-04-05")
 	hash := md5.Sum([]byte(s))
