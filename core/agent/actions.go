@@ -2,7 +2,9 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/mudler/LocalAgent/pkg/xlog"
@@ -87,6 +89,10 @@ func (a *Agent) decision(
 		return nil, err
 	}
 
+	if err := a.saveConversation(append(conversation, msg), "decision"); err != nil {
+		xlog.Error("Error saving conversation", "error", err)
+	}
+
 	return &decisionResult{actionParams: params, actioName: msg.ToolCalls[0].Function.Name, message: msg.Content}, nil
 }
 
@@ -111,6 +117,26 @@ func (m Messages) Exist(content string) bool {
 		}
 	}
 	return false
+}
+
+func (m Messages) Save(path string) error {
+	content, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	if _, err := f.Write(content); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {

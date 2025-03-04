@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -59,7 +60,16 @@ func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (act
 	rxStrict := xurls.Strict()
 	urls := rxStrict.FindAllString(res, -1)
 
-	return action.ActionResult{Result: res, Metadata: map[string]interface{}{MetadataUrls: urls}}, nil
+	results := []string{}
+	for _, u := range urls {
+		// remove //duckduckgo.com/l/?uddg= from the url
+		u = strings.ReplaceAll(u, "//duckduckgo.com/l/?uddg=", "")
+		// remove everything with &rut=.... at the end
+		u = strings.Split(u, "&rut=")[0]
+		results = append(results, u)
+	}
+
+	return action.ActionResult{Result: res, Metadata: map[string]interface{}{MetadataUrls: results}}, nil
 }
 
 func (a *SearchAction) Definition() action.ActionDefinition {

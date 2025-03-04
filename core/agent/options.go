@@ -40,6 +40,8 @@ type options struct {
 	// callbacks
 	reasoningCallback func(ActionCurrentState) bool
 	resultCallback    func(ActionState)
+
+	conversationsPath string
 }
 
 func defaultOptions() *options {
@@ -93,6 +95,13 @@ var CanStopItself = func(o *options) error {
 func WithTimeout(timeout string) Option {
 	return func(o *options) error {
 		o.timeout = timeout
+		return nil
+	}
+}
+
+func WithConversationsPath(path string) Option {
+	return func(o *options) error {
+		o.conversationsPath = path
 		return nil
 	}
 }

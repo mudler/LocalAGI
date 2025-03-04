@@ -2,6 +2,9 @@ package agent
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai"
@@ -60,9 +63,25 @@ func (a *Agent) knowledgeBaseLookup() {
 		}}, a.currentConversation...)
 }
 
-func (a *Agent) saveCurrentConversationInMemory() {
+func (a *Agent) saveConversation(m Messages, prefix string) error {
+	if a.options.conversationsPath == "" {
+		return nil
+	}
+	dateTime := time.Now().Format("2006-01-02-15-04-05")
+	fileName := a.Character.Name + "-" + dateTime + ".json"
+	if prefix != "" {
+		fileName = prefix + "-" + fileName
+	}
+	os.MkdirAll(a.options.conversationsPath, os.ModePerm)
+	return m.Save(filepath.Join(a.options.conversationsPath, fileName))
+}
 
-	
+func (a *Agent) saveCurrentConversation() {
+
+	if err := a.saveConversation(a.currentConversation, ""); err != nil {
+		xlog.Error("Error saving conversation", "error", err)
+	}
+
 	if !a.options.enableLongTermMemory && !a.options.enableSummaryMemory {
 		xlog.Debug("Long term memory is disabled", "agent", a.Character.Name)
 		return

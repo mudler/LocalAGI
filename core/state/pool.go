@@ -32,6 +32,7 @@ type AgentPool struct {
 	connectors                         func(*AgentConfig) []Connector
 	promptBlocks                       func(*AgentConfig) []PromptBlock
 	timeout                            string
+	conversationLogs                   string
 }
 
 type Status struct {
@@ -94,6 +95,7 @@ func NewAgentPool(
 			availableActions: availableActions,
 			promptBlocks:     promptBlocks,
 			timeout:          timeout,
+			conversationLogs: filepath.Join(directory, "conversations"),
 		}, nil
 	}
 
@@ -116,6 +118,7 @@ func NewAgentPool(
 		promptBlocks:     promptBlocks,
 		availableActions: availableActions,
 		timeout:          timeout,
+		conversationLogs: filepath.Join(directory, "conversations"),
 	}, nil
 }
 
@@ -270,6 +273,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	}
 	if config.HUD {
 		opts = append(opts, EnableHUD)
+	}
+
+	if a.conversationLogs != "" {
+		opts = append(opts, WithConversationsPath(a.conversationLogs))
 	}
 
 	if config.StandaloneJob {

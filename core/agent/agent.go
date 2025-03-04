@@ -177,7 +177,7 @@ func (a *Agent) ResetConversation() {
 	// store into memory the conversation before pruning it
 	// TODO: Shall we summarize the conversation into a bullet list of highlights
 	// using the LLM instead?
-	a.saveCurrentConversationInMemory()
+	a.saveCurrentConversation()
 
 	a.currentConversation = []openai.ChatCompletionMessage{}
 }
@@ -382,7 +382,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 			Content: reasoning,
 		})
 		job.Result.Conversation = a.currentConversation
-		a.saveCurrentConversationInMemory()
+		a.saveCurrentConversation()
 		job.Result.SetResponse(reasoning)
 		job.Result.Finish(nil)
 		return
@@ -532,7 +532,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				}
 
 				a.currentConversation = append(a.currentConversation, msg)
-				a.saveCurrentConversationInMemory()
+				a.saveCurrentConversation()
 				job.Result.SetResponse(msg.Content)
 				job.Result.Conversation = a.currentConversation
 				job.Result.Finish(nil)
@@ -612,7 +612,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		a.currentConversation = append(a.currentConversation, msg)
 		job.Result.Conversation = a.currentConversation
 		job.Result.SetResponse(msg.Content)
-		a.saveCurrentConversationInMemory()
+		a.saveCurrentConversation()
 		job.Result.Finish(nil)
 		return
 	}
@@ -642,7 +642,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	job.Result.SetResponse(msg.Content)
 	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
 	job.Result.Conversation = a.currentConversation
-	a.saveCurrentConversationInMemory()
+	a.saveCurrentConversation()
 	job.Result.Finish(nil)
 }
 
