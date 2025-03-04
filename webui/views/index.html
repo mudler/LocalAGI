@@ -140,13 +140,17 @@
             <img src="/public/logo_1.png" width="250" alt="Company Logo">
         </div>
         
-        <h1 class="dashboard-title">SMART ASSISTANT DASHBOARD</h1>
+        <h1 class="dashboard-title">LocalAgent</h1>
         
         <!-- Simple stats display -->
         <div class="dashboard-stats">
             <div class="stat-item">
                 <div class="stat-count">{{.Actions}}</div>
                 <div class="stat-label">Available Actions</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-count">{{.Connectors}}</div>
+                <div class="stat-label">Available Connectors</div>
             </div>
             <div class="stat-item">
                 <div class="stat-count">{{ .AgentCount }}</div>

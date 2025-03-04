@@ -32,6 +32,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			"Agents":     pool.List(),
 			"AgentCount": len(pool.List()),
 			"Actions":    len(services.AvailableActions),
+			"Connectors": len(services.AvailableConnectors),
 		})
 	})
 
@@ -93,9 +94,17 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	webapp.Get("/settings/:name", func(c *fiber.Ctx) error {
+		status := false
+		for _, a := range pool.List() {
+			if a == c.Params("name") {
+				status = !pool.GetAgent(a).Paused()
+			}
+		}
+
 		return c.Render("views/settings", fiber.Map{
 			//	"Character": agent.Character,
-			"Name": c.Params("name"),
+			"Name":   c.Params("name"),
+			"Status": status,
 		})
 	})
 	webapp.Post("/settings/import", app.ImportAgent(pool))

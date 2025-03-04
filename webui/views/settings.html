@@ -22,20 +22,14 @@
                 <h2>Agent Control</h2>
                 <div class="button-container">
                     <button 
-                        class="action-btn start-btn" 
-                        hx-put="/start/{{.Name}}" 
-                        hx-swap="none"
-                        data-action="start"
-                        data-agent="{{.Name}}">
-                        <i class="fas fa-play"></i> Start Agent
-                    </button>
-                    <button 
-                        class="action-btn pause-btn" 
-                        hx-put="/pause/{{.Name}}" 
-                        hx-swap="none"
-                        data-action="pause"
-                        data-agent="{{.Name}}">
-                        <i class="fas fa-pause"></i> Pause Agent
+                        class="action-btn toggle-btn" 
+                        data-agent="{{.Name}}"
+                        data-active="{{.Status}}">
+                        {{if .Status}}
+                            <i class="fas fa-pause"></i> Pause Agent
+                        {{else}}
+                            <i class="fas fa-play"></i> Start Agent
+                        {{end}}
                     </button>
                 </div>
             </div>
@@ -73,19 +67,86 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Add event listeners for action buttons (Start, Pause)
-            document.querySelectorAll('[data-action]').forEach(button => {
+            // Add event listener for delete button
+            document.querySelectorAll('[data-action="delete"]').forEach(button => {
                 button.addEventListener('htmx:afterRequest', function(event) {
                     handleActionResponse(event, this);
                 });
             });
+
+            // Handle toggle button
+            const toggleButton = document.querySelector('.toggle-btn');
+            if (toggleButton) {
+                toggleButton.addEventListener('click', function() {
+                    const agent = this.getAttribute('data-agent');
+                    const isActive = this.getAttribute('data-active') === "true";
+                    const endpoint = isActive ? `/pause/${agent}` : `/start/${agent}`;
+                    
+                    // Add animation
+                    this.style.animation = 'pulse 0.5s';
+                    
+                    // Create a new XMLHttpRequest
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('PUT', endpoint);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    
+                    xhr.onload = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                
+                                if (response.status === "ok") {
+                                    // Toggle the button state
+                                    const newState = !isActive;
+                                    this.setAttribute('data-active', newState.toString());
+                                    
+                                    // Update button text and icon
+                                    if (newState) {
+                                        this.innerHTML = '<i class="fas fa-pause"></i> Pause Agent';
+                                    } else {
+                                        this.innerHTML = '<i class="fas fa-play"></i> Start Agent';
+                                    }
+                                    
+                                    // Show success toast
+                                    const action = isActive ? 'pause' : 'start';
+                                    showToast(`Agent "${agent}" ${action}ed successfully`, 'success');
+                                    
+                                } else if (response.error) {
+                                    // Show error toast
+                                    showToast(`Error: ${response.error}`, 'error');
+                                }
+                            } catch (e) {
+                                // Handle parsing error
+                                showToast("Invalid response format", 'error');
+                                console.error("Error parsing response:", e);
+                            }
+                        } else {
+                            // Handle HTTP error
+                            showToast(`Server error: ${xhr.status}`, 'error');
+                        }
+                    };
+                    
+                    xhr.onerror = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        showToast("Network error occurred", 'error');
+                        console.error("Network error occurred");
+                    };
+                    
+                    // Send the request
+                    xhr.send(JSON.stringify({}));
+                });
+            }
             
             // Set current date for timestamp
-            const now = new Date();
+            const now = new Date("2025-03-04T20:52:02Z");
             document.getElementById('current-date').textContent = now.toISOString().split('T')[0];
         });
         
-        // Function to handle API responses for all actions
+        // Function to handle API responses for delete action
         function handleActionResponse(event, button) {
             const xhr = event.detail.xhr;
             const action = button.getAttribute('data-action');
@@ -100,12 +161,6 @@
                         let message = "";
                         
                         switch(action) {
-                            case 'start':
-                                message = `Agent "${agent}" started successfully`;
-                                break;
-                            case 'pause':
-                                message = `Agent "${agent}" paused successfully`;
-                                break;
                             case 'delete':
                                 message = `Agent "${agent}" deleted successfully`;
                                 // Redirect to agent list page after short delay for delete

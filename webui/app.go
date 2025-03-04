@@ -97,9 +97,9 @@ func statusJSONMessage(c *fiber.Ctx, message string) error {
 
 func (a *App) Pause(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		xlog.Info("Pausing agent", c.Params("name"))
 		agent := pool.GetAgent(c.Params("name"))
 		if agent != nil {
+			xlog.Info("Pausing agent", "name", c.Params("name"))
 			agent.Pause()
 		}
 		return statusJSONMessage(c, "ok")
@@ -110,6 +110,7 @@ func (a *App) Start(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		agent := pool.GetAgent(c.Params("name"))
 		if agent != nil {
+			xlog.Info("Starting agent", "name", c.Params("name"))
 			agent.Resume()
 		}
 		return statusJSONMessage(c, "ok")

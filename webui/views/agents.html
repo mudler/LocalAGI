@@ -16,7 +16,7 @@
 
     <div class="container mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-4xl md:text-6xl font-bold">Smart Agent List</h1>
+            <h1 class="text-4xl md:text-6xl font-bold">Agent List</h1>
             <p class="mt-4 text-gray-400">Manage and interact with your AI agents</p>
         </header>
         
@@ -55,7 +55,6 @@
                         <button id="import-button" type="submit" class="action-btn">
                             <i class="fas fa-cloud-upload-alt"></i> Import Agent
                         </button>
-                        <progress id='progress' value='0' max='100' class="ml-4"></progress>
                     </div>
                 </form>
             </div>
@@ -86,16 +85,15 @@
                         </a>
                     </div>
                     
-                    <div class="grid grid-cols-3 gap-2 w-full">
-                        <button class="action-btn start-btn col-span-1" 
-                                hx-put="/start/{{.}}" hx-swap="none" hx-ext="json-enc" 
-                                data-action="start" data-agent="{{.}}">
-                            <i class="fas fa-play"></i> 
-                        </button>
-                        <button class="action-btn pause-btn col-span-1" 
-                                hx-put="/pause/{{.}}" hx-swap="none" hx-ext="json-enc" 
-                                data-action="pause" data-agent="{{.}}">
-                            <i class="fas fa-pause"></i> 
+                    <div class="grid grid-cols-2 gap-2 w-full">
+                        <button class="action-btn toggle-btn col-span-1" 
+                                data-agent="{{.}}"
+                                data-active="{{ if eq (index $status .) true }}true{{ else }}false{{ end }}">
+                            {{ if eq (index $status .) true }}
+                                <i class="fas fa-pause"></i> Pause
+                            {{ else }}
+                                <i class="fas fa-play"></i> Start
+                            {{ end }}
                         </button>
                         <a href="/settings/{{.}}" class="action-btn col-span-1 flex items-center justify-center"
                            style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
@@ -179,41 +177,71 @@
                 }
             });
 
-            // Add event listeners for Start and Pause buttons
-            document.querySelectorAll('.action-btn[data-action]').forEach(button => {
-                button.addEventListener('htmx:beforeRequest', function() {
-                    this.style.animation = 'pulse 0.5s';
-                });
-                
-                button.addEventListener('htmx:afterRequest', function(event) {
-                    const xhr = event.detail.xhr;
-                    const action = this.getAttribute('data-action');
+            // Handle toggle buttons - using pure JavaScript
+            document.querySelectorAll('.toggle-btn').forEach(button => {
+                button.addEventListener('click', function() {
                     const agent = this.getAttribute('data-agent');
+                    const isActive = this.getAttribute('data-active') === 'true';
+                    const endpoint = isActive ? `/pause/${agent}` : `/start/${agent}`;
                     
-                    this.style.animation = '';
+                    // Add animation
+                    this.style.animation = 'pulse 0.5s';
                     
-                    if (xhr.status === 200) {
-                        try {
-                            const response = JSON.parse(xhr.responseText);
-                            
-                            if (response.status === "ok") {
-                                // Show success toast
-                                showToast(`Agent "${agent}" ${action === 'start' ? 'started' : 'paused'} successfully`, 'success');
+                    // Create a new XMLHttpRequest
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('PUT', endpoint);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    
+                    xhr.onload = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
                                 
-                                // Update the status cell if needed
-                                updateAgentStatus(agent, action === 'start' ? true : false);
-                            } else if (response.error) {
-                                // Show error toast
-                                showToast(`Error: ${response.error}`, 'error');
+                                if (response.status === "ok") {
+                                    // Toggle the button state
+                                    const newState = !isActive;
+                                    this.setAttribute('data-active', newState ? 'true' : 'false');
+                                    
+                                    // Update button text and icon
+                                    if (newState) {
+                                        this.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                                    } else {
+                                        this.innerHTML = '<i class="fas fa-play"></i> Start';
+                                    }
+                                    
+                                    // Show success toast
+                                    const action = isActive ? 'pause' : 'start';
+                                    showToast(`Agent "${agent}" ${action}ed successfully`, 'success');
+                                    
+                                    // Update the status badge
+                                    updateAgentStatus(agent, newState);
+                                } else if (response.error) {
+                                    // Show error toast
+                                    showToast(`Error: ${response.error}`, 'error');
+                                }
+                            } catch (e) {
+                                // Handle parsing error
+                                showToast("Invalid response format", 'error');
+                                console.error("Error parsing response:", e);
                             }
-                        } catch (e) {
-                            // Handle parsing error
-                            showToast("Invalid response format", 'error');
+                        } else {
+                            // Handle HTTP error
+                            showToast(`Server error: ${xhr.status}`, 'error');
                         }
-                    } else {
-                        // Handle HTTP error
-                        showToast(`Server error: ${xhr.status}`, 'error');
-                    }
+                    };
+                    
+                    xhr.onerror = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        showToast("Network error occurred", 'error');
+                        console.error("Network error occurred");
+                    };
+                    
+                    // Send the request
+                    xhr.send(JSON.stringify({}));
                 });
             });
         });
