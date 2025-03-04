@@ -72,11 +72,17 @@ func NewAgentPool(
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) []PromptBlock,
 	timeout string,
+	withLogs bool,
 ) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
 
 	poolfile := filepath.Join(directory, "pool.json")
+
+	conversationPath := ""
+	if withLogs {
+		conversationPath = filepath.Join(directory, "conversations")
+	}
 
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
@@ -95,7 +101,7 @@ func NewAgentPool(
 			availableActions: availableActions,
 			promptBlocks:     promptBlocks,
 			timeout:          timeout,
-			conversationLogs: filepath.Join(directory, "conversations"),
+			conversationLogs: conversationPath,
 		}, nil
 	}
 
@@ -118,7 +124,7 @@ func NewAgentPool(
 		promptBlocks:     promptBlocks,
 		availableActions: availableActions,
 		timeout:          timeout,
-		conversationLogs: filepath.Join(directory, "conversations"),
+		conversationLogs: conversationPath,
 	}, nil
 }
 

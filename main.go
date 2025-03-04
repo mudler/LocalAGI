@@ -16,6 +16,7 @@ var apiKey = os.Getenv("API_KEY")
 var timeout = os.Getenv("TIMEOUT")
 var stateDir = os.Getenv("STATE_DIR")
 var localRAG = os.Getenv("LOCAL_RAG")
+var withLogs = os.Getenv("ENABLE_CONVERSATIONS_LOGGING") == "true"
 
 func init() {
 	if testModel == "" {
@@ -52,6 +53,7 @@ func main() {
 		services.Connectors,
 		services.PromptBlocks,
 		timeout,
+		withLogs,
 	)
 	if err != nil {
 		panic(err)
