@@ -1,0 +1,40 @@
+# Make sure to check the documentation at http://goreleaser.com
+version: 2
+builds:
+  - main: ./
+    id: "localagent"
+    binary: localagent
+    ldflags:
+      - -w -s
+      # - -X github.com/internal.Version={{.Tag}}
+      # - -X github.com/internal.Commit={{.Commit}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+      - freebsd
+    goarch:
+      - amd64
+      - arm
+      - arm64
+source:
+  enabled: true
+  name_template: '{{ .ProjectName }}-{{ .Tag }}-source'
+archives:
+  # Default template uses underscores instead of -
+  - name_template: >-
+      {{ .ProjectName }}-{{ .Tag }}-
+      {{- if eq .Os "freebsd" }}FreeBSD
+      {{- else }}{{- title .Os }}{{end}}-
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{end}}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+checksum:
+  name_template: '{{ .ProjectName }}-{{ .Tag }}-checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  use: github-native
