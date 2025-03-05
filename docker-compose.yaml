@@ -38,8 +38,8 @@ services:
     ports:
       - 8080:3000
     environment:
-      - TEST_MODEL=marco-o1
+      - LOCALAGENT_MODEL=marco-o1
       - EMBEDDING_MODEL=bert-embeddings
-      - API_URL=http://api:8080
+      - LOCALAGENT_LLM_API_URL=http://api:8080
     volumes:
       - ./data/:/pool

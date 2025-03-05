@@ -22,7 +22,7 @@ var _ = Describe("GenImageAction", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		apiKey := os.Getenv("OPENAI_API_KEY")
-		apiURL := os.Getenv("OPENAI_API_URL")
+		apiURL := os.Getenv("OPENAI_LOCALAGENT_API_URL")
 		testModel := os.Getenv("OPENAI_MODEL")
 		if apiURL == "" {
 			Skip("OPENAI_API_URL must be set")

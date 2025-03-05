@@ -13,7 +13,7 @@ func TestAgent(t *testing.T) {
 	RunSpecs(t, "Agent test suite")
 }
 
-var testModel = os.Getenv("TEST_MODEL")
+var testModel = os.Getenv("LOCALAGENT_MODEL")
 var apiModel = os.Getenv("API_MODEL")
 
 func init() {

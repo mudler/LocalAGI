@@ -10,13 +10,13 @@ import (
 	"github.com/mudler/LocalAgent/webui"
 )
 
-var testModel = os.Getenv("TEST_MODEL")
-var apiURL = os.Getenv("API_URL")
-var apiKey = os.Getenv("API_KEY")
-var timeout = os.Getenv("TIMEOUT")
-var stateDir = os.Getenv("STATE_DIR")
-var localRAG = os.Getenv("LOCAL_RAG")
-var withLogs = os.Getenv("ENABLE_CONVERSATIONS_LOGGING") == "true"
+var testModel = os.Getenv("LOCALAGENT_MODEL")
+var apiURL = os.Getenv("LOCALAGENT_LLM_API_URL")
+var apiKey = os.Getenv("LOCALAGENT_API_KEY")
+var timeout = os.Getenv("LOCALAGENT_TIMEOUT")
+var stateDir = os.Getenv("LOCALAGENT_STATE_DIR")
+var localRAG = os.Getenv("LOCALAGENT_LOCALRAG_URL")
+var withLogs = os.Getenv("LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING") == "true"
 
 func init() {
 	if testModel == "" {
