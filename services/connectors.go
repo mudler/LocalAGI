@@ -11,6 +11,7 @@ import (
 
 const (
 	// Connectors
+	ConnectorIRC          = "irc"
 	ConnectorTelegram     = "telegram"
 	ConnectorSlack        = "slack"
 	ConnectorDiscord      = "discord"
@@ -19,6 +20,7 @@ const (
 )
 
 var AvailableConnectors = []string{
+	ConnectorIRC,
 	ConnectorTelegram,
 	ConnectorSlack,
 	ConnectorDiscord,
@@ -52,6 +54,8 @@ func Connectors(a *state.AgentConfig) []state.Connector {
 			conns = append(conns, connectors.NewGithubIssueWatcher(config))
 		case ConnectorGithubPRs:
 			conns = append(conns, connectors.NewGithubPRWatcher(config))
+		case ConnectorIRC:
+			conns = append(conns, connectors.NewIRC(config))
 		}
 	}
 	return conns

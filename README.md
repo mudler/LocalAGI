@@ -144,6 +144,26 @@ In the UI, when configuring the connector:
 { "token": "botfathertoken" }
 ```
 
+#### IRC
+
+Connect to IRC servers and interact with channels:
+
+```json
+{
+  "server": "irc.example.com",
+  "port": "6667",
+  "nickname": "LocalAgentBot",
+  "channel": "#yourchannel",
+  "alwaysReply": "false"
+}
+```
+
+The IRC connector supports:
+- Connecting to IRC servers without encryption
+- Joining a specified channel
+- Responding to direct mentions (or all messages if alwaysReply is "true")
+- Direct messaging with users
+
 ### REST API
 
 The LocalAgent API follows RESTful principles and uses JSON for request and response bodies.

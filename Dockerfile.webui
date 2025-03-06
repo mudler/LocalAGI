@@ -1,22 +1,28 @@
 # Define argument for linker flags
 ARG LDFLAGS=-s -w
 
-# Use a temporary build image based on Golang 1.20-alpine
+# Use a temporary build image based on Golang 1.22-alpine
 FROM golang:1.22-alpine as builder
 
 # Set environment variables: linker flags and disable CGO
 ENV LDFLAGS=$LDFLAGS CGO_ENABLED=0
 
-# Install git and build the edgevpn binary with the provided linker flags
-# --no-cache flag ensures the package cache isn't stored in the layer, reducing image size
+# Install git
 RUN apk add --no-cache git
 
-# Add the current directory contents to the work directory in the container
-COPY . /work
-
-# Set the current work directory inside the container
+# Set the working directory
 WORKDIR /work
 
+# Copy go.mod and go.sum files first to leverage Docker cache
+COPY go.mod go.sum ./
+
+# Download dependencies - this layer will be cached as long as go.mod and go.sum don't change
+RUN go mod download
+
+# Now copy the rest of the source code
+COPY . .
+
+# Build the application
 RUN go build -ldflags="$LDFLAGS" -o localagent ./
 
 FROM scratch
