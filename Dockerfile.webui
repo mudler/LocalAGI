@@ -9,6 +9,7 @@ ENV LDFLAGS=$LDFLAGS CGO_ENABLED=0
 
 # Install git
 RUN apk add --no-cache git
+RUN rm -rf /tmp/* /var/cache/apk/*
 
 # Set the working directory
 WORKDIR /work
@@ -30,6 +31,8 @@ FROM scratch
 # Copy the webui binary from the builder stage to the final image
 COPY --from=builder /work/localagent /localagent
 COPY --from=builder /etc/ssl/ /etc/ssl/
+COPY --from=builder /tmp /tmp
+
 
 # Define the command that will be run when the container is started
 ENTRYPOINT ["/localagent"]
