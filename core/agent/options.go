@@ -7,10 +7,12 @@ import (
 )
 
 type Option func(*options) error
+
 type llmOptions struct {
-	APIURL string
-	APIKey string
-	Model  string
+	APIURL          string
+	APIKey          string
+	Model           string
+	MultimodalModel string
 }
 
 type options struct {
@@ -42,6 +44,10 @@ type options struct {
 	resultCallback    func(ActionState)
 
 	conversationsPath string
+}
+
+func (o *options) SeparatedMultimodalModel() bool {
+	return o.LLMAPI.MultimodalModel != "" && o.LLMAPI.Model != o.LLMAPI.MultimodalModel
 }
 
 func defaultOptions() *options {
@@ -205,6 +211,13 @@ func WithPrompts(prompts ...PromptBlock) Option {
 func WithLLMAPIKey(key string) Option {
 	return func(o *options) error {
 		o.LLMAPI.APIKey = key
+		return nil
+	}
+}
+
+func WithMultimodalModel(model string) Option {
+	return func(o *options) error {
+		o.LLMAPI.MultimodalModel = model
 		return nil
 	}
 }

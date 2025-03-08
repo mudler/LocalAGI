@@ -78,6 +78,7 @@ LocalAgent can be configured using the following environment variables:
 | Variable                      | Description                                      |
 |-------------------------------|--------------------------------------------------|
 | `LOCALAGENT_MODEL`                  | Specifies the test model to use                  |
+| `LOCALAGENT_MULTIMODAL_MODEL`       | Specifies a separate model to use with multimodal capabilities (optional, if LOCALAGENT_MODEL does not support multimodality)        |
 | `LOCALAGENT_LLM_API_URL`                     | URL of the API server                            |
 | `LOCALAGENT_API_KEY`                     | API key for authentication                       |
 | `LOCALAGENT_TIMEOUT`                     | Timeout duration for requests                    |

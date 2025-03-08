@@ -34,6 +34,7 @@ type AgentConfig struct {
 
 	// This is what needs to be part of ActionsConfig
 	Model                 string `json:"model" form:"model"`
+	MultimodalModel       string `json:"multimodal_model" form:"multimodal_model"`
 	Name                  string `json:"name" form:"name"`
 	HUD                   bool   `json:"hud" form:"hud"`
 	StandaloneJob         bool   `json:"standalone_job" form:"standalone_job"`
