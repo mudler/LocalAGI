@@ -249,6 +249,171 @@ func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (resu
 	return result, nil
 }
 
+func (a *Agent) processPrompts() {
+	//if job.Image != "" {
+	// TODO: Use llava to explain the image content
+	//}
+	// Add custom prompts
+	for _, prompt := range a.options.prompts {
+		message, err := prompt.Render(a)
+		if err != nil {
+			xlog.Error("Error rendering prompt", "error", err)
+			continue
+		}
+		if message == "" {
+			xlog.Debug("Prompt is empty, skipping", "agent", a.Character.Name)
+			continue
+		}
+		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
+			a.currentConversation = append([]openai.ChatCompletionMessage{
+				{
+					Role:    prompt.Role(),
+					Content: message,
+				}}, a.currentConversation...)
+		}
+	}
+
+	// TODO: move to a Promptblock?
+	if a.options.systemPrompt != "" {
+		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
+			a.currentConversation = append([]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: a.options.systemPrompt,
+				}}, a.currentConversation...)
+		}
+	}
+}
+
+func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (string, error) {
+	resp, err := a.client.CreateChatCompletion(ctx,
+		openai.ChatCompletionRequest{
+			Model: model, Messages: []openai.ChatCompletionMessage{
+				{
+
+					Role: "user",
+					MultiContent: []openai.ChatMessagePart{
+						{
+							Type: openai.ChatMessagePartTypeText,
+							Text: "What is in the image?",
+						},
+						{
+							Type: openai.ChatMessagePartTypeImageURL,
+							ImageURL: &openai.ChatMessageImageURL{
+								URL: imageURL,
+							},
+						},
+					},
+				},
+			}})
+	if err != nil {
+		return "", err
+	}
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no choices")
+	}
+
+	return resp.Choices[0].Message.Content, nil
+}
+
+func extractImageContent(message openai.ChatCompletionMessage) (imageURL, text string, e error) {
+	e = fmt.Errorf("no image found")
+	if message.MultiContent != nil {
+		for _, content := range message.MultiContent {
+			if content.Type == openai.ChatMessagePartTypeImageURL {
+				imageURL = content.ImageURL.URL
+				e = nil
+			}
+			if content.Type == openai.ChatMessagePartTypeText {
+				text = content.Text
+				e = nil
+			}
+		}
+	}
+	return
+}
+
+func (a *Agent) processUserInputs(job *Job, role string) {
+
+	noNewMessage := job.Text == "" && job.Image == ""
+	onlyText := job.Text != "" && job.Image == ""
+
+	// walk conversation history, and check if last message from user contains image.
+	// If it does, we need to describe the image first with a model that supports image understanding (if the current model doesn't support it)
+	// and add it to the conversation context
+	if a.options.SeparatedMultimodalModel() && noNewMessage {
+		lastUserMessage := a.currentConversation.GetLatestUserMessage()
+		if lastUserMessage != nil {
+			imageURL, text, err := extractImageContent(*lastUserMessage)
+			if err == nil {
+				// We have an image, we need to describe it first
+				// and add it to the conversation context
+				imageDescription, err := a.describeImage(a.context.Context, a.options.LLMAPI.MultimodalModel, imageURL)
+				if err != nil {
+					xlog.Error("Error describing image", "error", err)
+				} else {
+					// We replace the user message with the image description
+					// and add the user text to the conversation
+					lastUserMessage.Content = fmt.Sprintf("The user shared an image which can be described as: %s", imageDescription)
+					lastUserMessage.MultiContent = nil
+					lastUserMessage.Role = "system"
+					a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+						Role:    role,
+						Content: text,
+					})
+				}
+			}
+		}
+
+	}
+
+	if onlyText {
+		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+			Role:    role,
+			Content: job.Text,
+		})
+	}
+
+	if job.Image != "" {
+		// If an image is present with the text
+		// we have two cases: if the model supports both images and text, we can send both
+		// if the model supports only text, we can send the text only and we need to describe the image first with a model that support image understanding and add it to the conversation context
+		if a.options.SeparatedMultimodalModel() {
+			// We need to describe the image first
+			imageDescription, err := a.describeImage(a.context.Context, a.options.LLMAPI.Model, job.Image)
+			if err != nil {
+				xlog.Error("Error describing image", "error", err)
+			} else {
+				a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+					Role:    "system",
+					Content: fmt.Sprintf("The user shared an image which can be described as: %s", imageDescription),
+				})
+				a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+					Role:    role,
+					Content: job.Text,
+				})
+			}
+		} else {
+			// Just append to the message both the image and the text
+			a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+				Role: role,
+				MultiContent: []openai.ChatMessagePart{
+					{
+						Type: openai.ChatMessagePartTypeText,
+						Text: job.Text,
+					},
+					{
+						Type: openai.ChatMessagePartTypeImageURL,
+						ImageURL: &openai.ChatMessageImageURL{
+							URL: job.Image,
+						},
+					},
+				},
+			})
+		}
+	}
+}
+
 func (a *Agent) consumeJob(job *Job, role string) {
 	a.Lock()
 	paused := a.pause
@@ -290,46 +455,8 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		}()
 	}
 
-	//if job.Image != "" {
-	// TODO: Use llava to explain the image content
-	//}
-	// Add custom prompts
-	for _, prompt := range a.options.prompts {
-		message, err := prompt.Render(a)
-		if err != nil {
-			xlog.Error("Error rendering prompt", "error", err)
-			continue
-		}
-		if message == "" {
-			xlog.Debug("Prompt is empty, skipping", "agent", a.Character.Name)
-			continue
-		}
-		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
-			a.currentConversation = append([]openai.ChatCompletionMessage{
-				{
-					Role:    prompt.Role(),
-					Content: message,
-				}}, a.currentConversation...)
-		}
-	}
-
-	// TODO: move to a Promptblock?
-	if a.options.systemPrompt != "" {
-		if !Messages(a.currentConversation).Exist(a.options.systemPrompt) {
-			a.currentConversation = append([]openai.ChatCompletionMessage{
-				{
-					Role:    "system",
-					Content: a.options.systemPrompt,
-				}}, a.currentConversation...)
-		}
-	}
-
-	if job.Text != "" {
-		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-			Role:    role,
-			Content: job.Text,
-		})
-	}
+	a.processPrompts()
+	a.processUserInputs(job, role)
 
 	// RAG
 	a.knowledgeBaseLookup()

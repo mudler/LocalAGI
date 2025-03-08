@@ -139,6 +139,17 @@ func (m Messages) Save(path string) error {
 	return nil
 }
 
+func (m Messages) GetLatestUserMessage() *openai.ChatCompletionMessage {
+	for i := len(m) - 1; i >= 0; i-- {
+		msg := m[i]
+		if msg.Role == UserRole {
+			return &msg
+		}
+	}
+
+	return nil
+}
+
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
 
 	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.systemInternalActions(), reasoning)
