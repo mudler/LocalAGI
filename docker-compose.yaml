@@ -1,5 +1,5 @@
 services:
-  api:
+  localai:
     # See https://localai.io/basics/getting_started/#container-images for
     # a list of available container images (or build your own with the provided Dockerfile)
     # Available images with CUDA, ROCm, SYCL, Vulkan
@@ -7,19 +7,21 @@ services:
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
     image: localai/localai:latest-cpu
     command: 
-    - marco-o1
-    - bert-embeddings
+    - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
+    #- marco-o1 (smaller)
+    - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
       interval: 10s
       timeout: 20m
       retries: 20
     ports:
-    - 8081:8080
+    - 8080
     environment:
       - DEBUG=true
     volumes:
-      - ./models:/build/models:cached
+      - ./volumes/models:/build/models:cached
+      - ./volumes/images:/tmp/generated/images
     # decomment the following piece if running with Nvidia GPUs
     # deploy:
     #   resources:
@@ -28,9 +30,25 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+  ragserver:
+    image: quay.io/mudler/localrag
+    ports:
+      - 8080
+    environment:
+      - COLLECTION_DB_PATH=/db
+      - EMBEDDING_MODEL=granite-embedding-107m-multilingual
+      - FILE_ASSETS=/assets
+      - OPENAI_API_KEY=sk-1234567890
+      - OPENAI_BASE_URL=http://localai:8080
+    volumes:
+      - ./volumes/localrag/db:/db
+      - ./volumes/localrag/assets/:/assets
+
   localagent:
     depends_on:
-      api:
+      localai:
+        condition: service_healthy
+      ragserver:
         condition: service_healthy
     build:
       context: .
@@ -39,7 +57,11 @@ services:
       - 8080:3000
     environment:
       - LOCALAGENT_MODEL=marco-o1
-      - EMBEDDING_MODEL=bert-embeddings
-      - LOCALAGENT_LLM_API_URL=http://api:8080
+      - LOCALAGENT_LLM_API_URL=http://localai:8080
+      - LOCALAGENT_API_KEY=sk-1234567890
+      - LOCALAGENT_LOCALRAG_URL=http://ragserver:8080
+      - LOCALAGENT_STATE_DIR=/pool
+      - LOCALAGENT_TIMEOUT=5m
+      - LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING=false
     volumes:
-      - ./data/:/pool
+      - ./volumes/localagent/:/pool
