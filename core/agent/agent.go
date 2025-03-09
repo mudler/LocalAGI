@@ -286,9 +286,11 @@ func (a *Agent) processPrompts() {
 }
 
 func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (string, error) {
+	xlog.Debug("Describing image", "model", model, "image", imageURL)
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
-			Model: model, Messages: []openai.ChatCompletionMessage{
+			Model: model,
+			Messages: []openai.ChatCompletionMessage{
 				{
 
 					Role: "user",
@@ -300,6 +302,7 @@ func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (stri
 						{
 							Type: openai.ChatMessagePartTypeImageURL,
 							ImageURL: &openai.ChatMessageImageURL{
+
 								URL: imageURL,
 							},
 						},
@@ -313,6 +316,7 @@ func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (stri
 		return "", fmt.Errorf("no choices")
 	}
 
+	xlog.Debug("Described image", "description", resp.Choices[0].Message.Content)
 	return resp.Choices[0].Message.Content, nil
 }
 
@@ -343,7 +347,7 @@ func (a *Agent) processUserInputs(job *Job, role string) {
 	// and add it to the conversation context
 	if a.options.SeparatedMultimodalModel() && noNewMessage {
 		lastUserMessage := a.currentConversation.GetLatestUserMessage()
-		if lastUserMessage != nil {
+		if lastUserMessage != nil && a.currentConversation.IsLastMessageFromRole(UserRole) {
 			imageURL, text, err := extractImageContent(*lastUserMessage)
 			if err == nil {
 				// We have an image, we need to describe it first
@@ -361,6 +365,7 @@ func (a *Agent) processUserInputs(job *Job, role string) {
 						Role:    role,
 						Content: text,
 					})
+					xlog.Debug("Conversation after image description", "conversation", a.currentConversation)
 				}
 			}
 		}

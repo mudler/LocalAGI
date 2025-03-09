@@ -150,6 +150,14 @@ func (m Messages) GetLatestUserMessage() *openai.ChatCompletionMessage {
 	return nil
 }
 
+func (m Messages) IsLastMessageFromRole(role string) bool {
+	if len(m) == 0 {
+		return false
+	}
+
+	return m[len(m)-1].Role == role
+}
+
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
 
 	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.systemInternalActions(), reasoning)
