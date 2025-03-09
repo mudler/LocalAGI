@@ -119,6 +119,20 @@ func (m Messages) Exist(content string) bool {
 	return false
 }
 
+func (m Messages) RemoveLastUserMessage() Messages {
+	if len(m) == 0 {
+		return m
+	}
+
+	for i := len(m) - 1; i >= 0; i-- {
+		if m[i].Role == UserRole {
+			return append(m[:i], m[i+1:]...)
+		}
+	}
+
+	return m
+}
+
 func (m Messages) Save(path string) error {
 	content, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {

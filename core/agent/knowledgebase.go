@@ -20,14 +20,9 @@ func (a *Agent) knowledgeBaseLookup() {
 	// Walk conversation from bottom to top, and find the first message of the user
 	// to use it as a query to the KB
 	var userMessage string
-	for i := len(a.currentConversation) - 1; i >= 0; i-- {
-		xlog.Info("[Knowledge Base Lookup] Conversation", "role", a.currentConversation[i].Role, "Content", a.currentConversation[i].Content)
-		if a.currentConversation[i].Role == "user" {
-			userMessage = a.currentConversation[i].Content
-			break
-		}
-	}
-	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage)
+	userMessage = a.currentConversation.GetLatestUserMessage().Content
+
+	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage, "lastMessage", a.currentConversation.GetLatestUserMessage())
 
 	if userMessage == "" {
 		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)

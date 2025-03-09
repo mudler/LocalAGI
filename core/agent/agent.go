@@ -358,14 +358,18 @@ func (a *Agent) processUserInputs(job *Job, role string) {
 				} else {
 					// We replace the user message with the image description
 					// and add the user text to the conversation
-					lastUserMessage.Content = fmt.Sprintf("The user shared an image which can be described as: %s", imageDescription)
-					lastUserMessage.MultiContent = nil
-					lastUserMessage.Role = "system"
+					explainerMessage := openai.ChatCompletionMessage{
+						Role:    "system",
+						Content: fmt.Sprintf("The user shared an image which can be described as: %s", imageDescription),
+					}
+
+					// remove lastUserMessage from the conversation
+					a.currentConversation = a.currentConversation.RemoveLastUserMessage()
+					a.currentConversation = append(a.currentConversation, explainerMessage)
 					a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 						Role:    role,
 						Content: text,
 					})
-					xlog.Debug("Conversation after image description", "conversation", a.currentConversation)
 				}
 			}
 		}
