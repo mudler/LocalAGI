@@ -1,6 +1,9 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/304ad402-5ddc-441b-a4b9-55ff9eec72be" alt="LocalAgent Logo" width="200"/>
+  <img src="https://github.com/user-attachments/assets/304ad402-5ddc-441b-a4b9-55ff9eec72be" alt="LocalAgent Logo" width="220"/>
 </p>
+
+<h1 align="center">LOCAL AGENT</h1>
+<h3 align="center"><em>AI that stays where it belongs — on your machine.</em></h3>
 
 <div align="center">
   
@@ -11,143 +14,140 @@
   
 </div>
 
-**LocalAgent** is an AI Agent platform with the aim to runs 100% locally on your machine. Designed for privacy, efficiency, and flexibility, LocalAgent allows you to build, deploy, and interact with AI agents without sending your data to external services.
+## TAKE BACK CONTROL
 
-## Features
+**LocalAgent** is an AI platform that runs 100% on your hardware. No clouds. No data sharing. No compromises.
 
-- **100% Local Execution**: All processing happens on your own hardware - no data leaves your machine
-- **Multiple Model Support**: Compatible with various local LLM formats (GGUF, GGML, etc.)
-- **Extensible Architecture**: Build custom agents with specialized capabilities
-- **Web-based GUI**: User-friendly interface for easy interaction with your agents
-- **RESTful API**: Comprehensive API for developers to integrate LocalAgent into their applications
-- **Works well locally!**: It is well tested and meant to work with [LocalAI](https://github.com/mudler/LocalAI)
-- **Cross-platform**: Works on Linux, macOS, and Windows
+Built for those who value privacy as non-negotiable, LocalAgent lets you deploy intelligent agents that never phone home. Your data stays where you put it — period.
 
-LocalAgent is part of a set of open source tools aimed to streamline AI usage locally, see also its sister projects:
+## WHY LOCALAGENT?
 
-- [LocalAI](https://github.com/mudler/LocalAI)
-- [LocalRAG](https://github.com/mudler/LocalRAG)
+- **✓ TRUE PRIVACY** — Everything runs on your hardware, nothing leaves your machine
+- **✓ MODEL FREEDOM** — Works with local LLM formats (GGUF, GGML) you already have
+- **✓ BUILD YOUR WAY** — Extensible architecture for custom agents with specialized skills
+- **✓ SLICK INTERFACE** — Clean web UI for hassle-free agent interactions
+- **✓ DEV-FRIENDLY** — Comprehensive REST API for seamless integration
+- **✓ PLAYS WELL WITH OTHERS** — Optimized for [LocalAI](https://github.com/mudler/LocalAI)
+- **✓ RUN ANYWHERE** — Linux, macOS, Windows — we've got you covered
 
-## Installation
+## THE LOCAL ECOSYSTEM
 
-### Prerequisites
+LocalAgent is part of a trinity of tools designed to keep AI under your control:
 
-For building from source:
+- [**LocalAI**](https://github.com/mudler/LocalAI) — Run LLMs on your hardware
+- [**LocalRAG**](https://github.com/mudler/LocalRAG) — Local Retrieval-Augmented Generation
+- [**LocalAgent**](https://github.com/mudler/LocalAgent) — Deploy AI agents that respect your privacy
 
-- Go 1.20 or later
-- Git
+## QUICK START
 
-### From Source
+### One-Command Docker Setup
+
+The fastest way to get everything running — LocalRAG, LocalAI, and LocalAgent pre-configured:
 
 ```bash
-# Clone the repository
+docker-compose up
+```
+
+> No API keys. No cloud subscriptions. No external dependencies. Just AI that works.
+
+### Manual Launch
+
+Run the binary and you're live:
+
+```bash
+./localagent
+```
+
+Access your agents at `http://localhost:3000`
+
+### Environment Configuration
+
+| Variable | What It Does |
+|----------|--------------|
+| `LOCALAGENT_MODEL` | Your go-to model |
+| `LOCALAGENT_MULTIMODAL_MODEL` | Optional model for multimodal capabilities |
+| `LOCALAGENT_LLM_API_URL` | OpenAI-compatible API server URL |
+| `LOCALAGENT_API_KEY` | API authentication |
+| `LOCALAGENT_TIMEOUT` | Request timeout settings |
+| `LOCALAGENT_STATE_DIR` | Where state gets stored |
+| `LOCALAGENT_LOCALRAG_URL` | LocalRAG connection |
+| `LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
+
+## INSTALLATION OPTIONS
+
+### Pre-Built Binaries
+
+Download ready-to-run binaries from the [Releases](https://github.com/mudler/LocalAgent/releases) page.
+
+### Source Build
+
+Requirements:
+- Go 1.20+
+- Git
+
+```bash
+# Clone repo
 git clone https://github.com/mudler/LocalAgent.git
 cd LocalAgent
 
-# Build the application
+# Build it
 go build -o localagent
 
-# Run LocalAgent
+# Run it
 ./localagent
 ```
 
-### Using Docker containers
+## CONNECTORS
 
-```bash
-docker run -ti -p 3000:3000 -v  quay.io/mudler/localagent
-```
+Link your agents to the services you already use. Configuration examples below.
 
-### Pre-built Binaries
-
-Download the pre-built binaries for your platform from the [Releases](https://github.com/mudler/LocalAgent/releases) page.
-
-## Getting Started
-
-After installation, you can start LocalAgent with default settings:
-
-```bash
-./localagent
-```
-
-This will start both the API server and the web interface. By default, the web interface is accessible at `http://localhost:3000`.
-
-### Environment Variables
-
-LocalAgent can be configured using the following environment variables:
-
-| Variable                      | Description                                      |
-|-------------------------------|--------------------------------------------------|
-| `LOCALAGENT_MODEL`                  | Specifies the test model to use                  |
-| `LOCALAGENT_MULTIMODAL_MODEL`       | Specifies a separate model to use with multimodal capabilities (optional, if LOCALAGENT_MODEL does not support multimodality)        |
-| `LOCALAGENT_LLM_API_URL`                     | URL of the API server                            |
-| `LOCALAGENT_API_KEY`                     | API key for authentication                       |
-| `LOCALAGENT_TIMEOUT`                     | Timeout duration for requests                    |
-| `LOCALAGENT_STATE_DIR`                   | Directory to store state information             |
-| `LOCALAGENT_LOCALRAG_URL`                   | LocalRAG URL               |
-| `LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING`| Enable or disable logging of conversations       |
-
-## Documentation
-
-### Connectors
-
-LocalAgent can be connected to a wide range of services. Each service support a set of configuration, examples are provided below for every connector.
-
-#### Github (issues)
-
-Create an user and a PAT token, and associate to a repository:
+### GitHub Issues
 
 ```json
 {
-	"token": "PAT_TOKEN",
-    "repository": "repository-to-watch-issues",
-    "owner": "repository-owner",
-    "botUserName": "username"
+  "token": "YOUR_PAT_TOKEN",
+  "repository": "repo-to-monitor",
+  "owner": "repo-owner",
+  "botUserName": "bot-username"
 }
 ```
 
-#### Discord
+### Discord
 
-Follow the steps in: https://discordpy.readthedocs.io/en/stable/discord.html to create a discord bot.   
-
-The token of the bot is in the "Bot" tab. Also enable " Message Content Intent " in the Bot tab!
+After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/discord.html):
 
 ```json
 {
-"token": "Bot DISCORDTOKENHERE",
-"defaultChannel": "OPTIONALCHANNELINT"
+  "token": "Bot YOUR_DISCORD_TOKEN",
+  "defaultChannel": "OPTIONAL_CHANNEL_ID"
 }
 ```
+> Don't forget to enable "Message Content Intent" in Bot settings!
 
-#### Slack
+### Slack
 
-See slack.yaml
-
-- Create a new App from a manifest (copy-paste from `slack.yaml`)
-- Create Oauth token bot token from "OAuth & Permissions" -> "OAuth Tokens for Your Workspace"
-- Create App level token (from "Basic Information" -> "App-Level Tokens" ( `scope connections:writeRoute authorizations:read` ))
-
-In the UI, when configuring the connector:
+Use the included `slack.yaml` manifest to create your app, then configure:
 
 ```json
 {
-"botToken": "xoxb-...",
-"appToken": "xapp-1-..."
+  "botToken": "xoxb-your-bot-token",
+  "appToken": "xapp-your-app-token"
 }
 ```
 
-#### Telegram
+### Telegram
 
-Ask a token to @botfather
-
-In the UI, when configuring the connector:
+Get a token from @botfather, then:
 
 ```json
-{ "token": "botfathertoken" }
+{ 
+  "token": "your-bot-father-token" 
+}
 ```
 
-#### IRC
+### IRC
 
-Connect to IRC servers and interact with channels:
+Connect to IRC networks:
 
 ```json
 {
@@ -159,26 +159,133 @@ Connect to IRC servers and interact with channels:
 }
 ```
 
-The IRC connector supports:
-- Connecting to IRC servers without encryption
-- Joining a specified channel
-- Responding to direct mentions (or all messages if alwaysReply is "true")
-- Direct messaging with users
+## REST API
 
-### REST API
+### Agent Management
 
-The LocalAgent API follows RESTful principles and uses JSON for request and response bodies.
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/agents` | GET | List all available agents | [Example](#get-all-agents) |
+| `/status/:name` | GET | View agent status history | [Example](#get-agent-status) |
+| `/create` | POST | Create a new agent | [Example](#create-agent) |
+| `/delete/:name` | DELETE | Remove an agent | [Example](#delete-agent) |
+| `/pause/:name` | PUT | Pause agent activities | [Example](#pause-agent) |
+| `/start/:name` | PUT | Resume a paused agent | [Example](#start-agent) |
+| `/settings/export/:name` | GET | Export agent config | [Example](#export-agent) |
+| `/settings/import` | POST | Import agent config | [Example](#import-agent) |
 
+### Chat Interactions
 
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/chat/:name` | POST | Send message & get response | [Example](#send-message) |
+| `/notify/:name` | GET | Send notification to agent | [Example](#notify-agent) |
+| `/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
 
+<details>
+<summary><strong>Curl Examples</strong></summary>
 
+#### Get All Agents
+```bash
+curl -X GET "http://localhost:3000/agents"
+```
 
-## License
+#### Get Agent Status
+```bash
+curl -X GET "http://localhost:3000/status/my-agent"
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+#### Create Agent
+```bash
+curl -X POST "http://localhost:3000/create" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-agent",
+    "model": "gpt-4",
+    "system_prompt": "You are an AI assistant.",
+    "enable_kb": true,
+    "enable_reasoning": true
+  }'
+```
+
+#### Delete Agent
+```bash
+curl -X DELETE "http://localhost:3000/delete/my-agent"
+```
+
+#### Pause Agent
+```bash
+curl -X PUT "http://localhost:3000/pause/my-agent"
+```
+
+#### Start Agent
+```bash
+curl -X PUT "http://localhost:3000/start/my-agent"
+```
+
+#### Export Agent
+```bash
+curl -X GET "http://localhost:3000/settings/export/my-agent" --output my-agent.json
+```
+
+#### Import Agent
+```bash
+curl -X POST "http://localhost:3000/settings/import" \
+  -F "file=@/path/to/my-agent.json"
+```
+
+#### Send Message
+```bash
+curl -X POST "http://localhost:3000/chat/my-agent" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello, how are you today?"}'
+```
+
+#### Notify Agent
+```bash
+curl -X GET "http://localhost:3000/notify/my-agent" \
+  -d "message=Important notification"
+```
+
+#### Agent SSE Stream
+```bash
+curl -N -X GET "http://localhost:3000/sse/my-agent"
+```
+Note: For proper SSE handling, you should use a client that supports SSE natively.
+
+</details>
+
+### Agent Configuration Reference
+
+```json
+{
+  "name": "my-agent",
+  "model": "gpt-4",
+  "multimodal_model": "gpt-4-vision",
+  "hud": true,
+  "standalone_job": false,
+  "random_identity": false,
+  "initiate_conversations": true,
+  "identity_guidance": "You are a helpful assistant.",
+  "periodic_runs": "0 * * * *",
+  "permanent_goal": "Help users with their questions.",
+  "enable_kb": true,
+  "enable_reasoning": true,
+  "kb_results": 5,
+  "can_stop_itself": false,
+  "system_prompt": "You are an AI assistant.",
+  "long_term_memory": true,
+  "summary_long_term_memory": false
+}
+```
+
+## LICENSE
+
+MIT License — See the [LICENSE](LICENSE) file for details.
 
 ---
 
 <p align="center">
+  <strong>LOCAL PROCESSING. GLOBAL THINKING.</strong><br>
   Made with ❤️ by <a href="https://github.com/mudler">mudler</a>
 </p>
