@@ -44,12 +44,16 @@ services:
       - ./volumes/localrag/db:/db
       - ./volumes/localrag/assets/:/assets
 
+  ragserver-healthcheck:
+    image: busybox
+    command: ["sh", "-c", "until wget -q -O - http://ragserver:8080 > /dev/null 2>&1; do echo 'Waiting for ragserver...'; sleep 1; done; echo 'RagServer is up!'"]
+
   localagent:
     depends_on:
       localai:
         condition: service_healthy
-      ragserver:
-        condition: service_healthy
+      ragserver-healthcheck:
+        condition: service_completed_successfully
     build:
       context: .
       dockerfile: Dockerfile.webui
