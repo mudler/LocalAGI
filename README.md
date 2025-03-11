@@ -38,6 +38,26 @@ LocalAgent is part of a trinity of tools designed to keep AI under your control:
 - [**LocalRAG**](https://github.com/mudler/LocalRAG) — Local Retrieval-Augmented Generation
 - [**LocalAgent**](https://github.com/mudler/LocalAgent) — Deploy AI agents that respect your privacy
 
+## Features
+
+### Powerful WebUI
+
+![Screenshot from 2025-03-11 22-50-24](https://github.com/user-attachments/assets/cd5228a3-4e67-4271-8fce-eccd229e6e58)
+![Screenshot from 2025-03-11 22-50-06](https://github.com/user-attachments/assets/0a5ddb03-85ff-4995-8217-785d3249ffb1)
+![Screenshot from 2025-03-11 22-49-56](https://github.com/user-attachments/assets/65af8ee6-ed2b-4e60-8906-ea12b28ecc58)
+
+
+### Connectors ready-to-go
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4171072f-e4bf-4485-982b-55d55086f8fc" alt="Telegram Logo" width="60"/>
+  <img src="https://github.com/user-attachments/assets/9235da84-0187-4f26-8482-32dcc55702ef" alt="Discord Logo" width="220"/>
+  <img src="https://github.com/user-attachments/assets/a88c3d88-a387-4fb5-b513-22bdd5da7413" alt="Slack Logo" width="220"/>
+  <img src="https://github.com/user-attachments/assets/d249cdf5-ab34-4ab1-afdf-b99e2db182d2" alt="IRC Logo" width="220"/>
+  <img src="https://github.com/user-attachments/assets/52c852b0-4b50-4926-9fa0-aa50613ac622" alt="Github Logo" width="220"/>
+</p>
+![Slack-logo-500x281
+
 ## QUICK START
 
 ### One-Command Docker Setup
