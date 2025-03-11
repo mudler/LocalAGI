@@ -25,6 +25,7 @@ const (
 	ActionBrowse              = "browse"
 	ActionSendMail            = "send_mail"
 	ActionGenerateImage       = "generate_image"
+	ActionCounter             = "counter"
 )
 
 var AvailableActions = []string{
@@ -39,6 +40,7 @@ var AvailableActions = []string{
 	ActionWikipedia,
 	ActionSendMail,
 	ActionGenerateImage,
+	ActionCounter,
 }
 
 func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
@@ -80,6 +82,8 @@ func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
 				allActions = append(allActions, actions.NewBrowse(config))
 			case ActionSendMail:
 				allActions = append(allActions, actions.NewSendMail(config))
+			case ActionCounter:
+				allActions = append(allActions, actions.NewCounter(config))
 			}
 		}
 

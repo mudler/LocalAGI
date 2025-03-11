@@ -7,8 +7,8 @@ services:
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
     image: localai/localai:latest-cpu
     command: 
-    - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
-    #- marco-o1 (smaller)
+    # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
+    - marco-o1 # (smaller)
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -67,5 +67,7 @@ services:
       - LOCALAGENT_STATE_DIR=/pool
       - LOCALAGENT_TIMEOUT=5m
       - LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./volumes/localagent/:/pool

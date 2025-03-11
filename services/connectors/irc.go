@@ -101,7 +101,7 @@ func (i *IRC) Start(a *agent.Agent) {
 		}
 
 		xlog.Info("Recv message", "message", message, "sender", sender, "channel", channel)
-		cleanedMessage := "I am " + sender + ". " + cleanUpMessage(message, i.nickname)
+		cleanedMessage := "My name is " + sender + ". " + cleanUpMessage(message, i.nickname)
 
 		go func() {
 			res := a.Ask(
