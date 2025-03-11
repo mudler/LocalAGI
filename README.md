@@ -18,7 +18,7 @@
 
 **LocalAgent** is an AI platform that runs 100% on your hardware. No clouds. No data sharing. No compromises.
 
-Built for those who value privacy as non-negotiable, LocalAgent lets you deploy intelligent agents that never phone home. Your data stays where you put it — period.
+Built for those who value privacy as non-negotiable, LocalAgent lets you deploy intelligent agents that never phone home. Your data stays where you put it — period. Are you tired of agent wrappers to cloud APIs? me too.
 
 ## WHY LOCALAGENT?
 
