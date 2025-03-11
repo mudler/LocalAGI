@@ -5,6 +5,7 @@ import "github.com/mudler/LocalAgent/core/state"
 type Config struct {
 	DefaultChunkSize int
 	Pool             *state.AgentPool
+	ApiKeys          []string
 }
 
 type Option func(*Config)
@@ -18,6 +19,12 @@ func WithDefaultChunkSize(size int) Option {
 func WithPool(pool *state.AgentPool) Option {
 	return func(c *Config) {
 		c.Pool = pool
+	}
+}
+
+func WithApiKeys(keys ...string) Option {
+	return func(c *Config) {
+		c.ApiKeys = keys
 	}
 }
 

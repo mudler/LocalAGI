@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mudler/LocalAgent/core/state"
 	"github.com/mudler/LocalAgent/services"
@@ -18,6 +19,7 @@ var timeout = os.Getenv("LOCALAGENT_TIMEOUT")
 var stateDir = os.Getenv("LOCALAGENT_STATE_DIR")
 var localRAG = os.Getenv("LOCALAGENT_LOCALRAG_URL")
 var withLogs = os.Getenv("LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING") == "true"
+var apiKeysEnv = os.Getenv("LOCALAGENT_API_KEYS")
 
 func init() {
 	if testModel == "" {
@@ -43,6 +45,11 @@ func main() {
 	// make sure state dir exists
 	os.MkdirAll(stateDir, 0755)
 
+	apiKeys := []string{}
+	if apiKeysEnv != "" {
+		apiKeys = strings.Split(apiKeysEnv, ",")
+	}
+
 	// Create the agent pool
 	pool, err := state.NewAgentPool(
 		testModel,
@@ -62,7 +69,7 @@ func main() {
 	}
 
 	// Create the application
-	app := webui.NewApp(webui.WithPool(pool))
+	app := webui.NewApp(webui.WithPool(pool), webui.WithApiKeys(apiKeys...))
 
 	// Start the agents
 	if err := pool.StartAll(); err != nil {

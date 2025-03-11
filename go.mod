@@ -7,8 +7,8 @@ toolchain go1.22.2
 require (
 	github.com/bwmarrin/discordgo v0.28.1
 	github.com/chasefleming/elem-go v0.25.0
+	github.com/dave-gray101/v2keyauth v0.0.0-20240624150259-c45d584d25e2
 	github.com/donseba/go-htmx v1.8.0
-	github.com/dslipak/pdf v0.0.2
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
 	github.com/go-telegram/bot v1.2.1
 	github.com/gofiber/fiber/v2 v2.52.4
@@ -19,6 +19,7 @@ require (
 	github.com/philippgille/chromem-go v0.5.0
 	github.com/sashabaranov/go-openai v1.18.3
 	github.com/slack-go/slack v0.12.5
+	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64
 	github.com/tmc/langchaingo v0.1.8
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.52.0
@@ -58,7 +59,6 @@ require (
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	go.starlark.net v0.0.0-20230302034142-4b1e35fe2254 // indirect

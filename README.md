@@ -91,6 +91,7 @@ Access your agents at `http://localhost:3000`
 | `LOCALAGENT_STATE_DIR` | Where state gets stored |
 | `LOCALAGENT_LOCALRAG_URL` | LocalRAG connection |
 | `LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
+| `LOCALAGENT_API_KEYS` | A comma separated list of api keys used for authentication |
 
 ## INSTALLATION OPTIONS
 

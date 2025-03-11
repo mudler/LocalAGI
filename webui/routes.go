@@ -1,12 +1,16 @@
 package webui
 
 import (
+	"crypto/subtle"
 	"embed"
+	"errors"
 	"math/rand"
 	"net/http"
 
+	"github.com/dave-gray101/v2keyauth"
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/fiber/v2/middleware/keyauth"
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
 	"github.com/mudler/LocalAgent/core/state"
@@ -26,6 +30,14 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		PathPrefix: "public",
 		Browse:     true,
 	}))
+
+	if len(app.config.ApiKeys) > 0 {
+		kaConfig, err := GetKeyAuthConfig(app.config.ApiKeys)
+		if err != nil || kaConfig == nil {
+			panic(err)
+		}
+		webapp.Use(v2keyauth.New(*kaConfig))
+	}
 
 	webapp.Get("/", func(c *fiber.Ctx) error {
 		return c.Render("views/index", fiber.Map{
@@ -138,4 +150,54 @@ func Reverse[T any](original []T) (reversed []T) {
 	}
 
 	return
+}
+
+func GetKeyAuthConfig(apiKeys []string) (*v2keyauth.Config, error) {
+	customLookup, err := v2keyauth.MultipleKeySourceLookup([]string{"header:Authorization", "header:x-api-key", "header:xi-api-key", "cookie:token"}, keyauth.ConfigDefault.AuthScheme)
+	if err != nil {
+		return nil, err
+	}
+
+	return &v2keyauth.Config{
+		CustomKeyLookup: customLookup,
+		Next:            func(c *fiber.Ctx) bool { return false },
+		Validator:       getApiKeyValidationFunction(apiKeys),
+		ErrorHandler:    getApiKeyErrorHandler(false, apiKeys),
+		AuthScheme:      "Bearer",
+	}, nil
+}
+
+func getApiKeyErrorHandler(opaqueErrors bool, apiKeys []string) fiber.ErrorHandler {
+	return func(ctx *fiber.Ctx, err error) error {
+		if errors.Is(err, v2keyauth.ErrMissingOrMalformedAPIKey) {
+			if len(apiKeys) == 0 {
+				return ctx.Next() // if no keys are set up, any error we get here is not an error.
+			}
+			ctx.Set("WWW-Authenticate", "Bearer")
+			if opaqueErrors {
+				return ctx.SendStatus(401)
+			}
+			return ctx.Status(401).Render("views/login", fiber.Map{})
+		}
+		if opaqueErrors {
+			return ctx.SendStatus(500)
+		}
+		return err
+	}
+}
+
+func getApiKeyValidationFunction(apiKeys []string) func(*fiber.Ctx, string) (bool, error) {
+
+	return func(ctx *fiber.Ctx, apiKey string) (bool, error) {
+		if len(apiKeys) == 0 {
+			return true, nil // If no keys are setup, accept everything
+		}
+		for _, validKey := range apiKeys {
+			if subtle.ConstantTimeCompare([]byte(apiKey), []byte(validKey)) == 1 {
+				return true, nil
+			}
+		}
+		return false, v2keyauth.ErrMissingOrMalformedAPIKey
+	}
+
 }
