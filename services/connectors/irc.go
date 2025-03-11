@@ -8,7 +8,7 @@ import (
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
-	"github.com/thoj/go-ircevent"
+	irc "github.com/thoj/go-ircevent"
 )
 
 type IRC struct {
@@ -53,21 +53,25 @@ func cleanUpMessage(message string, nickname string) string {
 
 // isMentioned checks if the bot is mentioned in the message
 func isMentioned(message string, nickname string) bool {
-	return strings.Contains(message, nickname+":") || 
-	       strings.Contains(message, nickname+",") || 
-	       strings.HasPrefix(message, nickname)
+	return strings.Contains(message, nickname+":") ||
+		strings.Contains(message, nickname+",") ||
+		strings.HasPrefix(message, nickname)
 }
 
 // Start connects to the IRC server and starts listening for messages
 func (i *IRC) Start(a *agent.Agent) {
 	i.conn = irc.IRC(i.nickname, i.nickname)
-	i.conn.UseTLS = false 
+	if i.conn == nil {
+		xlog.Error("Failed to create IRC client")
+		return
+	}
+	i.conn.UseTLS = false
 	i.conn.AddCallback("001", func(e *irc.Event) {
 		xlog.Info("Connected to IRC server", "server", i.server)
 		i.conn.Join(i.channel)
 		xlog.Info("Joined channel", "channel", i.channel)
 	})
-	
+
 	i.conn.AddCallback("JOIN", func(e *irc.Event) {
 		if e.Nick == i.nickname {
 			xlog.Info("Bot joined channel", "channel", e.Arguments[0])
@@ -128,10 +132,10 @@ func (i *IRC) Start(a *agent.Agent) {
 						chunk = line
 						line = ""
 					}
-					
+
 					// Send the message to the channel
 					i.conn.Privmsg(channel, chunk)
-					
+
 					// Small delay to prevent flooding
 					time.Sleep(500 * time.Millisecond)
 				}

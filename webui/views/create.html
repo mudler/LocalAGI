@@ -78,7 +78,7 @@
 
                 <div class="mb-4">
                     <label for="kb_results">Knowledge Base Results</label>
-                    <input type="text" name="kb_results" id="kb_results" placeholder="3">
+                    <input type="number" name="kb_results" id="kb_results" placeholder="3">
                 </div>
         
                 <div class="mb-4">
@@ -278,19 +278,152 @@
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                // Show a loading state
+                // Show loading state
                 const createButton = document.getElementById('create-button');
                 const originalButtonText = createButton.innerHTML;
                 createButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
                 createButton.disabled = true;
                 
-                // Get form data
+                // Build a structured data object
                 const formData = new FormData(form);
+                const jsonData = {};
                 
-                // Send the form data using fetch API
+                // Process basic form fields
+                for (const [key, value] of formData.entries()) {
+                    // Skip the array fields (connectors, actions, promptblocks) as they'll be processed separately
+                    if (!key.includes('[') && !key.includes('].')) {
+                        // Handle checkboxes
+                        if (value === 'on') {
+                            jsonData[key] = true;
+                        } 
+                        // Handle numeric fields - specifically kb_results
+                        else if (key === 'kb_results') {
+                            // Convert to integer or default to 3 if empty
+                            jsonData[key] = value ? parseInt(value, 10) : 3;
+                            
+                            // Check if the parse was successful
+                            if (isNaN(jsonData[key])) {
+                                showToast('Knowledge Base Results must be a number', 'error');
+                                createButton.innerHTML = originalButtonText;
+                                createButton.disabled = false;
+                                return; // Stop form submission
+                            }
+                        }
+                        // Handle other numeric fields if needed
+                        else if (key === 'periodic_runs' && value) {
+                            // Try to parse as number if it looks like one
+                            const numValue = parseInt(value, 10);
+                            if (!isNaN(numValue) && String(numValue) === value) {
+                                jsonData[key] = numValue;
+                            } else {
+                                jsonData[key] = value;
+                            }
+                        }
+                        else {
+                            jsonData[key] = value;
+                        }
+                    }
+                }
+                
+                // Process connectors - KEEP CONFIG AS STRING
+                const connectors = [];
+                const connectorsElements = document.getElementsByClassName('connector');
+                for (let i = 0; i < connectorsElements.length; i++) {
+                    const typeField = document.getElementById(`connectorType${i}`);
+                    const configField = document.getElementById(`connectorConfig${i}`);
+                    
+                    if (typeField && configField) {
+                        try {
+                            // Validate JSON but send as string
+                            const configValue = configField.value.trim() || '{}';
+                            // Parse to validate but don't use the parsed object
+                            JSON.parse(configValue); 
+                            
+                            connectors.push({
+                                type: typeField.value,
+                                config: configValue // Send the raw string, not parsed JSON
+                            });
+                        } catch (err) {
+                            console.error(`Error parsing connector ${i} config:`, err);
+                            showToast(`Error in connector ${i+1} configuration: Invalid JSON`, 'error');
+                            
+                            createButton.innerHTML = originalButtonText;
+                            createButton.disabled = false;
+                            return; // Stop form submission
+                        }
+                    }
+                }
+                jsonData.connectors = connectors;
+                
+                // Process actions - KEEP CONFIG AS STRING
+                const actions = [];
+                const actionElements = document.getElementsByClassName('action');
+                for (let i = 0; i < actionElements.length; i++) {
+                    const nameField = document.getElementById(`actionsName${i}`);
+                    const configField = document.getElementById(`actionsConfig${i}`);
+                    
+                    if (nameField && configField) {
+                        try {
+                            // Validate JSON but send as string
+                            const configValue = configField.value.trim() || '{}';
+                            // Parse to validate but don't use the parsed object
+                            JSON.parse(configValue);
+                            
+                            actions.push({
+                                name: nameField.value,
+                                config: configValue // Send the raw string, not parsed JSON
+                            });
+                        } catch (err) {
+                            console.error(`Error parsing action ${i} config:`, err);
+                            showToast(`Error in action ${i+1} configuration: Invalid JSON`, 'error');
+                            
+                            createButton.innerHTML = originalButtonText;
+                            createButton.disabled = false;
+                            return; // Stop form submission
+                        }
+                    }
+                }
+                jsonData.actions = actions;
+                
+                // Process prompt blocks - KEEP CONFIG AS STRING
+                const promptBlocks = [];
+                const promptBlockElements = document.getElementsByClassName('promptBlock');
+                for (let i = 0; i < promptBlockElements.length; i++) {
+                    const nameField = document.getElementById(`promptName${i}`);
+                    const configField = document.getElementById(`promptConfig${i}`);
+                    
+                    if (nameField && configField) {
+                        try {
+                            // Validate JSON but send as string
+                            const configValue = configField.value.trim() || '{}';
+                            // Parse to validate but don't use the parsed object
+                            JSON.parse(configValue);
+                            
+                            promptBlocks.push({
+                                name: nameField.value,
+                                config: configValue // Send the raw string, not parsed JSON
+                            });
+                        } catch (err) {
+                            console.error(`Error parsing prompt block ${i} config:`, err);
+                            showToast(`Error in prompt block ${i+1} configuration: Invalid JSON`, 'error');
+                            
+                            createButton.innerHTML = originalButtonText;
+                            createButton.disabled = false;
+                            return; // Stop form submission
+                        }
+                    }
+                }
+                jsonData.promptblocks = promptBlocks;
+                
+                console.log('Sending data:', jsonData);
+                
+                // Send the structured data as JSON
                 fetch('/create', {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(jsonData)
                 })
                 .then(response => response.json())
                 .then(data => {

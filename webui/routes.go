@@ -102,11 +102,18 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		}
 
 		return c.Render("views/settings", fiber.Map{
-			//	"Character": agent.Character,
-			"Name":   c.Params("name"),
-			"Status": status,
+			"Name":         c.Params("name"),
+			"Status":       status,
+			"Actions":      services.AvailableActions,
+			"Connectors":   services.AvailableConnectors,
+			"PromptBlocks": services.AvailableBlockPrompts,
 		})
 	})
+
+	// New API endpoints for getting and updating agent configuration
+	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
+	webapp.Put("/api/agent/:name/config", app.UpdateAgentConfig(pool))
+
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
 }

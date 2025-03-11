@@ -136,6 +136,56 @@ func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
+// NEW FUNCTION: Get agent configuration
+func (a *App) GetAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		config := pool.GetConfig(c.Params("name"))
+		if config == nil {
+			return errorJSONMessage(c, "Agent not found")
+		}
+		return c.JSON(config)
+	}
+}
+
+// UpdateAgentConfig handles updating an agent's configuration
+func (a *App) UpdateAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		agentName := c.Params("name")
+
+		// First check if agent exists
+		oldConfig := pool.GetConfig(agentName)
+		if oldConfig == nil {
+			return errorJSONMessage(c, "Agent not found")
+		}
+
+		// Parse the new configuration using the same approach as Create
+		newConfig := state.AgentConfig{}
+		if err := c.BodyParser(&newConfig); err != nil {
+			xlog.Error("Error parsing agent config", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		// Ensure the name doesn't change
+		newConfig.Name = agentName
+
+		// Remove the agent first
+		if err := pool.Remove(agentName); err != nil {
+			return errorJSONMessage(c, "Error removing agent: "+err.Error())
+		}
+
+		// Create agent with new config
+		if err := pool.CreateAgent(agentName, &newConfig); err != nil {
+			// Try to restore the old configuration if update fails
+			if restoreErr := pool.CreateAgent(agentName, oldConfig); restoreErr != nil {
+				return errorJSONMessage(c, fmt.Sprintf("Failed to update agent and restore failed: %v, %v", err, restoreErr))
+			}
+			return errorJSONMessage(c, "Error updating agent: "+err.Error())
+		}
+
+		return statusJSONMessage(c, "ok")
+	}
+}
+
 func (a *App) ExportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		agent := pool.GetConfig(c.Params("name"))

@@ -21,18 +21,18 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	file                                                string
-	pooldir                                             string
-	pool                                                AgentPoolData
-	agents                                              map[string]*Agent
-	managers                                            map[string]sse.Manager
-	agentStatus                                         map[string]*Status
-	apiURL, model, multimodalModel, localRAGAPI, apiKey string
-	availableActions                                    func(*AgentConfig) func(ctx context.Context) []Action
-	connectors                                          func(*AgentConfig) []Connector
-	promptBlocks                                        func(*AgentConfig) []PromptBlock
-	timeout                                             string
-	conversationLogs                                    string
+	file                                                              string
+	pooldir                                                           string
+	pool                                                              AgentPoolData
+	agents                                                            map[string]*Agent
+	managers                                                          map[string]sse.Manager
+	agentStatus                                                       map[string]*Status
+	apiURL, defaultModel, defaultMultimodalModel, localRAGAPI, apiKey string
+	availableActions                                                  func(*AgentConfig) func(ctx context.Context) []Action
+	connectors                                                        func(*AgentConfig) []Connector
+	promptBlocks                                                      func(*AgentConfig) []PromptBlock
+	timeout                                                           string
+	conversationLogs                                                  string
 }
 
 type Status struct {
@@ -66,7 +66,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	model, multimodalModel, apiURL, apiKey, directory string,
+	defaultModel, defaultMultimodalModel, apiURL, apiKey, directory string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context) []agent.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -87,22 +87,22 @@ func NewAgentPool(
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
-			file:             poolfile,
-			pooldir:          directory,
-			apiURL:           apiURL,
-			model:            model,
-			multimodalModel:  multimodalModel,
-			localRAGAPI:      LocalRAGAPI,
-			apiKey:           apiKey,
-			agents:           make(map[string]*Agent),
-			pool:             make(map[string]AgentConfig),
-			agentStatus:      make(map[string]*Status),
-			managers:         make(map[string]sse.Manager),
-			connectors:       connectors,
-			availableActions: availableActions,
-			promptBlocks:     promptBlocks,
-			timeout:          timeout,
-			conversationLogs: conversationPath,
+			file:                   poolfile,
+			pooldir:                directory,
+			apiURL:                 apiURL,
+			defaultModel:           defaultModel,
+			defaultMultimodalModel: defaultMultimodalModel,
+			localRAGAPI:            LocalRAGAPI,
+			apiKey:                 apiKey,
+			agents:                 make(map[string]*Agent),
+			pool:                   make(map[string]AgentConfig),
+			agentStatus:            make(map[string]*Status),
+			managers:               make(map[string]sse.Manager),
+			connectors:             connectors,
+			availableActions:       availableActions,
+			promptBlocks:           promptBlocks,
+			timeout:                timeout,
+			conversationLogs:       conversationPath,
 		}, nil
 	}
 
@@ -111,22 +111,22 @@ func NewAgentPool(
 		return nil, err
 	}
 	return &AgentPool{
-		file:             poolfile,
-		apiURL:           apiURL,
-		pooldir:          directory,
-		model:            model,
-		multimodalModel:  multimodalModel,
-		apiKey:           apiKey,
-		agents:           make(map[string]*Agent),
-		managers:         make(map[string]sse.Manager),
-		agentStatus:      map[string]*Status{},
-		pool:             *poolData,
-		connectors:       connectors,
-		localRAGAPI:      LocalRAGAPI,
-		promptBlocks:     promptBlocks,
-		availableActions: availableActions,
-		timeout:          timeout,
-		conversationLogs: conversationPath,
+		file:                   poolfile,
+		apiURL:                 apiURL,
+		pooldir:                directory,
+		defaultModel:           defaultModel,
+		defaultMultimodalModel: defaultMultimodalModel,
+		apiKey:                 apiKey,
+		agents:                 make(map[string]*Agent),
+		managers:               make(map[string]sse.Manager),
+		agentStatus:            map[string]*Status{},
+		pool:                   *poolData,
+		connectors:             connectors,
+		localRAGAPI:            LocalRAGAPI,
+		promptBlocks:           promptBlocks,
+		availableActions:       availableActions,
+		timeout:                timeout,
+		conversationLogs:       conversationPath,
 	}, nil
 }
 
@@ -166,8 +166,8 @@ func (a *AgentPool) GetStatusHistory(name string) *Status {
 func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
 	manager := sse.NewManager(5)
 	ctx := context.Background()
-	model := a.model
-	multimodalModel := a.multimodalModel
+	model := a.defaultModel
+	multimodalModel := a.defaultMultimodalModel
 	if config.MultimodalModel != "" {
 		multimodalModel = config.MultimodalModel
 	}
@@ -340,7 +340,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	go func() {
 		if err := agent.Run(); err != nil {
-			xlog.Error("Agent stopped", "error", err.Error())
+			xlog.Error("Agent stopped", "error", err.Error(), "name", name)
 			panic(err)
 		}
 	}()
