@@ -56,7 +56,6 @@ LocalAgent is part of a trinity of tools designed to keep AI under your control:
   <img src="https://github.com/user-attachments/assets/d249cdf5-ab34-4ab1-afdf-b99e2db182d2" alt="IRC Logo" width="220"/>
   <img src="https://github.com/user-attachments/assets/52c852b0-4b50-4926-9fa0-aa50613ac622" alt="Github Logo" width="220"/>
 </p>
-![Slack-logo-500x281
 
 ## QUICK START
 
