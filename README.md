@@ -192,6 +192,8 @@ Connect to IRC networks:
 | `/start/:name` | PUT | Resume a paused agent | [Example](#start-agent) |
 | `/settings/export/:name` | GET | Export agent config | [Example](#export-agent) |
 | `/settings/import` | POST | Import agent config | [Example](#import-agent) |
+| `/api/agent/:name/config` | GET | Get agent configuration | |
+| `/api/agent/:name/config` | PUT | Update agent configuration | | 
 
 ### Chat Interactions
 
