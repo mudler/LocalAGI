@@ -12,10 +12,10 @@ import (
 )
 
 type GithubIssuesLabeler struct {
-	token, repository, owner string
-	availableLabels          []string
-	context                  context.Context
-	client                   *github.Client
+	token, repository, owner, customActionName string
+	availableLabels                            []string
+	context                                    context.Context
+	client                                     *github.Client
 }
 
 func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *GithubIssuesLabeler {
@@ -29,12 +29,13 @@ func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *Githu
 	}
 
 	return &GithubIssuesLabeler{
-		client:          client,
-		token:           config["token"],
-		repository:      config["repository"],
-		owner:           config["owner"],
-		context:         ctx,
-		availableLabels: availableLabels,
+		client:           client,
+		token:            config["token"],
+		customActionName: config["customActionName"],
+		repository:       config["repository"],
+		owner:            config["owner"],
+		context:          ctx,
+		availableLabels:  availableLabels,
 	}
 }
 
@@ -70,9 +71,13 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 }
 
 func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {
+	actionName := "add_label_to_github_issue"
+	if g.customActionName != "" {
+		actionName = g.customActionName
+	}
 	if g.repository != "" && g.owner != "" {
 		return action.ActionDefinition{
-			Name:        "add_label_to_github_issue",
+			Name:        action.ActionDefinitionName(actionName),
 			Description: "Add a label to a Github issue. You might want to assign labels to issues to categorize them.",
 			Properties: map[string]jsonschema.Definition{
 				"issue_number": {
@@ -89,7 +94,7 @@ func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {
 		}
 	}
 	return action.ActionDefinition{
-		Name:        "add_label_to_github_issue",
+		Name:        action.ActionDefinitionName(actionName),
 		Description: "Add a label to a Github issue. You might want to assign labels to issues to categorize them.",
 		Properties: map[string]jsonschema.Definition{
 			"issue_number": {
