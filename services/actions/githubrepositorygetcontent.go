@@ -6,20 +6,19 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/action"
-	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-type GithubIssueSearch struct {
+type GithubRepositoryGetContent struct {
 	token, repository, owner, customActionName string
 	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueSearch(ctx context.Context, config map[string]string) *GithubIssueSearch {
+func NewGithubRepositoryGetContent(ctx context.Context, config map[string]string) *GithubRepositoryGetContent {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
-	return &GithubIssueSearch{
+	return &GithubRepositoryGetContent{
 		client:           client,
 		token:            config["token"],
 		repository:       config["repository"],
@@ -29,9 +28,9 @@ func NewGithubIssueSearch(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubRepositoryGetContent) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
-		Query      string `json:"query"`
+		Path       string `json:"path"`
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`
 	}{}
@@ -47,52 +46,51 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 		result.Owner = g.owner
 	}
 
-	query := fmt.Sprintf("%s in:%s user:%s", result.Query, result.Repository, result.Owner)
-	resultString := ""
-	issues, _, err := g.client.Search.Issues(g.context, query, &github.SearchOptions{
-		ListOptions: github.ListOptions{PerPage: 5},
-		Order:       "desc",
-		//Sort:        "created",
-	})
+	fileContent, directoryContent, _, err := g.client.Repositories.GetContents(g.context, result.Owner, result.Repository, result.Path, nil)
 	if err != nil {
-		resultString = fmt.Sprintf("Error listing issues: %v", err)
+		resultString := fmt.Sprintf("Error getting content : %v", err)
 		return action.ActionResult{Result: resultString}, err
 	}
-	for _, i := range issues.Issues {
-		xlog.Info("Issue found", "title", i.GetTitle())
-		resultString += fmt.Sprintf("Issue found: %s\n", i.GetTitle())
-		resultString += fmt.Sprintf("URL: %s\n", i.GetHTMLURL())
-		//	resultString += fmt.Sprintf("Body: %s\n", i.GetBody())
+
+	if len(directoryContent) > 0 {
+		resultString := fmt.Sprintf("Directory found: %s\n", result.Path)
+		for _, f := range directoryContent {
+			resultString += fmt.Sprintf("File: %s\n", f.GetName())
+		}
+		return action.ActionResult{Result: resultString}, err
 	}
 
-	return action.ActionResult{Result: resultString}, err
+	content := fileContent.Content
+
+	return action.ActionResult{Result: fmt.Sprintf("File %s\nContent:%s\n", result.Path, content)}, err
 }
 
-func (g *GithubIssueSearch) Definition() action.ActionDefinition {
-	actionName := "search_github_issue"
+func (g *GithubRepositoryGetContent) Definition() action.ActionDefinition {
+	actionName := "get_github_repository_content"
+	actionDescription := "Get content of a file or directory in a github repository"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	if g.repository != "" && g.owner != "" {
 		return action.ActionDefinition{
 			Name:        action.ActionDefinitionName(actionName),
-			Description: "Search between github issues",
+			Description: actionDescription,
 			Properties: map[string]jsonschema.Definition{
-				"query": {
+				"path": {
 					Type:        jsonschema.String,
-					Description: "The text to search for",
+					Description: "The path to the file or directory",
 				},
 			},
-			Required: []string{"query"},
+			Required: []string{"path"},
 		}
 	}
 	return action.ActionDefinition{
 		Name:        action.ActionDefinitionName(actionName),
-		Description: "Search between github issues",
+		Description: actionDescription,
 		Properties: map[string]jsonschema.Definition{
-			"query": {
+			"path": {
 				Type:        jsonschema.String,
-				Description: "The text to search for",
+				Description: "The path to the file or directory",
 			},
 			"repository": {
 				Type:        jsonschema.String,
@@ -103,6 +101,6 @@ func (g *GithubIssueSearch) Definition() action.ActionDefinition {
 				Description: "The owner of the repository",
 			},
 		},
-		Required: []string{"query", "repository", "owner"},
+		Required: []string{"path", "repository", "owner"},
 	}
 }

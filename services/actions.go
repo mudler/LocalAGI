@@ -14,18 +14,20 @@ import (
 
 const (
 	// Actions
-	ActionSearch              = "search"
-	ActionCustom              = "custom"
-	ActionGithubIssueLabeler  = "github-issue-labeler"
-	ActionGithubIssueOpener   = "github-issue-opener"
-	ActionGithubIssueCloser   = "github-issue-closer"
-	ActionGithubIssueSearcher = "github-issue-searcher"
-	ActionScraper             = "scraper"
-	ActionWikipedia           = "wikipedia"
-	ActionBrowse              = "browse"
-	ActionSendMail            = "send_mail"
-	ActionGenerateImage       = "generate_image"
-	ActionCounter             = "counter"
+	ActionSearch                         = "search"
+	ActionCustom                         = "custom"
+	ActionGithubIssueLabeler             = "github-issue-labeler"
+	ActionGithubIssueOpener              = "github-issue-opener"
+	ActionGithubIssueCloser              = "github-issue-closer"
+	ActionGithubIssueSearcher            = "github-issue-searcher"
+	ActionGithubRepositoryGet            = "github-repository-get-content"
+	ActionGithubRepositoryCreateOrUpdate = "github-repository-create-or-update-content"
+	ActionScraper                        = "scraper"
+	ActionWikipedia                      = "wikipedia"
+	ActionBrowse                         = "browse"
+	ActionSendMail                       = "send_mail"
+	ActionGenerateImage                  = "generate_image"
+	ActionCounter                        = "counter"
 )
 
 var AvailableActions = []string{
@@ -35,6 +37,7 @@ var AvailableActions = []string{
 	ActionGithubIssueOpener,
 	ActionGithubIssueCloser,
 	ActionGithubIssueSearcher,
+	ActionGithubRepositoryGet,
 	ActionScraper,
 	ActionBrowse,
 	ActionWikipedia,
@@ -74,6 +77,10 @@ func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
 				allActions = append(allActions, actions.NewGithubIssueCloser(ctx, config))
 			case ActionGithubIssueSearcher:
 				allActions = append(allActions, actions.NewGithubIssueSearch(ctx, config))
+			case ActionGithubRepositoryGet:
+				allActions = append(allActions, actions.NewGithubRepositoryGetContent(ctx, config))
+			case ActionGithubRepositoryCreateOrUpdate:
+				allActions = append(allActions, actions.NewGithubRepositoryCreateOrUpdateContent(ctx, config))
 			case ActionScraper:
 				allActions = append(allActions, actions.NewScraper(config))
 			case ActionWikipedia:

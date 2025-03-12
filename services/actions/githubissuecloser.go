@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/go-github/v61/github"
+	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )

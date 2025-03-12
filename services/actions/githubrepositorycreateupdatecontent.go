@@ -9,16 +9,16 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-type GithubIssuesOpener struct {
+type GithubRepositoryCreateOrUpdateContent struct {
 	token, repository, owner, customActionName string
 	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueOpener(ctx context.Context, config map[string]string) *GithubIssuesOpener {
+func NewGithubRepositoryCreateOrUpdateContent(ctx context.Context, config map[string]string) *GithubRepositoryCreateOrUpdateContent {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
-	return &GithubIssuesOpener{
+	return &GithubRepositoryCreateOrUpdateContent{
 		client:           client,
 		token:            config["token"],
 		repository:       config["repository"],
@@ -28,12 +28,12 @@ func NewGithubIssueOpener(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	result := struct {
-		Title      string `json:"title"`
-		Body       string `json:"text"`
+		Path       string `json:"path"`
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`
+		Content    string `json:"content"`
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
@@ -47,65 +47,61 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 		result.Owner = g.owner
 	}
 
-	issue := &github.IssueRequest{
-		Title: &result.Title,
-		Body:  &result.Body,
-	}
-
-	resultString := ""
-	createdIssue, _, err := g.client.Issues.Create(g.context, result.Owner, result.Repository, issue)
+	fileContent, _, err := g.client.Repositories.CreateFile(g.context, result.Owner, result.Repository, result.Path, &github.RepositoryContentFileOptions{
+		Content: []byte(result.Content),
+	})
 	if err != nil {
-		resultString = fmt.Sprintf("Error creating issue: %v", err)
-	} else {
-		resultString = fmt.Sprintf("Created issue %d in repository %s/%s", createdIssue.GetNumber(), result.Owner, result.Repository)
+		resultString := fmt.Sprintf("Error creating content : %v", err)
+		return action.ActionResult{Result: resultString}, err
 	}
 
-	return action.ActionResult{Result: resultString}, err
+	return action.ActionResult{Result: fmt.Sprintf("File created/updated: %s\n", fileContent.GetURL())}, err
 }
 
-func (g *GithubIssuesOpener) Definition() action.ActionDefinition {
-	actionName := "create_github_issue"
+func (g *GithubRepositoryCreateOrUpdateContent) Definition() action.ActionDefinition {
+	actionName := "github_repository_create_or_update_content"
+	actionDescription := "Create or update a file in a GitHub repository"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	if g.repository != "" && g.owner != "" {
 		return action.ActionDefinition{
 			Name:        action.ActionDefinitionName(actionName),
-			Description: "Create a new issue on a GitHub repository.",
+			Description: actionDescription,
 			Properties: map[string]jsonschema.Definition{
-				"text": {
+				"path": {
 					Type:        jsonschema.String,
-					Description: "The text of the new issue",
+					Description: "The path to the file or directory",
 				},
-				"title": {
+				"content": {
 					Type:        jsonschema.String,
-					Description: "The title of the issue.",
+					Description: "The content to create/update",
 				},
 			},
-			Required: []string{"title", "text"},
+			Required: []string{"path", "content"},
 		}
 	}
 	return action.ActionDefinition{
 		Name:        action.ActionDefinitionName(actionName),
-		Description: "Create a new issue on a GitHub repository.",
+		Description: actionDescription,
 		Properties: map[string]jsonschema.Definition{
-			"text": {
+			"path": {
 				Type:        jsonschema.String,
-				Description: "The text of the new issue",
-			},
-			"title": {
-				Type:        jsonschema.String,
-				Description: "The title of the issue.",
-			},
-			"owner": {
-				Type:        jsonschema.String,
-				Description: "The owner of the repository.",
+				Description: "The path to the file or directory",
 			},
 			"repository": {
 				Type:        jsonschema.String,
-				Description: "The repository where to create the issue.",
+				Description: "The repository to search in",
+			},
+			"owner": {
+				Type:        jsonschema.String,
+				Description: "The owner of the repository",
+			},
+			"content": {
+				Type:        jsonschema.String,
+				Description: "The content to create/update",
 			},
 		},
-		Required: []string{"title", "text", "owner", "repository"},
+		Required: []string{"path", "repository", "owner", "content"},
 	}
 }

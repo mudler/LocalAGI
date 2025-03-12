@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v61/github"
+	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
