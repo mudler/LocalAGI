@@ -57,7 +57,7 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 	if err != nil {
 		resultString = fmt.Sprintf("Error creating issue: %v", err)
 	} else {
-		resultString = fmt.Sprintf("Created issue %d in repository %s/%s", createdIssue.GetNumber(), result.Owner, result.Repository)
+		resultString = fmt.Sprintf("Created issue %d in repository %s/%s: %s", createdIssue.GetNumber(), result.Owner, result.Repository, createdIssue.GetURL())
 	}
 
 	return action.ActionResult{Result: resultString}, err
