@@ -12,10 +12,10 @@ import (
 )
 
 type GithubIssuesLabeler struct {
-	token           string
-	availableLabels []string
-	context         context.Context
-	client          *github.Client
+	token, repository, owner string
+	availableLabels          []string
+	context                  context.Context
+	client                   *github.Client
 }
 
 func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *GithubIssuesLabeler {
@@ -31,6 +31,8 @@ func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *Githu
 	return &GithubIssuesLabeler{
 		client:          client,
 		token:           config["token"],
+		repository:      config["repository"],
+		owner:           config["owner"],
 		context:         ctx,
 		availableLabels: availableLabels,
 	}
@@ -48,6 +50,11 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 		return action.ActionResult{}, err
 	}
 
+	if g.repository != "" && g.owner != "" {
+		result.Repository = g.repository
+		result.Owner = g.owner
+	}
+
 	labels, _, err := g.client.Issues.AddLabelsToIssue(g.context, result.Owner, result.Repository, result.IssueNumber, []string{result.Label})
 	//labelsNames := []string{}
 	for _, l := range labels {
@@ -63,6 +70,24 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 }
 
 func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {
+	if g.repository != "" && g.owner != "" {
+		return action.ActionDefinition{
+			Name:        "add_label_to_github_issue",
+			Description: "Add a label to a Github issue. You might want to assign labels to issues to categorize them.",
+			Properties: map[string]jsonschema.Definition{
+				"issue_number": {
+					Type:        jsonschema.Number,
+					Description: "The number of the issue to add the label to.",
+				},
+				"label": {
+					Type:        jsonschema.String,
+					Description: "The label to add to the issue.",
+					Enum:        g.availableLabels,
+				},
+			},
+			Required: []string{"issue_number", "label"},
+		}
+	}
 	return action.ActionDefinition{
 		Name:        "add_label_to_github_issue",
 		Description: "Add a label to a Github issue. You might want to assign labels to issues to categorize them.",

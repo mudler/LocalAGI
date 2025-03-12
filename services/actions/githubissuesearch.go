@@ -11,18 +11,20 @@ import (
 )
 
 type GithubIssueSearch struct {
-	token   string
-	context context.Context
-	client  *github.Client
+	token, repository, owner string
+	context                  context.Context
+	client                   *github.Client
 }
 
 func NewGithubIssueSearch(ctx context.Context, config map[string]string) *GithubIssueSearch {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubIssueSearch{
-		client:  client,
-		token:   config["token"],
-		context: ctx,
+		client:     client,
+		token:      config["token"],
+		repository: config["repository"],
+		owner:      config["owner"],
+		context:    ctx,
 	}
 }
 
@@ -37,6 +39,11 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 		fmt.Printf("error: %v", err)
 
 		return action.ActionResult{}, err
+	}
+
+	if g.repository != "" && g.owner != "" {
+		result.Repository = g.repository
+		result.Owner = g.owner
 	}
 
 	query := fmt.Sprintf("%s in:%s user:%s", result.Query, result.Repository, result.Owner)
@@ -61,6 +68,19 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 }
 
 func (g *GithubIssueSearch) Definition() action.ActionDefinition {
+	if g.repository != "" && g.owner != "" {
+		return action.ActionDefinition{
+			Name:        "search_github_issue",
+			Description: "Search between github issues",
+			Properties: map[string]jsonschema.Definition{
+				"query": {
+					Type:        jsonschema.String,
+					Description: "The text to search for",
+				},
+			},
+			Required: []string{"query"},
+		}
+	}
 	return action.ActionDefinition{
 		Name:        "search_github_issue",
 		Description: "Search between github issues",
@@ -78,6 +98,6 @@ func (g *GithubIssueSearch) Definition() action.ActionDefinition {
 				Description: "The owner of the repository",
 			},
 		},
-		Required: []string{"text", "repository", "owner"},
+		Required: []string{"query", "repository", "owner"},
 	}
 }

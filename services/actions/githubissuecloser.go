@@ -10,17 +10,19 @@ import (
 )
 
 type GithubIssuesCloser struct {
-	token   string
-	context context.Context
-	client  *github.Client
+	token, repository, owner string
+	context                  context.Context
+	client                   *github.Client
 }
 
 func NewGithubIssueCloser(ctx context.Context, config map[string]string) *GithubIssuesCloser {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 	return &GithubIssuesCloser{
-		client:  client,
-		token:   config["token"],
-		context: ctx,
+		client:     client,
+		token:      config["token"],
+		repository: config["repository"],
+		owner:      config["owner"],
+		context:    ctx,
 	}
 }
 
@@ -37,6 +39,13 @@ func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams
 		return action.ActionResult{}, err
 	}
 
+	if g.repository != "" {
+		result.Repository = g.repository
+	}
+
+	if g.owner != "" {
+		result.Owner = g.owner
+	}
 	// _, _, err = g.client.Issues.CreateComment(
 	// 	g.context,
 	// 	result.Owner, result.Repository,
@@ -68,6 +77,20 @@ func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams
 }
 
 func (g *GithubIssuesCloser) Definition() action.ActionDefinition {
+	if g.repository != "" && g.owner != "" {
+		return action.ActionDefinition{
+			Name:        "close_github_issue",
+			Description: "Closes a Github issue.",
+			Properties: map[string]jsonschema.Definition{
+				"issue_number": {
+					Type:        jsonschema.Number,
+					Description: "The issue number to close",
+				},
+			},
+			Required: []string{"issue_number"},
+		}
+	}
+
 	return action.ActionDefinition{
 		Name:        "close_github_issue",
 		Description: "Closes a Github issue.",

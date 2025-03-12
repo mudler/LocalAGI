@@ -10,18 +10,20 @@ import (
 )
 
 type GithubIssuesOpener struct {
-	token   string
-	context context.Context
-	client  *github.Client
+	token, repository, owner string
+	context                  context.Context
+	client                   *github.Client
 }
 
 func NewGithubIssueOpener(ctx context.Context, config map[string]string) *GithubIssuesOpener {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubIssuesOpener{
-		client:  client,
-		token:   config["token"],
-		context: ctx,
+		client:     client,
+		token:      config["token"],
+		repository: config["repository"],
+		owner:      config["owner"],
+		context:    ctx,
 	}
 }
 
@@ -37,6 +39,11 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 		fmt.Printf("error: %v", err)
 
 		return action.ActionResult{}, err
+	}
+
+	if g.repository != "" && g.owner != "" {
+		result.Repository = g.repository
+		result.Owner = g.owner
 	}
 
 	issue := &github.IssueRequest{
@@ -56,6 +63,23 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 }
 
 func (g *GithubIssuesOpener) Definition() action.ActionDefinition {
+	if g.repository != "" && g.owner != "" {
+		return action.ActionDefinition{
+			Name:        "create_github_issue",
+			Description: "Create a new issue on a GitHub repository.",
+			Properties: map[string]jsonschema.Definition{
+				"text": {
+					Type:        jsonschema.String,
+					Description: "The text of the new issue",
+				},
+				"title": {
+					Type:        jsonschema.String,
+					Description: "The title of the issue.",
+				},
+			},
+			Required: []string{"title", "text"},
+		}
+	}
 	return action.ActionDefinition{
 		Name:        "create_github_issue",
 		Description: "Create a new issue on a GitHub repository.",
