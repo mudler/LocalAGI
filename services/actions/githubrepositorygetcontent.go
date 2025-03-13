@@ -60,7 +60,10 @@ func (g *GithubRepositoryGetContent) Run(ctx context.Context, params action.Acti
 		return action.ActionResult{Result: resultString}, err
 	}
 
-	content := fileContent.Content
+	var content string
+	if fileContent.Content != nil {
+		content = *fileContent.Content
+	}
 
 	return action.ActionResult{Result: fmt.Sprintf("File %s\nContent:%s\n", result.Path, content)}, err
 }

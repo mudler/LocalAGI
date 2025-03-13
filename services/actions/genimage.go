@@ -68,7 +68,8 @@ func (a *GenImageAction) Run(ctx context.Context, params action.ActionParams) (a
 	}
 
 	return action.ActionResult{
-		Result: fmt.Sprintf("The image was generated and available at: %s", resp.Data[0].URL), Metadata: map[string]interface{}{
+		Result: fmt.Sprintf("The image was generated and available at: %s", resp.Data[0].URL),
+		Metadata: map[string]interface{}{
 			MetadataImages: []string{resp.Data[0].URL},
 		}}, nil
 }
