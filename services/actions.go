@@ -38,6 +38,7 @@ var AvailableActions = []string{
 	ActionGithubIssueCloser,
 	ActionGithubIssueSearcher,
 	ActionGithubRepositoryGet,
+	ActionGithubRepositoryCreateOrUpdate,
 	ActionScraper,
 	ActionBrowse,
 	ActionWikipedia,
