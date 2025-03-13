@@ -64,8 +64,15 @@ func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params 
 		result.Branch = g.defaultBranch
 	}
 
+	var sha *string
+	branch, _, _ := g.client.Repositories.GetBranch(g.context, result.Owner, result.Repository, result.Branch, 2)
+	if branch != nil {
+		sha = branch.Commit.SHA
+	}
+
 	fileContent, _, err := g.client.Repositories.CreateFile(g.context, result.Owner, result.Repository, result.Path, &github.RepositoryContentFileOptions{
 		Message: &result.CommitMessage,
+		SHA:     sha,
 		Committer: &github.CommitAuthor{
 			Name:  &g.commitAuthor,
 			Email: &g.commitMail,
