@@ -65,9 +65,9 @@ func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params 
 	}
 
 	var sha *string
-	branch, _, _ := g.client.Repositories.GetBranch(g.context, result.Owner, result.Repository, result.Branch, 2)
-	if branch != nil {
-		sha = branch.Commit.SHA
+	c, _, _, _ := g.client.Repositories.GetContents(g.context, result.Owner, result.Repository, result.Path, nil)
+	if c != nil {
+		sha = c.SHA
 	}
 
 	fileContent, _, err := g.client.Repositories.CreateFile(g.context, result.Owner, result.Repository, result.Path, &github.RepositoryContentFileOptions{
