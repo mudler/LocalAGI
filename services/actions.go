@@ -22,6 +22,8 @@ const (
 	ActionGithubIssueSearcher            = "github-issue-searcher"
 	ActionGithubRepositoryGet            = "github-repository-get-content"
 	ActionGithubRepositoryCreateOrUpdate = "github-repository-create-or-update-content"
+	ActionGithubIssueReader              = "github-issue-reader"
+	ActionGithubIssueCommenter           = "github-issue-commenter"
 	ActionScraper                        = "scraper"
 	ActionWikipedia                      = "wikipedia"
 	ActionBrowse                         = "browse"
@@ -39,6 +41,8 @@ var AvailableActions = []string{
 	ActionGithubIssueSearcher,
 	ActionGithubRepositoryGet,
 	ActionGithubRepositoryCreateOrUpdate,
+	ActionGithubIssueReader,
+	ActionGithubIssueCommenter,
 	ActionScraper,
 	ActionBrowse,
 	ActionWikipedia,
@@ -78,6 +82,10 @@ func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
 				allActions = append(allActions, actions.NewGithubIssueCloser(ctx, config))
 			case ActionGithubIssueSearcher:
 				allActions = append(allActions, actions.NewGithubIssueSearch(ctx, config))
+			case ActionGithubIssueReader:
+				allActions = append(allActions, actions.NewGithubIssueReader(ctx, config))
+			case ActionGithubIssueCommenter:
+				allActions = append(allActions, actions.NewGithubIssueCommenter(ctx, config))
 			case ActionGithubRepositoryGet:
 				allActions = append(allActions, actions.NewGithubRepositoryGetContent(ctx, config))
 			case ActionGithubRepositoryCreateOrUpdate:
