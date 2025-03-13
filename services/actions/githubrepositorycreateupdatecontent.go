@@ -102,7 +102,7 @@ func (g *GithubRepositoryCreateOrUpdateContent) Definition() action.ActionDefini
 		},
 	}
 
-	if g.defaultBranch != "" {
+	if g.defaultBranch == "" {
 		properties["branch"] = jsonschema.Definition{
 			Type:        jsonschema.String,
 			Description: "The branch to create/update the file",
