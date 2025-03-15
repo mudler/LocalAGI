@@ -44,6 +44,8 @@ type options struct {
 	resultCallback    func(ActionState)
 
 	conversationsPath string
+
+	mcpServers []MCPServer
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -157,6 +159,13 @@ func WithRAGDB(db RAGDB) Option {
 func WithSystemPrompt(prompt string) Option {
 	return func(o *options) error {
 		o.systemPrompt = prompt
+		return nil
+	}
+}
+
+func WithMCPServers(servers ...MCPServer) Option {
+	return func(o *options) error {
+		o.mcpServers = servers
 		return nil
 	}
 }

@@ -35,6 +35,15 @@
                         <i class="fas fa-plus-circle"></i> Add Action
                     </button>
                 </div>
+
+                <div id="mcpSection">
+                </div>
+                
+                <div class="button-container">
+                    <button type="button" id="addMCPButton" class="action-btn">
+                        <i class="fas fa-plus-circle"></i> Add MCP Server
+                    </button>
+                </div>
            
                 <div class="mb-4" id="dynamic_box">
                     <!-- Dynamic prompts will be added here dynamically -->
@@ -247,6 +256,27 @@
             actionsSection.insertAdjacentHTML('beforeend', newActionHTML);
         });
 
+        // Add MCP functionality
+        document.getElementById('addMCPButton').addEventListener('click', function() {
+            const mcpSection = document.getElementById('mcpSection');
+            const newMCPIndex = mcpSection.getElementsByClassName('mcp_server').length;
+            const newMCPHTML = `
+                <div class="mcp_server mb-4 section-box" style="margin-top: 15px; padding: 15px;">
+                    <h2>MCP Server ${newMCPIndex + 1}</h2>
+                    <div class="mb-4">
+                        <label for="mcpURL${newMCPIndex}">MCP Server URL</label>
+                        <input type="text" id="mcpURL${newMCPIndex}" name="mcp_servers[${newMCPIndex}].url" placeholder='https://...'>
+                    </div>
+                    <div class="mb-4">
+                        <label for="mcpToken${newMCPIndex}">Bearer Token</label>
+                        <input type="text" id="mcpToken${newMCPIndex}" name="mcp_servers[${newMCPIndex}].token" placeholder='Bearer token'>
+                    </div>
+                </div>
+            `;
+
+            mcpSection.insertAdjacentHTML('beforeend', newMCPHTML);
+        });
+
         // Add dynamic prompt functionality
         document.getElementById('dynamic_button').addEventListener('click', function() {
             const promptsSection = document.getElementById('dynamic_box');
@@ -354,6 +384,22 @@
                     }
                 }
                 jsonData.connectors = connectors;
+
+                // MCP Servers
+                const mcpServers = [];
+                const mcpServerElements = document.getElementsByClassName('mcp_server');
+                for (let i = 0; i < mcpServerElements.length; i++) {
+                    const urlField = document.getElementById(`mcpURL${i}`);
+                    const tokenField = document.getElementById(`mcpToken${i}`);
+                    
+                    if (urlField && urlField.value.trim()) {
+                        mcpServers.push({
+                            url: urlField.value.trim(),
+                            token: tokenField ? tokenField.value.trim() : ''
+                        });
+                    }
+                }
+                jsonData.mcp_servers = mcpServers;
                 
                 // Process actions - KEEP CONFIG AS STRING
                 const actions = [];

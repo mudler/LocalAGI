@@ -212,6 +212,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
 		WithContext(ctx),
+		WithMCPServers(config.MCPServers...),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
 		WithPrompts(promptBlocks...),

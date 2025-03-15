@@ -59,6 +59,17 @@
                             <i class="fas fa-plus-circle"></i> Add Action
                         </button>
                     </div>
+
+                    <div id="mcpSection">
+                        <!-- Connectors will be added here dynamically -->
+                    </div>
+                    
+                    <div class="button-container">
+                        <button type="button" id="addMCPButton" class="action-btn">
+                            <i class="fas fa-plus-circle"></i> Add MCP Server
+                        </button>
+                    </div>
+
                
                     <div class="mb-4" id="dynamic_box">
                         <!-- Dynamic prompts will be added here dynamically -->
@@ -343,6 +354,28 @@
                 connectorsSection.insertAdjacentHTML('beforeend', newConnectorHTML);
             });
 
+            // Add MCP functionality
+            document.getElementById('addMCPButton').addEventListener('click', function() {
+                const mcpSection = document.getElementById('mcpSection');
+                const newMCPIndex = mcpSection.getElementsByClassName('mcp_server').length;
+                const newMCPHTML = `
+                    <div class="mcp_server mb-4 section-box" style="margin-top: 15px; padding: 15px;">
+                        <h2>MCP Server ${newMCPIndex + 1}</h2>
+                        <div class="mb-4">
+                            <label for="mcpURL${newMCPIndex}">MCP Server URL</label>
+                            <input type="text" id="mcpURL${newMCPIndex}" name="mcp_servers[${newMCPIndex}].url" placeholder='https://...'>
+                        </div>
+                        <div class="mb-4">
+                            <label for="mcpToken${newMCPIndex}">Bearer Token</label>
+                            <input type="text" id="mcpToken${newMCPIndex}" name="mcp_servers[${newMCPIndex}].token" placeholder='Bearer token'>
+                        </div>
+                    </div>
+                `;
+
+                mcpSection.insertAdjacentHTML('beforeend', newMCPHTML);
+            });
+
+
             // Add action functionality
             document.getElementById('action_button').addEventListener('click', function() {
                 const actionsSection = document.getElementById('action_box');
@@ -472,7 +505,23 @@
                     }
                 }
                 jsonData.connectors = connectors;
-                
+
+                // MCP Servers - updated to handle URL and token
+                const mcpServers = [];
+                const mcpServerElements = document.getElementsByClassName('mcp_server');
+                for (let i = 0; i < mcpServerElements.length; i++) {
+                    const urlField = document.getElementById(`mcpURL${i}`);
+                    const tokenField = document.getElementById(`mcpToken${i}`);
+                    
+                    if (urlField && urlField.value.trim()) {
+                        mcpServers.push({
+                            url: urlField.value.trim(),
+                            token: tokenField ? tokenField.value.trim() : ''
+                        });
+                    }
+                }
+                jsonData.mcp_servers = mcpServers;
+
                 // Process actions - KEEP CONFIG AS STRING
                 const actions = [];
                 const actionElements = document.getElementsByClassName('action');
@@ -649,9 +698,10 @@
         }
 
 
-                function populateFormWithConfig(config) {
+            function populateFormWithConfig(config) {
             // Clear existing dynamic sections
             document.getElementById('connectorsSection').innerHTML = '';
+            document.getElementById('mcpSection').innerHTML = '';
             document.getElementById('action_box').innerHTML = '';
             document.getElementById('dynamic_box').innerHTML = '';
 
@@ -691,6 +741,34 @@
                     if (connectorConfig) {
                         // Format the config value
                         formatConfigValue(connectorConfig, connector.config);
+                    }
+                });
+            }
+
+            // Populate MCP servers
+            if (config.mcp_servers && Array.isArray(config.mcp_servers)) {
+                config.mcp_servers.forEach((server, index) => {
+                    // Add MCP server section
+                    document.getElementById('addMCPButton').click();
+                    
+                    // Find the added MCP server elements
+                    const mcpURL = document.getElementById(`mcpURL${index}`);
+                    const mcpToken = document.getElementById(`mcpToken${index}`);
+                    
+                    // Set values
+                    if (mcpURL) {
+                        // If server is a string (old format), use it as URL
+                        if (typeof server === 'string') {
+                            mcpURL.value = server;
+                        } 
+                        // If server is an object (new format), extract URL
+                        else if (typeof server === 'object' && server !== null) {
+                            mcpURL.value = server.url || '';
+                            
+                            if (mcpToken && server.token) {
+                                mcpToken.value = server.token;
+                            }
+                        }
                     }
                 });
             }

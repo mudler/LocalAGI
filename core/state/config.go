@@ -31,6 +31,7 @@ type AgentConfig struct {
 	Connector    []ConnectorConfig    `json:"connectors" form:"connectors" `
 	Actions      []ActionsConfig      `json:"actions" form:"actions"`
 	PromptBlocks []PromptBlocksConfig `json:"promptblocks" form:"promptblocks"`
+	MCPServers   []agent.MCPServer    `json:"mcp_servers" form:"mcp_servers"`
 
 	// This is what needs to be part of ActionsConfig
 	Model                 string `json:"model" form:"model"`

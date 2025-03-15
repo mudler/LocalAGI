@@ -174,7 +174,7 @@ func (m Messages) IsLastMessageFromRole(role string) bool {
 
 func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
 
-	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.systemInternalActions(), reasoning)
+	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.availableActions(), reasoning)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 
 	return a.decision(ctx,
 		cc,
-		a.systemInternalActions().ToTools(),
+		a.availableActions().ToTools(),
 		openai.ToolChoice{
 			Type:     openai.ToolTypeFunction,
 			Function: openai.ToolFunction{Name: act.Definition().Name.String()},
@@ -211,9 +211,9 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	)
 }
 
-func (a *Agent) systemInternalActions() Actions {
+func (a *Agent) availableActions() Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
-	defaultActions := a.options.userActions
+	defaultActions := append(a.mcpActions, a.options.userActions...)
 
 	if a.options.initiateConversations && a.selfEvaluationInProgress { // && self-evaluation..
 		acts := append(defaultActions, action.NewConversation())
@@ -264,7 +264,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		// and then use the reply to get the action
 		thought, err := a.decision(ctx,
 			messages,
-			a.systemInternalActions().ToTools(),
+			a.availableActions().ToTools(),
 			nil)
 		if err != nil {
 			return nil, nil, "", err
@@ -274,7 +274,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		xlog.Debug(fmt.Sprintf("thought message: %v", thought.message))
 
 		// Find the action
-		chosenAction := a.systemInternalActions().Find(thought.actioName)
+		chosenAction := a.availableActions().Find(thought.actioName)
 		if chosenAction == nil || thought.actioName == "" {
 			xlog.Debug("no answer")
 
@@ -286,7 +286,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return chosenAction, thought.actionParams, thought.message, nil
 	}
 
-	prompt, err := renderTemplate(templ, a.prepareHUD(), a.systemInternalActions(), "")
+	prompt, err := renderTemplate(templ, a.prepareHUD(), a.availableActions(), "")
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -325,7 +325,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	// From the thought, get the action call
 	// Get all the available actions IDs
 	actionsID := []string{}
-	for _, m := range a.systemInternalActions() {
+	for _, m := range a.availableActions() {
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 	intentionsTools := action.NewIntention(actionsID...)
@@ -358,7 +358,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	}
 
 	// Find the action
-	chosenAction := a.systemInternalActions().Find(actionChoice.Tool)
+	chosenAction := a.availableActions().Find(actionChoice.Tool)
 	if chosenAction == nil {
 		return nil, nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	}

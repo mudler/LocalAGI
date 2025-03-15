@@ -39,6 +39,8 @@ type Agent struct {
 	pause                    bool
 
 	newConversations chan openai.ChatCompletionMessage
+
+	mcpActions Actions
 }
 
 type RAGDB interface {
@@ -83,6 +85,10 @@ func New(opts ...Option) (*Agent, error) {
 	// h := xlog.NewTextHandler(os.Stdout, &xlog.HandlerOptions{Level: programLevel})
 	// xlog = xlog.New(h)
 	//programLevel.Set(a.options.logLevel)
+
+	xlog.Info("Populating actions from MCP Servers (if any)")
+	a.initMCPActions()
+	xlog.Info("Done populating actions from MCP Servers")
 
 	xlog.Info(
 		"Agent created",
@@ -214,7 +220,7 @@ func (a *Agent) Memory() RAGDB {
 }
 
 func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (result action.ActionResult, err error) {
-	for _, act := range a.systemInternalActions() {
+	for _, act := range a.availableActions() {
 		if act.Definition().Name == chosenAction.Definition().Name {
 			res, err := act.Run(a.actionContext, params)
 			if err != nil {
@@ -708,7 +714,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {
-		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.systemInternalActions(), reasoning)
+		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(), reasoning)
 		if err != nil {
 			job.Result.Conversation = a.currentConversation
 			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
