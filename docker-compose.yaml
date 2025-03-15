@@ -45,6 +45,9 @@ services:
       - ./volumes/localrag/assets/:/assets
 
   ragserver-healthcheck:
+    depends_on:
+      ragserver:
+        condition: service_started
     image: busybox
     command: ["sh", "-c", "until wget -q -O - http://ragserver:8080 > /dev/null 2>&1; do echo 'Waiting for ragserver...'; sleep 1; done; echo 'RagServer is up!'"]
 
