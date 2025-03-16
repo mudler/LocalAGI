@@ -3,6 +3,7 @@
 <head>
     <title>Create New Agent</title>
     {{template "views/partials/header"}}
+    <script src="/public/js/agent-form.js"></script>
 </head>
 <body>
     {{template "views/partials/menu"}}
@@ -11,176 +12,9 @@
             <h1>Create New Agent</h1>
             
             <form id="create-agent-form" action="/create" method="POST">
-                <div class="mb-4">
-                    <label for="name">Name</label>
-                    <input type="text" name="name" id="name" placeholder="Name">
-                </div>
+                {{template "views/partials/agent-form" . }}
 
-                <div id="connectorsSection">
-                    <!-- Connectors will be added here dynamically -->
-                </div>
-                
-                <div class="button-container">
-                    <button type="button" id="addConnectorButton" class="action-btn">
-                        <i class="fas fa-plus-circle"></i> Add Connector
-                    </button>
-                </div>
-
-                <div class="mb-4" id="action_box">
-                    <!-- Actions will be added here dynamically -->
-                </div>
-                
-                <div class="button-container">
-                    <button id="action_button" type="button" class="action-btn">
-                        <i class="fas fa-plus-circle"></i> Add Action
-                    </button>
-                </div>
-
-                <div id="mcpSection">
-                </div>
-                
-                <div class="button-container">
-                    <button type="button" id="addMCPButton" class="action-btn">
-                        <i class="fas fa-plus-circle"></i> Add MCP Server
-                    </button>
-                </div>
-           
-                <div class="mb-4" id="dynamic_box">
-                    <!-- Dynamic prompts will be added here dynamically -->
-                </div>
-                
-                <div class="button-container">
-                    <button id="dynamic_button" type="button" class="action-btn">
-                        <i class="fas fa-plus-circle"></i> Add Dynamic Prompt
-                    </button>
-                </div>
-             
-                <div class="mb-4">
-                    <label for="hud" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="hud" id="hud">
-                            <span class="checkmark"></span>
-                        </span>
-                        HUD
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="enable_kb" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="enable_kb" id="enable_kb">
-                            <span class="checkmark"></span>
-                        </span>
-                        Enable Knowledge Base
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="enable_reasoning" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="enable_reasoning" id="enable_reasoning">
-                            <span class="checkmark"></span>
-                        </span>
-                        Enable Reasoning
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="kb_results">Knowledge Base Results</label>
-                    <input type="number" name="kb_results" id="kb_results" placeholder="3">
-                </div>
-        
-                <div class="mb-4">
-                    <label for="standalone_job" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="standalone_job" id="standalone_job">
-                            <span class="checkmark"></span>
-                        </span>
-                        Standalone Job
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="initiate_conversations" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="initiate_conversations" id="initiate_conversations">
-                            <span class="checkmark"></span>
-                        </span>
-                        Initiate Conversations
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="can_stop_itself" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="can_stop_itself" id="can_stop_itself">
-                            <span class="checkmark"></span>
-                        </span>
-                        Can Stop Itself
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="random_identity" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="random_identity" id="random_identity">
-                            <span class="checkmark"></span>
-                        </span>
-                        Random Identity
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="long_term_memory" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="long_term_memory" id="long_term_memory">
-                            <span class="checkmark"></span>
-                        </span>
-                        Long Term Memory
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="summary_long_term_memory" class="checkbox-label">
-                        <span class="checkbox-custom">
-                            <input type="checkbox" name="summary_long_term_memory" id="summary_long_term_memory">
-                            <span class="checkmark"></span>
-                        </span>
-                        Long Term Memory (Summarize!)
-                    </label>
-                </div>
-
-                <div class="mb-4">
-                    <label for="identity_guidance">Identity Guidance</label>
-                    <textarea name="identity_guidance" id="identity_guidance" placeholder="Identity Guidance"></textarea>
-                </div>
-
-                <div class="mb-4">
-                    <label for="periodic_runs">Periodic Runs</label>
-                    <input type="text" name="periodic_runs" id="periodic_runs" placeholder="Periodic Runs">
-                </div>
-
-                <div class="mb-4">
-                    <label for="model">Model </label>
-                    <input type="text" name="model" id="model" placeholder="Model name">
-                </div>
-
-                <div class="mb-4">
-                    <label for="multimodal_model">Multimodal Model </label>
-                    <input type="text" name="multimodal_model" id="multimodal_model" placeholder="Model name">
-                </div>
-
-                <div class="mb-4">
-                    <label for="permanent_goal">Permanent Goal</label>
-                    <textarea name="permanent_goal" id="permanent_goal" placeholder="Permanent goal"></textarea>
-                </div>
-
-                <div class="mb-4">
-                    <label for="system_prompt">System Prompt</label>
-                    <textarea name="system_prompt" id="system_prompt" placeholder="System prompt"></textarea>
-                </div>
-
-                <button type="submit" id="create-button">
+                <button type="submit" id="create-button" data-original-text="<i class='fas fa-robot'></i> Create Agent">
                     <i class="fas fa-robot"></i> Create Agent
                 </button>
             </form>
@@ -209,100 +43,15 @@
         const connectors = `{{ range .Connectors }}<option value="{{.}}">{{.}}</option>{{ end }}`;
         const promptBlocks = `{{ range .PromptBlocks }}<option value="{{.}}">{{.}}</option>{{ end }}`;
 
-        // Add connector functionality
-        document.getElementById('addConnectorButton').addEventListener('click', function() {
-            const connectorsSection = document.getElementById('connectorsSection');
-            const newConnectorIndex = connectorsSection.getElementsByClassName('connector').length;
-            const newConnectorHTML = `
-                <div class="connector mb-4 section-box" style="margin-top: 15px; padding: 15px;">
-                    <h2>Connector ${newConnectorIndex + 1}</h2>
-                    <div class="mb-4">
-                        <label for="connectorType${newConnectorIndex}">Connector Type</label>
-                        <select name="connectors[${newConnectorIndex}].type" id="connectorType${newConnectorIndex}">
-                            ${connectors}
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label for="connectorConfig${newConnectorIndex}">Connector Config (JSON)</label>
-                        <textarea id="connectorConfig${newConnectorIndex}" name="connectors[${newConnectorIndex}].config" placeholder='{"token":"sk-mg3.."}'>{}</textarea>
-                    </div>
-                </div>
-            `;
-        
-            connectorsSection.insertAdjacentHTML('beforeend', newConnectorHTML);
-        });
-
-        // Add action functionality
-        document.getElementById('action_button').addEventListener('click', function() {
-            const actionsSection = document.getElementById('action_box');
-            const ii = actionsSection.getElementsByClassName('action').length;
-
-            const newActionHTML = `
-            <div class="action mb-4 section-box" style="margin-top: 15px; padding: 15px;">
-                <h2>Action ${ii + 1}</h2>
-                <div class="mb-4">
-                    <label for="actionsName${ii}">Action</label>
-                    <select name="actions[${ii}].name" id="actionsName${ii}">
-                        ${actions}
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label for="actionsConfig${ii}">Action Config (JSON)</label>
-                    <textarea id="actionsConfig${ii}" name="actions[${ii}].config" placeholder='{"results":"5"}'>{}</textarea>
-                </div>
-            </div>
-            `;
-        
-            actionsSection.insertAdjacentHTML('beforeend', newActionHTML);
-        });
-
-        // Add MCP functionality
-        document.getElementById('addMCPButton').addEventListener('click', function() {
-            const mcpSection = document.getElementById('mcpSection');
-            const newMCPIndex = mcpSection.getElementsByClassName('mcp_server').length;
-            const newMCPHTML = `
-                <div class="mcp_server mb-4 section-box" style="margin-top: 15px; padding: 15px;">
-                    <h2>MCP Server ${newMCPIndex + 1}</h2>
-                    <div class="mb-4">
-                        <label for="mcpURL${newMCPIndex}">MCP Server URL</label>
-                        <input type="text" id="mcpURL${newMCPIndex}" name="mcp_servers[${newMCPIndex}].url" placeholder='https://...'>
-                    </div>
-                    <div class="mb-4">
-                        <label for="mcpToken${newMCPIndex}">Bearer Token</label>
-                        <input type="text" id="mcpToken${newMCPIndex}" name="mcp_servers[${newMCPIndex}].token" placeholder='Bearer token'>
-                    </div>
-                </div>
-            `;
-
-            mcpSection.insertAdjacentHTML('beforeend', newMCPHTML);
-        });
-
-        // Add dynamic prompt functionality
-        document.getElementById('dynamic_button').addEventListener('click', function() {
-            const promptsSection = document.getElementById('dynamic_box');
-            const ii = promptsSection.getElementsByClassName('promptBlock').length;
-
-            const newPromptHTML = `
-            <div class="promptBlock mb-4 section-box" style="margin-top: 15px; padding: 15px;">
-                <h2>Prompt Block ${ii + 1}</h2>
-                <div class="mb-4">
-                    <label for="promptName${ii}">Block Prompt</label>
-                    <select name="promptblocks[${ii}].name" id="promptName${ii}">
-                        ${promptBlocks}
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label for="promptConfig${ii}">Prompt Config (JSON)</label>
-                    <textarea id="promptConfig${ii}" name="promptblocks[${ii}].config" placeholder='{"results":"5"}'>{}</textarea>
-                </div>
-            </div>
-            `;
-        
-            promptsSection.insertAdjacentHTML('beforeend', newPromptHTML);
-        });
-
-        // Form submission handling
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize common form components
+            initAgentFormCommon({
+                actions: actions,
+                connectors: connectors,
+                promptBlocks: promptBlocks
+            });
+            
+            // Form submission handling
             const form = document.getElementById('create-agent-form');
             
             form.addEventListener('submit', function(e) {
@@ -311,158 +60,26 @@
                 // Show loading state
                 const createButton = document.getElementById('create-button');
                 const originalButtonText = createButton.innerHTML;
+                createButton.setAttribute('data-original-text', originalButtonText);
                 createButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
                 createButton.disabled = true;
                 
                 // Build a structured data object
                 const formData = new FormData(form);
-                const jsonData = {};
+                const jsonData = AgentFormUtils.processFormData(formData);
                 
-                // Process basic form fields
-                for (const [key, value] of formData.entries()) {
-                    // Skip the array fields (connectors, actions, promptblocks) as they'll be processed separately
-                    if (!key.includes('[') && !key.includes('].')) {
-                        // Handle checkboxes
-                        if (value === 'on') {
-                            jsonData[key] = true;
-                        } 
-                        // Handle numeric fields - specifically kb_results
-                        else if (key === 'kb_results') {
-                            // Convert to integer or default to 3 if empty
-                            jsonData[key] = value ? parseInt(value, 10) : 3;
-                            
-                            // Check if the parse was successful
-                            if (isNaN(jsonData[key])) {
-                                showToast('Knowledge Base Results must be a number', 'error');
-                                createButton.innerHTML = originalButtonText;
-                                createButton.disabled = false;
-                                return; // Stop form submission
-                            }
-                        }
-                        // Handle other numeric fields if needed
-                        else if (key === 'periodic_runs' && value) {
-                            // Try to parse as number if it looks like one
-                            const numValue = parseInt(value, 10);
-                            if (!isNaN(numValue) && String(numValue) === value) {
-                                jsonData[key] = numValue;
-                            } else {
-                                jsonData[key] = value;
-                            }
-                        }
-                        else {
-                            jsonData[key] = value;
-                        }
-                    }
-                }
+                // Process special fields
+                jsonData.connectors = AgentFormUtils.processConnectors(createButton);
+                if (jsonData.connectors === null) return; // Validation failed
                 
-                // Process connectors - KEEP CONFIG AS STRING
-                const connectors = [];
-                const connectorsElements = document.getElementsByClassName('connector');
-                for (let i = 0; i < connectorsElements.length; i++) {
-                    const typeField = document.getElementById(`connectorType${i}`);
-                    const configField = document.getElementById(`connectorConfig${i}`);
-                    
-                    if (typeField && configField) {
-                        try {
-                            // Validate JSON but send as string
-                            const configValue = configField.value.trim() || '{}';
-                            // Parse to validate but don't use the parsed object
-                            JSON.parse(configValue); 
-                            
-                            connectors.push({
-                                type: typeField.value,
-                                config: configValue // Send the raw string, not parsed JSON
-                            });
-                        } catch (err) {
-                            console.error(`Error parsing connector ${i} config:`, err);
-                            showToast(`Error in connector ${i+1} configuration: Invalid JSON`, 'error');
-                            
-                            createButton.innerHTML = originalButtonText;
-                            createButton.disabled = false;
-                            return; // Stop form submission
-                        }
-                    }
-                }
-                jsonData.connectors = connectors;
-
-                // MCP Servers
-                const mcpServers = [];
-                const mcpServerElements = document.getElementsByClassName('mcp_server');
-                for (let i = 0; i < mcpServerElements.length; i++) {
-                    const urlField = document.getElementById(`mcpURL${i}`);
-                    const tokenField = document.getElementById(`mcpToken${i}`);
-                    
-                    if (urlField && urlField.value.trim()) {
-                        mcpServers.push({
-                            url: urlField.value.trim(),
-                            token: tokenField ? tokenField.value.trim() : ''
-                        });
-                    }
-                }
-                jsonData.mcp_servers = mcpServers;
+                jsonData.mcp_servers = AgentFormUtils.processMCPServers();
                 
-                // Process actions - KEEP CONFIG AS STRING
-                const actions = [];
-                const actionElements = document.getElementsByClassName('action');
-                for (let i = 0; i < actionElements.length; i++) {
-                    const nameField = document.getElementById(`actionsName${i}`);
-                    const configField = document.getElementById(`actionsConfig${i}`);
-                    
-                    if (nameField && configField) {
-                        try {
-                            // Validate JSON but send as string
-                            const configValue = configField.value.trim() || '{}';
-                            // Parse to validate but don't use the parsed object
-                            JSON.parse(configValue);
-                            
-                            actions.push({
-                                name: nameField.value,
-                                config: configValue // Send the raw string, not parsed JSON
-                            });
-                        } catch (err) {
-                            console.error(`Error parsing action ${i} config:`, err);
-                            showToast(`Error in action ${i+1} configuration: Invalid JSON`, 'error');
-                            
-                            createButton.innerHTML = originalButtonText;
-                            createButton.disabled = false;
-                            return; // Stop form submission
-                        }
-                    }
-                }
-                jsonData.actions = actions;
+                jsonData.actions = AgentFormUtils.processActions(createButton);
+                if (jsonData.actions === null) return; // Validation failed
                 
-                // Process prompt blocks - KEEP CONFIG AS STRING
-                const promptBlocks = [];
-                const promptBlockElements = document.getElementsByClassName('promptBlock');
-                for (let i = 0; i < promptBlockElements.length; i++) {
-                    const nameField = document.getElementById(`promptName${i}`);
-                    const configField = document.getElementById(`promptConfig${i}`);
-                    
-                    if (nameField && configField) {
-                        try {
-                            // Validate JSON but send as string
-                            const configValue = configField.value.trim() || '{}';
-                            // Parse to validate but don't use the parsed object
-                            JSON.parse(configValue);
-                            
-                            promptBlocks.push({
-                                name: nameField.value,
-                                config: configValue // Send the raw string, not parsed JSON
-                            });
-                        } catch (err) {
-                            console.error(`Error parsing prompt block ${i} config:`, err);
-                            showToast(`Error in prompt block ${i+1} configuration: Invalid JSON`, 'error');
-                            
-                            createButton.innerHTML = originalButtonText;
-                            createButton.disabled = false;
-                            return; // Stop form submission
-                        }
-                    }
-                }
-                jsonData.promptblocks = promptBlocks;
-                
-                console.log('Sending data:', jsonData);
-                
+                jsonData.promptblocks = AgentFormUtils.processPromptBlocks(createButton);
+                if (jsonData.promptblocks === null) return; // Validation failed
+                                
                 // Send the structured data as JSON
                 fetch('/create', {
                     method: 'POST',
@@ -490,7 +107,7 @@
                         
                         // Redirect to agent list page after a delay
                         setTimeout(() => {
-                            window.location.href = '/';
+                            window.location.href = '/agents';
                         }, 2000);
                     } else if (data.error) {
                         // Show error toast
@@ -528,24 +145,6 @@
                     createButton.disabled = false;
                 });
             });
-        });
-
-        // Add additional CSS for checkbox labels
-        document.addEventListener('DOMContentLoaded', function() {
-            const style = document.createElement('style');
-            style.textContent = `
-                .checkbox-label {
-                    display: flex;
-                    align-items: center;
-                    cursor: pointer;
-                    margin-bottom: 10px;
-                }
-                
-                .checkbox-label .checkbox-custom {
-                    margin-right: 10px;
-                }
-            `;
-            document.head.appendChild(style);
         });
     </script>
 </body>
