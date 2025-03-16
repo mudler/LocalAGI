@@ -14,6 +14,7 @@ import (
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
 	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services"
 )
 
@@ -51,7 +52,12 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Get("/agents", func(c *fiber.Ctx) error {
 		statuses := map[string]bool{}
 		for _, a := range pool.List() {
-			statuses[a] = !pool.GetAgent(a).Paused()
+			agent := pool.GetAgent(a)
+			if agent == nil {
+				xlog.Error("Agent not found", "name", a)
+				continue
+			}
+			statuses[a] = !agent.Paused()
 		}
 		return c.Render("views/agents", fiber.Map{
 			"Agents": pool.List(),

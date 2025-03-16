@@ -134,11 +134,13 @@ func NewAgentPool(
 // and starts it.
 // It also saves the state to the file.
 func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
+	a.Lock()
+	defer a.Unlock()
 	if _, ok := a.pool[name]; ok {
 		return fmt.Errorf("agent %s already exists", name)
 	}
 	a.pool[name] = *agentConfig
-	if err := a.Save(); err != nil {
+	if err := a.save(); err != nil {
 		return err
 	}
 
@@ -146,6 +148,8 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 }
 
 func (a *AgentPool) List() []string {
+	a.Lock()
+	defer a.Unlock()
 	var agents []string
 	for agent := range a.pool {
 		agents = append(agents, agent)
@@ -365,6 +369,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 // Starts all the agents in the pool
 func (a *AgentPool) StartAll() error {
+	a.Lock()
+	defer a.Unlock()
 	for name, config := range a.pool {
 		if a.agents[name] != nil { // Agent already started
 			continue
@@ -377,18 +383,27 @@ func (a *AgentPool) StartAll() error {
 }
 
 func (a *AgentPool) StopAll() {
+	a.Lock()
+	defer a.Unlock()
 	for _, agent := range a.agents {
 		agent.Stop()
 	}
 }
 
 func (a *AgentPool) Stop(name string) {
+	a.Lock()
+	defer a.Unlock()
+	a.stop(name)
+}
+
+func (a *AgentPool) stop(name string) {
 	if agent, ok := a.agents[name]; ok {
 		agent.Stop()
 	}
 }
-
 func (a *AgentPool) Start(name string) error {
+	a.Lock()
+	defer a.Unlock()
 	if agent, ok := a.agents[name]; ok {
 		err := agent.Run()
 		if err != nil {
@@ -412,35 +427,43 @@ func (a *AgentPool) stateFiles(name string) (string, string) {
 }
 
 func (a *AgentPool) Remove(name string) error {
-
+	a.Lock()
+	defer a.Unlock()
 	// Cleanup character and state
 	stateFile, characterFile := a.stateFiles(name)
 
 	os.Remove(stateFile)
 	os.Remove(characterFile)
 
-	a.Stop(name)
+	a.stop(name)
 	delete(a.agents, name)
 	delete(a.pool, name)
-	if err := a.Save(); err != nil {
+	if err := a.save(); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (a *AgentPool) Save() error {
+	a.Lock()
+	defer a.Unlock()
+	return a.save()
+}
+
+func (a *AgentPool) save() error {
 	data, err := json.MarshalIndent(a.pool, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(a.file, data, 0644)
 }
-
 func (a *AgentPool) GetAgent(name string) *Agent {
 	return a.agents[name]
 }
 
 func (a *AgentPool) GetConfig(name string) *AgentConfig {
+	a.Lock()
+	defer a.Unlock()
 	agent, exists := a.pool[name]
 	if !exists {
 		return nil
@@ -449,5 +472,7 @@ func (a *AgentPool) GetConfig(name string) *AgentConfig {
 }
 
 func (a *AgentPool) GetManager(name string) sse.Manager {
+	a.Lock()
+	defer a.Unlock()
 	return a.managers[name]
 }
