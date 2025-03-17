@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAgent/webui/types"
 
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
@@ -292,5 +294,59 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			).WithEvent("message_status"))
 
 		return nil
+	}
+}
+
+func (a *App) Responses(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		var request types.RequestBody
+		if err := c.BodyParser(&request); err != nil {
+			return err
+		}
+
+		request.SetInputByType()
+
+		agentName := request.Model
+
+		messages := request.ToChatCompletionMessages()
+
+		a := pool.GetAgent(agentName)
+		if a == nil {
+			xlog.Info("Agent not found in pool", c.Params("name"))
+			return c.Status(http.StatusInternalServerError).JSON(types.ResponseBody{Error: "Agent not found"})
+		}
+
+		res := a.Ask(
+			agent.WithConversationHistory(messages),
+		)
+		if res.Error != nil {
+			xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
+
+			return c.Status(http.StatusInternalServerError).JSON(types.ResponseBody{Error: res.Error.Error()})
+		} else {
+			xlog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
+		}
+
+		response := types.ResponseBody{
+			Object: "response",
+			//   "created_at": 1741476542,
+			CreatedAt: time.Now().Unix(),
+			Status:    "completed",
+			Output: []types.ResponseMessage{
+				{
+					Type:   "message",
+					Status: "completed",
+					Role:   "assistant",
+					Content: []types.MessageContentItem{
+						types.MessageContentItem{
+							Type: "output_text",
+							Text: res.Response,
+						},
+					},
+				},
+			},
+		}
+
+		return c.JSON(response)
 	}
 }

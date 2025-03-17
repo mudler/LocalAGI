@@ -203,6 +203,7 @@ Connect to IRC networks:
 | `/chat/:name` | POST | Send message & get response | [Example](#send-message) |
 | `/notify/:name` | GET | Send notification to agent | [Example](#notify-agent) |
 | `/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
+| `/v1/responses` | POST | Send message & get response | [OpenAI's Responses](https://platform.openai.com/docs/api-reference/responses/create) |
 
 <details>
 <summary><strong>Curl Examples</strong></summary>

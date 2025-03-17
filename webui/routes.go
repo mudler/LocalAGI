@@ -104,6 +104,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Put("/pause/:name", app.Pause(pool))
 	webapp.Put("/start/:name", app.Start(pool))
 
+	webapp.Post("/v1/responses", app.Responses(pool))
+
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
 		return c.Render("views/chat", fiber.Map{
 			//	"Character": agent.Character,
