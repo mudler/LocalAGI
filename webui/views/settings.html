@@ -3,6 +3,8 @@
 <head>
     <title>Agent settings {{.Name}}</title>
     {{template "views/partials/header"}}
+    <script src="/public/js/wizard.js"></script>
+    <link rel="stylesheet" href="/public/css/wizard.css">
     <script src="/public/js/agent-form.js"></script>
 </head>
 <body>
@@ -19,6 +21,21 @@
         </header>
         
         <div class="max-w-4xl mx-auto">
+
+            <!-- Agent Configuration Form Section -->
+            <div class="section-box">
+                <h2>Edit Agent Configuration</h2>
+                <form id="edit-agent-form">
+                    <input type="hidden" name="name" id="name" value="{{.Name}}">
+                    
+                    {{template "views/partials/agent-form" .}}
+
+                    <button type="submit" id="update-button" class="action-btn" data-original-text="<i class='fas fa-save'></i> Update Agent">
+                        <i class="fas fa-save"></i> Update Agent
+                    </button>
+                </form>
+            </div>
+
             <div class="section-box">
                 <h2>Agent Control</h2>
                 <div class="button-container">
@@ -33,20 +50,6 @@
                         {{end}}
                     </button>
                 </div>
-            </div>
-
-            <!-- Agent Configuration Form Section -->
-            <div class="section-box">
-                <h2>Edit Agent Configuration</h2>
-                <form id="edit-agent-form">
-                    <input type="hidden" name="name" id="name" value="{{.Name}}">
-                    
-                    {{template "views/partials/agent-form" .}}
-
-                    <button type="submit" id="update-button" class="action-btn" data-original-text="<i class='fas fa-save'></i> Update Agent">
-                        <i class="fas fa-save"></i> Update Agent
-                    </button>
-                </form>
             </div>
 
             <div class="section-box">
