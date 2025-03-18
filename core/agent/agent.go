@@ -86,6 +86,10 @@ func New(opts ...Option) (*Agent, error) {
 	// xlog = xlog.New(h)
 	//programLevel.Set(a.options.logLevel)
 
+	if err := a.prepareIdentity(); err != nil {
+		return nil, fmt.Errorf("failed to prepare identity: %v", err)
+	}
+
 	xlog.Info("Populating actions from MCP Servers (if any)")
 	a.initMCPActions()
 	xlog.Info("Done populating actions from MCP Servers")
@@ -866,43 +870,10 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// a.ResetConversation()
 }
 
-func (a *Agent) prepareIdentity() error {
-
-	if a.options.characterfile != "" {
-		if _, err := os.Stat(a.options.characterfile); err == nil {
-			// if there is a file, load the character back
-			if err = a.LoadCharacter(a.options.characterfile); err != nil {
-				return fmt.Errorf("failed to load character: %v", err)
-			}
-		} else {
-			if a.options.randomIdentity {
-				if err = a.generateIdentity(a.options.randomIdentityGuidance); err != nil {
-					return fmt.Errorf("failed to generate identity: %v", err)
-				}
-			}
-
-			// otherwise save it for next time
-			if err = a.SaveCharacter(a.options.characterfile); err != nil {
-				return fmt.Errorf("failed to save character: %v", err)
-			}
-		}
-	} else {
-		if err := a.generateIdentity(a.options.randomIdentityGuidance); err != nil {
-			return fmt.Errorf("failed to generate identity: %v", err)
-		}
-	}
-
-	return nil
-}
-
 func (a *Agent) Run() error {
 	// The agent run does two things:
 	// picks up requests from a queue
 	// and generates a response/perform actions
-
-	if err := a.prepareIdentity(); err != nil {
-		return fmt.Errorf("failed to prepare identity: %v", err)
-	}
 
 	// It is also preemptive.
 	// That is, it can interrupt the current action

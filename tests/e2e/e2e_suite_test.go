@@ -1,4 +1,4 @@
-package agent_test
+package e2e_test
 
 import (
 	"os"
@@ -8,13 +8,14 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestAgent(t *testing.T) {
+func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Agent test suite")
+	RunSpecs(t, "E2E test suite")
 }
 
 var testModel = os.Getenv("LOCALAGENT_MODEL")
 var apiURL = os.Getenv("LOCALAI_API_URL")
+var localagentURL = os.Getenv("LOCALAGENT_API_URL")
 
 func init() {
 	if testModel == "" {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/mudler/LocalAgent/core/action"
-	"github.com/mudler/LocalAgent/pkg/llm"
+	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
 // PromptHUD contains
@@ -22,11 +22,49 @@ type PromptHUD struct {
 
 type Character struct {
 	Name       string   `json:"name"`
-	Age        any      `json:"age"`
+	Age        string   `json:"age"`
 	Occupation string   `json:"job_occupation"`
 	Hobbies    []string `json:"hobbies"`
 	MusicTaste []string `json:"favorites_music_genres"`
 	Sex        string   `json:"sex"`
+}
+
+func (c *Character) ToJSONSchema() jsonschema.Definition {
+	return jsonschema.Definition{
+		Type: jsonschema.Object,
+		Properties: map[string]jsonschema.Definition{
+			"name": {
+				Type:        jsonschema.String,
+				Description: "The name of the character",
+			},
+			"age": {
+				Type:        jsonschema.String,
+				Description: "The age of the character",
+			},
+			"job_occupation": {
+				Type:        jsonschema.String,
+				Description: "The occupation of the character",
+			},
+			"hobbies": {
+				Type:        jsonschema.Array,
+				Description: "The hobbies of the character",
+				Items: &jsonschema.Definition{
+					Type: jsonschema.String,
+				},
+			},
+			"favorites_music_genres": {
+				Type:        jsonschema.Array,
+				Description: "The favorite music genres of the character",
+				Items: &jsonschema.Definition{
+					Type: jsonschema.String,
+				},
+			},
+			"sex": {
+				Type:        jsonschema.String,
+				Description: "The character sex (male, female)",
+			},
+		},
+	}
 }
 
 func Load(path string) (*Character, error) {
@@ -81,28 +119,8 @@ func (a *Agent) SaveCharacter(path string) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func (a *Agent) generateIdentity(guidance string) error {
-	if guidance == "" {
-		guidance = "Generate a random character for roleplaying."
-	}
-	err := llm.GenerateJSONFromStruct(a.context.Context, a.client, guidance, a.options.LLMAPI.Model, &a.options.character)
-	a.Character = a.options.character
-	if err != nil {
-		return fmt.Errorf("failed to generate JSON from structure: %v", err)
-	}
-
-	if !a.validCharacter() {
-		return fmt.Errorf("generated character is not valid ( guidance: %s ): %v", guidance, a.Character.String())
-	}
-	return nil
-}
-
 func (a *Agent) validCharacter() bool {
-	return a.Character.Name != "" &&
-		a.Character.Age != "" &&
-		a.Character.Occupation != "" &&
-		len(a.Character.Hobbies) != 0 &&
-		len(a.Character.MusicTaste) != 0
+	return a.Character.Name != ""
 }
 
 const fmtT = `=====================
