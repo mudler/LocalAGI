@@ -28,7 +28,7 @@ type AgentPool struct {
 	managers                                                          map[string]sse.Manager
 	agentStatus                                                       map[string]*Status
 	apiURL, defaultModel, defaultMultimodalModel, localRAGAPI, apiKey string
-	availableActions                                                  func(*AgentConfig) func(ctx context.Context) []Action
+	availableActions                                                  func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []Action
 	connectors                                                        func(*AgentConfig) []Connector
 	promptBlocks                                                      func(*AgentConfig) []PromptBlock
 	timeout                                                           string
@@ -68,7 +68,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 func NewAgentPool(
 	defaultModel, defaultMultimodalModel, apiURL, apiKey, directory string,
 	LocalRAGAPI string,
-	availableActions func(*AgentConfig) func(ctx context.Context) []agent.Action,
+	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []agent.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) []PromptBlock,
 	timeout string,
@@ -185,7 +185,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	connectors := a.connectors(config)
 	promptBlocks := a.promptBlocks(config)
 
-	actions := a.availableActions(config)(ctx)
+	actions := a.availableActions(config)(ctx, a)
 
 	stateFile, characterFile := a.stateFiles(name)
 
@@ -458,7 +458,19 @@ func (a *AgentPool) save() error {
 	return os.WriteFile(a.file, data, 0644)
 }
 func (a *AgentPool) GetAgent(name string) *Agent {
+	a.Lock()
+	defer a.Unlock()
 	return a.agents[name]
+}
+
+func (a *AgentPool) AllAgents() []string {
+	a.Lock()
+	defer a.Unlock()
+	var agents []string
+	for agent := range a.agents {
+		agents = append(agents, agent)
+	}
+	return agents
 }
 
 func (a *AgentPool) GetConfig(name string) *AgentConfig {

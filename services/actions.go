@@ -31,6 +31,7 @@ const (
 	ActionSendMail                       = "send_mail"
 	ActionGenerateImage                  = "generate_image"
 	ActionCounter                        = "counter"
+	ActionCallAgents                     = "call_agents"
 )
 
 var AvailableActions = []string{
@@ -51,10 +52,11 @@ var AvailableActions = []string{
 	ActionGenerateImage,
 	ActionTwitterPost,
 	ActionCounter,
+	ActionCallAgents,
 }
 
-func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
-	return func(ctx context.Context) []agent.Action {
+func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []agent.Action {
+	return func(ctx context.Context, pool *state.AgentPool) []agent.Action {
 		allActions := []agent.Action{}
 
 		for _, a := range a.Actions {
@@ -104,6 +106,8 @@ func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
 				allActions = append(allActions, actions.NewPostTweet(config))
 			case ActionCounter:
 				allActions = append(allActions, actions.NewCounter(config))
+			case ActionCallAgents:
+				allActions = append(allActions, actions.NewCallAgent(config, pool))
 			}
 		}
 
