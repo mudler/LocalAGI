@@ -27,6 +27,7 @@ const (
 	ActionScraper                        = "scraper"
 	ActionWikipedia                      = "wikipedia"
 	ActionBrowse                         = "browse"
+	ActionTwitterPost                    = "twitter-post"
 	ActionSendMail                       = "send_mail"
 	ActionGenerateImage                  = "generate_image"
 	ActionCounter                        = "counter"
@@ -48,6 +49,7 @@ var AvailableActions = []string{
 	ActionWikipedia,
 	ActionSendMail,
 	ActionGenerateImage,
+	ActionTwitterPost,
 	ActionCounter,
 }
 
@@ -98,6 +100,8 @@ func Actions(a *state.AgentConfig) func(ctx context.Context) []agent.Action {
 				allActions = append(allActions, actions.NewBrowse(config))
 			case ActionSendMail:
 				allActions = append(allActions, actions.NewSendMail(config))
+			case ActionTwitterPost:
+				allActions = append(allActions, actions.NewPostTweet(config))
 			case ActionCounter:
 				allActions = append(allActions, actions.NewCounter(config))
 			}

@@ -17,6 +17,7 @@ const (
 	ConnectorDiscord      = "discord"
 	ConnectorGithubIssues = "github-issues"
 	ConnectorGithubPRs    = "github-prs"
+	ConnectorTwitter      = "twitter"
 )
 
 var AvailableConnectors = []string{
@@ -26,6 +27,7 @@ var AvailableConnectors = []string{
 	ConnectorDiscord,
 	ConnectorGithubIssues,
 	ConnectorGithubPRs,
+	ConnectorTwitter,
 }
 
 func Connectors(a *state.AgentConfig) []state.Connector {
@@ -56,6 +58,13 @@ func Connectors(a *state.AgentConfig) []state.Connector {
 			conns = append(conns, connectors.NewGithubPRWatcher(config))
 		case ConnectorIRC:
 			conns = append(conns, connectors.NewIRC(config))
+		case ConnectorTwitter:
+			cc, err := connectors.NewTwitterConnector(config)
+			if err != nil {
+				xlog.Info("Error creating twitter connector", err)
+				continue
+			}
+			conns = append(conns, cc)
 		}
 	}
 	return conns
