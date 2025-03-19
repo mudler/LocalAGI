@@ -33,6 +33,7 @@ type AgentConfig struct {
 	PromptBlocks []PromptBlocksConfig `json:"promptblocks" form:"promptblocks"`
 	MCPServers   []agent.MCPServer    `json:"mcp_servers" form:"mcp_servers"`
 
+	Description string `json:"description" form:"description"`
 	// This is what needs to be part of ActionsConfig
 	Model                 string `json:"model" form:"model"`
 	MultimodalModel       string `json:"multimodal_model" form:"multimodal_model"`
