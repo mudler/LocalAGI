@@ -26,9 +26,9 @@ type WrappedClient struct {
 	collection string
 }
 
-func NewWrappedClient(baseURL, collection string) *WrappedClient {
+func NewWrappedClient(baseURL, apiKey, collection string) *WrappedClient {
 	wc := &WrappedClient{
-		Client:     NewClient(baseURL),
+		Client:     NewClient(baseURL, apiKey),
 		collection: collection,
 	}
 
@@ -104,13 +104,23 @@ type Result struct {
 // Client is a client for the RAG API
 type Client struct {
 	BaseURL string
+	APIKey  string
 }
 
 // NewClient creates a new RAG API client
-func NewClient(baseURL string) *Client {
+func NewClient(baseURL, apiKey string) *Client {
 	return &Client{
 		BaseURL: baseURL,
+		APIKey:  apiKey,
 	}
+}
+
+// Add a helper method to set the Authorization header
+func (c *Client) addAuthHeader(req *http.Request) {
+	if c.APIKey == "" {
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 }
 
 // CreateCollection creates a new collection
@@ -126,7 +136,15 @@ func (c *Client) CreateCollection(name string) error {
 		return err
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -143,7 +161,14 @@ func (c *Client) CreateCollection(name string) error {
 func (c *Client) ListCollections() ([]string, error) {
 	url := fmt.Sprintf("%s/api/collections", c.BaseURL)
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.addAuthHeader(req)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -162,18 +187,25 @@ func (c *Client) ListCollections() ([]string, error) {
 	return collections, nil
 }
 
-// ListCollections lists all collections
+// ListEntries lists all entries in a collection
 func (c *Client) ListEntries(collection string) ([]string, error) {
 	url := fmt.Sprintf("%s/api/collections/%s/entries", c.BaseURL, collection)
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.addAuthHeader(req)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to list collections")
+		return nil, errors.New("failed to list entries")
 	}
 
 	var entries []string
@@ -185,39 +217,37 @@ func (c *Client) ListEntries(collection string) ([]string, error) {
 	return entries, nil
 }
 
-// DeleteEntry deletes an Entry in a collection and return the entries left
+// DeleteEntry deletes an entry in a collection
 func (c *Client) DeleteEntry(collection, entry string) ([]string, error) {
 	url := fmt.Sprintf("%s/api/collections/%s/entry/delete", c.BaseURL, collection)
 
 	type request struct {
 		Entry string `json:"entry"`
 	}
-	client := &http.Client{}
+
 	payload, err := json.Marshal(request{Entry: entry})
 	if err != nil {
 		return nil, err
 	}
 
-	// Create request
-	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(payload))
+	req, err := http.NewRequest(http.MethodDelete, url, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, err
 	}
-
 	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
 
-	// Fetch Request
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyResult := new(bytes.Buffer)
 		bodyResult.ReadFrom(resp.Body)
-		return nil, errors.New("failed to delete collection: " + bodyResult.String())
+		return nil, errors.New("failed to delete entry: " + bodyResult.String())
 	}
 
 	var results []string
@@ -243,7 +273,15 @@ func (c *Client) Search(collection, query string, maxResults int) ([]Result, err
 		return nil, err
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -262,12 +300,15 @@ func (c *Client) Search(collection, query string, maxResults int) ([]Result, err
 	return results, nil
 }
 
+// Reset resets a collection
 func (c *Client) Reset(collection string) error {
 	url := fmt.Sprintf("%s/api/collections/%s/reset", c.BaseURL, collection)
+
 	req, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		return err
 	}
+	c.addAuthHeader(req)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -279,7 +320,6 @@ func (c *Client) Reset(collection string) error {
 	if resp.StatusCode != http.StatusOK {
 		b := new(bytes.Buffer)
 		b.ReadFrom(resp.Body)
-
 		return errors.New("failed to reset collection: " + b.String())
 	}
 
@@ -319,6 +359,7 @@ func (c *Client) Store(collection, filePath string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	c.addAuthHeader(req)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

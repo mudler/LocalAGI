@@ -35,8 +35,13 @@ type AgentConfig struct {
 
 	Description string `json:"description" form:"description"`
 	// This is what needs to be part of ActionsConfig
-	Model                 string `json:"model" form:"model"`
-	MultimodalModel       string `json:"multimodal_model" form:"multimodal_model"`
+	Model           string `json:"model" form:"model"`
+	MultimodalModel string `json:"multimodal_model" form:"multimodal_model"`
+	APIURL          string `json:"api_url" form:"api_url"`
+	APIKey          string `json:"api_key" form:"api_key"`
+	LocalRAGURL     string `json:"local_rag_url" form:"local_rag_url"`
+	LocalRAGAPIKey  string `json:"local_rag_api_key" form:"local_rag_api_key"`
+
 	Name                  string `json:"name" form:"name"`
 	HUD                   bool   `json:"hud" form:"hud"`
 	StandaloneJob         bool   `json:"standalone_job" form:"standalone_job"`

@@ -21,18 +21,18 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	file                                                              string
-	pooldir                                                           string
-	pool                                                              AgentPoolData
-	agents                                                            map[string]*Agent
-	managers                                                          map[string]sse.Manager
-	agentStatus                                                       map[string]*Status
-	apiURL, defaultModel, defaultMultimodalModel, localRAGAPI, apiKey string
-	availableActions                                                  func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []Action
-	connectors                                                        func(*AgentConfig) []Connector
-	promptBlocks                                                      func(*AgentConfig) []PromptBlock
-	timeout                                                           string
-	conversationLogs                                                  string
+	file                                                                           string
+	pooldir                                                                        string
+	pool                                                                           AgentPoolData
+	agents                                                                         map[string]*Agent
+	managers                                                                       map[string]sse.Manager
+	agentStatus                                                                    map[string]*Status
+	apiURL, defaultModel, defaultMultimodalModel, localRAGAPI, localRAGKey, apiKey string
+	availableActions                                                               func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []Action
+	connectors                                                                     func(*AgentConfig) []Connector
+	promptBlocks                                                                   func(*AgentConfig) []PromptBlock
+	timeout                                                                        string
+	conversationLogs                                                               string
 }
 
 type Status struct {
@@ -182,6 +182,22 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		config.PeriodicRuns = "10m"
 	}
 
+	if config.APIURL != "" {
+		a.apiURL = config.APIURL
+	}
+
+	if config.APIKey != "" {
+		a.apiKey = config.APIKey
+	}
+
+	if config.LocalRAGURL != "" {
+		a.localRAGAPI = config.LocalRAGURL
+	}
+
+	if config.LocalRAGAPIKey != "" {
+		a.localRAGKey = config.LocalRAGAPIKey
+	}
+
 	connectors := a.connectors(config)
 	promptBlocks := a.promptBlocks(config)
 
@@ -231,7 +247,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithCharacterFile(characterFile),
 		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
-		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, name)),
+		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)),
 		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",
