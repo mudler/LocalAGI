@@ -5,10 +5,9 @@ services:
     # Available images with CUDA, ROCm, SYCL, Vulkan
     # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
-    image: localai/localai:latest-cpu
+    image: localai/localai:latest-gpu-nvidia-cuda-12
     command: 
-    # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
-    - arcee-agent # (smaller)
+    - qwen_qwq-32b
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -22,14 +21,13 @@ services:
     volumes:
       - ./volumes/models:/build/models:cached
       - ./volumes/images:/tmp/generated/images
-    # decomment the following piece if running with Nvidia GPUs
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
   ragserver:
     image: quay.io/mudler/localrag
     ports:
