@@ -10,10 +10,13 @@ import (
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/webui/types"
+	"github.com/mudler/LocalAgent/services"
 
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
 	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/pkg/metaform"
+	"github.com/mudler/LocalAgent/services/connectors"
 
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
@@ -348,5 +351,43 @@ func (a *App) Responses(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		}
 
 		return c.JSON(response)
+	}
+}
+
+func (app *App) GetConnectorForm(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		connectorType := c.Params("type")
+		
+		// Create a temporary connector to get its form metadata
+		var form metaform.Form
+		
+		switch connectorType {
+		case services.ConnectorTelegram:
+			form = (&connectors.Telegram{}).ConfigForm()
+		case services.ConnectorSlack:
+			form = (&connectors.Slack{}).ConfigForm()
+		case services.ConnectorDiscord:
+			form = (&connectors.Discord{}).ConfigForm()
+		case services.ConnectorGithubIssues:
+			form = (&connectors.GithubIssues{}).ConfigForm()
+		case services.ConnectorGithubPRs:
+			form = (&connectors.GithubPRs{}).ConfigForm()
+		case services.ConnectorIRC:
+			form = (&connectors.IRC{}).ConfigForm()
+		case services.ConnectorTwitter:
+			form = (&connectors.Twitter{}).ConfigForm()
+		default:
+			return c.Status(404).JSON(fiber.Map{
+				"error": "Connector type not found",
+			})
+		}
+		
+		// Create a data structure to pass both the form and the connector type
+		data := fiber.Map{
+			"Form": form,
+			"Type": connectorType,
+		}
+		
+		return c.Render("views/partials/metaform", data)	
 	}
 }

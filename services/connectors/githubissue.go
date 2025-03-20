@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/metaform"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
@@ -60,6 +61,51 @@ func (g *GithubIssues) AgentReasoningCallback() func(state agent.ActionCurrentSt
 	return func(state agent.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
+	}
+}
+
+func (g *GithubIssues) ConfigForm() metaform.Form {
+	return metaform.Form{
+		Fields: []metaform.Field{
+			{
+				Kind:        metaform.FieldString,
+				Name:        "token",
+				Label:       "GitHub Token",
+				Required:    true,
+				Placeholder: "Your GitHub personal access token",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "owner",
+				Label:       "Repository Owner",
+				Required:    true,
+				Placeholder: "username or organization",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "repository",
+				Label:       "Repository Name",
+				Required:    true,
+				Placeholder: "repo-name",
+			},
+			{
+				Kind:     metaform.FieldOptions,
+				Name:     "replyIfNoReplies",
+				Label:    "Reply Behavior",
+				Required: true,
+				Options: []metaform.Option{
+					{Value: "true", Label: "Reply only to issues with no comments"},
+					{Value: "false", Label: "Reply to all issues"},
+				},
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "pollInterval",
+				Label:       "Poll Interval",
+				Required:    false,
+				Placeholder: "10m",
+			},
+		},
 	}
 }
 

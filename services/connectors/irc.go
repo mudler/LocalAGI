@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/metaform"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
 	irc "github.com/thoj/go-ircevent"
@@ -40,6 +41,51 @@ func (i *IRC) AgentReasoningCallback() func(state agent.ActionCurrentState) bool
 	return func(state agent.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
+	}
+}
+
+func (i *IRC) ConfigForm() metaform.Form {
+	return metaform.Form{
+		Fields: []metaform.Field{
+			{
+				Kind:        metaform.FieldString,
+				Name:        "server",
+				Label:       "Server",
+				Required:    true,
+				Placeholder: "chat.freenode.net",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "port",
+				Label:       "Port",
+				Required:    true,
+				Placeholder: "6667",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "nickname",
+				Label:       "Nickname",
+				Required:    true,
+				Placeholder: "LocalAgentBot",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "channel",
+				Label:       "Channel",
+				Required:    true,
+				Placeholder: "#general",
+			},
+			{
+				Kind:     metaform.FieldOptions,
+				Name:     "alwaysReply",
+				Label:    "Always Reply",
+				Required: true,
+				Options: []metaform.Option{
+					{Value: "false", Label: "Only when mentioned"},
+					{Value: "true", Label: "Reply to all messages"},
+				},
+			},
+		},
 	}
 }
 

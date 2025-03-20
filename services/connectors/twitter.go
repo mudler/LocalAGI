@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/metaform"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/connectors/twitter"
 	"github.com/sashabaranov/go-openai"
@@ -29,6 +30,37 @@ func (t *Twitter) AgentReasoningCallback() func(state agent.ActionCurrentState) 
 	return func(state agent.ActionCurrentState) bool {
 
 		return true
+	}
+}
+
+func (t *Twitter) ConfigForm() metaform.Form {
+	return metaform.Form{
+		Fields: []metaform.Field{
+			{
+				Kind:        metaform.FieldString,
+				Name:        "token",
+				Label:       "Token",
+				Required:    true,
+				Placeholder: "elmo-...",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "botUsername",
+				Label:       "Bot Username",
+				Required:    true,
+				Placeholder: "Chocolate Pineapple",
+			},
+			{
+				Kind:     metaform.FieldOptions,
+				Name:     "noCharacterLimit",
+				Label:    "No Character Limit",
+				Required: false,
+				Options: []metaform.Option{
+					{Value: "false", Label: ""},
+					{Value: "true", Label: ""},
+				},
+			},
+		},
 	}
 }
 

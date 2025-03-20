@@ -2,5 +2,7 @@ models/
 data/
 pool
 uploads/
+volumes/
 local-agent-framework
 localagent
+LocalAgent

@@ -9,6 +9,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/metaform"
 )
 
 type Telegram struct {
@@ -34,6 +35,20 @@ func (t *Telegram) AgentReasoningCallback() func(state agent.ActionCurrentState)
 			Description: state.Reasoning,
 		})
 		return true
+	}
+}
+
+func (t *Telegram) ConfigForm() metaform.Form {
+	return metaform.Form{
+		Fields: []metaform.Field{
+			{
+				Kind:        metaform.FieldString,
+				Name:        "token",
+				Label:       "Bot Token",
+				Required:    true,
+				Placeholder: "Your Telegram bot token from @BotFather",
+			},
+		},
 	}
 }
 

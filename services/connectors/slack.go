@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mudler/LocalAgent/pkg/metaform"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
 	"github.com/sashabaranov/go-openai"
@@ -49,6 +50,44 @@ func (t *Slack) AgentReasoningCallback() func(state agent.ActionCurrentState) bo
 	return func(state agent.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
+	}
+}
+
+func (t *Slack) ConfigForm() metaform.Form {
+	return metaform.Form{
+		Fields: []metaform.Field{
+			{
+				Kind:        metaform.FieldString,
+				Name:        "appToken",
+				Label:       "App Token",
+				Required:    true,
+				Placeholder: "xapp-...",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "botToken",
+				Label:       "Bot Token",
+				Required:    true,
+				Placeholder: "xoxb-...",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "channelID",
+				Label:       "Channel ID",
+				Required:    false,
+				Placeholder: "C12345678",
+			},
+			{
+				Kind:     metaform.FieldOptions,
+				Name:     "alwaysReply",
+				Label:    "Always Reply",
+				Required: false,
+				Options: []metaform.Option{
+					{Value: "false", Label: "Only when mentioned"},
+					{Value: "true", Label: "Reply to all messages"},
+				},
+			},
+		},
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/pkg/metaform"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 )
 
@@ -34,6 +35,27 @@ func (d *Discord) AgentReasoningCallback() func(state agent.ActionCurrentState) 
 	return func(state agent.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
+	}
+}
+
+func (d *Discord) ConfigForm() metaform.Form {
+	return metaform.Form{
+		Fields: []metaform.Field{
+			{
+				Kind:        metaform.FieldString,
+				Name:        "token",
+				Label:       "Bot Token",
+				Required:    true,
+				Placeholder: "Your Discord bot token",
+			},
+			{
+				Kind:        metaform.FieldString,
+				Name:        "defaultChannel",
+				Label:       "Default Channel",
+				Required:    true,
+				Placeholder: "The default channel for the bot to join",
+			},
+		},
 	}
 }
 
