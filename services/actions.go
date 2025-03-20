@@ -33,6 +33,7 @@ const (
 	ActionGenerateImage                  = "generate_image"
 	ActionCounter                        = "counter"
 	ActionCallAgents                     = "call_agents"
+	ActionShellcommand                   = "shell-command"
 )
 
 var AvailableActions = []string{
@@ -55,6 +56,7 @@ var AvailableActions = []string{
 	ActionTwitterPost,
 	ActionCounter,
 	ActionCallAgents,
+	ActionShellcommand,
 }
 
 func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []agent.Action {
@@ -112,6 +114,8 @@ func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPo
 				allActions = append(allActions, actions.NewCounter(config))
 			case ActionCallAgents:
 				allActions = append(allActions, actions.NewCallAgent(config, pool))
+			case ActionShellcommand:
+				allActions = append(allActions, actions.NewShell(config))
 			}
 		}
 
