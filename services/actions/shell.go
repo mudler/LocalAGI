@@ -13,11 +13,14 @@ import (
 func NewShell(config map[string]string) *ShellAction {
 	return &ShellAction{
 		privateKey: config["privateKey"],
+		user:       config["user"],
+		host:       config["host"],
 	}
 }
 
 type ShellAction struct {
 	privateKey string
+	user, host string
 }
 
 func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
@@ -33,6 +36,11 @@ func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (acti
 		return action.ActionResult{}, err
 	}
 
+	if a.host != "" && a.user != "" {
+		result.Host = a.host
+		result.User = a.user
+	}
+
 	output, err := sshCommand(a.privateKey, result.Command, result.User, result.Host)
 	if err != nil {
 		return action.ActionResult{}, err
@@ -42,6 +50,19 @@ func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (acti
 }
 
 func (a *ShellAction) Definition() action.ActionDefinition {
+	if a.host != "" && a.user != "" {
+		return action.ActionDefinition{
+			Name:        "shell",
+			Description: "Run a shell command on a remote server.",
+			Properties: map[string]jsonschema.Definition{
+				"command": {
+					Type:        jsonschema.String,
+					Description: "The command to run on the remote server.",
+				},
+			},
+			Required: []string{"command"},
+		}
+	}
 	return action.ActionDefinition{
 		Name:        "shell",
 		Description: "Run a shell command on a remote server.",
