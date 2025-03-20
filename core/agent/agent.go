@@ -198,6 +198,7 @@ var ErrContextCanceled = fmt.Errorf("context canceled")
 func (a *Agent) Stop() {
 	a.Lock()
 	defer a.Unlock()
+	xlog.Debug("Stopping agent", "agent", a.Character.Name)
 	a.context.Cancel()
 }
 

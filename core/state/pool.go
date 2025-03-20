@@ -369,7 +369,6 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	go func() {
 		if err := agent.Run(); err != nil {
 			xlog.Error("Agent stopped", "error", err.Error(), "name", name)
-			panic(err)
 		}
 	}()
 

@@ -14,7 +14,7 @@ type ActionContext struct {
 }
 
 func (ac *ActionContext) Cancel() {
-	if ac.cancelFunc == nil {
+	if ac.cancelFunc != nil {
 		ac.cancelFunc()
 	}
 }
