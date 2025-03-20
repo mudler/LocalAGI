@@ -12,15 +12,19 @@ import (
 
 func NewShell(config map[string]string) *ShellAction {
 	return &ShellAction{
-		privateKey: config["privateKey"],
-		user:       config["user"],
-		host:       config["host"],
+		privateKey:        config["privateKey"],
+		user:              config["user"],
+		host:              config["host"],
+		customName:        config["customName"],
+		customDescription: config["customDescription"],
 	}
 }
 
 type ShellAction struct {
-	privateKey string
-	user, host string
+	privateKey        string
+	user, host        string
+	customName        string
+	customDescription string
 }
 
 func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
@@ -50,10 +54,18 @@ func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (acti
 }
 
 func (a *ShellAction) Definition() action.ActionDefinition {
+	name := "shell"
+	description := "Run a shell command on a remote server."
+	if a.customName != "" {
+		name = a.customName
+	}
+	if a.customDescription != "" {
+		description = a.customDescription
+	}
 	if a.host != "" && a.user != "" {
 		return action.ActionDefinition{
-			Name:        "shell",
-			Description: "Run a shell command on a remote server.",
+			Name:        action.ActionDefinitionName(name),
+			Description: description,
 			Properties: map[string]jsonschema.Definition{
 				"command": {
 					Type:        jsonschema.String,
@@ -64,8 +76,8 @@ func (a *ShellAction) Definition() action.ActionDefinition {
 		}
 	}
 	return action.ActionDefinition{
-		Name:        "shell",
-		Description: "Run a shell command on a remote server.",
+		Name:        action.ActionDefinitionName(name),
+		Description: description,
 		Properties: map[string]jsonschema.Definition{
 			"command": {
 				Type:        jsonschema.String,
