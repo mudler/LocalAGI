@@ -61,7 +61,7 @@ services:
     ports:
       - 8080:3000
     environment:
-      - LOCALAGENT_MODEL=arcee-agent
+      - LOCALAGENT_MODEL=qwen_qwq-32b
       - LOCALAGENT_LLM_API_URL=http://localai:8080
       - LOCALAGENT_API_KEY=sk-1234567890
       - LOCALAGENT_LOCALRAG_URL=http://ragserver:8080
