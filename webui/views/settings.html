@@ -190,15 +190,9 @@
                 updateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
                 updateButton.disabled = true;
                 
-                // Get the agent name from the hidden input field
-                const agentName = document.getElementById('name').value;
-                
                 // Build a structured data object
                 const formData = new FormData(form);
                 const jsonData = AgentFormUtils.processFormData(formData);
-                
-                // Ensure the name is set correctly
-                jsonData.name = agentName;
                 
                 // Process special fields
                 jsonData.connectors = AgentFormUtils.processConnectors(updateButton);
@@ -215,7 +209,7 @@
                 console.log('Sending data:', jsonData);
                 
                 // Send the structured data as JSON
-                fetch(`/api/agent/${agentName}/config`, {
+                fetch(`/api/agent/${jsonData.name}/config`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
@@ -366,13 +360,16 @@
                     
                     // Find the added connector elements
                     const connectorType = document.getElementById(`connectorType${index}`);
+                    const connectorConfig = document.getElementById(`connectorConfig${index}`);
                     
-                    // Set connector type value
+                    // Set values
                     if (connectorType) {
                         AgentFormUtils.setSelectValue(connectorType, connector.type);
-                        
-                        // Load the connector form with the existing config data
-                        loadConnectorForm(index, connector.type, connector.config);
+                    }
+                    
+                    if (connectorConfig) {
+                        // Format the config value
+                        AgentFormUtils.formatConfigValue(connectorConfig, connector.config);
                     }
                 });
             }

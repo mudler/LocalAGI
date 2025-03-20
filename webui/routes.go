@@ -113,7 +113,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
-	webapp.Get("/settings/connector/form/:type", app.GetConnectorForm(pool))
 	webapp.Get("/settings/:name", func(c *fiber.Ctx) error {
 		status := false
 		for _, a := range pool.List() {

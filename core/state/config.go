@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/pkg/metaform"
 )
 
 type ConnectorConfig struct {
@@ -63,6 +62,5 @@ type AgentConfig struct {
 type Connector interface {
 	AgentResultCallback() func(state agent.ActionState)
 	AgentReasoningCallback() func(state agent.ActionCurrentState) bool
-	ConfigForm() metaform.Form
 	Start(a *agent.Agent)
 }
