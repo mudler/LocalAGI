@@ -100,6 +100,7 @@ func New(opts ...Option) (*Agent, error) {
 		"character", a.Character.String(),
 		"state", a.State().String(),
 		"goal", a.options.permanentGoal,
+		"model", a.options.LLMAPI.Model,
 	)
 
 	return a, nil
@@ -131,7 +132,7 @@ func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Ask(opts ...JobOption) *JobResult {
-	xlog.Debug("Agent Ask()", "agent", a.Character.Name)
+	xlog.Debug("Agent Ask()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
 	defer func() {
 		xlog.Debug("Agent has finished being asked", "agent", a.Character.Name)
 	}()

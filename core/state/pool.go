@@ -172,12 +172,15 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	ctx := context.Background()
 	model := a.defaultModel
 	multimodalModel := a.defaultMultimodalModel
+
 	if config.MultimodalModel != "" {
 		multimodalModel = config.MultimodalModel
 	}
+
 	if config.Model != "" {
 		model = config.Model
 	}
+
 	if config.PeriodicRuns == "" {
 		config.PeriodicRuns = "10m"
 	}
@@ -200,15 +203,14 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	connectors := a.connectors(config)
 	promptBlocks := a.promptBlocks(config)
-
 	actions := a.availableActions(config)(ctx, a)
-
 	stateFile, characterFile := a.stateFiles(name)
 
 	actionsLog := []string{}
 	for _, action := range actions {
 		actionsLog = append(actionsLog, action.Definition().Name.String())
 	}
+
 	connectorLog := []string{}
 	for _, connector := range connectors {
 		connectorLog = append(connectorLog, fmt.Sprintf("%+v", connector))
@@ -305,6 +307,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 			}
 		}),
 	}
+
 	if config.HUD {
 		opts = append(opts, EnableHUD)
 	}
@@ -328,9 +331,11 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	if config.CanStopItself {
 		opts = append(opts, CanStopItself)
 	}
+
 	if config.InitiateConversations {
 		opts = append(opts, EnableInitiateConversations)
 	}
+
 	if config.RandomIdentity {
 		if config.IdentityGuidance != "" {
 			opts = append(opts, WithRandomIdentity(config.IdentityGuidance))
@@ -342,6 +347,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	if config.EnableKnowledgeBase {
 		opts = append(opts, EnableKnowledgeBase)
 	}
+
 	if config.EnableReasoning {
 		opts = append(opts, EnableForceReasoning)
 	}
@@ -351,6 +357,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	}
 
 	xlog.Info("Starting agent", "name", name, "config", config)
+
 	agent, err := New(opts...)
 	if err != nil {
 		return err
@@ -367,6 +374,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	}()
 
 	xlog.Info("Starting connectors", "name", name, "config", config)
+
 	for _, c := range connectors {
 		go c.Start(agent)
 	}

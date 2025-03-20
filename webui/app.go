@@ -184,6 +184,8 @@ func (a *App) UpdateAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error 
 			return errorJSONMessage(c, "Error updating agent: "+err.Error())
 		}
 
+		xlog.Info("Updated agent", "name", agentName, "config", fmt.Sprintf("%+v", newConfig))
+
 		return statusJSONMessage(c, "ok")
 	}
 }
