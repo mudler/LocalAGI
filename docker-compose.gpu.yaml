@@ -5,9 +5,13 @@ services:
     # Available images with CUDA, ROCm, SYCL, Vulkan
     # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
-    image: localai/localai:latest-gpu-nvidia-cuda-12
+    image: localai/localai:master-gpu-nvidia-cuda-12
     command: 
-    - qwen_qwq-32b
+    - mlabonne_gemma-3-27b-it-abliterated
+    # Other good alternative options:
+    # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
+    # - qwen_qwq-32b
+    # - arcee-agent
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -61,7 +65,7 @@ services:
     ports:
       - 8080:3000
     environment:
-      - LOCALAGENT_MODEL=qwen_qwq-32b
+      - LOCALAGENT_MODEL=mlabonne_gemma-3-27b-it-abliterated
       - LOCALAGENT_LLM_API_URL=http://localai:8080
       - LOCALAGENT_API_KEY=sk-1234567890
       - LOCALAGENT_LOCALRAG_URL=http://ragserver:8080
