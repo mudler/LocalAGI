@@ -130,9 +130,16 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
+	webapp.Get("/actions-playground", func(c *fiber.Ctx) error {
+		return c.Render("views/actions", fiber.Map{})
+	})
+
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
 	webapp.Put("/api/agent/:name/config", app.UpdateAgentConfig(pool))
+
+	webapp.Post("/action/:name/run", app.ExecuteAction(pool))
+	webapp.Get("/actions", app.ListActions())
 
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))

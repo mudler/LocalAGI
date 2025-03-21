@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,8 +10,10 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAgent/services"
 	"github.com/mudler/LocalAgent/webui/types"
 
+	"github.com/mudler/LocalAgent/core/action"
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
 	"github.com/mudler/LocalAgent/core/state"
@@ -296,6 +299,47 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			).WithEvent("message_status"))
 
 		return nil
+	}
+}
+
+func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		payload := struct {
+			Config map[string]string   `json:"config"`
+			Params action.ActionParams `json:"params"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			xlog.Error("Error parsing action payload", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		actionName := c.Params("name")
+
+		xlog.Debug("Executing action", "action", actionName, "config", payload.Config, "params", payload.Params)
+		a, err := services.Action(actionName, payload.Config, pool)
+		if err != nil {
+			xlog.Error("Error creating action", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Second)
+		defer cancel()
+
+		res, err := a.Run(ctx, payload.Params)
+		if err != nil {
+			xlog.Error("Error running action", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		xlog.Info("Action executed", "action", actionName, "result", res)
+		return c.JSON(res)
+	}
+}
+
+func (a *App) ListActions() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(services.AvailableActions)
 	}
 }
 

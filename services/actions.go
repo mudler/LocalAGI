@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/mudler/LocalAgent/core/state"
@@ -70,55 +71,70 @@ func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPo
 				continue
 			}
 
-			switch a.Name {
-			case ActionCustom:
-				customAction, err := action.NewCustom(config, "")
-				if err != nil {
-					xlog.Error("Error creating custom action", "error", err)
-					continue
-				}
-				allActions = append(allActions, customAction)
-			case ActionGenerateImage:
-				allActions = append(allActions, actions.NewGenImage(config))
-			case ActionSearch:
-				allActions = append(allActions, actions.NewSearch(config))
-			case ActionGithubIssueLabeler:
-				allActions = append(allActions, actions.NewGithubIssueLabeler(ctx, config))
-			case ActionGithubIssueOpener:
-				allActions = append(allActions, actions.NewGithubIssueOpener(ctx, config))
-			case ActionGithubIssueCloser:
-				allActions = append(allActions, actions.NewGithubIssueCloser(ctx, config))
-			case ActionGithubIssueSearcher:
-				allActions = append(allActions, actions.NewGithubIssueSearch(ctx, config))
-			case ActionGithubIssueReader:
-				allActions = append(allActions, actions.NewGithubIssueReader(ctx, config))
-			case ActionGithubIssueCommenter:
-				allActions = append(allActions, actions.NewGithubIssueCommenter(ctx, config))
-			case ActionGithubRepositoryGet:
-				allActions = append(allActions, actions.NewGithubRepositoryGetContent(ctx, config))
-			case ActionGithubRepositoryCreateOrUpdate:
-				allActions = append(allActions, actions.NewGithubRepositoryCreateOrUpdateContent(ctx, config))
-			case ActionGithubREADME:
-				allActions = append(allActions, actions.NewGithubRepositoryREADME(ctx, config))
-			case ActionScraper:
-				allActions = append(allActions, actions.NewScraper(config))
-			case ActionWikipedia:
-				allActions = append(allActions, actions.NewWikipedia(config))
-			case ActionBrowse:
-				allActions = append(allActions, actions.NewBrowse(config))
-			case ActionSendMail:
-				allActions = append(allActions, actions.NewSendMail(config))
-			case ActionTwitterPost:
-				allActions = append(allActions, actions.NewPostTweet(config))
-			case ActionCounter:
-				allActions = append(allActions, actions.NewCounter(config))
-			case ActionCallAgents:
-				allActions = append(allActions, actions.NewCallAgent(config, pool))
-			case ActionShellcommand:
-				allActions = append(allActions, actions.NewShell(config))
+			a, err := Action(a.Name, config, pool)
+			if err != nil {
+				continue
 			}
+			allActions = append(allActions, a)
 		}
 
 		return allActions
 	}
+}
+
+func Action(name string, config map[string]string, pool *state.AgentPool) (agent.Action, error) {
+	var a agent.Action
+	var err error
+
+	switch name {
+	case ActionCustom:
+		a, err = action.NewCustom(config, "")
+	case ActionGenerateImage:
+		a = actions.NewGenImage(config)
+	case ActionSearch:
+		a = actions.NewSearch(config)
+	case ActionGithubIssueLabeler:
+		a = actions.NewGithubIssueLabeler(context.Background(), config)
+	case ActionGithubIssueOpener:
+		a = actions.NewGithubIssueOpener(context.Background(), config)
+	case ActionGithubIssueCloser:
+		a = actions.NewGithubIssueCloser(context.Background(), config)
+	case ActionGithubIssueSearcher:
+		a = actions.NewGithubIssueSearch(context.Background(), config)
+	case ActionGithubIssueReader:
+		a = actions.NewGithubIssueReader(context.Background(), config)
+	case ActionGithubIssueCommenter:
+		a = actions.NewGithubIssueCommenter(context.Background(), config)
+	case ActionGithubRepositoryGet:
+		a = actions.NewGithubRepositoryGetContent(context.Background(), config)
+	case ActionGithubRepositoryCreateOrUpdate:
+		a = actions.NewGithubRepositoryCreateOrUpdateContent(context.Background(), config)
+	case ActionGithubREADME:
+		a = actions.NewGithubRepositoryREADME(context.Background(), config)
+	case ActionScraper:
+		a = actions.NewScraper(config)
+	case ActionWikipedia:
+		a = actions.NewWikipedia(config)
+	case ActionBrowse:
+		a = actions.NewBrowse(config)
+	case ActionSendMail:
+		a = actions.NewSendMail(config)
+	case ActionTwitterPost:
+		a = actions.NewPostTweet(config)
+	case ActionCounter:
+		a = actions.NewCounter(config)
+	case ActionCallAgents:
+		a = actions.NewCallAgent(config, pool)
+	case ActionShellcommand:
+		a = actions.NewShell(config)
+	default:
+		xlog.Error("Action not found", "name", name)
+		return nil, fmt.Errorf("Action not found")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return a, nil
 }
