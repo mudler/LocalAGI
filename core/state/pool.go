@@ -244,6 +244,7 @@ func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agen
 func (a *AgentPool) List() []string {
 	a.Lock()
 	defer a.Unlock()
+	
 	var agents []string
 	for agent := range a.pool {
 		agents = append(agents, agent)

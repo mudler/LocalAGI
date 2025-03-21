@@ -130,7 +130,7 @@ func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		fmt.Printf("Agent configuration: %+v\n", config)
+		xlog.Info("Agent configuration: %+v\n", config)
 
 		if config.Name == "" {
 			return errorJSONMessage(c, "Name is required")
@@ -138,6 +138,7 @@ func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		if err := pool.CreateAgent(config.Name, &config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
+		
 		return statusJSONMessage(c, "ok")
 	}
 }
@@ -156,7 +157,7 @@ func (a *App) GetAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error {
 // UpdateAgentConfig handles updating an agent's configuration
 func (a *App) UpdateAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		agentName := c.Params("name")
+		agentName := strings.Clone(c.Params("name"))
 
 		// First check if agent exists
 		oldConfig := pool.GetConfig(agentName)
@@ -170,9 +171,6 @@ func (a *App) UpdateAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error 
 			xlog.Error("Error parsing agent config", "error", err)
 			return errorJSONMessage(c, err.Error())
 		}
-
-		// Ensure the name doesn't change
-		newConfig.Name = agentName
 
 		// Remove the agent first
 		if err := pool.Remove(agentName); err != nil {

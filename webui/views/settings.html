@@ -5,6 +5,7 @@
     {{template "views/partials/header"}}
     <script src="/public/js/wizard.js"></script>
     <link rel="stylesheet" href="/public/css/wizard.css">
+    <script src="/public/js/connector-templates.js"></script>
     <script src="/public/js/agent-form.js"></script>
 </head>
 <body>
@@ -361,16 +362,25 @@
                     
                     // Find the added connector elements
                     const connectorType = document.getElementById(`connectorType${index}`);
-                    const connectorConfig = document.getElementById(`connectorConfig${index}`);
                     
                     // Set values
                     if (connectorType) {
+                        // First set the connector type
                         AgentFormUtils.setSelectValue(connectorType, connector.type);
-                    }
-                    
-                    if (connectorConfig) {
-                        // Format the config value
-                        AgentFormUtils.formatConfigValue(connectorConfig, connector.config);
+                        
+                        // Parse the config if it's a string (from backend)
+                        let configObj = connector.config;
+                        if (typeof connector.config === 'string') {
+                            try {
+                                configObj = JSON.parse(connector.config);
+                            } catch (e) {
+                                console.error('Error parsing connector config:', e);
+                                configObj = {}; // Fallback to empty object if parsing fails
+                            }
+                        }
+                        
+                        // Now render the appropriate form for this connector type with the config values
+                        AgentFormUtils.renderConnectorForm(index, connector.type, configObj);
                     }
                 });
             }
