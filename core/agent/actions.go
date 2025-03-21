@@ -225,6 +225,12 @@ func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Actio
 		return fmt.Errorf("error unmarshalling plan result: %w", err)
 	}
 
+	stateResult := ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, action.ActionResult{
+		Result: fmt.Sprintf("planning %s, subtasks: %+v", planResult.Goal, planResult.Subtasks),
+	}}
+	job.Result.SetResult(stateResult)
+	job.CallbackWithResult(stateResult)
+
 	xlog.Info("[Planning] starts", "agent", a.Character.Name, "goal", planResult.Goal)
 	for _, s := range planResult.Subtasks {
 		xlog.Info("[Planning] subtask", "agent", a.Character.Name, "action", s.Action, "reasoning", s.Reasoning)
@@ -242,25 +248,33 @@ func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Actio
 			"reasoning", reasoning,
 		)
 
-		action := a.availableActions().Find(subtask.Action)
+		subTaskAction := a.availableActions().Find(subtask.Action)
+		subTaskReasoning := fmt.Sprintf("%s, overall goal is: %s", subtask.Reasoning, planResult.Goal)
 
-		params, err := a.generateParameters(ctx, pickTemplate, action, a.currentConversation, fmt.Sprintf("%s, overall goal is: %s", subtask.Reasoning, planResult.Goal))
+		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, a.currentConversation, subTaskReasoning)
 		if err != nil {
 			return fmt.Errorf("error generating action's parameters: %w", err)
 
 		}
 		actionParams = params.actionParams
 
-		result, err := a.runAction(action, actionParams)
+		if !job.Callback(ActionCurrentState{subTaskAction, actionParams, subTaskReasoning}) {
+			job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, actionParams, subTaskReasoning}, action.ActionResult{Result: "stopped by callback"}})
+			job.Result.Conversation = a.currentConversation
+			job.Result.Finish(nil)
+			break
+		}
+
+		result, err := a.runAction(subTaskAction, actionParams)
 		if err != nil {
 			return fmt.Errorf("error running action: %w", err)
 		}
 
-		stateResult := ActionState{ActionCurrentState{action, actionParams, subtask.Reasoning}, result}
+		stateResult := ActionState{ActionCurrentState{subTaskAction, actionParams, subTaskReasoning}, result}
 		job.Result.SetResult(stateResult)
 		job.CallbackWithResult(stateResult)
-		xlog.Debug("[subtask] Action executed", "agent", a.Character.Name, "action", action.Definition().Name, "result", result)
-		a.addFunctionResultToConversation(action, actionParams, result)
+		xlog.Debug("[subtask] Action executed", "agent", a.Character.Name, "action", subTaskAction.Definition().Name, "result", result)
+		a.addFunctionResultToConversation(subTaskAction, actionParams, result)
 	}
 
 	return nil

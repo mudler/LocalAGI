@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAgent/services/actions"
 
 	"github.com/mudler/LocalAgent/core/action"
 	. "github.com/mudler/LocalAgent/core/agent"
@@ -200,6 +201,38 @@ var _ = Describe("Agent test", func() {
 			fmt.Printf("%+v\n", result)
 			Expect(result.Error).ToNot(HaveOccurred())
 			Expect(agent.State().Goal).To(ContainSubstring("guitar"), fmt.Sprint(agent.State()))
+		})
+
+		It("Can generate a plan", func() {
+			agent, err := New(
+				WithLLMAPIURL(apiURL),
+				WithModel(testModel),
+				WithLLMAPIKey(apiKeyURL),
+				WithActions(
+					actions.NewSearch(map[string]string{}),
+				),
+				EnablePlanning,
+				EnableForceReasoning,
+				//	EnableStandaloneJob,
+				//	WithRandomIdentity(),
+			)
+			Expect(err).ToNot(HaveOccurred())
+			go agent.Run()
+			defer agent.Stop()
+
+			result := agent.Ask(
+				WithText("plan a trip to San Francisco from Venice, Italy"),
+			)
+			Expect(len(result.State)).To(BeNumerically(">", 1))
+
+			actionsExecuted := []string{}
+			for _, r := range result.State {
+				xlog.Info(r.Result)
+				actionsExecuted = append(actionsExecuted, r.Action.Definition().Name.String())
+			}
+			Expect(actionsExecuted).To(ContainElement("search_internet"), fmt.Sprint(result))
+			Expect(actionsExecuted).To(ContainElement("plan"), fmt.Sprint(result))
+
 		})
 
 		/*

@@ -15,6 +15,7 @@ func TestAgent(t *testing.T) {
 
 var testModel = os.Getenv("LOCALAGENT_MODEL")
 var apiURL = os.Getenv("LOCALAI_API_URL")
+var apiKeyURL = os.Getenv("LOCALAI_API_KEY")
 
 func init() {
 	if testModel == "" {

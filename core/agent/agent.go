@@ -612,20 +612,23 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	// If we don't have to reply , run the action!
 	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
-		result, err := a.runAction(chosenAction, actionParams)
-		if err != nil {
-			//job.Result.Finish(fmt.Errorf("error running action: %w", err))
-			//return
-			// make the LLM aware of the error of running the action instead of stopping the job here
-			result.Result = fmt.Sprintf("Error running tool: %v", err)
+
+		if !chosenAction.Definition().Name.Is(action.PlanActionName) {
+			result, err := a.runAction(chosenAction, actionParams)
+			if err != nil {
+				//job.Result.Finish(fmt.Errorf("error running action: %w", err))
+				//return
+				// make the LLM aware of the error of running the action instead of stopping the job here
+				result.Result = fmt.Sprintf("Error running tool: %v", err)
+			}
+
+			stateResult := ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, result}
+			job.Result.SetResult(stateResult)
+			job.CallbackWithResult(stateResult)
+			xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
+
+			a.addFunctionResultToConversation(chosenAction, actionParams, result)
 		}
-
-		stateResult := ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, result}
-		job.Result.SetResult(stateResult)
-		job.CallbackWithResult(stateResult)
-		xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
-
-		a.addFunctionResultToConversation(chosenAction, actionParams, result)
 
 		//a.currentConversation = append(a.currentConversation, messages...)
 		//a.currentConversation = messages
