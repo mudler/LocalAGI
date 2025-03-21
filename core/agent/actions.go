@@ -215,9 +215,11 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Action, actionParams action.ActionParams, reasoning string, pickTemplate string) error {
 	// Planning: run all the actions in sequence
 	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
+		xlog.Debug("no plan action")
 		return nil
 	}
 
+	xlog.Debug("[planning]...")
 	planResult := action.PlanResult{}
 	if err := actionParams.Unmarshal(&planResult); err != nil {
 		return fmt.Errorf("error unmarshalling plan result: %w", err)

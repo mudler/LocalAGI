@@ -44,16 +44,19 @@ func (a *PlanAction) Definition() ActionDefinition {
 		Properties: map[string]jsonschema.Definition{
 			"subtasks": {
 				Type:        jsonschema.Array,
-				Description: "The message to reply with",
-				Properties: map[string]jsonschema.Definition{
-					"action": {
-						Type:        jsonschema.String,
-						Description: "The action to call",
-						Enum:        a.plannables,
-					},
-					"reasoning": {
-						Type:        jsonschema.String,
-						Description: "The reasoning for calling this action",
+				Description: "The subtasks to be executed",
+				Items: &jsonschema.Definition{
+					Type: jsonschema.Object,
+					Properties: map[string]jsonschema.Definition{
+						"action": {
+							Type:        jsonschema.String,
+							Description: "The action to call",
+							Enum:        a.plannables,
+						},
+						"reasoning": {
+							Type:        jsonschema.String,
+							Description: "The reasoning for calling this action",
+						},
 					},
 				},
 			},

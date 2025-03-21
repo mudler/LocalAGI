@@ -567,6 +567,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 
 	if actionParams == nil {
 		job.Result.Finish(fmt.Errorf("no parameters"))
+		xlog.Error("No parameters", "agent", a.Character.Name)
 		return
 	}
 
