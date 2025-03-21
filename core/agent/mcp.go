@@ -26,6 +26,10 @@ type mcpAction struct {
 	toolDescription string
 }
 
+func (a *mcpAction) Plannable() bool {
+	return true
+}
+
 func (m *mcpAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
 	resp, err := m.mcpClient.CallTool(ctx, m.toolName, params)
 	if err != nil {

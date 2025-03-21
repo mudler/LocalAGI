@@ -85,3 +85,7 @@ func (a *SearchAction) Definition() action.ActionDefinition {
 		Required: []string{"query"},
 	}
 }
+
+func (a *SearchAction) Plannable() bool {
+	return true
+}

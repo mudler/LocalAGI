@@ -48,3 +48,7 @@ func (a *WikipediaAction) Definition() action.ActionDefinition {
 		Required: []string{"query"},
 	}
 }
+
+func (a *WikipediaAction) Plannable() bool {
+	return true
+}

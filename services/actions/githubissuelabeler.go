@@ -118,3 +118,7 @@ func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {
 		Required: []string{"issue_number", "repository", "owner", "label"},
 	}
 }
+
+func (a *GithubIssuesLabeler) Plannable() bool {
+	return true
+}

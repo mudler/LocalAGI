@@ -85,3 +85,7 @@ func (a *CallAgentAction) Definition() action.ActionDefinition {
 		Required: []string{"agent_name", "message"},
 	}
 }
+
+func (a *CallAgentAction) Plannable() bool {
+	return true
+}

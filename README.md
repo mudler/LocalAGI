@@ -289,6 +289,7 @@ Note: For proper SSE handling, you should use a client that supports SSE nativel
   "standalone_job": false,
   "random_identity": false,
   "initiate_conversations": true,
+  "enable_planning": true,
   "identity_guidance": "You are a helpful assistant.",
   "periodic_runs": "0 * * * *",
   "permanent_goal": "Help users with their questions.",

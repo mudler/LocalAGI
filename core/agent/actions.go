@@ -27,6 +27,7 @@ type ActionCurrentState struct {
 type Action interface {
 	Run(ctx context.Context, action action.ActionParams) (action.ActionResult, error)
 	Definition() action.ActionDefinition
+	Plannable() bool
 }
 
 type Actions []Action
@@ -211,8 +212,76 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	)
 }
 
+func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Action, actionParams action.ActionParams, reasoning string, pickTemplate string) error {
+	// Planning: run all the actions in sequence
+	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
+		return nil
+	}
+
+	planResult := action.PlanResult{}
+	if err := actionParams.Unmarshal(&planResult); err != nil {
+		return fmt.Errorf("error unmarshalling plan result: %w", err)
+	}
+
+	xlog.Info("[Planning] starts", "agent", a.Character.Name, "goal", planResult.Goal)
+	for _, s := range planResult.Subtasks {
+		xlog.Info("[Planning] subtask", "agent", a.Character.Name, "action", s.Action, "reasoning", s.Reasoning)
+	}
+
+	if len(planResult.Subtasks) == 0 {
+		return fmt.Errorf("no subtasks")
+	}
+
+	// Execute all subtasks in sequence
+	for _, subtask := range planResult.Subtasks {
+		xlog.Info("[subtask] Generating parameters",
+			"agent", a.Character.Name,
+			"action", subtask.Action,
+			"reasoning", reasoning,
+		)
+
+		action := a.availableActions().Find(subtask.Action)
+
+		params, err := a.generateParameters(ctx, pickTemplate, action, a.currentConversation, fmt.Sprintf("%s, overall goal is: %s", subtask.Reasoning, planResult.Goal))
+		if err != nil {
+			return fmt.Errorf("error generating action's parameters: %w", err)
+
+		}
+		actionParams = params.actionParams
+
+		result, err := a.runAction(action, actionParams)
+		if err != nil {
+			return fmt.Errorf("error running action: %w", err)
+		}
+
+		stateResult := ActionState{ActionCurrentState{action, actionParams, subtask.Reasoning}, result}
+		job.Result.SetResult(stateResult)
+		job.CallbackWithResult(stateResult)
+		xlog.Debug("[subtask] Action executed", "agent", a.Character.Name, "action", action.Definition().Name, "result", result)
+		a.addFunctionResultToConversation(action, actionParams, result)
+	}
+
+	return nil
+}
+
 func (a *Agent) availableActions() Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
+
+	addPlanAction := func(actions Actions) Actions {
+		if !a.options.canPlan {
+			return actions
+		}
+		plannablesActions := []string{}
+		for _, a := range actions {
+			if a.Plannable() {
+				plannablesActions = append(plannablesActions, a.Definition().Name.String())
+			}
+		}
+		planAction := action.NewPlan(plannablesActions)
+		actions = append(actions, planAction)
+		return actions
+	}
+
 	defaultActions := append(a.mcpActions, a.options.userActions...)
 
 	if a.options.initiateConversations && a.selfEvaluationInProgress { // && self-evaluation..
@@ -224,7 +293,7 @@ func (a *Agent) availableActions() Actions {
 		//		acts = append(acts, action.NewStop())
 		//	}
 
-		return acts
+		return addPlanAction(acts)
 	}
 
 	if a.options.canStopItself {
@@ -232,14 +301,14 @@ func (a *Agent) availableActions() Actions {
 		if a.options.enableHUD {
 			acts = append(acts, action.NewState())
 		}
-		return acts
+		return addPlanAction(acts)
 	}
 
 	if a.options.enableHUD {
-		return append(defaultActions, action.NewState())
+		return addPlanAction(append(defaultActions, action.NewState()))
 	}
 
-	return defaultActions
+	return addPlanAction(defaultActions)
 }
 
 func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {

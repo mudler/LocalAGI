@@ -107,3 +107,7 @@ func (g *GithubRepositoryGetContent) Definition() action.ActionDefinition {
 		Required: []string{"path", "repository", "owner"},
 	}
 }
+
+func (a *GithubRepositoryGetContent) Plannable() bool {
+	return true
+}

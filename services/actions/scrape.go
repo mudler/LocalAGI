@@ -54,3 +54,7 @@ func (a *ScraperAction) Definition() action.ActionDefinition {
 		Required: []string{"url"},
 	}
 }
+
+func (a *ScraperAction) Plannable() bool {
+	return true
+}

@@ -332,6 +332,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		opts = append(opts, CanStopItself)
 	}
 
+	if config.CanPlan {
+		opts = append(opts, EnablePlanning)
+	}
+
 	if config.InitiateConversations {
 		opts = append(opts, EnableInitiateConversations)
 	}

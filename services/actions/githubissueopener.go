@@ -109,3 +109,7 @@ func (g *GithubIssuesOpener) Definition() action.ActionDefinition {
 		Required: []string{"title", "text", "owner", "repository"},
 	}
 }
+
+func (a *GithubIssuesOpener) Plannable() bool {
+	return true
+}

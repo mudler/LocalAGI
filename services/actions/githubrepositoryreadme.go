@@ -73,3 +73,7 @@ func (g *GithubRepositoryREADME) Definition() action.ActionDefinition {
 		Required: []string{"repository", "owner"},
 	}
 }
+
+func (a *GithubRepositoryREADME) Plannable() bool {
+	return true
+}

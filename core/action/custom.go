@@ -75,6 +75,10 @@ func (a *CustomAction) initializeInterpreter() error {
 	return nil
 }
 
+func (a *CustomAction) Plannable() bool {
+	return true
+}
+
 func (a *CustomAction) Run(ctx context.Context, params ActionParams) (ActionResult, error) {
 	v, err := a.i.Eval(fmt.Sprintf("%s.Run", a.config["name"]))
 	if err != nil {

@@ -23,6 +23,10 @@ func (a *ReasoningAction) Run(context.Context, ActionParams) (ActionResult, erro
 	return ActionResult{}, nil
 }
 
+func (a *ReasoningAction) Plannable() bool {
+	return false
+}
+
 func (a *ReasoningAction) Definition() ActionDefinition {
 	return ActionDefinition{
 		Name:        "pick_action",

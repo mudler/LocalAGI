@@ -66,3 +66,7 @@ func (a *BrowseAction) Definition() action.ActionDefinition {
 		Required: []string{"url"},
 	}
 }
+
+func (a *BrowseAction) Plannable() bool {
+	return true
+}

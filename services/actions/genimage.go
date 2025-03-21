@@ -92,3 +92,7 @@ func (a *GenImageAction) Definition() action.ActionDefinition {
 		Required: []string{"prompt"},
 	}
 }
+
+func (a *GenImageAction) Plannable() bool {
+	return true
+}

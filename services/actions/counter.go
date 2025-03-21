@@ -44,7 +44,7 @@ func (a *CounterAction) Run(ctx context.Context, params action.ActionParams) (ac
 
 	// Get current value or initialize if it doesn't exist
 	currentValue, exists := a.counters[request.Name]
-	
+
 	// Update the counter
 	newValue := currentValue + request.Adjustment
 	a.counters[request.Name] = newValue
@@ -93,3 +93,6 @@ func (a *CounterAction) Definition() action.ActionDefinition {
 	}
 }
 
+func (a *CounterAction) Plannable() bool {
+	return true
+}

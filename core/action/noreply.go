@@ -16,6 +16,10 @@ func (a *StopAction) Run(context.Context, ActionParams) (ActionResult, error) {
 	return ActionResult{}, nil
 }
 
+func (a *StopAction) Plannable() bool {
+	return false
+}
+
 func (a *StopAction) Definition() ActionDefinition {
 	return ActionDefinition{
 		Name:        StopActionName,

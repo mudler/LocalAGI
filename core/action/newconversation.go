@@ -22,6 +22,10 @@ func (a *ConversationAction) Run(context.Context, ActionParams) (ActionResult, e
 	return ActionResult{}, nil
 }
 
+func (a *ConversationAction) Plannable() bool {
+	return false
+}
+
 func (a *ConversationAction) Definition() ActionDefinition {
 	return ActionDefinition{
 		Name:        ConversationActionName,

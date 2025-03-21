@@ -106,3 +106,7 @@ func (g *GithubIssueSearch) Definition() action.ActionDefinition {
 		Required: []string{"query", "repository", "owner"},
 	}
 }
+
+func (a *GithubIssueSearch) Plannable() bool {
+	return true
+}

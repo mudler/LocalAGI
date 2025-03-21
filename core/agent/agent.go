@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -571,6 +570,11 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
+	if err := a.handlePlanning(ctx, job, chosenAction, actionParams, reasoning, pickTemplate); err != nil {
+		job.Result.Finish(fmt.Errorf("error running action: %w", err))
+		return
+	}
+
 	if !job.Callback(ActionCurrentState{chosenAction, actionParams, reasoning}) {
 		job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, action.ActionResult{Result: "stopped by callback"}})
 		job.Result.Conversation = a.currentConversation
@@ -620,27 +624,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		job.CallbackWithResult(stateResult)
 		xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
 
-		// calling the function
-		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-			Role: "assistant",
-			ToolCalls: []openai.ToolCall{
-				{
-					Type: openai.ToolTypeFunction,
-					Function: openai.FunctionCall{
-						Name:      chosenAction.Definition().Name.String(),
-						Arguments: actionParams.String(),
-					},
-				},
-			},
-		})
-
-		// result of calling the function
-		a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			Content:    result.Result,
-			Name:       chosenAction.Definition().Name.String(),
-			ToolCallID: chosenAction.Definition().Name.String(),
-		})
+		a.addFunctionResultToConversation(chosenAction, actionParams, result)
 
 		//a.currentConversation = append(a.currentConversation, messages...)
 		//a.currentConversation = messages
@@ -776,8 +760,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	// If we didn't got any message, we can use the response from the action
-	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" ||
-		strings.Contains(msg.Content, "<tool_call>") {
+	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" {
 		xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
 
 		msg = openai.ChatCompletionMessage{
@@ -792,6 +775,30 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	job.Result.Conversation = a.currentConversation
 	a.saveCurrentConversation()
 	job.Result.Finish(nil)
+}
+
+func (a *Agent) addFunctionResultToConversation(chosenAction Action, actionParams action.ActionParams, result action.ActionResult) {
+	// calling the function
+	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+		Role: "assistant",
+		ToolCalls: []openai.ToolCall{
+			{
+				Type: openai.ToolTypeFunction,
+				Function: openai.FunctionCall{
+					Name:      chosenAction.Definition().Name.String(),
+					Arguments: actionParams.String(),
+				},
+			},
+		},
+	})
+
+	// result of calling the function
+	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		Content:    result.Result,
+		Name:       chosenAction.Definition().Name.String(),
+		ToolCallID: chosenAction.Definition().Name.String(),
+	})
 }
 
 // This is running in the background.

@@ -25,6 +25,10 @@ func (a *IntentAction) Run(context.Context, ActionParams) (ActionResult, error) 
 	return ActionResult{}, nil
 }
 
+func (a *IntentAction) Plannable() bool {
+	return false
+}
+
 func (a *IntentAction) Definition() ActionDefinition {
 	return ActionDefinition{
 		Name:        "pick_tool",

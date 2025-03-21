@@ -97,3 +97,7 @@ func (g *GithubIssuesReader) Definition() action.ActionDefinition {
 		Required: []string{"issue_number", "repository", "owner"},
 	}
 }
+
+func (a *GithubIssuesReader) Plannable() bool {
+	return true
+}

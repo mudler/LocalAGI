@@ -37,6 +37,10 @@ func (a *StateAction) Run(context.Context, ActionParams) (ActionResult, error) {
 	return ActionResult{Result: "internal state has been updated"}, nil
 }
 
+func (a *StateAction) Plannable() bool {
+	return false
+}
+
 func (a *StateAction) Definition() ActionDefinition {
 	return ActionDefinition{
 		Name:        StateActionName,

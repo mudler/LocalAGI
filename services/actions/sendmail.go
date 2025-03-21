@@ -76,3 +76,7 @@ func (a *SendMailAction) Definition() action.ActionDefinition {
 		Required: []string{"to", "subject", "message"},
 	}
 }
+
+func (a *SendMailAction) Plannable() bool {
+	return true
+}

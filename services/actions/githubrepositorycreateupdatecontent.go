@@ -142,3 +142,7 @@ func (g *GithubRepositoryCreateOrUpdateContent) Definition() action.ActionDefini
 		Required:    []string{"path", "repository", "owner", "content"},
 	}
 }
+
+func (a *GithubRepositoryCreateOrUpdateContent) Plannable() bool {
+	return true
+}

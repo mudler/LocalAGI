@@ -36,6 +36,10 @@ type TestAction struct {
 	response map[string]string
 }
 
+func (a *TestAction) Plannable() bool {
+	return true
+}
+
 func (a *TestAction) Run(c context.Context, p action.ActionParams) (action.ActionResult, error) {
 	for k, r := range a.response {
 		if strings.Contains(strings.ToLower(p.String()), strings.ToLower(k)) {

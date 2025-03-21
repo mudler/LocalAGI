@@ -47,6 +47,7 @@ type AgentConfig struct {
 	StandaloneJob         bool   `json:"standalone_job" form:"standalone_job"`
 	RandomIdentity        bool   `json:"random_identity" form:"random_identity"`
 	InitiateConversations bool   `json:"initiate_conversations" form:"initiate_conversations"`
+	CanPlan               bool   `json:"enable_planning" form:"enable_planning"`
 	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`

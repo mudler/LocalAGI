@@ -25,6 +25,10 @@ func (a *ReplyAction) Run(context.Context, ActionParams) (string, error) {
 	return "no-op", nil
 }
 
+func (a *ReplyAction) Plannable() bool {
+	return false
+}
+
 func (a *ReplyAction) Definition() ActionDefinition {
 	return ActionDefinition{
 		Name:        ReplyActionName,

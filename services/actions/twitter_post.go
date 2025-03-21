@@ -58,3 +58,7 @@ func (a *PostTweetAction) Definition() action.ActionDefinition {
 		Required: []string{"text"},
 	}
 }
+
+func (a *PostTweetAction) Plannable() bool {
+	return true
+}

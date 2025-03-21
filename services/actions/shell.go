@@ -134,3 +134,7 @@ func sshCommand(privateKey, command, user, host string) (string, error) {
 
 	return string(output), nil
 }
+
+func (a *ShellAction) Plannable() bool {
+	return true
+}

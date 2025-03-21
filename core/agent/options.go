@@ -26,6 +26,7 @@ type options struct {
 	canStopItself         bool
 	initiateConversations bool
 	forceReasoning        bool
+	canPlan               bool
 	characterfile         string
 	statefile             string
 	context               context.Context
@@ -124,6 +125,11 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 
 var EnableInitiateConversations = func(o *options) error {
 	o.initiateConversations = true
+	return nil
+}
+
+var EnablePlanning = func(o *options) error {
+	o.canPlan = true
 	return nil
 }
 

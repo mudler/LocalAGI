@@ -103,3 +103,7 @@ func (g *GithubIssuesCommenter) Definition() action.ActionDefinition {
 		Required: []string{"issue_number", "repository", "owner", "comment"},
 	}
 }
+
+func (a *GithubIssuesCommenter) Plannable() bool {
+	return true
+}
