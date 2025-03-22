@@ -149,6 +149,7 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 	a.Lock()
 	defer a.Unlock()
 	name = replaceInvalidChars(name)
+	agentConfig.Name = name
 	if _, ok := a.pool[name]; ok {
 		return fmt.Errorf("agent %s already exists", name)
 	}
@@ -157,17 +158,17 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 		return err
 	}
 
-	go func() {
+	go func(ac AgentConfig) {
 		// Create the agent avatar
-		if err := a.createAgentAvatar(agentConfig); err != nil {
+		if err := a.createAgentAvatar(ac); err != nil {
 			xlog.Error("Failed to create agent avatar", "error", err)
 		}
-	}()
+	}(*agentConfig)
 
 	return a.startAgentWithConfig(name, agentConfig)
 }
 
-func (a *AgentPool) createAgentAvatar(agent *AgentConfig) error {
+func (a *AgentPool) createAgentAvatar(agent AgentConfig) error {
 	client := llm.NewClient(a.apiKey, a.apiURL+"/v1", "10m")
 
 	if a.imageModel == "" {

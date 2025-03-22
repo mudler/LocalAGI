@@ -405,7 +405,7 @@ type AgentRole struct {
 	SystemPrompt string `json:"system_prompt"`
 }
 
-func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) GenerateGroupProfiles(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		var request struct {
 			Descript string `json:"description"`
@@ -451,18 +451,32 @@ func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		for _, agent := range results.Agents {
+		return c.JSON(results.Agents)
+	}
+}
+
+func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+
+		var config struct {
+			Agents      []AgentRole       `json:"agents"`
+			AgentConfig state.AgentConfig `json:"agent_config"`
+		}
+		if err := c.BodyParser(&config); err != nil {
+			return errorJSONMessage(c, err.Error())
+		}
+
+		agentConfig := &config.AgentConfig
+		for _, agent := range config.Agents {
 			xlog.Info("Creating agent", "name", agent.Name, "description", agent.Description)
-			config := state.AgentConfig{
-				Name:         agent.Name,
-				Description:  agent.Description,
-				SystemPrompt: agent.SystemPrompt,
-			}
-			if err := pool.CreateAgent(agent.Name, &config); err != nil {
+			agentConfig.Name = agent.Name
+			agentConfig.Description = agent.Description
+			agentConfig.SystemPrompt = agent.SystemPrompt
+			if err := pool.CreateAgent(agent.Name, agentConfig); err != nil {
 				return errorJSONMessage(c, err.Error())
 			}
 		}
 
-		return c.JSON(results)
+		return statusJSONMessage(c, "ok")
 	}
 }
