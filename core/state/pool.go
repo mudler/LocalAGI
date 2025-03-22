@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,8 +15,11 @@ import (
 	"github.com/mudler/LocalAgent/core/agent"
 	. "github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
+	"github.com/mudler/LocalAgent/pkg/llm"
 	"github.com/mudler/LocalAgent/pkg/localrag"
 	"github.com/mudler/LocalAgent/pkg/utils"
+	"github.com/sashabaranov/go-openai"
+	"github.com/sashabaranov/go-openai/jsonschema"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
 )
@@ -153,7 +157,86 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 		return err
 	}
 
+	go func() {
+		// Create the agent avatar
+		if err := a.createAgentAvatar(agentConfig); err != nil {
+			xlog.Error("Failed to create agent avatar", "error", err)
+		}
+	}()
+
 	return a.startAgentWithConfig(name, agentConfig)
+}
+
+func (a *AgentPool) createAgentAvatar(agent *AgentConfig) error {
+	client := llm.NewClient(a.apiKey, a.apiURL+"/v1", "10m")
+
+	if a.imageModel == "" {
+		return fmt.Errorf("image model not set")
+	}
+
+	if a.defaultModel == "" {
+		return fmt.Errorf("default model not set")
+	}
+
+	var results struct {
+		ImagePrompt string `json:"image_prompt"`
+	}
+
+	err := llm.GenerateTypedJSON(
+		context.Background(),
+		llm.NewClient(a.apiKey, a.apiURL, "10m"),
+		"Generate a prompt that I can use to create a random avatar for the bot '"+agent.Name+"', the description of the bot is: "+agent.Description,
+		a.defaultModel,
+		jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"image_prompt": {
+					Type:        jsonschema.String,
+					Description: "The prompt to generate the image",
+				},
+			},
+			Required: []string{"image_prompt"},
+		}, &results)
+	if err != nil {
+		return fmt.Errorf("failed to generate image prompt: %w", err)
+	}
+
+	if results.ImagePrompt == "" {
+		xlog.Error("Failed to generate image prompt")
+		return fmt.Errorf("failed to generate image prompt")
+	}
+
+	req := openai.ImageRequest{
+		Prompt:         results.ImagePrompt,
+		Model:          a.imageModel,
+		Size:           openai.CreateImageSize256x256,
+		ResponseFormat: openai.CreateImageResponseFormatB64JSON,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	resp, err := client.CreateImage(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to generate image: %w", err)
+	}
+
+	if len(resp.Data) == 0 {
+		return fmt.Errorf("failed to generate image")
+	}
+
+	imageJson := resp.Data[0].B64JSON
+
+	os.MkdirAll(filepath.Join(a.pooldir, "avatars"), 0755)
+
+	// Save the image to the agent directory
+	imagePath := filepath.Join(a.pooldir, "avatars", fmt.Sprintf("%s.png", agent.Name))
+	imageData, err := base64.StdEncoding.DecodeString(imageJson)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(imagePath, imageData, 0644)
 }
 
 func (a *AgentPool) List() []string {
@@ -474,6 +557,10 @@ func (a *AgentPool) Remove(name string) error {
 	a.stop(name)
 	delete(a.agents, name)
 	delete(a.pool, name)
+
+	// remove avatar
+	os.Remove(filepath.Join(a.pooldir, "avatars", fmt.Sprintf("%s.png", name)))
+
 	if err := a.save(); err != nil {
 		return err
 	}

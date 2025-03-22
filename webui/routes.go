@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
+	"path/filepath"
 
 	"github.com/dave-gray101/v2keyauth"
 	fiber "github.com/gofiber/fiber/v2"
@@ -25,6 +26,13 @@ var viewsfs embed.FS
 var embeddedFiles embed.FS
 
 func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
+
+	// Static avatars in a.pooldir/avatars
+	webapp.Use("/avatars", filesystem.New(filesystem.Config{
+		Root: http.Dir(filepath.Join(app.config.StateDir, "avatars")),
+		//	PathPrefix: "avatars",
+		Browse: true,
+	}))
 
 	webapp.Use("/public", filesystem.New(filesystem.Config{
 		Root:       http.FS(embeddedFiles),
@@ -145,6 +153,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
+
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

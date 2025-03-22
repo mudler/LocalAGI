@@ -77,6 +77,7 @@ func main() {
 		webui.WithLLMAPIUrl(apiURL),
 		webui.WithLLMAPIKey(apiKey),
 		webui.WithLLMModel(testModel),
+		webui.WithStateDir(stateDir),
 	)
 
 	// Start the agents

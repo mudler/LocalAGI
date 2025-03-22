@@ -9,6 +9,7 @@ type Config struct {
 	LLMAPIURL        string
 	LLMAPIKey        string
 	LLMModel         string
+	StateDir         string
 }
 
 type Option func(*Config)
@@ -16,6 +17,12 @@ type Option func(*Config)
 func WithDefaultChunkSize(size int) Option {
 	return func(c *Config) {
 		c.DefaultChunkSize = size
+	}
+}
+
+func WithStateDir(dir string) Option {
+	return func(c *Config) {
+		c.StateDir = dir
 	}
 }
 
