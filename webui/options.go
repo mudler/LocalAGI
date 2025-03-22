@@ -6,6 +6,9 @@ type Config struct {
 	DefaultChunkSize int
 	Pool             *state.AgentPool
 	ApiKeys          []string
+	LLMAPIURL        string
+	LLMAPIKey        string
+	LLMModel         string
 }
 
 type Option func(*Config)
@@ -13,6 +16,24 @@ type Option func(*Config)
 func WithDefaultChunkSize(size int) Option {
 	return func(c *Config) {
 		c.DefaultChunkSize = size
+	}
+}
+
+func WithLLMModel(model string) Option {
+	return func(c *Config) {
+		c.LLMModel = model
+	}
+}
+
+func WithLLMAPIUrl(url string) Option {
+	return func(c *Config) {
+		c.LLMAPIURL = url
+	}
+}
+
+func WithLLMAPIKey(key string) Option {
+	return func(c *Config) {
+		c.LLMAPIKey = key
 	}
 }
 

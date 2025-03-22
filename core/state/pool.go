@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,18 +22,18 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	file                                                                           string
-	pooldir                                                                        string
-	pool                                                                           AgentPoolData
-	agents                                                                         map[string]*Agent
-	managers                                                                       map[string]sse.Manager
-	agentStatus                                                                    map[string]*Status
-	apiURL, defaultModel, defaultMultimodalModel, localRAGAPI, localRAGKey, apiKey string
-	availableActions                                                               func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []Action
-	connectors                                                                     func(*AgentConfig) []Connector
-	promptBlocks                                                                   func(*AgentConfig) []PromptBlock
-	timeout                                                                        string
-	conversationLogs                                                               string
+	file                                                                                       string
+	pooldir                                                                                    string
+	pool                                                                                       AgentPoolData
+	agents                                                                                     map[string]*Agent
+	managers                                                                                   map[string]sse.Manager
+	agentStatus                                                                                map[string]*Status
+	apiURL, defaultModel, defaultMultimodalModel, imageModel, localRAGAPI, localRAGKey, apiKey string
+	availableActions                                                                           func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []Action
+	connectors                                                                                 func(*AgentConfig) []Connector
+	promptBlocks                                                                               func(*AgentConfig) []PromptBlock
+	timeout                                                                                    string
+	conversationLogs                                                                           string
 }
 
 type Status struct {
@@ -66,7 +67,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	defaultModel, defaultMultimodalModel, apiURL, apiKey, directory string,
+	defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []agent.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -92,6 +93,7 @@ func NewAgentPool(
 			apiURL:                 apiURL,
 			defaultModel:           defaultModel,
 			defaultMultimodalModel: defaultMultimodalModel,
+			imageModel:             imageModel,
 			localRAGAPI:            LocalRAGAPI,
 			apiKey:                 apiKey,
 			agents:                 make(map[string]*Agent),
@@ -116,6 +118,7 @@ func NewAgentPool(
 		pooldir:                directory,
 		defaultModel:           defaultModel,
 		defaultMultimodalModel: defaultMultimodalModel,
+		imageModel:             imageModel,
 		apiKey:                 apiKey,
 		agents:                 make(map[string]*Agent),
 		managers:               make(map[string]sse.Manager),
@@ -130,12 +133,18 @@ func NewAgentPool(
 	}, nil
 }
 
+func replaceInvalidChars(s string) string {
+	s = strings.ReplaceAll(s, "/", "_")
+	return strings.ReplaceAll(s, " ", "_")
+}
+
 // CreateAgent adds a new agent to the pool
 // and starts it.
 // It also saves the state to the file.
 func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 	a.Lock()
 	defer a.Unlock()
+	name = replaceInvalidChars(name)
 	if _, ok := a.pool[name]; ok {
 		return fmt.Errorf("agent %s already exists", name)
 	}

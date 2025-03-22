@@ -141,6 +141,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/action/:name/run", app.ExecuteAction(pool))
 	webapp.Get("/actions", app.ListActions())
 
+	webapp.Post("/api/agent/group/create", app.CreateGroup(pool))
+
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
 }

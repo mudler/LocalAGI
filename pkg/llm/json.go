@@ -5,55 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-// generateAnswer generates an answer for the given text using the OpenAI API
-func GenerateJSON(ctx context.Context, client *openai.Client, model, text string, i interface{}) error {
-	req := openai.ChatCompletionRequest{
-		ResponseFormat: &openai.ChatCompletionResponseFormat{Type: openai.ChatCompletionResponseFormatTypeJSONObject},
-		Model:          model,
-		Messages: []openai.ChatCompletionMessage{
-			{
-
-				Role:    "user",
-				Content: text,
-			},
-		},
-	}
-
-	resp, err := client.CreateChatCompletion(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to generate answer: %v", err)
-	}
-	if len(resp.Choices) == 0 {
-		return fmt.Errorf("no response from OpenAI API")
-	}
-
-	err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), i)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func GenerateJSONFromStruct(ctx context.Context, client *openai.Client, guidance, model string, i interface{}) error {
-	// TODO: use functions?
-	exampleJSON, err := json.Marshal(i)
-	if err != nil {
-		return err
-	}
-	return GenerateJSON(ctx, client, model, "Generate a character as JSON data. "+guidance+". This is the JSON fields that should contain: "+string(exampleJSON), i)
-}
-
-func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, model string, i jsonschema.Definition, dst interface{}) error {
+func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, model string, i jsonschema.Definition, dst any) error {
+	toolName := "json"
 	decision := openai.ChatCompletionRequest{
 		Model: model,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    "user",
-				Content: "Generate a character as JSON data. " + guidance,
+				Content: guidance,
 			},
 		},
 		Tools: []openai.Tool{
@@ -61,12 +25,15 @@ func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, mod
 
 				Type: openai.ToolTypeFunction,
 				Function: openai.FunctionDefinition{
-					Name:       "identity",
+					Name:       toolName,
 					Parameters: i,
 				},
 			},
 		},
-		ToolChoice: "identity",
+		ToolChoice: openai.ToolChoice{
+			Type:     openai.ToolTypeFunction,
+			Function: openai.ToolFunction{Name: toolName},
+		},
 	}
 
 	resp, err := client.CreateChatCompletion(ctx, decision)
@@ -83,6 +50,8 @@ func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, mod
 	if len(msg.ToolCalls) == 0 {
 		return fmt.Errorf("no tool calls: %d", len(msg.ToolCalls))
 	}
+
+	xlog.Debug("JSON generated", "Arguments", msg.ToolCalls[0].Function.Arguments)
 
 	return json.Unmarshal([]byte(msg.ToolCalls[0].Function.Arguments), dst)
 }

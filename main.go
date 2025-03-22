@@ -20,6 +20,7 @@ var stateDir = os.Getenv("LOCALAGENT_STATE_DIR")
 var localRAG = os.Getenv("LOCALAGENT_LOCALRAG_URL")
 var withLogs = os.Getenv("LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING") == "true"
 var apiKeysEnv = os.Getenv("LOCALAGENT_API_KEYS")
+var imageModel = os.Getenv("LOCALAGENT_IMAGE_MODEL")
 
 func init() {
 	if testModel == "" {
@@ -54,6 +55,7 @@ func main() {
 	pool, err := state.NewAgentPool(
 		testModel,
 		multimodalModel,
+		imageModel,
 		apiURL,
 		apiKey,
 		stateDir,
@@ -69,7 +71,13 @@ func main() {
 	}
 
 	// Create the application
-	app := webui.NewApp(webui.WithPool(pool), webui.WithApiKeys(apiKeys...))
+	app := webui.NewApp(
+		webui.WithPool(pool),
+		webui.WithApiKeys(apiKeys...),
+		webui.WithLLMAPIUrl(apiURL),
+		webui.WithLLMAPIKey(apiKey),
+		webui.WithLLMModel(testModel),
+	)
 
 	// Start the agents
 	if err := pool.StartAll(); err != nil {

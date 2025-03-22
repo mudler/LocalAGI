@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mudler/LocalAgent/pkg/llm"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services"
 	"github.com/mudler/LocalAgent/webui/types"
+	"github.com/sashabaranov/go-openai/jsonschema"
 
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/mudler/LocalAgent/core/agent"
@@ -394,5 +396,73 @@ func (a *App) Responses(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		}
 
 		return c.JSON(response)
+	}
+}
+
+type AgentRole struct {
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	SystemPrompt string `json:"system_prompt"`
+}
+
+func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		var request struct {
+			Descript string `json:"description"`
+		}
+
+		if err := c.BodyParser(&request); err != nil {
+			return errorJSONMessage(c, err.Error())
+		}
+
+		var results struct {
+			Agents []AgentRole `json:"agents"`
+		}
+
+		xlog.Debug("Generating group", "description", request.Descript)
+		client := llm.NewClient(a.config.LLMAPIKey, a.config.LLMAPIURL, "10m")
+		err := llm.GenerateTypedJSON(c.Context(), client, request.Descript, a.config.LLMModel, jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"agents": {
+					Type: jsonschema.Array,
+					Items: &jsonschema.Definition{
+						Type:     jsonschema.Object,
+						Required: []string{"name", "description", "system_prompt"},
+						Properties: map[string]jsonschema.Definition{
+							"name": {
+								Type:        jsonschema.String,
+								Description: "The name of the agent",
+							},
+							"description": {
+								Type:        jsonschema.String,
+								Description: "The description of the agent",
+							},
+							"system_prompt": {
+								Type:        jsonschema.String,
+								Description: "The system prompt for the agent",
+							},
+						},
+					},
+				},
+			},
+		}, &results)
+		if err != nil {
+			return errorJSONMessage(c, err.Error())
+		}
+
+		for _, agent := range results.Agents {
+			xlog.Info("Creating agent", "name", agent.Name, "description", agent.Description)
+			config := state.AgentConfig{
+				Name:         agent.Name,
+				Description:  agent.Description,
+				SystemPrompt: agent.SystemPrompt,
+			}
+			if err := pool.CreateAgent(agent.Name, &config); err != nil {
+				return errorJSONMessage(c, err.Error())
+			}
+		}
+
+		return c.JSON(results)
 	}
 }
