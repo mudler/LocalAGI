@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -28,18 +28,18 @@ type GenImageAction struct {
 	imageModel string
 }
 
-func (a *GenImageAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *GenImageAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Prompt string `json:"prompt"`
 		Size   string `json:"size"`
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if result.Prompt == "" {
-		return action.ActionResult{}, fmt.Errorf("prompt is required")
+		return types.ActionResult{}, fmt.Errorf("prompt is required")
 	}
 
 	req := openai.ImageRequest{
@@ -60,22 +60,22 @@ func (a *GenImageAction) Run(ctx context.Context, params action.ActionParams) (a
 
 	resp, err := a.client.CreateImage(ctx, req)
 	if err != nil {
-		return action.ActionResult{Result: "Failed to generate image " + err.Error()}, err
+		return types.ActionResult{Result: "Failed to generate image " + err.Error()}, err
 	}
 
 	if len(resp.Data) == 0 {
-		return action.ActionResult{Result: "Failed to generate image"}, nil
+		return types.ActionResult{Result: "Failed to generate image"}, nil
 	}
 
-	return action.ActionResult{
+	return types.ActionResult{
 		Result: fmt.Sprintf("The image was generated and available at: %s", resp.Data[0].URL),
 		Metadata: map[string]interface{}{
 			MetadataImages: []string{resp.Data[0].URL},
 		}}, nil
 }
 
-func (a *GenImageAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *GenImageAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "generate_image",
 		Description: "Generate image with.",
 		Properties: map[string]jsonschema.Definition{

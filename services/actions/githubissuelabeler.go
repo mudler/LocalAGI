@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -39,7 +39,7 @@ func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *Githu
 	}
 }
 
-func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubIssuesLabeler) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
@@ -48,7 +48,7 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if g.repository != "" && g.owner != "" {
@@ -67,17 +67,17 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params action.ActionParam
 	if err != nil {
 		resultString = fmt.Sprintf("Error adding label '%s' to issue %d in repository %s/%s: %v", result.Label, result.IssueNumber, result.Owner, result.Repository, err)
 	}
-	return action.ActionResult{Result: resultString}, err
+	return types.ActionResult{Result: resultString}, err
 }
 
-func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {
+func (g *GithubIssuesLabeler) Definition() types.ActionDefinition {
 	actionName := "add_label_to_github_issue"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: "Add a label to a Github issue. You might want to assign labels to issues to categorize them.",
 			Properties: map[string]jsonschema.Definition{
 				"issue_number": {
@@ -93,8 +93,8 @@ func (g *GithubIssuesLabeler) Definition() action.ActionDefinition {
 			Required: []string{"issue_number", "label"},
 		}
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: "Add a label to a Github issue. You might want to assign labels to issues to categorize them.",
 		Properties: map[string]jsonschema.Definition{
 			"issue_number": {

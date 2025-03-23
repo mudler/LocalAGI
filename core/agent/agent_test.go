@@ -8,8 +8,8 @@ import (
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
 
-	"github.com/mudler/LocalAgent/core/action"
 	. "github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -19,14 +19,14 @@ const testActionResult = "In Boston it's 30C today, it's sunny, and humidity is 
 const testActionResult2 = "In milan it's very hot today, it is 45C and the humidity is at 200%"
 const testActionResult3 = "In paris it's very cold today, it is 2C and the humidity is at 10%"
 
-var _ Action = &TestAction{}
+var _ types.Action = &TestAction{}
 
-var debugOptions = []JobOption{
-	WithReasoningCallback(func(state ActionCurrentState) bool {
+var debugOptions = []types.JobOption{
+	types.WithReasoningCallback(func(state types.ActionCurrentState) bool {
 		xlog.Info("Reasoning", state)
 		return true
 	}),
-	WithResultCallback(func(state ActionState) {
+	types.WithResultCallback(func(state types.ActionState) {
 		xlog.Info("Reasoning", state.Reasoning)
 		xlog.Info("Action", state.Action)
 		xlog.Info("Result", state.Result)
@@ -41,18 +41,18 @@ func (a *TestAction) Plannable() bool {
 	return true
 }
 
-func (a *TestAction) Run(c context.Context, p action.ActionParams) (action.ActionResult, error) {
+func (a *TestAction) Run(c context.Context, p types.ActionParams) (types.ActionResult, error) {
 	for k, r := range a.response {
 		if strings.Contains(strings.ToLower(p.String()), strings.ToLower(k)) {
-			return action.ActionResult{Result: r}, nil
+			return types.ActionResult{Result: r}, nil
 		}
 	}
 
-	return action.ActionResult{Result: "No match"}, nil
+	return types.ActionResult{Result: "No match"}, nil
 }
 
-func (a *TestAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *TestAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "get_weather",
 		Description: "get current weather",
 		Properties: map[string]jsonschema.Definition{
@@ -74,8 +74,8 @@ type FakeStoreResultAction struct {
 	TestAction
 }
 
-func (a *FakeStoreResultAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *FakeStoreResultAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "store_results",
 		Description: "store results permanently. Use this tool after you have a result you want to keep.",
 		Properties: map[string]jsonschema.Definition{
@@ -93,8 +93,8 @@ type FakeInternetAction struct {
 	TestAction
 }
 
-func (a *FakeInternetAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *FakeInternetAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "search_internet",
 		Description: "search on internet",
 		Properties: map[string]jsonschema.Definition{
@@ -127,7 +127,7 @@ var _ = Describe("Agent test", func() {
 
 			res := agent.Ask(
 				append(debugOptions,
-					WithText("what's the weather in Boston and Milano? Use celsius units"),
+					types.WithText("what's the weather in Boston and Milano? Use celsius units"),
 				)...,
 			)
 			Expect(res.Error).ToNot(HaveOccurred())
@@ -142,7 +142,7 @@ var _ = Describe("Agent test", func() {
 
 			res = agent.Ask(
 				append(debugOptions,
-					WithText("Now I want to know the weather in Paris, always use celsius units"),
+					types.WithText("Now I want to know the weather in Paris, always use celsius units"),
 				)...)
 			for _, r := range res.State {
 
@@ -173,7 +173,7 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 			res := agent.Ask(
 				append(debugOptions,
-					WithText("can you get the weather in boston? Use celsius units"))...,
+					types.WithText("can you get the weather in boston? Use celsius units"))...,
 			)
 			reasons := []string{}
 			for _, r := range res.State {
@@ -196,7 +196,7 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 
 			result := agent.Ask(
-				WithText("Update your goals such as you want to learn to play the guitar"),
+				types.WithText("Update your goals such as you want to learn to play the guitar"),
 			)
 			fmt.Printf("%+v\n", result)
 			Expect(result.Error).ToNot(HaveOccurred())
@@ -221,7 +221,7 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 
 			result := agent.Ask(
-				WithText("plan a trip to San Francisco from Venice, Italy"),
+				types.WithText("plan a trip to San Francisco from Venice, Italy"),
 			)
 			Expect(len(result.State)).To(BeNumerically(">", 1))
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/traefik/yaegi/interp"
@@ -79,24 +80,24 @@ func (a *CustomAction) Plannable() bool {
 	return true
 }
 
-func (a *CustomAction) Run(ctx context.Context, params ActionParams) (ActionResult, error) {
+func (a *CustomAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	v, err := a.i.Eval(fmt.Sprintf("%s.Run", a.config["name"]))
 	if err != nil {
-		return ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	run := v.Interface().(func(map[string]interface{}) (string, map[string]interface{}, error))
 
 	res, meta, err := run(params)
-	return ActionResult{Result: res, Metadata: meta}, err
+	return types.ActionResult{Result: res, Metadata: meta}, err
 }
 
-func (a *CustomAction) Definition() ActionDefinition {
+func (a *CustomAction) Definition() types.ActionDefinition {
 
 	v, err := a.i.Eval(fmt.Sprintf("%s.Definition", a.config["name"]))
 	if err != nil {
 		xlog.Error("Error getting custom action definition", "error", err)
-		return ActionDefinition{}
+		return types.ActionDefinition{}
 	}
 
 	properties := v.Interface().(func() map[string][]string)
@@ -104,7 +105,7 @@ func (a *CustomAction) Definition() ActionDefinition {
 	v, err = a.i.Eval(fmt.Sprintf("%s.RequiredFields", a.config["name"]))
 	if err != nil {
 		xlog.Error("Error getting custom action definition", "error", err)
-		return ActionDefinition{}
+		return types.ActionDefinition{}
 	}
 
 	requiredFields := v.Interface().(func() []string)
@@ -121,8 +122,8 @@ func (a *CustomAction) Definition() ActionDefinition {
 			Description: v[1],
 		}
 	}
-	return ActionDefinition{
-		Name:        ActionDefinitionName(a.config["name"]),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(a.config["name"]),
 		Description: a.config["description"],
 		Properties:  prop,
 		Required:    requiredFields(),

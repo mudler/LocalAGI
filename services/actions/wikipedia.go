@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/tools/wikipedia"
 )
@@ -15,7 +15,7 @@ func NewWikipedia(config map[string]string) *WikipediaAction {
 
 type WikipediaAction struct{}
 
-func (a *WikipediaAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *WikipediaAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Query string `json:"query"`
 	}{}
@@ -23,20 +23,20 @@ func (a *WikipediaAction) Run(ctx context.Context, params action.ActionParams) (
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 	wiki := wikipedia.New("LocalAgent")
 	res, err := wiki.Call(ctx, result.Query)
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
-	return action.ActionResult{Result: res}, nil
+	return types.ActionResult{Result: res}, nil
 }
 
-func (a *WikipediaAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *WikipediaAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "wikipedia",
 		Description: "Find wikipedia pages using the wikipedia api",
 		Properties: map[string]jsonschema.Definition{

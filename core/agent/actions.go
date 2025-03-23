@@ -7,53 +7,15 @@ import (
 	"os"
 
 	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
+
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
 )
 
-type ActionState struct {
-	ActionCurrentState
-	action.ActionResult
-}
-
-type ActionCurrentState struct {
-	Action    Action
-	Params    action.ActionParams
-	Reasoning string
-}
-
-// Actions is something the agent can do
-type Action interface {
-	Run(ctx context.Context, action action.ActionParams) (action.ActionResult, error)
-	Definition() action.ActionDefinition
-	Plannable() bool
-}
-
-type Actions []Action
-
-func (a Actions) ToTools() []openai.Tool {
-	tools := []openai.Tool{}
-	for _, action := range a {
-		tools = append(tools, openai.Tool{
-			Type:     openai.ToolTypeFunction,
-			Function: action.Definition().ToFunctionDefinition(),
-		})
-	}
-	return tools
-}
-
-func (a Actions) Find(name string) Action {
-	for _, action := range a {
-		if action.Definition().Name.Is(name) {
-			return action
-		}
-	}
-	return nil
-}
-
 type decisionResult struct {
-	actionParams action.ActionParams
+	actionParams types.ActionParams
 	message      string
 	actioName    string
 }
@@ -85,7 +47,7 @@ func (a *Agent) decision(
 		return &decisionResult{message: msg.Content}, nil
 	}
 
-	params := action.ActionParams{}
+	params := types.ActionParams{}
 	if err := params.Read(msg.ToolCalls[0].Function.Arguments); err != nil {
 		return nil, err
 	}
@@ -173,7 +135,7 @@ func (m Messages) IsLastMessageFromRole(role string) bool {
 	return m[len(m)-1].Role == role
 }
 
-func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
+func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act types.Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
 
 	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.availableActions(), reasoning)
 	if err != nil {
@@ -212,7 +174,7 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	)
 }
 
-func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Action, actionParams action.ActionParams, reasoning string, pickTemplate string) error {
+func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction types.Action, actionParams types.ActionParams, reasoning string, pickTemplate string) error {
 	// Planning: run all the actions in sequence
 	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
 		xlog.Debug("no plan action")
@@ -225,9 +187,17 @@ func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Actio
 		return fmt.Errorf("error unmarshalling plan result: %w", err)
 	}
 
-	stateResult := ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, action.ActionResult{
-		Result: fmt.Sprintf("planning %s, subtasks: %+v", planResult.Goal, planResult.Subtasks),
-	}}
+	stateResult := types.ActionState{
+		ActionCurrentState: types.ActionCurrentState{
+			Job:       job,
+			Action:    chosenAction,
+			Params:    actionParams,
+			Reasoning: reasoning,
+		},
+		ActionResult: types.ActionResult{
+			Result: fmt.Sprintf("planning %s, subtasks: %+v", planResult.Goal, planResult.Subtasks),
+		},
+	}
 	job.Result.SetResult(stateResult)
 	job.CallbackWithResult(stateResult)
 
@@ -258,8 +228,23 @@ func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Actio
 		}
 		actionParams = params.actionParams
 
-		if !job.Callback(ActionCurrentState{subTaskAction, actionParams, subTaskReasoning}) {
-			job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, actionParams, subTaskReasoning}, action.ActionResult{Result: "stopped by callback"}})
+		if !job.Callback(types.ActionCurrentState{
+			Job:       job,
+			Action:    subTaskAction,
+			Params:    actionParams,
+			Reasoning: subTaskReasoning,
+		}) {
+			job.Result.SetResult(types.ActionState{
+				ActionCurrentState: types.ActionCurrentState{
+					Job:       job,
+					Action:    chosenAction,
+					Params:    actionParams,
+					Reasoning: subTaskReasoning,
+				},
+				ActionResult: types.ActionResult{
+					Result: "stopped by callback",
+				},
+			})
 			job.Result.Conversation = a.currentConversation
 			job.Result.Finish(nil)
 			break
@@ -270,7 +255,15 @@ func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Actio
 			return fmt.Errorf("error running action: %w", err)
 		}
 
-		stateResult := ActionState{ActionCurrentState{subTaskAction, actionParams, subTaskReasoning}, result}
+		stateResult := types.ActionState{
+			ActionCurrentState: types.ActionCurrentState{
+				Job:       job,
+				Action:    subTaskAction,
+				Params:    actionParams,
+				Reasoning: subTaskReasoning,
+			},
+			ActionResult: result,
+		}
 		job.Result.SetResult(stateResult)
 		job.CallbackWithResult(stateResult)
 		xlog.Debug("[subtask] Action executed", "agent", a.Character.Name, "action", subTaskAction.Definition().Name, "result", result)
@@ -280,10 +273,10 @@ func (a *Agent) handlePlanning(ctx context.Context, job *Job, chosenAction Actio
 	return nil
 }
 
-func (a *Agent) availableActions() Actions {
+func (a *Agent) availableActions() types.Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
 
-	addPlanAction := func(actions Actions) Actions {
+	addPlanAction := func(actions types.Actions) types.Actions {
 		if !a.options.canPlan {
 			return actions
 		}
@@ -341,7 +334,7 @@ func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {
 }
 
 // pickAction picks an action based on the conversation
-func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (Action, action.ActionParams, string, error) {
+func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage) (types.Action, types.ActionParams, string, error) {
 	c := messages
 
 	if !a.options.forceReasoning {
@@ -390,7 +383,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	// and then use the reply to get the action
 	thought, err := a.decision(ctx,
 		c,
-		Actions{action.NewReasoning()}.ToTools(),
+		types.Actions{action.NewReasoning()}.ToTools(),
 		action.NewReasoning().Definition().Name)
 	if err != nil {
 		return nil, nil, "", err
@@ -421,7 +414,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 			Role:    "system",
 			Content: "Given the assistant thought, pick the relevant action: " + reason,
 		}),
-		Actions{intentionsTools}.ToTools(),
+		types.Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)

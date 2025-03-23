@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -28,7 +28,7 @@ func NewGithubRepositoryGetContent(ctx context.Context, config map[string]string
 	}
 }
 
-func (g *GithubRepositoryGetContent) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubRepositoryGetContent) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Path       string `json:"path"`
 		Repository string `json:"repository"`
@@ -38,7 +38,7 @@ func (g *GithubRepositoryGetContent) Run(ctx context.Context, params action.Acti
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if g.repository != "" && g.owner != "" {
@@ -49,7 +49,7 @@ func (g *GithubRepositoryGetContent) Run(ctx context.Context, params action.Acti
 	fileContent, directoryContent, _, err := g.client.Repositories.GetContents(g.context, result.Owner, result.Repository, result.Path, nil)
 	if err != nil {
 		resultString := fmt.Sprintf("Error getting content : %v", err)
-		return action.ActionResult{Result: resultString}, err
+		return types.ActionResult{Result: resultString}, err
 	}
 
 	if len(directoryContent) > 0 {
@@ -57,26 +57,26 @@ func (g *GithubRepositoryGetContent) Run(ctx context.Context, params action.Acti
 		for _, f := range directoryContent {
 			resultString += fmt.Sprintf("File: %s\n", f.GetName())
 		}
-		return action.ActionResult{Result: resultString}, err
+		return types.ActionResult{Result: resultString}, err
 	}
 
 	content, err := fileContent.GetContent()
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
-	return action.ActionResult{Result: fmt.Sprintf("File %s\nContent:%s\n", result.Path, content)}, err
+	return types.ActionResult{Result: fmt.Sprintf("File %s\nContent:%s\n", result.Path, content)}, err
 }
 
-func (g *GithubRepositoryGetContent) Definition() action.ActionDefinition {
+func (g *GithubRepositoryGetContent) Definition() types.ActionDefinition {
 	actionName := "get_github_repository_content"
 	actionDescription := "Get content of a file or directory in a github repository"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: actionDescription,
 			Properties: map[string]jsonschema.Definition{
 				"path": {
@@ -87,8 +87,8 @@ func (g *GithubRepositoryGetContent) Definition() action.ActionDefinition {
 			Required: []string{"path"},
 		}
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: actionDescription,
 		Properties: map[string]jsonschema.Definition{
 			"path": {

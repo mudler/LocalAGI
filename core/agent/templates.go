@@ -5,11 +5,11 @@ import (
 	"html/template"
 	"time"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai"
 )
 
-func renderTemplate(templ string, hud *PromptHUD, actions Actions, reasoning string) (string, error) {
+func renderTemplate(templ string, hud *PromptHUD, actions types.Actions, reasoning string) (string, error) {
 	// prepare the prompt
 	prompt := bytes.NewBuffer([]byte{})
 
@@ -19,14 +19,14 @@ func renderTemplate(templ string, hud *PromptHUD, actions Actions, reasoning str
 	}
 
 	// Get all the actions definitions
-	definitions := []action.ActionDefinition{}
+	definitions := []types.ActionDefinition{}
 	for _, m := range actions {
 		definitions = append(definitions, m.Definition())
 	}
 
 	err = promptTemplate.Execute(prompt, struct {
 		HUD       *PromptHUD
-		Actions   []action.ActionDefinition
+		Actions   []types.ActionDefinition
 		Reasoning string
 		Messages  []openai.ChatCompletionMessage
 		Time      string

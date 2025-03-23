@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -27,7 +27,7 @@ func NewGithubIssueCloser(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubIssuesCloser) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
@@ -37,7 +37,7 @@ func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if g.repository != "" {
@@ -67,24 +67,24 @@ func (g *GithubIssuesCloser) Run(ctx context.Context, params action.ActionParams
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	resultString := fmt.Sprintf("Closed issue %d in repository %s/%s", result.IssueNumber, result.Owner, result.Repository)
 	if err != nil {
 		resultString = fmt.Sprintf("Error closing issue %d in repository %s/%s: %v", result.IssueNumber, result.Owner, result.Repository, err)
 	}
-	return action.ActionResult{Result: resultString}, err
+	return types.ActionResult{Result: resultString}, err
 }
 
-func (g *GithubIssuesCloser) Definition() action.ActionDefinition {
+func (g *GithubIssuesCloser) Definition() types.ActionDefinition {
 	actionName := "close_github_issue"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: "Closes a Github issue.",
 			Properties: map[string]jsonschema.Definition{
 				"issue_number": {
@@ -96,8 +96,8 @@ func (g *GithubIssuesCloser) Definition() action.ActionDefinition {
 		}
 	}
 
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: "Closes a Github issue.",
 		Properties: map[string]jsonschema.Definition{
 			"repository": {

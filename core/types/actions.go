@@ -1,4 +1,4 @@
-package action
+package types
 
 import (
 	"context"
@@ -19,7 +19,7 @@ func (ac *ActionContext) Cancel() {
 	}
 }
 
-func NewContext(ctx context.Context, cancel context.CancelFunc) *ActionContext {
+func NewActionContext(ctx context.Context, cancel context.CancelFunc) *ActionContext {
 	return &ActionContext{
 		Context:    ctx,
 		cancelFunc: cancel,
@@ -29,6 +29,7 @@ func NewContext(ctx context.Context, cancel context.CancelFunc) *ActionContext {
 type ActionParams map[string]interface{}
 
 type ActionResult struct {
+	Job      *Job
 	Result   string
 	Metadata map[string]interface{}
 }
@@ -83,4 +84,45 @@ func (a ActionDefinition) ToFunctionDefinition() openai.FunctionDefinition {
 			Required:   a.Required,
 		},
 	}
+}
+
+// Actions is something the agent can do
+type Action interface {
+	Run(ctx context.Context, action ActionParams) (ActionResult, error)
+	Definition() ActionDefinition
+	Plannable() bool
+}
+
+type Actions []Action
+
+func (a Actions) ToTools() []openai.Tool {
+	tools := []openai.Tool{}
+	for _, action := range a {
+		tools = append(tools, openai.Tool{
+			Type:     openai.ToolTypeFunction,
+			Function: action.Definition().ToFunctionDefinition(),
+		})
+	}
+	return tools
+}
+
+func (a Actions) Find(name string) Action {
+	for _, action := range a {
+		if action.Definition().Name.Is(name) {
+			return action
+		}
+	}
+	return nil
+}
+
+type ActionState struct {
+	ActionCurrentState
+	ActionResult
+}
+
+type ActionCurrentState struct {
+	Job       *Job
+	Action    Action
+	Params    ActionParams
+	Reasoning string
 }

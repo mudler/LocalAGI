@@ -5,6 +5,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 )
 
@@ -24,14 +25,14 @@ func NewDiscord(config map[string]string) *Discord {
 	}
 }
 
-func (d *Discord) AgentResultCallback() func(state agent.ActionState) {
-	return func(state agent.ActionState) {
+func (d *Discord) AgentResultCallback() func(state types.ActionState) {
+	return func(state types.ActionState) {
 		// Send the result to the bot
 	}
 }
 
-func (d *Discord) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
-	return func(state agent.ActionCurrentState) bool {
+func (d *Discord) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
+	return func(state types.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
 	}
@@ -84,7 +85,7 @@ func (d *Discord) messageCreate(a *agent.Agent) func(s *discordgo.Session, m *di
 			content = strings.ReplaceAll(content, "<@"+s.State.User.ID+"> ", "")
 			xlog.Info("Received message", "content", content)
 			job := a.Ask(
-				agent.WithText(
+				types.WithText(
 					content,
 				),
 			)

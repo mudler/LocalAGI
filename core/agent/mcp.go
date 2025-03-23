@@ -7,12 +7,12 @@ import (
 
 	mcp "github.com/metoro-io/mcp-golang"
 	"github.com/metoro-io/mcp-golang/transport/http"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-var _ Action = &mcpAction{}
+var _ types.Action = &mcpAction{}
 
 type MCPServer struct {
 	URL   string `json:"url"`
@@ -30,11 +30,11 @@ func (a *mcpAction) Plannable() bool {
 	return true
 }
 
-func (m *mcpAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (m *mcpAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	resp, err := m.mcpClient.CallTool(ctx, m.toolName, params)
 	if err != nil {
 		xlog.Error("Failed to call tool", "error", err.Error())
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	xlog.Debug("MCP response", "response", resp)
@@ -51,12 +51,12 @@ func (m *mcpAction) Run(ctx context.Context, params action.ActionParams) (action
 		}
 	}
 
-	return action.ActionResult{
+	return types.ActionResult{
 		Result: textResult,
 	}, nil
 }
 
-func (m *mcpAction) Definition() action.ActionDefinition {
+func (m *mcpAction) Definition() types.ActionDefinition {
 	props := map[string]jsonschema.Definition{}
 	dat, err := json.Marshal(m.inputSchema.Properties)
 	if err != nil {
@@ -64,8 +64,8 @@ func (m *mcpAction) Definition() action.ActionDefinition {
 	}
 	json.Unmarshal(dat, &props)
 
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(m.toolName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(m.toolName),
 		Description: m.toolDescription,
 		Required:    m.inputSchema.Required,
 		//Properties:  ,
@@ -84,7 +84,7 @@ func (a *Agent) initMCPActions() error {
 	a.mcpActions = nil
 	var err error
 
-	generatedActions := Actions{}
+	generatedActions := types.Actions{}
 
 	for _, mcpServer := range a.options.mcpServers {
 		transport := http.NewHTTPClientTransport("/mcp")

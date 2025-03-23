@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mudler/LocalAgent/core/agent"
 	. "github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/llm"
 	"github.com/mudler/LocalAgent/pkg/localrag"
 	"github.com/mudler/LocalAgent/pkg/utils"
@@ -26,25 +26,26 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	file                                                                                       string
-	pooldir                                                                                    string
-	pool                                                                                       AgentPoolData
-	agents                                                                                     map[string]*Agent
-	managers                                                                                   map[string]sse.Manager
-	agentStatus                                                                                map[string]*Status
-	apiURL, defaultModel, defaultMultimodalModel, imageModel, localRAGAPI, localRAGKey, apiKey string
-	availableActions                                                                           func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []Action
-	connectors                                                                                 func(*AgentConfig) []Connector
-	promptBlocks                                                                               func(*AgentConfig) []PromptBlock
-	timeout                                                                                    string
-	conversationLogs                                                                           string
+	file                                         string
+	pooldir                                      string
+	pool                                         AgentPoolData
+	agents                                       map[string]*Agent
+	managers                                     map[string]sse.Manager
+	agentStatus                                  map[string]*Status
+	apiURL, defaultModel, defaultMultimodalModel string
+	imageModel, localRAGAPI, localRAGKey, apiKey string
+	availableActions                             func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
+	connectors                                   func(*AgentConfig) []Connector
+	promptBlocks                                 func(*AgentConfig) []PromptBlock
+	timeout                                      string
+	conversationLogs                             string
 }
 
 type Status struct {
-	ActionResults []ActionState
+	ActionResults []types.ActionState
 }
 
-func (s *Status) addResult(result ActionState) {
+func (s *Status) addResult(result types.ActionState) {
 	// If we have more than 10 results, remove the oldest one
 	if len(s.ActionResults) > 10 {
 		s.ActionResults = s.ActionResults[1:]
@@ -53,7 +54,7 @@ func (s *Status) addResult(result ActionState) {
 	s.ActionResults = append(s.ActionResults, result)
 }
 
-func (s *Status) Results() []ActionState {
+func (s *Status) Results() []types.ActionState {
 	return s.ActionResults
 }
 
@@ -73,7 +74,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 func NewAgentPool(
 	defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory string,
 	LocalRAGAPI string,
-	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []agent.Action,
+	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) []PromptBlock,
 	timeout string,
@@ -158,24 +159,24 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 		return err
 	}
 
-	go func(ac AgentConfig, pool *AgentPool) {
+	go func(ac AgentConfig) {
 		// Create the agent avatar
-		if err := a.createAgentAvatar(ac); err != nil {
+		if err := createAgentAvatar(a.apiURL, a.apiKey, a.defaultModel, a.imageModel, a.pooldir, ac); err != nil {
 			xlog.Error("Failed to create agent avatar", "error", err)
 		}
-	}(a.pool[name], a)
+	}(a.pool[name])
 
 	return a.startAgentWithConfig(name, agentConfig)
 }
 
-func (a *AgentPool) createAgentAvatar(agent AgentConfig) error {
-	client := llm.NewClient(a.apiKey, a.apiURL+"/v1", "10m")
+func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agent AgentConfig) error {
+	client := llm.NewClient(APIKey, APIURL+"/v1", "10m")
 
-	if a.imageModel == "" {
+	if imageModel == "" {
 		return fmt.Errorf("image model not set")
 	}
 
-	if a.defaultModel == "" {
+	if model == "" {
 		return fmt.Errorf("default model not set")
 	}
 
@@ -185,9 +186,9 @@ func (a *AgentPool) createAgentAvatar(agent AgentConfig) error {
 
 	err := llm.GenerateTypedJSON(
 		context.Background(),
-		llm.NewClient(a.apiKey, a.apiURL, "10m"),
+		llm.NewClient(APIKey, APIURL, "10m"),
 		"Generate a prompt that I can use to create a random avatar for the bot '"+agent.Name+"', the description of the bot is: "+agent.Description,
-		a.defaultModel,
+		model,
 		jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
@@ -209,7 +210,7 @@ func (a *AgentPool) createAgentAvatar(agent AgentConfig) error {
 
 	req := openai.ImageRequest{
 		Prompt:         results.ImagePrompt,
-		Model:          a.imageModel,
+		Model:          imageModel,
 		Size:           openai.CreateImageSize256x256,
 		ResponseFormat: openai.CreateImageResponseFormatB64JSON,
 	}
@@ -228,10 +229,10 @@ func (a *AgentPool) createAgentAvatar(agent AgentConfig) error {
 
 	imageJson := resp.Data[0].B64JSON
 
-	os.MkdirAll(filepath.Join(a.pooldir, "avatars"), 0755)
+	os.MkdirAll(filepath.Join(avatarDir, "avatars"), 0755)
 
 	// Save the image to the agent directory
-	imagePath := filepath.Join(a.pooldir, "avatars", fmt.Sprintf("%s.png", agent.Name))
+	imagePath := filepath.Join(avatarDir, "avatars", fmt.Sprintf("%s.png", agent.Name))
 	imageData, err := base64.StdEncoding.DecodeString(imageJson)
 	if err != nil {
 		return err
@@ -343,7 +344,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
 		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)),
-		WithAgentReasoningCallback(func(state ActionCurrentState) bool {
+		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",
 				"agent", name,
@@ -367,7 +368,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		}),
 		WithSystemPrompt(config.SystemPrompt),
 		WithMultimodalModel(multimodalModel),
-		WithAgentResultCallback(func(state ActionState) {
+		WithAgentResultCallback(func(state types.ActionState) {
 			a.Lock()
 			if _, ok := a.agentStatus[name]; !ok {
 				a.agentStatus[name] = &Status{}

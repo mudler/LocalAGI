@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -21,7 +22,7 @@ type ReplyResponse struct {
 	Message string `json:"message"`
 }
 
-func (a *ReplyAction) Run(context.Context, ActionParams) (string, error) {
+func (a *ReplyAction) Run(context.Context, types.ActionParams) (string, error) {
 	return "no-op", nil
 }
 
@@ -29,8 +30,8 @@ func (a *ReplyAction) Plannable() bool {
 	return false
 }
 
-func (a *ReplyAction) Definition() ActionDefinition {
-	return ActionDefinition{
+func (a *ReplyAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        ReplyActionName,
 		Description: "Use this tool to reply to the user once we have all the informations we need.",
 		Properties: map[string]jsonschema.Definition{

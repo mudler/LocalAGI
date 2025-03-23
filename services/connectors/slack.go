@@ -14,6 +14,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 
 	"github.com/slack-go/slack/socketmode"
 
@@ -39,14 +40,14 @@ func NewSlack(config map[string]string) *Slack {
 	}
 }
 
-func (t *Slack) AgentResultCallback() func(state agent.ActionState) {
-	return func(state agent.ActionState) {
+func (t *Slack) AgentResultCallback() func(state types.ActionState) {
+	return func(state types.ActionState) {
 		// Send the result to the bot
 	}
 }
 
-func (t *Slack) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
-	return func(state agent.ActionCurrentState) bool {
+func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
+	return func(state types.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
 	}
@@ -71,7 +72,7 @@ func uniqueStringSlice(s []string) []string {
 	return list
 }
 
-func generateAttachmentsFromJobResponse(j *agent.JobResult) (attachments []slack.Attachment) {
+func generateAttachmentsFromJobResponse(j *types.JobResult) (attachments []slack.Attachment) {
 	for _, state := range j.State {
 		// coming from the search action
 		if urls, exists := state.Metadata[actions.MetadataUrls]; exists {
@@ -148,7 +149,7 @@ func (t *Slack) handleChannelMessage(
 			}
 		}
 
-		agentOptions := []agent.JobOption{agent.WithText(message)}
+		agentOptions := []types.JobOption{types.WithText(message)}
 
 		// If the last message has an image, we send it as a multi content message
 		if len(imageBytes.Bytes()) > 0 {
@@ -158,7 +159,7 @@ func (t *Slack) handleChannelMessage(
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error encoding image to base64: %v", err))
 			} else {
-				agentOptions = append(agentOptions, agent.WithImage(fmt.Sprintf("data:%s;base64,%s", mimeType, imgBase64)))
+				agentOptions = append(agentOptions, types.WithImage(fmt.Sprintf("data:%s;base64,%s", mimeType, imgBase64)))
 			}
 		}
 
@@ -350,8 +351,8 @@ func (t *Slack) handleMention(
 		}
 
 		res := a.Ask(
-			//	agent.WithText(message),
-			agent.WithConversationHistory(threadMessages),
+			//	types.WithText(message),
+			types.WithConversationHistory(threadMessages),
 		)
 
 		res.Response = githubmarkdownconvertergo.Slack(res.Response)

@@ -9,14 +9,13 @@ import (
 	"strings"
 	"time"
 
+	coreTypes "github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/llm"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services"
 	"github.com/mudler/LocalAgent/webui/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 
-	"github.com/mudler/LocalAgent/core/action"
-	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
 	"github.com/mudler/LocalAgent/core/state"
 
@@ -72,7 +71,7 @@ func (a *App) Notify(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		a := pool.GetAgent(c.Params("name"))
 		a.Ask(
-			agent.WithText(query),
+			coreTypes.WithText(query),
 		)
 		_, _ = c.Write([]byte("Message sent"))
 
@@ -275,7 +274,7 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 				return
 			}
 			res := a.Ask(
-				agent.WithText(query),
+				coreTypes.WithText(query),
 			)
 			if res.Error != nil {
 				xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
@@ -307,8 +306,8 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
-			Config map[string]string   `json:"config"`
-			Params action.ActionParams `json:"params"`
+			Config map[string]string      `json:"config"`
+			Params coreTypes.ActionParams `json:"params"`
 		}{}
 
 		if err := c.BodyParser(&payload); err != nil {
@@ -365,7 +364,7 @@ func (a *App) Responses(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		}
 
 		res := a.Ask(
-			agent.WithConversationHistory(messages),
+			coreTypes.WithConversationHistory(messages),
 		)
 		if res.Error != nil {
 			xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)

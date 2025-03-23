@@ -7,9 +7,9 @@ import (
 
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
-	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/services/actions"
 )
 
@@ -60,9 +60,9 @@ var AvailableActions = []string{
 	ActionShellcommand,
 }
 
-func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []agent.Action {
-	return func(ctx context.Context, pool *state.AgentPool) []agent.Action {
-		allActions := []agent.Action{}
+func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+	return func(ctx context.Context, pool *state.AgentPool) []types.Action {
+		allActions := []types.Action{}
 
 		for _, a := range a.Actions {
 			var config map[string]string
@@ -82,8 +82,8 @@ func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPo
 	}
 }
 
-func Action(name string, config map[string]string, pool *state.AgentPool) (agent.Action, error) {
-	var a agent.Action
+func Action(name string, config map[string]string, pool *state.AgentPool) (types.Action, error) {
+	var a types.Action
 	var err error
 
 	switch name {

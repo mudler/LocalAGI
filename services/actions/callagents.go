@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/action"
-	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -21,7 +20,7 @@ type CallAgentAction struct {
 	pool *state.AgentPool
 }
 
-func (a *CallAgentAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *CallAgentAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		AgentName string `json:"agent_name"`
 		Message   string `json:"message"`
@@ -30,16 +29,16 @@ func (a *CallAgentAction) Run(ctx context.Context, params action.ActionParams) (
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	ag := a.pool.GetAgent(result.AgentName)
 	if ag == nil {
-		return action.ActionResult{}, fmt.Errorf("agent '%s' not found", result.AgentName)
+		return types.ActionResult{}, fmt.Errorf("agent '%s' not found", result.AgentName)
 	}
 
 	resp := ag.Ask(
-		agent.WithConversationHistory(
+		types.WithConversationHistory(
 			[]openai.ChatCompletionMessage{
 				{
 					Role:    "user",
@@ -49,13 +48,13 @@ func (a *CallAgentAction) Run(ctx context.Context, params action.ActionParams) (
 		),
 	)
 	if resp.Error != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
-	return action.ActionResult{Result: resp.Response}, nil
+	return types.ActionResult{Result: resp.Response}, nil
 }
 
-func (a *CallAgentAction) Definition() action.ActionDefinition {
+func (a *CallAgentAction) Definition() types.ActionDefinition {
 	allAgents := a.pool.AllAgents()
 
 	description := "Use this tool to call another agent. Available agents and their roles are:"
@@ -68,7 +67,7 @@ func (a *CallAgentAction) Definition() action.ActionDefinition {
 		description += fmt.Sprintf("\n- %s: %s", agent, agentConfig.Description)
 	}
 
-	return action.ActionDefinition{
+	return types.ActionDefinition{
 		Name:        "call_agent",
 		Description: description,
 		Properties: map[string]jsonschema.Definition{

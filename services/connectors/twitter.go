@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/connectors/twitter"
 	"github.com/sashabaranov/go-openai"
@@ -19,14 +20,14 @@ type Twitter struct {
 	noCharacterLimit bool
 }
 
-func (t *Twitter) AgentResultCallback() func(state agent.ActionState) {
-	return func(state agent.ActionState) {
+func (t *Twitter) AgentResultCallback() func(state types.ActionState) {
+	return func(state types.ActionState) {
 
 	}
 }
 
-func (t *Twitter) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
-	return func(state agent.ActionCurrentState) bool {
+func (t *Twitter) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
+	return func(state types.ActionCurrentState) bool {
 
 		return true
 	}
@@ -98,7 +99,7 @@ func (t *Twitter) run(a *agent.Agent) error {
 	}
 
 	res := a.Ask(
-		agent.WithConversationHistory(
+		types.WithConversationHistory(
 			[]openai.ChatCompletionMessage{
 				{
 					Role:    "system",

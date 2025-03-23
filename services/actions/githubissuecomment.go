@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -28,7 +28,7 @@ func NewGithubIssueCommenter(ctx context.Context, config map[string]string) *Git
 	}
 }
 
-func (g *GithubIssuesCommenter) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubIssuesCommenter) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
@@ -37,7 +37,7 @@ func (g *GithubIssuesCommenter) Run(ctx context.Context, params action.ActionPar
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if g.repository != "" && g.owner != "" {
@@ -53,18 +53,18 @@ func (g *GithubIssuesCommenter) Run(ctx context.Context, params action.ActionPar
 	if err != nil {
 		resultString = fmt.Sprintf("Error adding comment to issue %d in repository %s/%s: %v", result.IssueNumber, result.Owner, result.Repository, err)
 	}
-	return action.ActionResult{Result: resultString}, err
+	return types.ActionResult{Result: resultString}, err
 }
 
-func (g *GithubIssuesCommenter) Definition() action.ActionDefinition {
+func (g *GithubIssuesCommenter) Definition() types.ActionDefinition {
 	actionName := "add_comment_to_github_issue"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	description := "Add a comment to a Github issue to a repository."
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: description,
 			Properties: map[string]jsonschema.Definition{
 				"issue_number": {
@@ -79,8 +79,8 @@ func (g *GithubIssuesCommenter) Definition() action.ActionDefinition {
 			Required: []string{"issue_number", "comment"},
 		}
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: description,
 		Properties: map[string]jsonschema.Definition{
 			"issue_number": {

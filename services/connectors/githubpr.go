@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
@@ -50,14 +51,14 @@ func NewGithubPRWatcher(config map[string]string) *GithubPRs {
 	}
 }
 
-func (g *GithubPRs) AgentResultCallback() func(state agent.ActionState) {
-	return func(state agent.ActionState) {
+func (g *GithubPRs) AgentResultCallback() func(state types.ActionState) {
+	return func(state types.ActionState) {
 		// Send the result to the bot
 	}
 }
 
-func (g *GithubPRs) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
-	return func(state agent.ActionCurrentState) bool {
+func (g *GithubPRs) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
+	return func(state types.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
 	}
@@ -175,7 +176,7 @@ func (g *GithubPRs) prService() {
 		}
 
 		res := g.agent.Ask(
-			agent.WithConversationHistory(messages),
+			types.WithConversationHistory(messages),
 		)
 		if res.Error != nil {
 			xlog.Error("Error asking", "error", res.Error, "agent", g.agent.Character.Name)

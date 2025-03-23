@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/tools/scraper"
 )
@@ -16,7 +16,7 @@ func NewScraper(config map[string]string) *ScraperAction {
 
 type ScraperAction struct{}
 
-func (a *ScraperAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *ScraperAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		URL string `json:"url"`
 	}{}
@@ -24,25 +24,25 @@ func (a *ScraperAction) Run(ctx context.Context, params action.ActionParams) (ac
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 	scraper, err := scraper.New()
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 	res, err := scraper.Call(ctx, result.URL)
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
-	return action.ActionResult{Result: res}, nil
+	return types.ActionResult{Result: res}, nil
 }
 
-func (a *ScraperAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *ScraperAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "scrape",
 		Description: "Scrapes a full website content and returns the entire site data.",
 		Properties: map[string]jsonschema.Definition{

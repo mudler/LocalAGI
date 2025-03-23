@@ -9,6 +9,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 )
 
 type Telegram struct {
@@ -20,16 +21,16 @@ type Telegram struct {
 
 // Send any text message to the bot after the bot has been started
 
-func (t *Telegram) AgentResultCallback() func(state agent.ActionState) {
-	return func(state agent.ActionState) {
+func (t *Telegram) AgentResultCallback() func(state types.ActionState) {
+	return func(state types.ActionState) {
 		t.bot.SetMyDescription(t.agent.Context(), &bot.SetMyDescriptionParams{
 			Description: state.Reasoning,
 		})
 	}
 }
 
-func (t *Telegram) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
-	return func(state agent.ActionCurrentState) bool {
+func (t *Telegram) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
+	return func(state types.ActionCurrentState) bool {
 		t.bot.SetMyDescription(t.agent.Context(), &bot.SetMyDescriptionParams{
 			Description: state.Reasoning,
 		})
@@ -45,7 +46,7 @@ func (t *Telegram) Start(a *agent.Agent) {
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {
 			go func() {
 				res := a.Ask(
-					agent.WithText(
+					types.WithText(
 						update.Message.Text,
 					),
 				)

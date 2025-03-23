@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -28,7 +28,7 @@ func NewGithubIssueReader(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesReader) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubIssuesReader) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
@@ -37,7 +37,7 @@ func (g *GithubIssuesReader) Run(ctx context.Context, params action.ActionParams
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if g.repository != "" && g.owner != "" {
@@ -47,26 +47,26 @@ func (g *GithubIssuesReader) Run(ctx context.Context, params action.ActionParams
 
 	issue, _, err := g.client.Issues.Get(g.context, result.Owner, result.Repository, result.IssueNumber)
 	if err == nil && issue != nil {
-		return action.ActionResult{
+		return types.ActionResult{
 			Result: fmt.Sprintf(
 				"Issue %d Repository: %s\nTitle: %s\nBody: %s",
 				*issue.Number, *issue.Repository.FullName, *issue.Title, *issue.Body)}, nil
 	}
 	if err != nil {
-		return action.ActionResult{Result: fmt.Sprintf("Error fetching issue: %s", err.Error())}, err
+		return types.ActionResult{Result: fmt.Sprintf("Error fetching issue: %s", err.Error())}, err
 	}
-	return action.ActionResult{Result: fmt.Sprintf("No issue found")}, err
+	return types.ActionResult{Result: fmt.Sprintf("No issue found")}, err
 }
 
-func (g *GithubIssuesReader) Definition() action.ActionDefinition {
+func (g *GithubIssuesReader) Definition() types.ActionDefinition {
 	actionName := "read_github_issue"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	description := "Read a Github issue."
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: description,
 			Properties: map[string]jsonschema.Definition{
 				"issue_number": {
@@ -77,8 +77,8 @@ func (g *GithubIssuesReader) Definition() action.ActionDefinition {
 			Required: []string{"issue_number"},
 		}
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: description,
 		Properties: map[string]jsonschema.Definition{
 			"issue_number": {

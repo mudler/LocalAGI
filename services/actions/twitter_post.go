@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/services/connectors/twitter"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -21,7 +21,7 @@ type PostTweetAction struct {
 	noCharacterLimit bool
 }
 
-func (a *PostTweetAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *PostTweetAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Text string `json:"text"`
 	}{}
@@ -29,24 +29,24 @@ func (a *PostTweetAction) Run(ctx context.Context, params action.ActionParams) (
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if !a.noCharacterLimit && len(result.Text) > 280 {
-		return action.ActionResult{}, fmt.Errorf("tweet is too long, max 280 characters")
+		return types.ActionResult{}, fmt.Errorf("tweet is too long, max 280 characters")
 	}
 
 	client := twitter.NewTwitterClient(a.token)
 
 	if err := client.Post(result.Text); err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
-	return action.ActionResult{Result: fmt.Sprintf("twitter post created")}, nil
+	return types.ActionResult{Result: fmt.Sprintf("twitter post created")}, nil
 }
 
-func (a *PostTweetAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *PostTweetAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "post_tweet",
 		Description: "Post a tweet",
 		Properties: map[string]jsonschema.Definition{

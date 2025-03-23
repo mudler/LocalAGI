@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -28,7 +28,7 @@ func NewGithubIssueOpener(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubIssuesOpener) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Title      string `json:"title"`
 		Body       string `json:"text"`
@@ -39,7 +39,7 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if g.repository != "" && g.owner != "" {
@@ -60,17 +60,17 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params action.ActionParams
 		resultString = fmt.Sprintf("Created issue %d in repository %s/%s: %s", createdIssue.GetNumber(), result.Owner, result.Repository, createdIssue.GetURL())
 	}
 
-	return action.ActionResult{Result: resultString}, err
+	return types.ActionResult{Result: resultString}, err
 }
 
-func (g *GithubIssuesOpener) Definition() action.ActionDefinition {
+func (g *GithubIssuesOpener) Definition() types.ActionDefinition {
 	actionName := "create_github_issue"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: "Create a new issue on a GitHub repository.",
 			Properties: map[string]jsonschema.Definition{
 				"text": {
@@ -85,8 +85,8 @@ func (g *GithubIssuesOpener) Definition() action.ActionDefinition {
 			Required: []string{"title", "text"},
 		}
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: "Create a new issue on a GitHub repository.",
 		Properties: map[string]jsonschema.Definition{
 			"text": {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -24,7 +24,7 @@ func NewCounter(config map[string]string) *CounterAction {
 }
 
 // Run executes the counter action
-func (a *CounterAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *CounterAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	// Parse parameters
 	request := struct {
 		Name       string `json:"name"`
@@ -32,11 +32,11 @@ func (a *CounterAction) Run(ctx context.Context, params action.ActionParams) (ac
 	}{}
 
 	if err := params.Unmarshal(&request); err != nil {
-		return action.ActionResult{}, fmt.Errorf("invalid parameters: %w", err)
+		return types.ActionResult{}, fmt.Errorf("invalid parameters: %w", err)
 	}
 
 	if request.Name == "" {
-		return action.ActionResult{}, fmt.Errorf("counter name cannot be empty")
+		return types.ActionResult{}, fmt.Errorf("counter name cannot be empty")
 	}
 
 	a.mutex.Lock()
@@ -63,7 +63,7 @@ func (a *CounterAction) Run(ctx context.Context, params action.ActionParams) (ac
 		message = fmt.Sprintf("Current value of counter '%s' is %d", request.Name, newValue)
 	}
 
-	return action.ActionResult{
+	return types.ActionResult{
 		Result: message,
 		Metadata: map[string]any{
 			"counter_name":  request.Name,
@@ -75,8 +75,8 @@ func (a *CounterAction) Run(ctx context.Context, params action.ActionParams) (ac
 }
 
 // Definition returns the action definition
-func (a *CounterAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *CounterAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "counter",
 		Description: "Create, update, or query named counters. Specify a name and an adjustment value (positive to increase, negative to decrease, zero to query).",
 		Properties: map[string]jsonschema.Definition{

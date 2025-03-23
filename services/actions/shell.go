@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"golang.org/x/crypto/ssh"
 )
@@ -27,7 +27,7 @@ type ShellAction struct {
 	customDescription string
 }
 
-func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *ShellAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Command string `json:"command"`
 		Host    string `json:"host"`
@@ -37,7 +37,7 @@ func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (acti
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if a.host != "" && a.user != "" {
@@ -47,13 +47,13 @@ func (a *ShellAction) Run(ctx context.Context, params action.ActionParams) (acti
 
 	output, err := sshCommand(a.privateKey, result.Command, result.User, result.Host)
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
-	return action.ActionResult{Result: output}, nil
+	return types.ActionResult{Result: output}, nil
 }
 
-func (a *ShellAction) Definition() action.ActionDefinition {
+func (a *ShellAction) Definition() types.ActionDefinition {
 	name := "shell"
 	description := "Run a shell command on a remote server."
 	if a.customName != "" {
@@ -63,8 +63,8 @@ func (a *ShellAction) Definition() action.ActionDefinition {
 		description = a.customDescription
 	}
 	if a.host != "" && a.user != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(name),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(name),
 			Description: description,
 			Properties: map[string]jsonschema.Definition{
 				"command": {
@@ -75,8 +75,8 @@ func (a *ShellAction) Definition() action.ActionDefinition {
 			Required: []string{"command"},
 		}
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(name),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(name),
 		Description: description,
 		Properties: map[string]jsonschema.Definition{
 			"command": {

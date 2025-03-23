@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -33,16 +34,16 @@ type AgentInternalState struct {
 	Goal        string   `json:"goal"`
 }
 
-func (a *StateAction) Run(context.Context, ActionParams) (ActionResult, error) {
-	return ActionResult{Result: "internal state has been updated"}, nil
+func (a *StateAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+	return types.ActionResult{Result: "internal state has been updated"}, nil
 }
 
 func (a *StateAction) Plannable() bool {
 	return false
 }
 
-func (a *StateAction) Definition() ActionDefinition {
-	return ActionDefinition{
+func (a *StateAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        StateActionName,
 		Description: "update the agent state (short memory) with the current state of the conversation.",
 		Properties: map[string]jsonschema.Definition{

@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -18,16 +19,16 @@ type ConversationActionResponse struct {
 	Message string `json:"message"`
 }
 
-func (a *ConversationAction) Run(context.Context, ActionParams) (ActionResult, error) {
-	return ActionResult{}, nil
+func (a *ConversationAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+	return types.ActionResult{}, nil
 }
 
 func (a *ConversationAction) Plannable() bool {
 	return false
 }
 
-func (a *ConversationAction) Definition() ActionDefinition {
-	return ActionDefinition{
+func (a *ConversationAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        ConversationActionName,
 		Description: "Use this tool to initiate a new conversation or to notify something.",
 		Properties: map[string]jsonschema.Definition{

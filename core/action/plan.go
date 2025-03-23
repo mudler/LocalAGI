@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -29,16 +30,16 @@ type PlanSubtask struct {
 	Reasoning string `json:"reasoning"`
 }
 
-func (a *PlanAction) Run(context.Context, ActionParams) (ActionResult, error) {
-	return ActionResult{}, nil
+func (a *PlanAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+	return types.ActionResult{}, nil
 }
 
 func (a *PlanAction) Plannable() bool {
 	return false
 }
 
-func (a *PlanAction) Definition() ActionDefinition {
-	return ActionDefinition{
+func (a *PlanAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        PlanActionName,
 		Description: "The assistant for solving complex tasks that involves calling more functions in sequence, replies with the action.",
 		Properties: map[string]jsonschema.Definition{

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -26,7 +26,7 @@ func NewGithubRepositoryREADME(ctx context.Context, config map[string]string) *G
 	}
 }
 
-func (g *GithubRepositoryREADME) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubRepositoryREADME) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`
@@ -35,30 +35,30 @@ func (g *GithubRepositoryREADME) Run(ctx context.Context, params action.ActionPa
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 	fileContent, _, err := g.client.Repositories.GetReadme(g.context, result.Owner, result.Repository, &github.RepositoryContentGetOptions{})
 	if err != nil {
 		resultString := fmt.Sprintf("Error getting content : %v", err)
-		return action.ActionResult{Result: resultString}, err
+		return types.ActionResult{Result: resultString}, err
 	}
 
 	content, err := fileContent.GetContent()
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
-	return action.ActionResult{Result: content}, err
+	return types.ActionResult{Result: content}, err
 }
 
-func (g *GithubRepositoryREADME) Definition() action.ActionDefinition {
+func (g *GithubRepositoryREADME) Definition() types.ActionDefinition {
 	actionName := "github_readme"
 	actionDescription := "Get the README file of a GitHub repository to have a basic understanding of the project."
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: actionDescription,
 		Properties: map[string]jsonschema.Definition{
 			"repository": {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	. "github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 
 	. "github.com/mudler/LocalAgent/services/actions"
 	. "github.com/onsi/ginkgo/v2"
@@ -15,7 +15,7 @@ var _ = Describe("GenImageAction", func() {
 	var (
 		ctx    context.Context
 		action *GenImageAction
-		params ActionParams
+		params types.ActionParams
 		config map[string]string
 	)
 
@@ -37,7 +37,7 @@ var _ = Describe("GenImageAction", func() {
 
 	Describe("Run", func() {
 		It("should generate an image with valid prompt and size", func() {
-			params = ActionParams{
+			params = types.ActionParams{
 				"prompt": "test prompt",
 				"size":   "256x256",
 			}
@@ -48,7 +48,7 @@ var _ = Describe("GenImageAction", func() {
 		})
 
 		It("should return an error if the prompt is not provided", func() {
-			params = ActionParams{
+			params = types.ActionParams{
 				"size": "256x256",
 			}
 

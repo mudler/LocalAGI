@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/tools/duckduckgo"
 	"mvdan.cc/xurls/v2"
@@ -34,7 +34,7 @@ func NewSearch(config map[string]string) *SearchAction {
 
 type SearchAction struct{ results int }
 
-func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *SearchAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Query string `json:"query"`
 	}{}
@@ -42,19 +42,19 @@ func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (act
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 	ddg, err := duckduckgo.New(a.results, "LocalAgent")
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 	res, err := ddg.Call(ctx, result.Query)
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	rxStrict := xurls.Strict()
@@ -69,11 +69,11 @@ func (a *SearchAction) Run(ctx context.Context, params action.ActionParams) (act
 		results = append(results, u)
 	}
 
-	return action.ActionResult{Result: res, Metadata: map[string]interface{}{MetadataUrls: results}}, nil
+	return types.ActionResult{Result: res, Metadata: map[string]interface{}{MetadataUrls: results}}, nil
 }
 
-func (a *SearchAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *SearchAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "search_internet",
 		Description: "Search the internet for something.",
 		Properties: map[string]jsonschema.Definition{

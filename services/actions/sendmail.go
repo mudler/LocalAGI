@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/smtp"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -27,7 +27,7 @@ type SendMailAction struct {
 	smtpPort string
 }
 
-func (a *SendMailAction) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (a *SendMailAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Message string `json:"message"`
 		To      string `json:"to"`
@@ -37,7 +37,7 @@ func (a *SendMailAction) Run(ctx context.Context, params action.ActionParams) (a
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	// Authentication.
@@ -50,13 +50,13 @@ func (a *SendMailAction) Run(ctx context.Context, params action.ActionParams) (a
 			result.To,
 		}, []byte(result.Message))
 	if err != nil {
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
-	return action.ActionResult{Result: fmt.Sprintf("Email sent to %s", result.To)}, nil
+	return types.ActionResult{Result: fmt.Sprintf("Email sent to %s", result.To)}, nil
 }
 
-func (a *SendMailAction) Definition() action.ActionDefinition {
-	return action.ActionDefinition{
+func (a *SendMailAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "send_email",
 		Description: "Send an email.",
 		Properties: map[string]jsonschema.Definition{

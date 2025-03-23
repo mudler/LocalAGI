@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	"github.com/mudler/LocalAgent/core/types"
 )
 
 type Option func(*options) error
@@ -20,7 +22,7 @@ type options struct {
 	character                                                                                    Character
 	randomIdentityGuidance                                                                       string
 	randomIdentity                                                                               bool
-	userActions                                                                                  Actions
+	userActions                                                                                  types.Actions
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
 
 	canStopItself         bool
@@ -41,8 +43,8 @@ type options struct {
 	systemPrompt string
 
 	// callbacks
-	reasoningCallback func(ActionCurrentState) bool
-	resultCallback    func(ActionState)
+	reasoningCallback func(types.ActionCurrentState) bool
+	resultCallback    func(types.ActionState)
 
 	conversationsPath string
 
@@ -262,14 +264,14 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-func WithAgentReasoningCallback(cb func(ActionCurrentState) bool) Option {
+func WithAgentReasoningCallback(cb func(types.ActionCurrentState) bool) Option {
 	return func(o *options) error {
 		o.reasoningCallback = cb
 		return nil
 	}
 }
 
-func WithAgentResultCallback(cb func(ActionState)) Option {
+func WithAgentResultCallback(cb func(types.ActionState)) Option {
 	return func(o *options) error {
 		o.resultCallback = cb
 		return nil
@@ -310,7 +312,7 @@ func WithRandomIdentity(guidance ...string) Option {
 	}
 }
 
-func WithActions(actions ...Action) Option {
+func WithActions(actions ...types.Action) Option {
 	return func(o *options) error {
 		o.userActions = actions
 		return nil

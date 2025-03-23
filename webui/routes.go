@@ -12,9 +12,9 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/keyauth"
-	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/sse"
 	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services"
 )
@@ -95,7 +95,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Get("/status/:name", func(c *fiber.Ctx) error {
 		history := pool.GetStatusHistory(c.Params("name"))
 		if history == nil {
-			history = &state.Status{ActionResults: []agent.ActionState{}}
+			history = &state.Status{ActionResults: []types.ActionState{}}
 		}
 		// reverse history
 

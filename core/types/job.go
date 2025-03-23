@@ -1,8 +1,10 @@
-package agent
+package types
 
 import (
+	"log"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -16,7 +18,8 @@ type Job struct {
 	Result              *JobResult
 	reasoningCallback   func(ActionCurrentState) bool
 	resultCallback      func(ActionState)
-	conversationHistory []openai.ChatCompletionMessage
+	ConversationHistory []openai.ChatCompletionMessage
+	UUID                string
 }
 
 // JobResult is the result of a job
@@ -25,17 +28,17 @@ type JobResult struct {
 	// The result of a job
 	State        []ActionState
 	Conversation []openai.ChatCompletionMessage
-	
-	Response     string
-	Error        error
-	ready        chan bool
+
+	Response string
+	Error    error
+	ready    chan bool
 }
 
 type JobOption func(*Job)
 
 func WithConversationHistory(history []openai.ChatCompletionMessage) JobOption {
 	return func(j *Job) {
-		j.conversationHistory = history
+		j.ConversationHistory = history
 	}
 }
 
@@ -85,6 +88,19 @@ func WithText(text string) JobOption {
 	}
 }
 
+func newUUID() string {
+	// Generate UUID with google/uuid
+	// https://pkg.go.dev/github.com/google/uuid
+
+	// Generate a Version 4 UUID
+	u, err := uuid.NewRandom()
+	if err != nil {
+		log.Fatalf("failed to generate UUID: %v", err)
+	}
+
+	return u.String()
+}
+
 // NewJob creates a new job
 // It is a request to the agent to do something
 // It has a JobResult to get the result asynchronously
@@ -92,42 +108,17 @@ func WithText(text string) JobOption {
 func NewJob(opts ...JobOption) *Job {
 	j := &Job{
 		Result: NewJobResult(),
+		UUID:   newUUID(),
 	}
 	for _, o := range opts {
 		o(j)
 	}
+
 	return j
 }
 
-// SetResult sets the result of a job
-func (j *JobResult) SetResult(text ActionState) {
-	j.Lock()
-	defer j.Unlock()
-
-	j.State = append(j.State, text)
-}
-
-// SetResult sets the result of a job
-func (j *JobResult) Finish(e error) {
-	j.Lock()
-	defer j.Unlock()
-
-	j.Error = e
-	close(j.ready)
-}
-
-// SetResult sets the result of a job
-func (j *JobResult) SetResponse(response string) {
-	j.Lock()
-	defer j.Unlock()
-
-	j.Response = response
-}
-
-// WaitResult waits for the result of a job
-func (j *JobResult) WaitResult() *JobResult {
-	<-j.ready
-	j.Lock()
-	defer j.Unlock()
-	return j
+func WithUUID(uuid string) JobOption {
+	return func(j *Job) {
+		j.UUID = uuid
+	}
 }

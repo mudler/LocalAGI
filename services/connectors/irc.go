@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
 	irc "github.com/thoj/go-ircevent"
@@ -30,14 +31,14 @@ func NewIRC(config map[string]string) *IRC {
 	}
 }
 
-func (i *IRC) AgentResultCallback() func(state agent.ActionState) {
-	return func(state agent.ActionState) {
+func (i *IRC) AgentResultCallback() func(state types.ActionState) {
+	return func(state types.ActionState) {
 		// Send the result to the bot
 	}
 }
 
-func (i *IRC) AgentReasoningCallback() func(state agent.ActionCurrentState) bool {
-	return func(state agent.ActionCurrentState) bool {
+func (i *IRC) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
+	return func(state types.ActionCurrentState) bool {
 		// Send the reasoning to the bot
 		return true
 	}
@@ -105,7 +106,7 @@ func (i *IRC) Start(a *agent.Agent) {
 
 		go func() {
 			res := a.Ask(
-				agent.WithText(cleanedMessage),
+				types.WithText(cleanedMessage),
 			)
 
 			xlog.Info("Sending message", "message", res.Response, "channel", channel)

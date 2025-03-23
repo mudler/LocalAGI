@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -31,7 +31,7 @@ func NewGithubRepositoryCreateOrUpdateContent(ctx context.Context, config map[st
 	}
 }
 
-func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Path          string `json:"path"`
 		Repository    string `json:"repository"`
@@ -44,7 +44,7 @@ func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params 
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if result.Branch == "" {
@@ -82,13 +82,13 @@ func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params 
 	})
 	if err != nil {
 		resultString := fmt.Sprintf("Error creating content : %v", err)
-		return action.ActionResult{Result: resultString}, err
+		return types.ActionResult{Result: resultString}, err
 	}
 
-	return action.ActionResult{Result: fmt.Sprintf("File created/updated: %s\n", fileContent.GetURL())}, err
+	return types.ActionResult{Result: fmt.Sprintf("File created/updated: %s\n", fileContent.GetURL())}, err
 }
 
-func (g *GithubRepositoryCreateOrUpdateContent) Definition() action.ActionDefinition {
+func (g *GithubRepositoryCreateOrUpdateContent) Definition() types.ActionDefinition {
 	actionName := "github_repository_create_or_update_content"
 	actionDescription := "Create or update a file in a GitHub repository"
 	if g.customActionName != "" {
@@ -117,8 +117,8 @@ func (g *GithubRepositoryCreateOrUpdateContent) Definition() action.ActionDefini
 	}
 
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: actionDescription,
 			Properties:  properties,
 			Required:    []string{"path", "content"},
@@ -135,8 +135,8 @@ func (g *GithubRepositoryCreateOrUpdateContent) Definition() action.ActionDefini
 		Description: "The repository to search in",
 	}
 
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: actionDescription,
 		Properties:  properties,
 		Required:    []string{"path", "repository", "owner", "content"},

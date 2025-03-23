@@ -10,6 +10,7 @@ import (
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/llm"
 	"github.com/sashabaranov/go-openai"
 )
@@ -25,21 +26,21 @@ type Agent struct {
 	options       *options
 	Character     Character
 	client        *openai.Client
-	jobQueue      chan *Job
-	actionContext *action.ActionContext
-	context       *action.ActionContext
+	jobQueue      chan *types.Job
+	actionContext *types.ActionContext
+	context       *types.ActionContext
 
 	currentReasoning         string
 	currentState             *action.AgentInternalState
-	nextAction               Action
-	nextActionParams         *action.ActionParams
+	nextAction               types.Action
+	nextActionParams         *types.ActionParams
 	currentConversation      Messages
 	selfEvaluationInProgress bool
 	pause                    bool
 
 	newConversations chan openai.ChatCompletionMessage
 
-	mcpActions Actions
+	mcpActions types.Actions
 }
 
 type RAGDB interface {
@@ -64,12 +65,12 @@ func New(opts ...Option) (*Agent, error) {
 
 	ctx, cancel := context.WithCancel(c)
 	a := &Agent{
-		jobQueue:     make(chan *Job),
+		jobQueue:     make(chan *types.Job),
 		options:      options,
 		client:       client,
 		Character:    options.character,
 		currentState: &action.AgentInternalState{},
-		context:      action.NewContext(ctx, cancel),
+		context:      types.NewActionContext(ctx, cancel),
 	}
 
 	if a.options.statefile != "" {
@@ -130,18 +131,18 @@ func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
 
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
-func (a *Agent) Ask(opts ...JobOption) *JobResult {
+func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 	xlog.Debug("Agent Ask()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
 	defer func() {
 		xlog.Debug("Agent has finished being asked", "agent", a.Character.Name)
 	}()
 
 	//a.StopAction()
-	j := NewJob(
+	j := types.NewJob(
 		append(
 			opts,
-			WithReasoningCallback(a.options.reasoningCallback),
-			WithResultCallback(a.options.resultCallback),
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
 		)...,
 	)
 	a.jobQueue <- j
@@ -224,12 +225,12 @@ func (a *Agent) Memory() RAGDB {
 	return a.options.ragdb
 }
 
-func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (result action.ActionResult, err error) {
+func (a *Agent) runAction(chosenAction types.Action, params types.ActionParams) (result types.ActionResult, err error) {
 	for _, act := range a.availableActions() {
 		if act.Definition().Name == chosenAction.Definition().Name {
 			res, err := act.Run(a.actionContext, params)
 			if err != nil {
-				return action.ActionResult{}, fmt.Errorf("error running action: %w", err)
+				return types.ActionResult{}, fmt.Errorf("error running action: %w", err)
 			}
 
 			result = res
@@ -244,7 +245,7 @@ func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (resu
 
 		err = params.Unmarshal(&state)
 		if err != nil {
-			return action.ActionResult{}, fmt.Errorf("error unmarshalling state of the agent: %w", err)
+			return types.ActionResult{}, fmt.Errorf("error unmarshalling state of the agent: %w", err)
 		}
 		// update the current state with the one we just got from the action
 		a.currentState = &state
@@ -252,7 +253,7 @@ func (a *Agent) runAction(chosenAction Action, params action.ActionParams) (resu
 		// update the state file
 		if a.options.statefile != "" {
 			if err := a.SaveState(a.options.statefile); err != nil {
-				return action.ActionResult{}, err
+				return types.ActionResult{}, err
 			}
 		}
 	}
@@ -348,7 +349,7 @@ func extractImageContent(message openai.ChatCompletionMessage) (imageURL, text s
 	return
 }
 
-func (a *Agent) processUserInputs(job *Job, role string) {
+func (a *Agent) processUserInputs(job *types.Job, role string) {
 
 	noNewMessage := job.Text == "" && job.Image == ""
 	onlyText := job.Text != "" && job.Image == ""
@@ -434,7 +435,7 @@ func (a *Agent) processUserInputs(job *Job, role string) {
 	}
 }
 
-func (a *Agent) consumeJob(job *Job, role string) {
+func (a *Agent) consumeJob(job *types.Job, role string) {
 	a.Lock()
 	paused := a.pause
 	a.Unlock()
@@ -451,10 +452,10 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	a.Lock()
 	// Set the action context
 	ctx, cancel := context.WithCancel(context.Background())
-	a.actionContext = action.NewContext(ctx, cancel)
+	a.actionContext = types.NewActionContext(ctx, cancel)
 	a.selfEvaluationInProgress = selfEvaluation
-	if len(job.conversationHistory) != 0 {
-		a.currentConversation = job.conversationHistory
+	if len(job.ConversationHistory) != 0 {
+		a.currentConversation = job.ConversationHistory
 	}
 	a.Unlock()
 
@@ -493,9 +494,9 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	}
 
 	// choose an action first
-	var chosenAction Action
+	var chosenAction types.Action
 	var reasoning string
-	var actionParams action.ActionParams
+	var actionParams types.ActionParams
 
 	if a.nextAction != nil {
 		// if we are being re-evaluated, we already have the action
@@ -576,8 +577,19 @@ func (a *Agent) consumeJob(job *Job, role string) {
 		return
 	}
 
-	if !job.Callback(ActionCurrentState{chosenAction, actionParams, reasoning}) {
-		job.Result.SetResult(ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, action.ActionResult{Result: "stopped by callback"}})
+	if !job.Callback(types.ActionCurrentState{
+		Job:       job,
+		Action:    chosenAction,
+		Params:    actionParams,
+		Reasoning: reasoning}) {
+		job.Result.SetResult(types.ActionState{
+			ActionCurrentState: types.ActionCurrentState{
+				Job:       job,
+				Action:    chosenAction,
+				Params:    actionParams,
+				Reasoning: reasoning,
+			},
+			ActionResult: types.ActionResult{Result: "stopped by callback"}})
 		job.Result.Conversation = a.currentConversation
 		job.Result.Finish(nil)
 		return
@@ -622,7 +634,15 @@ func (a *Agent) consumeJob(job *Job, role string) {
 				result.Result = fmt.Sprintf("Error running tool: %v", err)
 			}
 
-			stateResult := ActionState{ActionCurrentState{chosenAction, actionParams, reasoning}, result}
+			stateResult := types.ActionState{
+				ActionCurrentState: types.ActionCurrentState{
+					Job:       job,
+					Action:    chosenAction,
+					Params:    actionParams,
+					Reasoning: reasoning,
+				},
+				ActionResult: result,
+			}
 			job.Result.SetResult(stateResult)
 			job.CallbackWithResult(stateResult)
 			xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
@@ -781,7 +801,7 @@ func (a *Agent) consumeJob(job *Job, role string) {
 	job.Result.Finish(nil)
 }
 
-func (a *Agent) addFunctionResultToConversation(chosenAction Action, actionParams action.ActionParams, result action.ActionResult) {
+func (a *Agent) addFunctionResultToConversation(chosenAction types.Action, actionParams types.ActionParams, result types.ActionResult) {
 	// calling the function
 	a.currentConversation = append(a.currentConversation, openai.ChatCompletionMessage{
 		Role: "assistant",
@@ -847,10 +867,10 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// - asking the agent to do something else based on the result
 
 	//	whatNext := NewJob(WithText("Decide what to do based on the state"))
-	whatNext := NewJob(
-		WithText(innerMonologueTemplate),
-		WithReasoningCallback(a.options.reasoningCallback),
-		WithResultCallback(a.options.resultCallback),
+	whatNext := types.NewJob(
+		types.WithText(innerMonologueTemplate),
+		types.WithReasoningCallback(a.options.reasoningCallback),
+		types.WithResultCallback(a.options.resultCallback),
 	)
 	a.consumeJob(whatNext, SystemRole)
 	a.ResetConversation()
@@ -913,7 +933,7 @@ func (a *Agent) Run() error {
 	}
 }
 
-func (a *Agent) loop(timer *time.Timer, job *Job) {
+func (a *Agent) loop(timer *time.Timer, job *types.Job) {
 	// Remember always to reset the timer - if we don't the agent will stop..
 	defer timer.Reset(a.options.periodicRuns)
 	// Consume the job and generate a response

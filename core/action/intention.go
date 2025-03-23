@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -21,16 +22,16 @@ type IntentResponse struct {
 	Reasoning string `json:"reasoning"`
 }
 
-func (a *IntentAction) Run(context.Context, ActionParams) (ActionResult, error) {
-	return ActionResult{}, nil
+func (a *IntentAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+	return types.ActionResult{}, nil
 }
 
 func (a *IntentAction) Plannable() bool {
 	return false
 }
 
-func (a *IntentAction) Definition() ActionDefinition {
-	return ActionDefinition{
+func (a *IntentAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
 		Name:        "pick_tool",
 		Description: "Pick a tool",
 		Properties: map[string]jsonschema.Definition{

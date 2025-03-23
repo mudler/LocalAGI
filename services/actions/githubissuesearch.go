@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -29,7 +29,7 @@ func NewGithubIssueSearch(ctx context.Context, config map[string]string) *Github
 	}
 }
 
-func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams) (action.ActionResult, error) {
+func (g *GithubIssueSearch) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Query      string `json:"query"`
 		Repository string `json:"repository"`
@@ -39,7 +39,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 	if err != nil {
 		fmt.Printf("error: %v", err)
 
-		return action.ActionResult{}, err
+		return types.ActionResult{}, err
 	}
 
 	if g.repository != "" && g.owner != "" {
@@ -56,7 +56,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 	})
 	if err != nil {
 		resultString = fmt.Sprintf("Error listing issues: %v", err)
-		return action.ActionResult{Result: resultString}, err
+		return types.ActionResult{Result: resultString}, err
 	}
 	for _, i := range issues.Issues {
 		xlog.Info("Issue found", "title", i.GetTitle())
@@ -65,17 +65,17 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params action.ActionParams)
 		//	resultString += fmt.Sprintf("Body: %s\n", i.GetBody())
 	}
 
-	return action.ActionResult{Result: resultString}, err
+	return types.ActionResult{Result: resultString}, err
 }
 
-func (g *GithubIssueSearch) Definition() action.ActionDefinition {
+func (g *GithubIssueSearch) Definition() types.ActionDefinition {
 	actionName := "search_github_issue"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
 	if g.repository != "" && g.owner != "" {
-		return action.ActionDefinition{
-			Name:        action.ActionDefinitionName(actionName),
+		return types.ActionDefinition{
+			Name:        types.ActionDefinitionName(actionName),
 			Description: "Search between github issues",
 			Properties: map[string]jsonschema.Definition{
 				"query": {
@@ -86,8 +86,8 @@ func (g *GithubIssueSearch) Definition() action.ActionDefinition {
 			Required: []string{"query"},
 		}
 	}
-	return action.ActionDefinition{
-		Name:        action.ActionDefinitionName(actionName),
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(actionName),
 		Description: "Search between github issues",
 		Properties: map[string]jsonschema.Definition{
 			"query": {

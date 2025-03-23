@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/mudler/LocalAgent/core/agent"
+	"github.com/mudler/LocalAgent/core/types"
 )
 
 type ConnectorConfig struct {
@@ -61,7 +62,7 @@ type AgentConfig struct {
 }
 
 type Connector interface {
-	AgentResultCallback() func(state agent.ActionState)
-	AgentReasoningCallback() func(state agent.ActionCurrentState) bool
+	AgentResultCallback() func(state types.ActionState)
+	AgentReasoningCallback() func(state types.ActionCurrentState) bool
 	Start(a *agent.Agent)
 }
