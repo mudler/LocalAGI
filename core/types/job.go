@@ -20,6 +20,7 @@ type Job struct {
 	resultCallback      func(ActionState)
 	ConversationHistory []openai.ChatCompletionMessage
 	UUID                string
+	Metadata            map[string]interface{}
 }
 
 // JobResult is the result of a job
@@ -51,6 +52,12 @@ func WithReasoningCallback(f func(ActionCurrentState) bool) JobOption {
 func WithResultCallback(f func(ActionState)) JobOption {
 	return func(r *Job) {
 		r.resultCallback = f
+	}
+}
+
+func WithMetadata(metadata map[string]interface{}) JobOption {
+	return func(j *Job) {
+		j.Metadata = metadata
 	}
 }
 
