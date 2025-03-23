@@ -158,12 +158,14 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 		return err
 	}
 
-	go func(ac AgentConfig) {
-		// Create the agent avatar
-		if err := a.createAgentAvatar(ac); err != nil {
-			xlog.Error("Failed to create agent avatar", "error", err)
-		}
-	}(*agentConfig)
+	defer func(ac AgentConfig, pool *AgentPool) {
+		go func(ac AgentConfig, pool *AgentPool) {
+			// Create the agent avatar
+			if err := a.createAgentAvatar(ac); err != nil {
+				xlog.Error("Failed to create agent avatar", "error", err)
+			}
+		}(ac, pool)
+	}(*agentConfig, a)
 
 	return a.startAgentWithConfig(name, agentConfig)
 }
