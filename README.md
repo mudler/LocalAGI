@@ -104,6 +104,7 @@ Download ready-to-run binaries from the [Releases](https://github.com/mudler/Loc
 Requirements:
 - Go 1.20+
 - Git
+- Bun 1.2+
 
 ```bash
 # Clone repo
@@ -111,6 +112,8 @@ git clone https://github.com/mudler/LocalAgent.git
 cd LocalAgent
 
 # Build it
+cd webui/react-ui && bun i && bun run build
+cd ../..
 go build -o localagent
 
 # Run it

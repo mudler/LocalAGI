@@ -25,6 +25,9 @@ var viewsfs embed.FS
 //go:embed public/*
 var embeddedFiles embed.FS
 
+//go:embed react-ui/dist/*
+var reactUI embed.FS
+
 func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	// Static avatars in a.pooldir/avatars
@@ -55,6 +58,21 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			"Actions":    len(services.AvailableActions),
 			"Connectors": len(services.AvailableConnectors),
 		})
+	})
+
+	webapp.Use("/app", filesystem.New(filesystem.Config{
+		Root:       http.FS(reactUI),
+		PathPrefix: "react-ui/dist",
+	}))
+
+	// Fallback route for SPA
+	webapp.Get("/app/*", func(c *fiber.Ctx) error {
+		indexHTML, err := reactUI.ReadFile("react-ui/dist/index.html")
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString("Error reading index.html")
+		}
+		c.Set("Content-Type", "text/html")
+		return c.Send(indexHTML)
 	})
 
 	webapp.Get("/agents", func(c *fiber.Ctx) error {
@@ -159,6 +177,28 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Post("/api/agent/group/generateProfiles", app.GenerateGroupProfiles(pool))
 	webapp.Post("/api/agent/group/create", app.CreateGroup(pool))
+
+	// Dashboard API endpoint for React UI
+	webapp.Get("/api/agents", func(c *fiber.Ctx) error {
+		statuses := map[string]bool{}
+		agents := pool.List()
+		for _, a := range agents {
+			agent := pool.GetAgent(a)
+			if agent == nil {
+				xlog.Error("Agent not found", "name", a)
+				continue
+			}
+			statuses[a] = !agent.Paused()
+		}
+		
+		return c.JSON(fiber.Map{
+			"Agents": agents,
+			"AgentCount": len(agents),
+			"Actions": len(services.AvailableActions),
+			"Connectors": len(services.AvailableConnectors),
+			"Status": statuses,
+		})
+	})
 
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))

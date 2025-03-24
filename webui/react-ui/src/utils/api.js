@@ -1,0 +1,198 @@
+/**
+ * API utility for communicating with the Go backend
+ */
+import { API_CONFIG } from './config';
+
+// Helper function for handling API responses
+const handleResponse = async (response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `API error: ${response.status}`);
+  }
+  
+  // Check if response is JSON
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return response.json();
+  }
+  
+  return response.text();
+};
+
+// Helper function to build a full URL
+const buildUrl = (endpoint) => {
+  return `${API_CONFIG.baseUrl}${endpoint.startsWith('/') ? endpoint.substring(1) : endpoint}`;
+};
+
+// Agent-related API calls
+export const agentApi = {
+  // Get list of all agents
+  getAgents: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.agents), {
+      headers: API_CONFIG.headers
+    });
+    return handleResponse(response);
+  },
+  
+  // Get a specific agent's configuration
+  getAgentConfig: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.agentConfig(name)), {
+      headers: API_CONFIG.headers
+    });
+    return handleResponse(response);
+  },
+  
+  // Create a new agent
+  createAgent: async (config) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.createAgent), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(config),
+    });
+    return handleResponse(response);
+  },
+  
+  // Update an existing agent's configuration
+  updateAgentConfig: async (name, config) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.agentConfig(name)), {
+      method: 'PUT',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(config),
+    });
+    return handleResponse(response);
+  },
+  
+  // Delete an agent
+  deleteAgent: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.deleteAgent(name)), {
+      method: 'DELETE',
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+  
+  // Pause an agent
+  pauseAgent: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.pauseAgent(name)), {
+      method: 'PUT',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({}),
+    });
+    return handleResponse(response);
+  },
+  
+  // Start an agent
+  startAgent: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.startAgent(name)), {
+      method: 'PUT',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({}),
+    });
+    return handleResponse(response);
+  },
+  
+  // Export agent configuration
+  exportAgentConfig: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.exportAgent(name)), {
+      headers: API_CONFIG.headers
+    });
+    return handleResponse(response);
+  },
+  
+  // Import agent configuration
+  importAgentConfig: async (configData) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.importAgent), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(configData),
+    });
+    return handleResponse(response);
+  },
+  
+  // Generate group profiles
+  generateGroupProfiles: async (data) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.generateGroupProfiles), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  
+  // Create a group of agents
+  createGroup: async (data) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.createGroup), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+};
+
+// Chat-related API calls
+export const chatApi = {
+  // Send a chat message to an agent
+  sendMessage: async (name, message) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.chat(name)), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ message }),
+    });
+    return handleResponse(response);
+  },
+  
+  // Send a notification to an agent
+  sendNotification: async (name, message) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.notify(name)), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ message }),
+    });
+    return handleResponse(response);
+  },
+  
+  // Get responses from an agent
+  getResponses: async (data) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.responses), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+};
+
+// Action-related API calls
+export const actionApi = {
+  // List available actions
+  listActions: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.listActions), {
+      headers: API_CONFIG.headers
+    });
+    return handleResponse(response);
+  },
+  
+  // Execute an action for an agent
+  executeAction: async (name, actionData) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.executeAction(name)), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(actionData),
+    });
+    return handleResponse(response);
+  },
+};
+
+// Status-related API calls
+export const statusApi = {
+  // Get agent status history
+  getStatusHistory: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.status(name)), {
+      headers: API_CONFIG.headers
+    });
+    return handleResponse(response);
+  },
+};

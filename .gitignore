@@ -4,3 +4,4 @@ pool
 uploads/
 local-agent-framework
 localagent
+**/.env
