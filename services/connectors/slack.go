@@ -208,7 +208,7 @@ func (t *Slack) handleChannelMessage(
 			agentOptions...,
 		)
 
-		res.Response = githubmarkdownconvertergo.Slack(res.Response)
+		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
 		_, _, err = api.PostMessage(ev.Channel,
 			slack.MsgOptionLinkNames(true),
@@ -458,7 +458,8 @@ func (t *Slack) handleMention(
 		)
 
 		// Format the final response
-		finalResponse := githubmarkdownconvertergo.Slack(res.Response)
+		//finalResponse := githubmarkdownconvertergo.Slack(res.Response)
+		finalResponse := fmt.Sprintf("@%s %s", ev.User, res.Response)
 
 		// Update the placeholder message with the final result
 		t.placeholderMutex.RLock()
