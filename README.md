@@ -142,7 +142,8 @@ After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/dis
   "defaultChannel": "OPTIONAL_CHANNEL_ID"
 }
 ```
-> Don't forget to enable "Message Content Intent" in Bot settings!
+> Don't forget to enable "Message Content Intent" in Bot(tab) settings!
+> Enable " Message Content Intent " in the Bot tab!
 
 ### Slack
 
@@ -154,6 +155,10 @@ Use the included `slack.yaml` manifest to create your app, then configure:
   "appToken": "xapp-your-app-token"
 }
 ```
+
+- Create Oauth token bot token from "OAuth & Permissions" -> "OAuth Tokens for Your Workspace"
+- Create App level token (from "Basic Information" -> "App-Level Tokens" ( scope connections:writeRoute authorizations:read ))
+
 
 ### Telegram
 
