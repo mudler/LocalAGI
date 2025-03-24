@@ -10,9 +10,9 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-func (a *Agent) knowledgeBaseLookup() {
+func (a *Agent) knowledgeBaseLookup(conv Messages) {
 	if (!a.options.enableKB && !a.options.enableLongTermMemory && !a.options.enableSummaryMemory) ||
-		len(a.currentConversation) <= 0 {
+		len(conv) <= 0 {
 		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
 		return
 	}
@@ -20,9 +20,9 @@ func (a *Agent) knowledgeBaseLookup() {
 	// Walk conversation from bottom to top, and find the first message of the user
 	// to use it as a query to the KB
 	var userMessage string
-	userMessage = a.currentConversation.GetLatestUserMessage().Content
+	userMessage = conv.GetLatestUserMessage().Content
 
-	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage, "lastMessage", a.currentConversation.GetLatestUserMessage())
+	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage, "lastMessage", conv.GetLatestUserMessage())
 
 	if userMessage == "" {
 		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)
@@ -45,17 +45,17 @@ func (a *Agent) knowledgeBaseLookup() {
 	}
 	xlog.Info("[Knowledge Base Lookup] Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
 
-	// a.currentConversation = append(a.currentConversation,
+	// conv = append(conv,
 	// 	openai.ChatCompletionMessage{
 	// 		Role:    "system",
 	// 		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
 	// 	},
 	// )
-	a.currentConversation = append([]openai.ChatCompletionMessage{
+	conv = append([]openai.ChatCompletionMessage{
 		{
 			Role:    "system",
 			Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-		}}, a.currentConversation...)
+		}}, conv...)
 }
 
 func (a *Agent) saveConversation(m Messages, prefix string) error {
@@ -71,9 +71,9 @@ func (a *Agent) saveConversation(m Messages, prefix string) error {
 	return m.Save(filepath.Join(a.options.conversationsPath, fileName))
 }
 
-func (a *Agent) saveCurrentConversation() {
+func (a *Agent) saveCurrentConversation(conv Messages) {
 
-	if err := a.saveConversation(a.currentConversation, ""); err != nil {
+	if err := a.saveConversation(conv, ""); err != nil {
 		xlog.Error("Error saving conversation", "error", err)
 	}
 
@@ -82,12 +82,12 @@ func (a *Agent) saveCurrentConversation() {
 		return
 	}
 
-	xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(a.currentConversation))
+	xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(conv))
 
-	if a.options.enableSummaryMemory && len(a.currentConversation) > 0 {
+	if a.options.enableSummaryMemory && len(conv) > 0 {
 		msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
 			Role:    "user",
-			Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(a.currentConversation).String(),
+			Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(conv).String(),
 		}})
 		if err != nil {
 			xlog.Error("Error summarizing conversation", "error", err)
@@ -97,7 +97,7 @@ func (a *Agent) saveCurrentConversation() {
 			xlog.Error("Error storing into memory", "error", err)
 		}
 	} else {
-		for _, message := range a.currentConversation {
+		for _, message := range conv {
 			if message.Role == "user" {
 				if err := a.options.ragdb.Store(message.Content); err != nil {
 					xlog.Error("Error storing into memory", "error", err)

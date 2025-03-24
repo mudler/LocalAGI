@@ -174,7 +174,7 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	)
 }
 
-func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction types.Action, actionParams types.ActionParams, reasoning string, pickTemplate string) error {
+func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction types.Action, actionParams types.ActionParams, reasoning string, pickTemplate string, conv Messages) error {
 	// Planning: run all the actions in sequence
 	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
 		xlog.Debug("no plan action")
@@ -221,7 +221,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		subTaskAction := a.availableActions().Find(subtask.Action)
 		subTaskReasoning := fmt.Sprintf("%s, overall goal is: %s", subtask.Reasoning, planResult.Goal)
 
-		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, a.currentConversation, subTaskReasoning)
+		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning)
 		if err != nil {
 			return fmt.Errorf("error generating action's parameters: %w", err)
 
@@ -245,7 +245,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 					Result: "stopped by callback",
 				},
 			})
-			job.Result.Conversation = a.currentConversation
+			job.Result.Conversation = conv
 			job.Result.Finish(nil)
 			break
 		}
@@ -267,7 +267,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		job.Result.SetResult(stateResult)
 		job.CallbackWithResult(stateResult)
 		xlog.Debug("[subtask] Action executed", "agent", a.Character.Name, "action", subTaskAction.Definition().Name, "result", result)
-		a.addFunctionResultToConversation(subTaskAction, actionParams, result)
+		conv = a.addFunctionResultToConversation(subTaskAction, actionParams, result, conv)
 	}
 
 	return nil

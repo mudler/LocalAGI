@@ -13,8 +13,6 @@ type Job struct {
 	// The job is a request to the agent to do something
 	// It can be a question, a command, or a request to do something
 	// The agent will try to do it, and return a response
-	Text                string
-	Image               string // base64 encoded image
 	Result              *JobResult
 	reasoningCallback   func(ActionCurrentState) bool
 	resultCallback      func(ActionState)
@@ -83,15 +81,30 @@ func (j *Job) CallbackWithResult(stateResult ActionState) {
 	j.resultCallback(stateResult)
 }
 
-func WithImage(image string) JobOption {
+func WithTextImage(text, image string) JobOption {
 	return func(j *Job) {
-		j.Image = image
+		j.ConversationHistory = append(j.ConversationHistory, openai.ChatCompletionMessage{
+			Role: "user",
+			MultiContent: []openai.ChatMessagePart{
+				{
+					Type: openai.ChatMessagePartTypeText,
+					Text: text,
+				},
+				{
+					Type:     openai.ChatMessagePartTypeImageURL,
+					ImageURL: &openai.ChatMessageImageURL{URL: image},
+				},
+			},
+		})
 	}
 }
 
 func WithText(text string) JobOption {
 	return func(j *Job) {
-		j.Text = text
+		j.ConversationHistory = append(j.ConversationHistory, openai.ChatCompletionMessage{
+			Role:    "user",
+			Content: text,
+		})
 	}
 }
 

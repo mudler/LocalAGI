@@ -216,7 +216,6 @@ func (t *Slack) handleChannelMessage(
 		}
 
 		agentOptions := []types.JobOption{
-			types.WithText(message),
 			types.WithUUID(ev.ThreadTimeStamp),
 		}
 
@@ -228,8 +227,10 @@ func (t *Slack) handleChannelMessage(
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error encoding image to base64: %v", err))
 			} else {
-				agentOptions = append(agentOptions, types.WithImage(fmt.Sprintf("data:%s;base64,%s", mimeType, imgBase64)))
+				agentOptions = append(agentOptions, types.WithTextImage(message, fmt.Sprintf("data:%s;base64,%s", mimeType, imgBase64)))
 			}
+		} else {
+			agentOptions = append(agentOptions, types.WithText(message))
 		}
 
 		res := a.Ask(
