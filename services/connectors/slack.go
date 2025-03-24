@@ -98,6 +98,34 @@ func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) strin
 	return cleaned
 }
 
+func extractUserIDsFromMessage(message string) []string {
+	var userIDs []string
+	for _, part := range strings.Split(message, " ") {
+		if strings.HasPrefix(part, "<@") && strings.HasSuffix(part, ">") {
+			userIDs = append(userIDs, strings.TrimPrefix(strings.TrimSuffix(part, ">"), "<@"))
+		}
+	}
+	return userIDs
+}
+
+func replaceUserIDsWithNamesInMessage(api *slack.Client, message string) string {
+	for _, part := range strings.Split(message, " ") {
+		if strings.HasPrefix(part, "<@") && strings.HasSuffix(part, ">") {
+			xlog.Debug(fmt.Sprintf("Part: %s", part))
+			userID := strings.TrimPrefix(strings.TrimSuffix(part, ">"), "<@")
+			xlog.Debug(fmt.Sprintf("UserID: %s", userID))
+			userInfo, err := api.GetUserInfo(userID)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error getting user info: %v", err))
+				continue
+			}
+			message = strings.ReplaceAll(message, part, "@"+userInfo.Name)
+			xlog.Debug(fmt.Sprintf("Message: %s", message))
+		}
+	}
+	return message
+}
+
 func uniqueStringSlice(s []string) []string {
 	keys := make(map[string]bool)
 	list := []string{}
@@ -154,7 +182,7 @@ func (t *Slack) handleChannelMessage(
 		return
 	}
 
-	message := cleanUpUsernameFromMessage(ev.Text, b)
+	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
 	go func() {
 
@@ -243,7 +271,7 @@ func (t *Slack) handleMention(
 		// Skip messages from ourselves
 		return
 	}
-	message := cleanUpUsernameFromMessage(ev.Text, b)
+	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
 	// strip our id from the message
 	xlog.Info("Message", message)
@@ -354,7 +382,7 @@ func (t *Slack) handleMention(
 								Role: role,
 								MultiContent: []openai.ChatMessagePart{
 									{
-										Text: cleanUpUsernameFromMessage(msg.Text, b),
+										Text: replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(msg.Text, b)),
 										Type: openai.ChatMessagePartTypeText,
 									},
 									{
@@ -372,7 +400,7 @@ func (t *Slack) handleMention(
 							threadMessages,
 							openai.ChatCompletionMessage{
 								Role:    role,
-								Content: cleanUpUsernameFromMessage(msg.Text, b),
+								Content: replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(msg.Text, b)),
 							},
 						)
 					}
@@ -424,7 +452,7 @@ func (t *Slack) handleMention(
 						Role: "user",
 						MultiContent: []openai.ChatMessagePart{
 							{
-								Text: cleanUpUsernameFromMessage(message, b),
+								Text: replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(message, b)),
 								Type: openai.ChatMessagePartTypeText,
 							},
 							{
@@ -440,7 +468,7 @@ func (t *Slack) handleMention(
 			} else {
 				threadMessages = append(threadMessages, openai.ChatCompletionMessage{
 					Role:    "user",
-					Content: cleanUpUsernameFromMessage(message, b),
+					Content: replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(message, b)),
 				})
 			}
 		}
@@ -457,9 +485,15 @@ func (t *Slack) handleMention(
 			types.WithMetadata(metadata),
 		)
 
+		// get user id
+		user, err := api.GetUserInfo(ev.User)
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Error getting user info: %v", err))
+		}
+
 		// Format the final response
 		//finalResponse := githubmarkdownconvertergo.Slack(res.Response)
-		finalResponse := fmt.Sprintf("@%s %s", ev.User, res.Response)
+		finalResponse := fmt.Sprintf("@%s %s", user.Name, res.Response)
 
 		// Update the placeholder message with the final result
 		t.placeholderMutex.RLock()
