@@ -180,6 +180,13 @@ func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agen
 		return fmt.Errorf("default model not set")
 	}
 
+	imagePath := filepath.Join(avatarDir, "avatars", fmt.Sprintf("%s.png", agent.Name))
+	if _, err := os.Stat(imagePath); err == nil {
+		// Image already exists
+		xlog.Debug("Avatar already exists", "path", imagePath)
+		return nil
+	}
+
 	var results struct {
 		ImagePrompt string `json:"image_prompt"`
 	}
@@ -232,7 +239,6 @@ func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agen
 	os.MkdirAll(filepath.Join(avatarDir, "avatars"), 0755)
 
 	// Save the image to the agent directory
-	imagePath := filepath.Join(avatarDir, "avatars", fmt.Sprintf("%s.png", agent.Name))
 	imageData, err := base64.StdEncoding.DecodeString(imageJson)
 	if err != nil {
 		return err
@@ -244,7 +250,7 @@ func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agen
 func (a *AgentPool) List() []string {
 	a.Lock()
 	defer a.Unlock()
-	
+
 	var agents []string
 	for agent := range a.pool {
 		agents = append(agents, agent)
