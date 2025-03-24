@@ -14,16 +14,18 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.4
 	github.com/gofiber/template/html/v2 v2.1.1
 	github.com/google/go-github/v69 v69.2.0
+	github.com/google/uuid v1.6.0
 	github.com/metoro-io/mcp-golang v0.8.0
 	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.31.1
 	github.com/philippgille/chromem-go v0.5.0
 	github.com/sashabaranov/go-openai v1.18.3
-	github.com/slack-go/slack v0.12.5
+	github.com/slack-go/slack v0.16.0
 	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64
 	github.com/tmc/langchaingo v0.1.8
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.52.0
+	golang.org/x/crypto v0.30.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
 	mvdan.cc/xurls/v2 v2.6.0
 )
@@ -55,8 +57,7 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
-	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.12.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
@@ -85,7 +86,6 @@ require (
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.starlark.net v0.0.0-20230302034142-4b1e35fe2254 // indirect
-	golang.org/x/crypto v0.30.0 // indirect
 	golang.org/x/net v0.32.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect

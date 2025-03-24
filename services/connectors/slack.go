@@ -211,6 +211,8 @@ func (t *Slack) handleChannelMessage(
 		res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
 		_, _, err = api.PostMessage(ev.Channel,
+			slack.MsgOptionLinkNames(true),
+			slack.MsgOptionEnableLinkUnfurl(),
 			slack.MsgOptionText(res.Response, true),
 			slack.MsgOptionPostMessageParameters(postMessageParams),
 			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
@@ -259,6 +261,8 @@ func (t *Slack) handleMention(
 			// If we're in a thread, post the placeholder there
 			_, respTs, err := api.PostMessage(ev.Channel,
 				slack.MsgOptionText(thinkingMessage, false),
+				slack.MsgOptionLinkNames(true),
+				slack.MsgOptionEnableLinkUnfurl(),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
 				slack.MsgOptionTS(ts))
 			if err != nil {
@@ -270,6 +274,8 @@ func (t *Slack) handleMention(
 			// Starting a new thread
 			_, respTs, err := api.PostMessage(ev.Channel,
 				slack.MsgOptionText(thinkingMessage, false),
+				slack.MsgOptionLinkNames(true),
+				slack.MsgOptionEnableLinkUnfurl(),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
 				slack.MsgOptionTS(ev.TimeStamp))
 			if err != nil {
@@ -463,6 +469,8 @@ func (t *Slack) handleMention(
 			_, _, _, err = api.UpdateMessage(
 				ev.Channel,
 				msgTs,
+				slack.MsgOptionLinkNames(true),
+				slack.MsgOptionEnableLinkUnfurl(),
 				slack.MsgOptionText(finalResponse, true),
 				slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
 			)
