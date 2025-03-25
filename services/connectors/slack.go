@@ -38,8 +38,6 @@ type Slack struct {
 	apiClient        *slack.Client
 
 	conversationTracker *ConversationTracker[string]
-	processing          sync.Mutex
-	processingMessage   bool
 }
 
 const thinkingMessage = "thinking..."
@@ -199,25 +197,6 @@ func (t *Slack) handleChannelMessage(
 	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
 	go func() {
-
-		// Lock the conversation mutex to update the conversation history
-		t.processing.Lock()
-
-		// If we are already processing something, stop the current action
-		if t.processingMessage {
-			a.StopAction()
-		} else {
-			t.processingMessage = true
-		}
-		t.processing.Unlock()
-
-		// Defer to reset the processing flag
-		defer func() {
-			t.processing.Lock()
-			t.processingMessage = false
-			t.processing.Unlock()
-		}()
-
 		imageBytes := new(bytes.Buffer)
 		mimeType := "image/jpeg"
 
