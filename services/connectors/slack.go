@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -311,30 +312,35 @@ func encodeImageFromURL(imageBytes bytes.Buffer) (string, error) {
 	return base64Image, nil
 }
 
-// SplitText splits a long text into chunks of a specified maximum length without truncating words.
+// SplitText splits a long text into chunks of a specified maximum length without truncating words and preserves special characters.
 func splitText(text string, maxLen int) []string {
 	if len(text) <= maxLen {
 		return []string{text}
 	}
 
 	var chunks []string
-	words := strings.Fields(text) // Splitting the text into words
-	var chunk string
+	lines := strings.Split(text, "\n") // Split text by newlines first
+	whitespaceRegex := regexp.MustCompile(`\s+`)
 
-	for _, word := range words {
-		if len(chunk)+len(word)+1 > maxLen { // +1 for space
-			chunks = append(chunks, chunk)
-			chunk = word
-		} else {
-			if chunk != "" {
-				chunk += " "
+	for _, line := range lines {
+		var chunk string
+		words := whitespaceRegex.Split(line, -1) // Splitting the line into words while preserving whitespace
+
+		for _, word := range words {
+			if len(chunk)+len(word)+1 > maxLen { // +1 for space
+				chunks = append(chunks, chunk)
+				chunk = word
+			} else {
+				if chunk != "" {
+					chunk += " "
+				}
+				chunk += word
 			}
-			chunk += word
 		}
-	}
 
-	if chunk != "" {
-		chunks = append(chunks, chunk)
+		if chunk != "" {
+			chunks = append(chunks, chunk)
+		}
 	}
 
 	return chunks
@@ -377,10 +383,10 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 }
 
 func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackevents.AppMentionEvent, msgTs string, ts string, res *types.JobResult) {
-	if len(finalResponse) > 4000 {
+	if len(finalResponse) > 3000 {
 		// split response in multiple messages, and update the first
 
-		messages := splitText(finalResponse, 4000)
+		messages := splitText(finalResponse, 3000)
 
 		_, _, _, err := api.UpdateMessage(
 			ev.Channel,
