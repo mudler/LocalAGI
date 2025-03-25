@@ -126,41 +126,70 @@ function AgentsList() {
         <div className="agents-grid">
           {agents.map(name => (
             <div key={name} className="agent-card" data-agent={name} data-active={statuses[name]}>
-              <div className="agent-header">
-                <h2>{name}</h2>
-                <span className={`status-badge ${statuses[name] ? 'active' : 'inactive'}`}>
-                  {statuses[name] ? 'Active' : 'Paused'}
-                </span>
-              </div>
+              <div className="agent-content text-center">
+                <div className="avatar-container mb-4">
+                  <img 
+                    src={`/avatars/${name}.png`} 
+                    alt={name} 
+                    className="w-24 h-24 rounded-full" 
+                    style={{
+                      border: '2px solid var(--primary)', 
+                      boxShadow: 'var(--neon-glow)', 
+                      display: 'none',
+                      margin: '0 auto'
+                    }}
+                    onLoad={(e) => {
+                      e.target.style.display = 'block';
+                      e.target.nextElementSibling.style.display = 'none';
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextElementSibling.style.display = 'flex';
+                    }}
+                  />
+                  <div className="avatar-placeholder" style={{margin: '0 auto'}}>
+                    <span className="placeholder-text"><i className="fas fa-sync fa-spin"></i></span>
+                  </div>
+                </div>
+                
+                <div className="agent-header">
+                  <h2>{name}</h2>
+                  <span className={`status-badge ${statuses[name] ? 'active' : 'inactive'}`}>
+                    {statuses[name] ? 'Active' : 'Paused'}
+                  </span>
+                </div>
               
-              <div className="agent-actions">
-                <Link to={`/talk/${name}`} className="action-btn chat-btn">
-                  <i className="fas fa-comment"></i> Chat
-                </Link>
-                <Link to={`/settings/${name}`} className="action-btn settings-btn">
-                  <i className="fas fa-cog"></i> Settings
-                </Link>
-                <Link to={`/status/${name}`} className="action-btn status-btn">
-                  <i className="fas fa-chart-line"></i> Status
-                </Link>
+                <div className="agent-actions">
+                  <Link to={`/talk/${name}`} className="action-btn chat-btn">
+                    <i className="fas fa-comment"></i> Chat
+                  </Link>
+                  <Link to={`/status/${name}`} className="action-btn status-btn">
+                    <i className="fas fa-chart-line"></i> Status
+                  </Link>
+                  <Link to={`/settings/${name}`} className="action-btn settings-btn">
+                    <i className="fas fa-cog"></i> Settings
+                  </Link>
+                </div>
                 
-                <button 
-                  className="action-btn toggle-btn"
-                  onClick={() => toggleAgentStatus(name, statuses[name])}
-                >
-                  {statuses[name] ? (
-                    <><i className="fas fa-pause"></i> Pause</>
-                  ) : (
-                    <><i className="fas fa-play"></i> Start</>
-                  )}
-                </button>
-                
-                <button 
-                  className="action-btn delete-btn"
-                  onClick={() => deleteAgent(name)}
-                >
-                  <i className="fas fa-trash-alt"></i> Delete
-                </button>
+                <div className="agent-actions mt-2">
+                  <button 
+                    className="action-btn toggle-btn"
+                    onClick={() => toggleAgentStatus(name, statuses[name])}
+                  >
+                    {statuses[name] ? (
+                      <><i className="fas fa-pause"></i> Pause</>
+                    ) : (
+                      <><i className="fas fa-play"></i> Start</>
+                    )}
+                  </button>
+                  
+                  <button 
+                    className="action-btn delete-btn"
+                    onClick={() => deleteAgent(name)}
+                  >
+                    <i className="fas fa-trash-alt"></i> Delete
+                  </button>
+                </div>
               </div>
             </div>
           ))}

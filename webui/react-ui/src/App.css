@@ -288,17 +288,27 @@ a:hover {
 
 /* Status badge */
 .status-badge {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  padding: 5px 12px;
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
   border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-  z-index: 1;
+  margin-left: 10px;
+}
+
+.status-badge.active {
+  background-color: var(--primary);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 255, 149, 0.5);
+  animation: pulse 1.5s infinite;
+}
+
+.status-badge.inactive {
+  background-color: var(--light-bg);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .status-active, .active {
@@ -1640,10 +1650,9 @@ select.form-control {
 /* Agent header styling */
 .agent-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 15px;
-  position: relative;
+  margin-bottom: 1rem;
 }
 
 .agent-header h2 {
@@ -1654,4 +1663,175 @@ select.form-control {
 .agent-header .status-badge {
   position: static;
   margin-left: 10px;
+}
+
+/* Agents grid layout */
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 1.5rem;
+}
+
+/* Responsive grid adjustments */
+@media (min-width: 768px) {
+  .agents-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .agents-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Avatar placeholder */
+.avatar-placeholder {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+  color: var(--primary);
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  border: 2px solid var(--primary);
+  box-shadow: var(--neon-glow);
+  position: relative;
+  overflow: hidden;
+}
+
+.avatar-placeholder::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 4px;
+  background: var(--primary);
+  bottom: 0;
+  left: 0;
+  animation: loading-progress 2s infinite linear;
+}
+
+@keyframes loading-progress {
+  0% { width: 0; }
+  50% { width: 100%; }
+  100% { width: 0; }
+}
+
+.placeholder-text {
+  z-index: 1;
+}
+
+/* Agent card layout improvements */
+.agent-card {
+  background: rgba(30, 30, 30, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  transition: transform 0.3s, box-shadow 0.3s;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(94, 0, 255, 0.2);
+  backdrop-filter: blur(5px);
+}
+
+.agent-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  opacity: 0.7;
+}
+
+.agent-card::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary), var(--tertiary), var(--primary));
+  background-size: 200% 100%;
+  transition: width 0.5s ease;
+}
+
+.agent-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 25px rgba(94, 0, 255, 0.3);
+}
+
+.agent-card:hover::after {
+  width: 100%;
+  animation: gradientMove 3s linear infinite;
+}
+
+.agent-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+  justify-content: center;
+}
+
+.agent-action {
+  padding: 8px 15px;
+  background: rgba(30, 30, 30, 0.8);
+  border-radius: 6px;
+  color: var(--text);
+  transition: all 0.3s;
+  text-decoration: none;
+  border: 1px solid rgba(94, 0, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.agent-action::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary), var(--tertiary), var(--primary));
+  background-size: 200% 100%;
+  transition: width 0.5s ease;
+}
+
+.agent-action:hover {
+  background: rgba(40, 40, 40, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(94, 0, 255, 0.3);
+}
+
+.agent-action:hover::after {
+  width: 100%;
+  animation: gradientMove 3s linear infinite;
+}
+
+@keyframes gradientMove {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.agent-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatar-container {
+  margin-bottom: 1rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.text-center {
+  text-align: center;
 }
