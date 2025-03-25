@@ -64,11 +64,15 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		Role:    "user",
 	})
 
+	xlog.Info("New message", "username", username, "conversation", currentConv)
 	res := a.Ask(
 		types.WithConversationHistory(currentConv),
 	)
 
+	xlog.Debug("Response", "response", res.Response)
+
 	if res.Response == "" {
+		xlog.Error("Empty response from agent")
 		return
 	}
 
@@ -80,11 +84,15 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		},
 	)
 
-	b.SendMessage(ctx, &bot.SendMessageParams{
-		ParseMode: models.ParseModeMarkdown,
-		ChatID:    update.Message.Chat.ID,
-		Text:      res.Response,
+	xlog.Debug("Sending message back to telegram", "response", res.Response)
+	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		//	ParseMode: models.ParseModeMarkdown,
+		ChatID: update.Message.Chat.ID,
+		Text:   res.Response,
 	})
+	if err != nil {
+		xlog.Error("Error sending message", "error", err)
+	}
 }
 
 // func (t *Telegram) handleNewMessage(ctx context.Context, b *bot.Bot, m openai.ChatCompletionMessage) {

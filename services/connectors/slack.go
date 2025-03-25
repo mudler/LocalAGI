@@ -306,6 +306,8 @@ func (t *Slack) handleChannelMessage(
 			},
 		)
 
+		xlog.Debug("After adding message to conversation tracker", "conversation", t.conversationTracker.GetConversation(t.channelID))
+
 		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
 		_, _, err = api.PostMessage(ev.Channel,
@@ -574,6 +576,7 @@ func (t *Slack) handleMention(
 		// Format the final response
 		//finalResponse := githubmarkdownconvertergo.Slack(res.Response)
 		finalResponse := fmt.Sprintf("@%s %s", user.Name, res.Response)
+		xlog.Debug("Send final response to slack", "response", finalResponse)
 
 		// Update the placeholder message with the final result
 		t.placeholderMutex.RLock()

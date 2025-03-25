@@ -473,6 +473,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			Role:    "assistant",
 			Content: reasoning,
 		})
+
+		xlog.Debug("Finish job with reasoning", "reasoning", reasoning, "agent", a.Character.Name, "conversation", fmt.Sprintf("%+v", conv))
 		job.Result.Conversation = conv
 		a.saveCurrentConversation(conv)
 		job.Result.SetResponse(reasoning)
@@ -864,7 +866,7 @@ func (a *Agent) Run() error {
 	//todoTimer := time.NewTicker(a.options.periodicRuns)
 	timer := time.NewTimer(a.options.periodicRuns)
 	for {
-		xlog.Debug("Agent is waiting for a job", "agent", a.Character.Name)
+		xlog.Debug("Agent is now waiting for a new job", "agent", a.Character.Name)
 		select {
 		case job := <-a.jobQueue:
 			a.loop(timer, job)
