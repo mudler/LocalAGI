@@ -135,7 +135,7 @@ const AgentForm = ({
       ...formData,
       mcp_servers: [
         ...(formData.mcp_servers || []),
-        { url: '' }
+        { url: '', token: '' }
       ]
     });
   };
@@ -151,9 +151,12 @@ const AgentForm = ({
   };
 
   // Handle MCP server change
-  const handleMCPServerChange = (index, value) => {
+  const handleMCPServerChange = (index, field, value) => {
     const updatedMCPServers = [...formData.mcp_servers];
-    updatedMCPServers[index] = { url: value };
+    updatedMCPServers[index] = { 
+      ...updatedMCPServers[index],
+      [field]: value 
+    };
     setFormData({
       ...formData,
       mcp_servers: updatedMCPServers

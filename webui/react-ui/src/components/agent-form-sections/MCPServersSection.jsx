@@ -47,8 +47,8 @@ const MCPServersSection = ({
               <input 
                 type="password" 
                 id={`mcp-api-key-${index}`}
-                value={server.api_key || ''}
-                onChange={(e) => handleMCPServerChange(index, 'api_key', e.target.value)}
+                value={server.token || ''}
+                onChange={(e) => handleMCPServerChange(index, 'token', e.target.value)}
                 className="form-control"
               />
             </div>
