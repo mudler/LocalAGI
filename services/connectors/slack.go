@@ -177,6 +177,39 @@ func generateAttachmentsFromJobResponse(j *types.JobResult) (attachments []slack
 	return
 }
 
+func scanImagesInMessages(api *slack.Client, ev *slackevents.MessageEvent) (*bytes.Buffer, string) {
+	imageBytes := new(bytes.Buffer)
+	mimeType := "image/jpeg"
+
+	// Fetch the message using the API
+	messages, _, _, err := api.GetConversationReplies(&slack.GetConversationRepliesParameters{
+		ChannelID: ev.Channel,
+		Timestamp: ev.TimeStamp,
+	})
+
+	if err != nil {
+		xlog.Error(fmt.Sprintf("Error fetching messages: %v", err))
+	} else {
+		for _, msg := range messages {
+			if len(msg.Files) == 0 {
+				continue
+			}
+			for _, attachment := range msg.Files {
+				if attachment.URLPrivate != "" {
+					xlog.Debug(fmt.Sprintf("Getting Attachment: %+v", attachment))
+					// download image with slack api
+					mimeType = attachment.Mimetype
+					if err := api.GetFile(attachment.URLPrivate, imageBytes); err != nil {
+						xlog.Error(fmt.Sprintf("Error downloading image: %v", err))
+					}
+				}
+			}
+		}
+	}
+
+	return imageBytes, mimeType
+}
+
 func (t *Slack) handleChannelMessage(
 	a *agent.Agent,
 	api *slack.Client, ev *slackevents.MessageEvent, b *slack.AuthTestResponse, postMessageParams slack.PostMessageParameters) {
@@ -197,34 +230,7 @@ func (t *Slack) handleChannelMessage(
 	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
 	go func() {
-		imageBytes := new(bytes.Buffer)
-		mimeType := "image/jpeg"
-
-		// Fetch the message using the API
-		messages, _, _, err := api.GetConversationReplies(&slack.GetConversationRepliesParameters{
-			ChannelID: ev.Channel,
-			Timestamp: ev.TimeStamp,
-		})
-
-		if err != nil {
-			xlog.Error(fmt.Sprintf("Error fetching messages: %v", err))
-		} else {
-			for _, msg := range messages {
-				if len(msg.Files) == 0 {
-					continue
-				}
-				for _, attachment := range msg.Files {
-					if attachment.URLPrivate != "" {
-						xlog.Debug(fmt.Sprintf("Getting Attachment: %+v", attachment))
-						// download image with slack api
-						mimeType = attachment.Mimetype
-						if err := api.GetFile(attachment.URLPrivate, imageBytes); err != nil {
-							xlog.Error(fmt.Sprintf("Error downloading image: %v", err))
-						}
-					}
-				}
-			}
-		}
+		imageBytes, mimeType := scanImagesInMessages(api, ev)
 
 		agentOptions := []types.JobOption{
 			types.WithUUID(ev.ThreadTimeStamp),
