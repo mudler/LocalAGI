@@ -295,17 +295,7 @@ func (t *Slack) handleChannelMessage(
 
 		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
-		_, _, err := api.PostMessage(ev.Channel,
-			slack.MsgOptionLinkNames(true),
-			slack.MsgOptionEnableLinkUnfurl(),
-			slack.MsgOptionText(res.Response, true),
-			slack.MsgOptionPostMessageParameters(postMessageParams),
-			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
-		//	slack.MsgOptionTS(ts),
-		)
-		if err != nil {
-			xlog.Error(fmt.Sprintf("Error posting message: %v", err))
-		}
+		replyWithPostMessage(res.Response, api, ev, postMessageParams, res)
 
 	}()
 }
@@ -319,6 +309,118 @@ func encodeImageFromURL(imageBytes bytes.Buffer) (string, error) {
 	// Encode the image data to base64
 	base64Image := base64.StdEncoding.EncodeToString(imageBytes.Bytes())
 	return base64Image, nil
+}
+
+// SplitText splits a long text into chunks of a specified maximum length without truncating words.
+func splitText(text string, maxLen int) []string {
+	if len(text) <= maxLen {
+		return []string{text}
+	}
+
+	var chunks []string
+	words := strings.Fields(text) // Splitting the text into words
+	var chunk string
+
+	for _, word := range words {
+		if len(chunk)+len(word)+1 > maxLen { // +1 for space
+			chunks = append(chunks, chunk)
+			chunk = word
+		} else {
+			if chunk != "" {
+				chunk += " "
+			}
+			chunk += word
+		}
+	}
+
+	if chunk != "" {
+		chunks = append(chunks, chunk)
+	}
+
+	return chunks
+}
+
+func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackevents.MessageEvent, postMessageParams slack.PostMessageParameters, res *types.JobResult) {
+	if len(finalResponse) > 4000 {
+		// split response in multiple messages, and update the first
+
+		messages := splitText(finalResponse, 4000)
+
+		for i, message := range messages {
+			if i == 0 {
+				continue
+			}
+			_, _, err := api.PostMessage(ev.Channel,
+				slack.MsgOptionLinkNames(true),
+				slack.MsgOptionEnableLinkUnfurl(),
+				slack.MsgOptionText(message, true),
+				slack.MsgOptionPostMessageParameters(postMessageParams),
+				slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+			)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
+			}
+		}
+	} else {
+		_, _, err := api.PostMessage(ev.Channel,
+			slack.MsgOptionLinkNames(true),
+			slack.MsgOptionEnableLinkUnfurl(),
+			slack.MsgOptionText(res.Response, true),
+			slack.MsgOptionPostMessageParameters(postMessageParams),
+			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+		//	slack.MsgOptionTS(ts),
+		)
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
+		}
+	}
+}
+
+func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackevents.AppMentionEvent, msgTs string, ts string, res *types.JobResult) {
+	if len(finalResponse) > 4000 {
+		// split response in multiple messages, and update the first
+
+		messages := splitText(finalResponse, 4000)
+
+		_, _, _, err := api.UpdateMessage(
+			ev.Channel,
+			msgTs,
+			slack.MsgOptionLinkNames(true),
+			slack.MsgOptionEnableLinkUnfurl(),
+			slack.MsgOptionText(messages[0], true),
+			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+		)
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
+		}
+
+		for i, message := range messages {
+			if i == 0 {
+				continue
+			}
+			_, _, err = api.PostMessage(ev.Channel,
+				slack.MsgOptionLinkNames(true),
+				slack.MsgOptionEnableLinkUnfurl(),
+				slack.MsgOptionText(message, true),
+				slack.MsgOptionTS(ts),
+			)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
+			}
+		}
+	} else {
+		_, _, _, err := api.UpdateMessage(
+			ev.Channel,
+			msgTs,
+			slack.MsgOptionLinkNames(true),
+			slack.MsgOptionEnableLinkUnfurl(),
+			slack.MsgOptionText(finalResponse, true),
+			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+		)
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
+		}
+	}
 }
 
 func (t *Slack) handleMention(
@@ -569,17 +671,7 @@ func (t *Slack) handleMention(
 		t.placeholderMutex.RUnlock()
 
 		if exists && msgTs != "" {
-			_, _, _, err = api.UpdateMessage(
-				ev.Channel,
-				msgTs,
-				slack.MsgOptionLinkNames(true),
-				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(finalResponse, true),
-				slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
-			)
-			if err != nil {
-				xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
-			}
+			replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, res)
 
 			// Clean up the placeholder map
 			t.placeholderMutex.Lock()
