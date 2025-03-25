@@ -120,6 +120,28 @@ go build -o localagent
 ./localagent
 ```
 
+### Development
+
+The development workflow is similar to the source build, but with additional steps for hot reloading of the frontend:
+
+```bash
+# Clone repo
+git clone https://github.com/mudler/LocalAgent.git
+cd LocalAgent
+
+# Install dependencies and start frontend development server
+cd webui/react-ui && bun i && bun run dev
+```
+
+Then in seperate terminal:
+
+```bash
+# Start development server
+cd ../.. && go run main.go
+```
+
+> Note: see webui/react-ui/.vite.config.js for env vars that can be used to configure the backend URL
+
 ## CONNECTORS
 
 Link your agents to the services you already use. Configuration examples below.
