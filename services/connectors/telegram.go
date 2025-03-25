@@ -14,6 +14,7 @@ import (
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAgent/services/actions"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -85,6 +86,28 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 	)
 
 	xlog.Debug("Sending message back to telegram", "response", res.Response)
+
+	for _, res := range res.State {
+		// coming from the search action
+		// if urls, exists := res.Metadata[actions.MetadataUrls]; exists {
+		// 	for _, url := range uniqueStringSlice(urls.([]string)) {
+
+		// 	}
+		// }
+
+		// coming from the gen image actions
+		if imagesUrls, exists := res.Metadata[actions.MetadataImages]; exists {
+			for _, url := range uniqueStringSlice(imagesUrls.([]string)) {
+				b.SendPhoto(ctx, &bot.SendPhotoParams{
+					ChatID: update.Message.Chat.ID,
+					Photo: models.InputFileString{
+						Data: url,
+					},
+				})
+			}
+		}
+
+	}
 	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		//	ParseMode: models.ParseModeMarkdown,
 		ChatID: update.Message.Chat.ID,
