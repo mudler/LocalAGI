@@ -288,27 +288,17 @@ a:hover {
 
 /* Status badge */
 .status-badge {
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  padding: 5px 12px;
   border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-left: 10px;
-}
-
-.status-badge.active {
-  background-color: var(--primary);
-  color: #000;
-  box-shadow: 0 0 10px rgba(0, 255, 149, 0.5);
-  animation: pulse 1.5s infinite;
-}
-
-.status-badge.inactive {
-  background-color: var(--light-bg);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1;
 }
 
 .status-active, .active {
@@ -1650,9 +1640,10 @@ select.form-control {
 /* Agent header styling */
 .agent-header {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 15px;
+  position: relative;
 }
 
 .agent-header h2 {
@@ -1834,4 +1825,144 @@ select.form-control {
 
 .text-center {
   text-align: center;
+}
+
+/* Agent Status Page */
+.agent-status-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.agent-status-container .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.agent-status-container .header-content {
+  display: flex;
+  align-items: center;
+}
+
+.agent-status-container .back-link {
+  margin-right: 1rem;
+  color: var(--primary);
+  font-size: 1.2rem;
+}
+
+.agent-status-container .back-link:hover {
+  color: var(--secondary);
+}
+
+.chat-container {
+  background-color: var(--darker-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  overflow-y: auto;
+  flex-grow: 1;
+  padding: 1.5rem;
+}
+
+.status-item {
+  margin-bottom: 1rem;
+}
+
+.status-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.status-label {
+  font-weight: 600;
+  color: var(--primary);
+  margin-right: 0.5rem;
+  min-width: 100px;
+}
+
+.status-value {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.status-value.reasoning {
+  white-space: pre-wrap;
+}
+
+.no-status-data {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+}
+
+.loader {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: block;
+  margin: 15px auto;
+  position: relative;
+  color: var(--primary);
+  box-sizing: border-box;
+  animation: animloader 2s linear infinite;
+}
+
+@keyframes animloader {
+  0% { box-shadow: 14px 0 0 -2px, 38px 0 0 -2px, -14px 0 0 -2px, -38px 0 0 -2px; }
+  25% { box-shadow: 14px 0 0 -2px, 38px 0 0 -2px, -14px 0 0 -2px, -38px 0 0 2px; }
+  50% { box-shadow: 14px 0 0 -2px, 38px 0 0 -2px, -14px 0 0 2px, -38px 0 0 -2px; }
+  75% { box-shadow: 14px 0 0 2px, 38px 0 0 -2px, -14px 0 0 -2px, -38px 0 0 -2px; }
+  100% { box-shadow: 14px 0 0 -2px, 38px 0 0 2px, -14px 0 0 -2px, -38px 0 0 -2px; }
+}
+
+.error-container {
+  text-align: center;
+  padding: 2rem;
+}
+
+.error-container h2 {
+  color: var(--danger);
+  margin-bottom: 1rem;
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--medium-bg);
+  color: var(--primary);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background-color: var(--light-bg);
+  color: var(--primary);
 }

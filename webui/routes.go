@@ -200,6 +200,19 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
+	// API endpoint for agent status history
+	webapp.Get("/api/agent/:name/status", func(c *fiber.Ctx) error {
+		history := pool.GetStatusHistory(c.Params("name"))
+		if history == nil {
+			history = &state.Status{ActionResults: []types.ActionState{}}
+		}
+		
+		return c.JSON(fiber.Map{
+			"Name": c.Params("name"),
+			"History": Reverse(history.Results()),
+		})
+	})
+
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
 
