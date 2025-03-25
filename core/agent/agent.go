@@ -41,6 +41,7 @@ type Agent struct {
 
 	mcpActions types.Actions
 
+	subscriberMutex        sync.Mutex
 	newMessagesSubscribers []func(openai.ChatCompletionMessage)
 }
 
@@ -118,12 +119,21 @@ func (a *Agent) startNewConversationsConsumer() {
 				return
 
 			case msg := <-a.newConversations:
-				for _, s := range a.newMessagesSubscribers {
+				a.subscriberMutex.Lock()
+				subs := a.newMessagesSubscribers
+				a.subscriberMutex.Unlock()
+				for _, s := range subs {
 					s(msg)
 				}
 			}
 		}
 	}()
+}
+
+func (a *Agent) AddSubscriber(f func(openai.ChatCompletionMessage)) {
+	a.subscriberMutex.Lock()
+	defer a.subscriberMutex.Unlock()
+	a.newMessagesSubscribers = append(a.newMessagesSubscribers, f)
 }
 
 // StopAction stops the current action

@@ -642,6 +642,11 @@ func (t *Slack) handleMention(
 }
 
 func (t *Slack) Start(a *agent.Agent) {
+	postMessageParams := slack.PostMessageParameters{
+		LinkNames: 1,
+		Markdown:  true,
+	}
+
 	api := slack.New(
 		t.botToken,
 		//	slack.OptionDebug(true),
@@ -649,12 +654,22 @@ func (t *Slack) Start(a *agent.Agent) {
 		slack.OptionAppLevelToken(t.appToken),
 	)
 
-	t.apiClient = api
-
-	postMessageParams := slack.PostMessageParameters{
-		LinkNames: 1,
-		Markdown:  true,
+	if t.channelID != "" {
+		// handle new conversations
+		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+			_, _, err := api.PostMessage(t.channelID,
+				slack.MsgOptionLinkNames(true),
+				slack.MsgOptionEnableLinkUnfurl(),
+				slack.MsgOptionText(ccm.Content, true),
+				slack.MsgOptionPostMessageParameters(postMessageParams),
+			)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
+			}
+		})
 	}
+
+	t.apiClient = api
 
 	client := socketmode.New(
 		api,
