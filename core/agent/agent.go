@@ -608,7 +608,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 		if followingAction != nil &&
 			!followingAction.Definition().Name.Is(action.ReplyActionName) &&
-			!chosenAction.Definition().Name.Is(action.ReplyActionName) {
+			!chosenAction.Definition().Name.Is(action.ReplyActionName) &&
+			!followingAction.Definition().Name.Is(action.PlanActionName) {
+
 			xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
 
 			// We need to do another action (?)
@@ -619,6 +621,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			a.nextActionParams = &followingParams
 			a.consumeJob(job, role)
 			return
+		} else if followingAction.Definition().Name.Is(action.PlanActionName) {
+			xlog.Debug("Following action is a plan action, skipping", "agent", a.Character.Name)
 		} else if followingAction == nil {
 			xlog.Info("Not following another action", "agent", a.Character.Name)
 
