@@ -40,6 +40,8 @@ type Agent struct {
 	newConversations chan openai.ChatCompletionMessage
 
 	mcpActions types.Actions
+
+	newMessagesSubscribers []func(openai.ChatCompletionMessage)
 }
 
 type RAGDB interface {
@@ -64,12 +66,13 @@ func New(opts ...Option) (*Agent, error) {
 
 	ctx, cancel := context.WithCancel(c)
 	a := &Agent{
-		jobQueue:     make(chan *types.Job),
-		options:      options,
-		client:       client,
-		Character:    options.character,
-		currentState: &action.AgentInternalState{},
-		context:      types.NewActionContext(ctx, cancel),
+		jobQueue:               make(chan *types.Job),
+		options:                options,
+		client:                 client,
+		Character:              options.character,
+		currentState:           &action.AgentInternalState{},
+		context:                types.NewActionContext(ctx, cancel),
+		newMessagesSubscribers: options.newConversationsSubscribers,
 	}
 
 	if a.options.statefile != "" {
@@ -102,7 +105,25 @@ func New(opts ...Option) (*Agent, error) {
 		"model", a.options.LLMAPI.Model,
 	)
 
+	a.startNewConversationsConsumer()
+
 	return a, nil
+}
+
+func (a *Agent) startNewConversationsConsumer() {
+	go func() {
+		for {
+			select {
+			case <-a.context.Done():
+				return
+
+			case msg := <-a.newConversations:
+				for _, s := range a.newMessagesSubscribers {
+					s(msg)
+				}
+			}
+		}
+	}()
 }
 
 // StopAction stops the current action
@@ -122,10 +143,6 @@ func (a *Agent) Context() context.Context {
 
 func (a *Agent) ActionContext() context.Context {
 	return a.actionContext.Context
-}
-
-func (a *Agent) ConversationChannel() chan openai.ChatCompletionMessage {
-	return a.newConversations
 }
 
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.

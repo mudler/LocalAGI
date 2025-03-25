@@ -19,8 +19,7 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) {
 
 	// Walk conversation from bottom to top, and find the first message of the user
 	// to use it as a query to the KB
-	var userMessage string
-	userMessage = conv.GetLatestUserMessage().Content
+	userMessage := conv.GetLatestUserMessage().Content
 
 	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage, "lastMessage", conv.GetLatestUserMessage())
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
@@ -35,17 +36,28 @@ type Slack struct {
 	placeholders     map[string]string // map[jobUUID]messageTS
 	placeholderMutex sync.RWMutex
 	apiClient        *slack.Client
+
+	conversationTracker *ConversationTracker[string]
+	processing          sync.Mutex
+	processingMessage   bool
 }
 
 const thinkingMessage = "thinking..."
 
 func NewSlack(config map[string]string) *Slack {
+
+	duration, err := time.ParseDuration(config["lastMessageDuration"])
+	if err != nil {
+		duration = 5 * time.Minute
+	}
+
 	return &Slack{
-		appToken:     config["appToken"],
-		botToken:     config["botToken"],
-		channelID:    config["channelID"],
-		alwaysReply:  config["alwaysReply"] == "true",
-		placeholders: make(map[string]string),
+		appToken:            config["appToken"],
+		botToken:            config["botToken"],
+		channelID:           config["channelID"],
+		alwaysReply:         config["alwaysReply"] == "true",
+		conversationTracker: NewConversationTracker[string](duration),
+		placeholders:        make(map[string]string),
 	}
 }
 
@@ -182,6 +194,26 @@ func (t *Slack) handleChannelMessage(
 		return
 	}
 
+	currentConv := t.conversationTracker.GetConversation(t.channelID)
+
+	// Lock the conversation mutex to update the conversation history
+	t.processing.Lock()
+
+	// If we are already processing something, stop the current action
+	if t.processingMessage {
+		a.StopAction()
+	} else {
+		t.processingMessage = true
+	}
+	t.processing.Unlock()
+
+	// Defer to reset the processing flag
+	defer func() {
+		t.processing.Lock()
+		t.processingMessage = false
+		t.processing.Unlock()
+	}()
+
 	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
 	go func() {
@@ -221,20 +253,57 @@ func (t *Slack) handleChannelMessage(
 
 		// If the last message has an image, we send it as a multi content message
 		if len(imageBytes.Bytes()) > 0 {
-
 			// // Encode the image to base64
 			imgBase64, err := encodeImageFromURL(*imageBytes)
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error encoding image to base64: %v", err))
 			} else {
-				agentOptions = append(agentOptions, types.WithTextImage(message, fmt.Sprintf("data:%s;base64,%s", mimeType, imgBase64)))
+				currentConv = append(currentConv,
+					openai.ChatCompletionMessage{
+						Role: "user",
+						MultiContent: []openai.ChatMessagePart{
+							{
+								Text: message,
+								Type: openai.ChatMessagePartTypeText,
+							},
+							{
+								Type: openai.ChatMessagePartTypeImageURL,
+								ImageURL: &openai.ChatMessageImageURL{
+									URL: fmt.Sprintf("data:%s;base64,%s", mimeType, imgBase64),
+								},
+							},
+						},
+					},
+				)
 			}
 		} else {
-			agentOptions = append(agentOptions, types.WithText(message))
+			currentConv = append(currentConv, openai.ChatCompletionMessage{
+				Role:    "user",
+				Content: message,
+			})
 		}
+
+		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
 
 		res := a.Ask(
 			agentOptions...,
+		)
+
+		if res.Response == "" {
+			xlog.Debug(fmt.Sprintf("Empty response from agent"))
+			return
+		}
+
+		if res.Error != nil {
+			xlog.Error(fmt.Sprintf("Error from agent: %v", res.Error))
+			return
+		}
+
+		t.conversationTracker.AddMessage(
+			t.channelID, openai.ChatCompletionMessage{
+				Role:    "assistant",
+				Content: res.Response,
+			},
 		)
 
 		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
@@ -250,6 +319,7 @@ func (t *Slack) handleChannelMessage(
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 		}
+
 	}()
 }
 
@@ -485,6 +555,15 @@ func (t *Slack) handleMention(
 			types.WithUUID(jobUUID),
 			types.WithMetadata(metadata),
 		)
+
+		if res.Response == "" {
+			xlog.Debug(fmt.Sprintf("Empty response from agent"))
+			_, _, err := api.DeleteMessage(ev.Channel, msgTs)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error deleting message: %v", err))
+			}
+			return
+		}
 
 		// get user id
 		user, err := api.GetUserInfo(ev.User)

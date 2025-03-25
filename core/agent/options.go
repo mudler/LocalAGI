@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/sashabaranov/go-openai"
 )
 
 type Option func(*options) error
@@ -49,6 +50,8 @@ type options struct {
 	conversationsPath string
 
 	mcpServers []MCPServer
+
+	newConversationsSubscribers []func(openai.ChatCompletionMessage)
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -121,6 +124,13 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 	return func(o *options) error {
 		o.enableKB = true
 		o.kbResults = results
+		return nil
+	}
+}
+
+func WithNewConversationSubscriber(sub func(openai.ChatCompletionMessage)) Option {
+	return func(o *options) error {
+		o.newConversationsSubscribers = append(o.newConversationsSubscribers, sub)
 		return nil
 	}
 }

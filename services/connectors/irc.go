@@ -9,25 +9,33 @@ import (
 	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
+	"github.com/sashabaranov/go-openai"
 	irc "github.com/thoj/go-ircevent"
 )
 
 type IRC struct {
-	server      string
-	port        string
-	nickname    string
-	channel     string
-	conn        *irc.Connection
-	alwaysReply bool
+	server              string
+	port                string
+	nickname            string
+	channel             string
+	conn                *irc.Connection
+	alwaysReply         bool
+	conversationTracker *ConversationTracker[string]
 }
 
 func NewIRC(config map[string]string) *IRC {
+
+	duration, err := time.ParseDuration(config["lastMessageDuration"])
+	if err != nil {
+		duration = 5 * time.Minute
+	}
 	return &IRC{
-		server:      config["server"],
-		port:        config["port"],
-		nickname:    config["nickname"],
-		channel:     config["channel"],
-		alwaysReply: config["alwaysReply"] == "true",
+		server:              config["server"],
+		port:                config["port"],
+		nickname:            config["nickname"],
+		channel:             config["channel"],
+		alwaysReply:         config["alwaysReply"] == "true",
+		conversationTracker: NewConversationTracker[string](duration),
 	}
 }
 
@@ -102,12 +110,32 @@ func (i *IRC) Start(a *agent.Agent) {
 		}
 
 		xlog.Info("Recv message", "message", message, "sender", sender, "channel", channel)
-		cleanedMessage := "My name is " + sender + ". " + cleanUpMessage(message, i.nickname)
+		cleanedMessage := cleanUpMessage(message, i.nickname)
 
 		go func() {
-			res := a.Ask(
-				types.WithText(cleanedMessage),
+			conv := i.conversationTracker.GetConversation(channel)
+
+			conv = append(conv,
+				openai.ChatCompletionMessage{
+					Content: cleanedMessage,
+					Role:    "user",
+				},
 			)
+
+			res := a.Ask(
+				types.WithConversationHistory(conv),
+			)
+
+			if res.Response == "" {
+				xlog.Info("No response from agent")
+				return
+			}
+
+			// Update the conversation history
+			i.conversationTracker.AddMessage(channel, openai.ChatCompletionMessage{
+				Content: res.Response,
+				Role:    "assistant",
+			})
 
 			xlog.Info("Sending message", "message", res.Response, "channel", channel)
 
