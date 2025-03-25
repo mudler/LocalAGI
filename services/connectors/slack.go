@@ -306,10 +306,7 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 
 		messages := xstrings.SplitParagraph(finalResponse, 3000)
 
-		for i, message := range messages {
-			if i == 0 {
-				continue
-			}
+		for _, message := range messages {
 			_, _, err := api.PostMessage(ev.Channel,
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
