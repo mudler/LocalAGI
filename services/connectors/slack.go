@@ -295,7 +295,7 @@ func (t *Slack) handleChannelMessage(
 
 		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
-		_, _, err = api.PostMessage(ev.Channel,
+		_, _, err := api.PostMessage(ev.Channel,
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
 			slack.MsgOptionText(res.Response, true),
