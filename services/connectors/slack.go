@@ -7,12 +7,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAgent/pkg/xstrings"
 	"github.com/mudler/LocalAgent/services/actions"
 	"github.com/sashabaranov/go-openai"
 
@@ -137,23 +137,11 @@ func replaceUserIDsWithNamesInMessage(api *slack.Client, message string) string 
 	return message
 }
 
-func uniqueStringSlice(s []string) []string {
-	keys := make(map[string]bool)
-	list := []string{}
-	for _, entry := range s {
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
-			list = append(list, entry)
-		}
-	}
-	return list
-}
-
 func generateAttachmentsFromJobResponse(j *types.JobResult) (attachments []slack.Attachment) {
 	for _, state := range j.State {
 		// coming from the search action
 		if urls, exists := state.Metadata[actions.MetadataUrls]; exists {
-			for _, url := range uniqueStringSlice(urls.([]string)) {
+			for _, url := range xstrings.UniqueSlice(urls.([]string)) {
 				attachment := slack.Attachment{
 					Title:     "URL",
 					TitleLink: url,
@@ -165,7 +153,7 @@ func generateAttachmentsFromJobResponse(j *types.JobResult) (attachments []slack
 
 		// coming from the gen image actions
 		if imagesUrls, exists := state.Metadata[actions.MetadataImages]; exists {
-			for _, url := range uniqueStringSlice(imagesUrls.([]string)) {
+			for _, url := range xstrings.UniqueSlice(imagesUrls.([]string)) {
 				attachment := slack.Attachment{
 					Title:     "Image",
 					TitleLink: url,
@@ -312,45 +300,11 @@ func encodeImageFromURL(imageBytes bytes.Buffer) (string, error) {
 	return base64Image, nil
 }
 
-// SplitText splits a long text into chunks of a specified maximum length without truncating words and preserves special characters.
-func splitText(text string, maxLen int) []string {
-	if len(text) <= maxLen {
-		return []string{text}
-	}
-
-	var chunks []string
-	lines := strings.Split(text, "\n") // Split text by newlines first
-	whitespaceRegex := regexp.MustCompile(`\s+`)
-
-	for _, line := range lines {
-		var chunk string
-		words := whitespaceRegex.Split(line, -1) // Splitting the line into words while preserving whitespace
-
-		for _, word := range words {
-			if len(chunk)+len(word)+1 > maxLen { // +1 for space
-				chunks = append(chunks, chunk)
-				chunk = word
-			} else {
-				if chunk != "" {
-					chunk += " "
-				}
-				chunk += word
-			}
-		}
-
-		if chunk != "" {
-			chunks = append(chunks, chunk)
-		}
-	}
-
-	return chunks
-}
-
 func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackevents.MessageEvent, postMessageParams slack.PostMessageParameters, res *types.JobResult) {
 	if len(finalResponse) > 4000 {
 		// split response in multiple messages, and update the first
 
-		messages := splitText(finalResponse, 4000)
+		messages := xstrings.SplitParagraph(finalResponse, 3000)
 
 		for i, message := range messages {
 			if i == 0 {
@@ -386,7 +340,7 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 	if len(finalResponse) > 3000 {
 		// split response in multiple messages, and update the first
 
-		messages := splitText(finalResponse, 3000)
+		messages := xstrings.SplitParagraph(finalResponse, 3000)
 
 		_, _, _, err := api.UpdateMessage(
 			ev.Channel,
