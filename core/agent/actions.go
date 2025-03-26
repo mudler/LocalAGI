@@ -174,17 +174,17 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	)
 }
 
-func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction types.Action, actionParams types.ActionParams, reasoning string, pickTemplate string, conv Messages) error {
+func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction types.Action, actionParams types.ActionParams, reasoning string, pickTemplate string, conv Messages) (Messages, error) {
 	// Planning: run all the actions in sequence
 	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
 		xlog.Debug("no plan action")
-		return nil
+		return conv, nil
 	}
 
 	xlog.Debug("[planning]...")
 	planResult := action.PlanResult{}
 	if err := actionParams.Unmarshal(&planResult); err != nil {
-		return fmt.Errorf("error unmarshalling plan result: %w", err)
+		return conv, fmt.Errorf("error unmarshalling plan result: %w", err)
 	}
 
 	stateResult := types.ActionState{
@@ -207,7 +207,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 	}
 
 	if len(planResult.Subtasks) == 0 {
-		return fmt.Errorf("no subtasks")
+		return conv, fmt.Errorf("no subtasks")
 	}
 
 	// Execute all subtasks in sequence
@@ -223,7 +223,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 
 		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning)
 		if err != nil {
-			return fmt.Errorf("error generating action's parameters: %w", err)
+			return conv, fmt.Errorf("error generating action's parameters: %w", err)
 
 		}
 		actionParams = params.actionParams
@@ -252,7 +252,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 
 		result, err := a.runAction(subTaskAction, actionParams)
 		if err != nil {
-			return fmt.Errorf("error running action: %w", err)
+			return conv, fmt.Errorf("error running action: %w", err)
 		}
 
 		stateResult := types.ActionState{
@@ -270,7 +270,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		conv = a.addFunctionResultToConversation(subTaskAction, actionParams, result, conv)
 	}
 
-	return nil
+	return conv, nil
 }
 
 func (a *Agent) availableActions() types.Actions {
