@@ -300,6 +300,10 @@ func (t *Slack) handleChannelMessage(
 			})
 		}
 
+		t.conversationTracker.AddMessage(
+			t.channelID, currentConv[len(currentConv)-1],
+		)
+
 		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
 
 		// Add channel to metadata for tracking
@@ -685,16 +689,12 @@ func (t *Slack) handleMention(
 }
 
 func (t *Slack) Start(a *agent.Agent) {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+
 	postMessageParams := slack.PostMessageParameters{
 		LinkNames: 1,
 		Markdown:  true,
 	}
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+
 	// Store the agent reference for use in cancellation
 	t.agent = a
 
