@@ -67,6 +67,14 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		Role:    "user",
 	})
 
+	t.conversationTracker.AddMessage(
+		update.Message.From.ID,
+		openai.ChatCompletionMessage{
+			Content: update.Message.Text,
+			Role:    "user",
+		},
+	)
+
 	xlog.Info("New message", "username", username, "conversation", currentConv)
 	res := a.Ask(
 		types.WithConversationHistory(currentConv),
