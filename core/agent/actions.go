@@ -250,7 +250,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 			break
 		}
 
-		result, err := a.runAction(subTaskAction, actionParams)
+		result, err := a.runAction(ctx, subTaskAction, actionParams)
 		if err != nil {
 			return conv, fmt.Errorf("error running action: %w", err)
 		}

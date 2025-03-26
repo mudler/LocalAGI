@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"log"
 	"sync"
 
@@ -14,11 +15,14 @@ type Job struct {
 	// It can be a question, a command, or a request to do something
 	// The agent will try to do it, and return a response
 	Result              *JobResult
-	reasoningCallback   func(ActionCurrentState) bool
-	resultCallback      func(ActionState)
+	ReasoningCallback   func(ActionCurrentState) bool
+	ResultCallback      func(ActionState)
 	ConversationHistory []openai.ChatCompletionMessage
 	UUID                string
 	Metadata            map[string]interface{}
+
+	context context.Context
+	cancel  context.CancelFunc
 }
 
 // JobResult is the result of a job
@@ -43,13 +47,13 @@ func WithConversationHistory(history []openai.ChatCompletionMessage) JobOption {
 
 func WithReasoningCallback(f func(ActionCurrentState) bool) JobOption {
 	return func(r *Job) {
-		r.reasoningCallback = f
+		r.ReasoningCallback = f
 	}
 }
 
 func WithResultCallback(f func(ActionState)) JobOption {
 	return func(r *Job) {
-		r.resultCallback = f
+		r.ResultCallback = f
 	}
 }
 
@@ -68,17 +72,17 @@ func NewJobResult() *JobResult {
 }
 
 func (j *Job) Callback(stateResult ActionCurrentState) bool {
-	if j.reasoningCallback == nil {
+	if j.ReasoningCallback == nil {
 		return true
 	}
-	return j.reasoningCallback(stateResult)
+	return j.ReasoningCallback(stateResult)
 }
 
 func (j *Job) CallbackWithResult(stateResult ActionState) {
-	if j.resultCallback == nil {
+	if j.ResultCallback == nil {
 		return
 	}
-	j.resultCallback(stateResult)
+	j.ResultCallback(stateResult)
 }
 
 func WithTextImage(text, image string) JobOption {
@@ -134,6 +138,16 @@ func NewJob(opts ...JobOption) *Job {
 		o(j)
 	}
 
+	var ctx context.Context
+	if j.context == nil {
+		ctx = context.Background()
+	} else {
+		ctx = j.context
+	}
+
+	context, cancel := context.WithCancel(ctx)
+	j.context = context
+	j.cancel = cancel
 	return j
 }
 
@@ -141,4 +155,18 @@ func WithUUID(uuid string) JobOption {
 	return func(j *Job) {
 		j.UUID = uuid
 	}
+}
+
+func WithContext(ctx context.Context) JobOption {
+	return func(j *Job) {
+		j.context = ctx
+	}
+}
+
+func (j *Job) Cancel() {
+	j.cancel()
+}
+
+func (j *Job) GetContext() context.Context {
+	return j.context
 }

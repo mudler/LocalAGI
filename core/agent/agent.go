@@ -23,12 +23,11 @@ const (
 
 type Agent struct {
 	sync.Mutex
-	options       *options
-	Character     Character
-	client        *openai.Client
-	jobQueue      chan *types.Job
-	actionContext *types.ActionContext
-	context       *types.ActionContext
+	options   *options
+	Character Character
+	client    *openai.Client
+	jobQueue  chan *types.Job
+	context   *types.ActionContext
 
 	currentReasoning         string
 	currentState             *action.AgentInternalState
@@ -136,26 +135,11 @@ func (a *Agent) AddSubscriber(f func(openai.ChatCompletionMessage)) {
 	a.newMessagesSubscribers = append(a.newMessagesSubscribers, f)
 }
 
-// StopAction stops the current action
-// if any. Can be called before adding a new job.
-func (a *Agent) StopAction() {
-	a.Lock()
-	defer a.Unlock()
-	if a.actionContext != nil {
-		xlog.Debug("Stopping current action", "agent", a.Character.Name)
-		a.actionContext.Cancel()
-	}
-}
-
 func (a *Agent) Context() context.Context {
 	return a.context.Context
 }
 
-func (a *Agent) ActionContext() context.Context {
-	return a.actionContext.Context
-}
-
-// Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
+// Ask is a blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 	xlog.Debug("Agent Ask()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
@@ -163,16 +147,32 @@ func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 		xlog.Debug("Agent has finished being asked", "agent", a.Character.Name)
 	}()
 
-	//a.StopAction()
-	j := types.NewJob(
+	return a.Execute(types.NewJob(
 		append(
 			opts,
 			types.WithReasoningCallback(a.options.reasoningCallback),
 			types.WithResultCallback(a.options.resultCallback),
 		)...,
-	)
-	a.jobQueue <- j
+	))
+}
+
+// Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
+// It discards any other computation.
+func (a *Agent) Execute(j *types.Job) *types.JobResult {
+	xlog.Debug("Agent Execute()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
+	defer func() {
+		xlog.Debug("Agent has finished", "agent", a.Character.Name)
+	}()
+
+	a.Enqueue(j)
 	return j.Result.WaitResult()
+}
+
+func (a *Agent) Enqueue(j *types.Job) {
+	j.ReasoningCallback = a.options.reasoningCallback
+	j.ResultCallback = a.options.resultCallback
+
+	a.jobQueue <- j
 }
 
 func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletionMessage) (openai.ChatCompletionMessage, error) {
@@ -225,10 +225,10 @@ func (a *Agent) Memory() RAGDB {
 	return a.options.ragdb
 }
 
-func (a *Agent) runAction(chosenAction types.Action, params types.ActionParams) (result types.ActionResult, err error) {
+func (a *Agent) runAction(ctx context.Context, chosenAction types.Action, params types.ActionParams) (result types.ActionResult, err error) {
 	for _, act := range a.availableActions() {
 		if act.Definition().Name == chosenAction.Definition().Name {
-			res, err := act.Run(a.actionContext, params)
+			res, err := act.Run(ctx, params)
 			if err != nil {
 				return types.ActionResult{}, fmt.Errorf("error running action: %w", err)
 			}
@@ -407,20 +407,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	conv := job.ConversationHistory
 
 	a.Lock()
-	// Set the action context
-	ctx, cancel := context.WithCancel(context.Background())
-	a.actionContext = types.NewActionContext(ctx, cancel)
 	a.selfEvaluationInProgress = selfEvaluation
 	a.Unlock()
-
-	defer func() {
-		a.Lock()
-		if a.actionContext != nil {
-			a.actionContext.Cancel()
-			a.actionContext = nil
-		}
-		a.Unlock()
-	}()
+	defer job.Cancel()
 
 	if selfEvaluation {
 		defer func() {
@@ -463,7 +452,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		a.nextAction = nil
 	} else {
 		var err error
-		chosenAction, actionParams, reasoning, err = a.pickAction(ctx, pickTemplate, conv)
+		chosenAction, actionParams, reasoning, err = a.pickAction(job.GetContext(), pickTemplate, conv)
 		if err != nil {
 			xlog.Error("Error picking action", "error", err)
 			job.Result.Finish(err)
@@ -506,7 +495,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			"reasoning", reasoning,
 		)
 
-		params, err := a.generateParameters(ctx, pickTemplate, chosenAction, conv, reasoning)
+		params, err := a.generateParameters(job.GetContext(), pickTemplate, chosenAction, conv, reasoning)
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("error generating action's parameters: %w", err))
 			return
@@ -529,7 +518,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	var err error
-	conv, err = a.handlePlanning(ctx, job, chosenAction, actionParams, reasoning, pickTemplate, conv)
+	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)
 	if err != nil {
 		job.Result.Finish(fmt.Errorf("error running action: %w", err))
 		return
@@ -584,7 +573,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
 
 		if !chosenAction.Definition().Name.Is(action.PlanActionName) {
-			result, err := a.runAction(chosenAction, actionParams)
+			result, err := a.runAction(job.GetContext(), chosenAction, actionParams)
 			if err != nil {
 				//job.Result.Finish(fmt.Errorf("error running action: %w", err))
 				//return
@@ -613,7 +602,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 		// given the result, we can now ask OpenAI to complete the conversation or
 		// to continue using another tool given the result
-		followingAction, followingParams, reasoning, err := a.pickAction(ctx, reEvaluationTemplate, conv)
+		followingAction, followingParams, reasoning, err := a.pickAction(job.GetContext(), reEvaluationTemplate, conv)
 		if err != nil {
 			job.Result.Conversation = conv
 			job.Result.Finish(fmt.Errorf("error picking action: %w", err))
@@ -736,7 +725,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", conv))
-	msg, err := a.askLLM(ctx, conv)
+	msg, err := a.askLLM(job.GetContext(), conv)
 	if err != nil {
 		job.Result.Conversation = conv
 		job.Result.Finish(err)
@@ -793,7 +782,6 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// Remember always to reset the timer - if we don't the agent will stop..
 	defer timer.Reset(a.options.periodicRuns)
 
-	a.StopAction()
 	xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 
 	// TODO: Would be nice if we have a special action to
@@ -902,6 +890,5 @@ func (a *Agent) loop(timer *time.Timer, job *types.Job) {
 		<-timer.C
 	}
 	xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
-	a.StopAction()
 	a.consumeJob(job, UserRole)
 }

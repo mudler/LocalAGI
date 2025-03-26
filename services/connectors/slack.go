@@ -38,9 +38,8 @@ type Slack struct {
 	apiClient        *slack.Client
 
 	// Track active jobs for cancellation
-	activeJobs      map[string]bool // map[channelID]bool to track if a channel has active processing
+	activeJobs      map[string][]*types.Job // map[channelID]bool to track if a channel has active processing
 	activeJobsMutex sync.RWMutex
-	agent           *agent.Agent // Reference to the agent to call StopAction
 
 	conversationTracker *ConversationTracker[string]
 }
@@ -61,7 +60,7 @@ func NewSlack(config map[string]string) *Slack {
 		alwaysReply:         config["alwaysReply"] == "true",
 		conversationTracker: NewConversationTracker[string](duration),
 		placeholders:        make(map[string]string),
-		activeJobs:          make(map[string]bool),
+		activeJobs:          make(map[string][]*types.Job),
 	}
 }
 
@@ -116,15 +115,17 @@ func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 // cancelActiveJobForChannel cancels any active job for the given channel
 func (t *Slack) cancelActiveJobForChannel(channelID string) {
 	t.activeJobsMutex.RLock()
-	isActive := t.activeJobs[channelID]
+	ctxs, exists := t.activeJobs[channelID]
 	t.activeJobsMutex.RUnlock()
 
-	if isActive && t.agent != nil {
+	if exists {
 		xlog.Info(fmt.Sprintf("Cancelling active job for channel: %s", channelID))
-		t.agent.StopAction()
 
 		// Mark the job as inactive
 		t.activeJobsMutex.Lock()
+		for _, c := range ctxs {
+			c.Cancel()
+		}
 		delete(t.activeJobs, channelID)
 		t.activeJobsMutex.Unlock()
 	}
@@ -250,17 +251,6 @@ func (t *Slack) handleChannelMessage(
 	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
 	go func() {
-		// Mark this channel as having an active job
-		t.activeJobsMutex.Lock()
-		t.activeJobs[ev.Channel] = true
-		t.activeJobsMutex.Unlock()
-
-		defer func() {
-			// Mark job as complete
-			t.activeJobsMutex.Lock()
-			delete(t.activeJobs, ev.Channel)
-			t.activeJobsMutex.Unlock()
-		}()
 
 		imageBytes, mimeType := scanImagesInMessages(api, ev)
 
@@ -311,6 +301,27 @@ func (t *Slack) handleChannelMessage(
 			"channel": ev.Channel,
 		}
 		agentOptions = append(agentOptions, types.WithMetadata(metadata))
+
+		job := types.NewJob(agentOptions...)
+
+		// Mark this channel as having an active job
+		t.activeJobsMutex.Lock()
+		t.activeJobs[ev.Channel] = append(t.activeJobs[ev.Channel], job)
+		t.activeJobsMutex.Unlock()
+
+		defer func() {
+			// Mark job as complete
+			t.activeJobsMutex.Lock()
+			job.Cancel()
+			for i, j := range t.activeJobs[ev.Channel] {
+				if j.UUID == job.UUID {
+					t.activeJobs[ev.Channel] = append(t.activeJobs[ev.Channel][:i], t.activeJobs[ev.Channel][i+1:]...)
+					break
+				}
+			}
+
+			t.activeJobsMutex.Unlock()
+		}()
 
 		res := a.Ask(
 			agentOptions...,
@@ -694,9 +705,6 @@ func (t *Slack) Start(a *agent.Agent) {
 		LinkNames: 1,
 		Markdown:  true,
 	}
-
-	// Store the agent reference for use in cancellation
-	t.agent = a
 
 	api := slack.New(
 		t.botToken,
