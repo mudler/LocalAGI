@@ -1,4 +1,5 @@
 import React from 'react';
+import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * MCP Servers section of the agent form
@@ -9,6 +10,28 @@ const MCPServersSection = ({
   handleRemoveMCPServer, 
   handleMCPServerChange 
 }) => {
+  // Define field definitions for each MCP server
+  const getServerFields = () => [
+    {
+      name: 'url',
+      label: 'URL',
+      type: 'text',
+      defaultValue: '',
+      placeholder: 'https://example.com/mcp',
+    },
+    {
+      name: 'token',
+      label: 'API Key',
+      type: 'password',
+      defaultValue: '',
+    },
+  ];
+
+  // Handle field value changes for a specific server
+  const handleFieldChange = (index, name, value) => {
+    handleMCPServerChange(index, name, value);
+  };
+
   return (
     <div id="mcp-section">
       <h3 className="section-title">MCP Servers</h3>
@@ -30,28 +53,12 @@ const MCPServersSection = ({
               </button>
             </div>
             
-            <div className="mb-3">
-              <label htmlFor={`mcp-url-${index}`}>URL</label>
-              <input 
-                type="text" 
-                id={`mcp-url-${index}`}
-                value={server.url || ''}
-                onChange={(e) => handleMCPServerChange(index, 'url', e.target.value)}
-                className="form-control"
-                placeholder="https://example.com/mcp"
-              />
-            </div>
-            
-            <div className="mb-3">
-              <label htmlFor={`mcp-api-key-${index}`}>API Key</label>
-              <input 
-                type="password" 
-                id={`mcp-api-key-${index}`}
-                value={server.token || ''}
-                onChange={(e) => handleMCPServerChange(index, 'token', e.target.value)}
-                className="form-control"
-              />
-            </div>
+            <FormFieldDefinition
+              fields={getServerFields()}
+              values={server}
+              onChange={(name, value) => handleFieldChange(index, name, value)}
+              idPrefix={`mcp_server_${index}_`}
+            />
           </div>
         ))}
         

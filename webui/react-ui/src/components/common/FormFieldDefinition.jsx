@@ -22,18 +22,19 @@ const FormFieldDefinition = ({
   return (
     <div className="form-fields">
       {fields.map((field) => (
-        <FormField
-          key={field.name}
-          id={`${idPrefix}${field.name}`}
-          label={field.label}
-          type={field.type}
-          value={safeValues[field.name] !== undefined ? safeValues[field.name] : field.defaultValue}
-          onChange={(value) => onChange(field.name, value)}
-          placeholder={field.placeholder || ''}
-          helpText={field.helpText || ''}
-          options={field.options || []}
-          required={field.required || false}
-        />
+        <div key={field.name} style={{ marginBottom: '16px' }}>
+          <FormField
+            id={`${idPrefix}${field.name}`}
+            label={field.label}
+            type={field.type}
+            value={safeValues[field.name] !== undefined ? safeValues[field.name] : field.defaultValue}
+            onChange={(value) => onChange(field.name, value)}
+            placeholder={field.placeholder || ''}
+            helpText={field.helpText || ''}
+            options={field.options || []}
+            required={field.required || false}
+          />
+        </div>
       ))}
     </div>
   );

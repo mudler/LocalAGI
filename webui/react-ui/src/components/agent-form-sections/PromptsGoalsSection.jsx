@@ -1,67 +1,78 @@
 import React from 'react';
+import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * Prompts & Goals section of the agent form
  */
 const PromptsGoalsSection = ({ formData, handleInputChange, isGroupForm }) => {
-  // In group form context, we hide the system prompt as it comes from each agent profile
+  // Define field definitions for Prompts & Goals section
+  const getFields = () => {
+    // Base fields that are always shown
+    const baseFields = [
+      {
+        name: 'goals',
+        label: 'Goals',
+        type: 'textarea',
+        defaultValue: '',
+        helpText: 'Define the agent\'s goals (one per line)',
+        rows: 5,
+      },
+      {
+        name: 'constraints',
+        label: 'Constraints',
+        type: 'textarea',
+        defaultValue: '',
+        helpText: 'Define the agent\'s constraints (one per line)',
+        rows: 5,
+      },
+      {
+        name: 'tools',
+        label: 'Tools',
+        type: 'textarea',
+        defaultValue: '',
+        helpText: 'Define the agent\'s tools (one per line)',
+        rows: 5,
+      },
+    ];
+
+    // Only include system_prompt field if not in group form context
+    if (!isGroupForm) {
+      return [
+        {
+          name: 'system_prompt',
+          label: 'System Prompt',
+          type: 'textarea',
+          defaultValue: '',
+          helpText: 'Instructions that define the agent\'s behavior',
+          rows: 5,
+        },
+        ...baseFields
+      ];
+    }
+
+    return baseFields;
+  };
+
+  // Handle field value changes
+  const handleFieldChange = (name, value) => {
+    handleInputChange({
+      target: {
+        name,
+        value
+      }
+    });
+  };
+
   return (
     <div id="prompts-section">
       <h3 className="section-title">Prompts & Goals</h3>
       
-      {!isGroupForm && (
-        <div className="mb-4">
-          <label htmlFor="system_prompt">System Prompt</label>
-          <textarea 
-            name="system_prompt" 
-            id="system_prompt" 
-            value={formData.system_prompt || ''}
-            onChange={handleInputChange}
-            className="form-control"
-            rows="5"
-          />
-          <small className="form-text text-muted">Instructions that define the agent's behavior</small>
-        </div>
-      )}
-
-      <div className="mb-4">
-        <label htmlFor="goals">Goals</label>
-        <textarea 
-          name="goals" 
-          id="goals" 
-          value={formData.goals || ''}
-          onChange={handleInputChange}
-          className="form-control"
-          rows="5"
-        />
-        <small className="form-text text-muted">Define the agent's goals (one per line)</small>
-      </div>
-
-      <div className="mb-4">
-        <label htmlFor="constraints">Constraints</label>
-        <textarea 
-          name="constraints" 
-          id="constraints" 
-          value={formData.constraints || ''}
-          onChange={handleInputChange}
-          className="form-control"
-          rows="5"
-        />
-        <small className="form-text text-muted">Define the agent's constraints (one per line)</small>
-      </div>
-
-      <div className="mb-4">
-        <label htmlFor="tools">Tools</label>
-        <textarea 
-          name="tools" 
-          id="tools" 
-          value={formData.tools || ''}
-          onChange={handleInputChange}
-          className="form-control"
-          rows="5"
-        />
-        <small className="form-text text-muted">Define the agent's tools (one per line)</small>
-      </div>
+      <FormFieldDefinition
+        fields={getFields()}
+        values={formData}
+        onChange={handleFieldChange}
+        idPrefix="prompts_"
+      />
     </div>
   );
 };

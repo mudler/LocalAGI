@@ -1,4 +1,5 @@
 import React from 'react';
+import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * Basic Information section of the agent form
@@ -9,69 +10,74 @@ const BasicInfoSection = ({ formData, handleInputChange, isEdit, isGroupForm }) 
     return null;
   }
   
+  // Define field definitions for Basic Information section
+  const fields = [
+    {
+      name: 'name',
+      label: 'Name',
+      type: 'text',
+      defaultValue: '',
+      required: true,
+      helpText: isEdit ? 'Agent name cannot be changed after creation' : '',
+      disabled: isEdit, // This will be handled in the component
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea',
+      defaultValue: '',
+    },
+    {
+      name: 'identity_guidance',
+      label: 'Identity Guidance',
+      type: 'textarea',
+      defaultValue: '',
+    },
+    {
+      name: 'random_identity',
+      label: 'Random Identity',
+      type: 'checkbox',
+      defaultValue: false,
+    },
+    {
+      name: 'hud',
+      label: 'HUD',
+      type: 'checkbox',
+      defaultValue: false,
+    }
+  ];
+
+  // Handle field value changes
+  const handleFieldChange = (name, value) => {
+    // For checkboxes, convert string 'true'/'false' to boolean
+    if (name === 'random_identity' || name === 'hud') {
+      handleInputChange({
+        target: {
+          name,
+          type: 'checkbox',
+          checked: value === 'true'
+        }
+      });
+    } else {
+      handleInputChange({
+        target: {
+          name,
+          value
+        }
+      });
+    }
+  };
+  
   return (
     <div id="basic-section">
       <h3 className="section-title">Basic Information</h3>
       
-      <div className="mb-4">
-        <label htmlFor="name">Name</label>
-        <input 
-          type="text" 
-          name="name" 
-          id="name" 
-          value={formData.name || ''}
-          onChange={handleInputChange}
-          required
-          disabled={isEdit} // Disable name field in edit mode
-        />
-        {isEdit && <small className="form-text text-muted">Agent name cannot be changed after creation</small>}
-      </div>
-
-      <div className="mb-4">
-        <label htmlFor="description">Description</label>
-        <textarea 
-          name="description" 
-          id="description" 
-          value={formData.description || ''}
-          onChange={handleInputChange}
-        />
-      </div>
-
-      <div className="mb-4">
-        <label htmlFor="identity_guidance">Identity Guidance</label>
-        <textarea 
-          name="identity_guidance" 
-          id="identity_guidance" 
-          value={formData.identity_guidance || ''}
-          onChange={handleInputChange}
-        />
-      </div>
-
-      <div className="mb-4">
-        <label htmlFor="random_identity" className="checkbox-label">
-          <input 
-            type="checkbox" 
-            name="random_identity" 
-            id="random_identity"
-            checked={formData.random_identity || false}
-            onChange={handleInputChange}
-          />
-          Random Identity
-        </label>
-      </div>
-
-      <div className="mb-4">
-        <label htmlFor="hud" className="checkbox-label">
-          <input 
-            type="checkbox" 
-            name="hud" 
-            id="hud"
-            checked={formData.hud || false}
-            onChange={handleInputChange}
-          />
-          HUD
-        </label>
-      </div>
+      <FormFieldDefinition
+        fields={fields}
+        values={formData}
+        onChange={handleFieldChange}
+        idPrefix="basic_"
+      />
     </div>
   );
 };

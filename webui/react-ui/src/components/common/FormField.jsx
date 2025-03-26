@@ -81,6 +81,7 @@ const FormField = ({
               className="form-control"
               placeholder={placeholder}
               required={required}
+              rows={5}
             />
             {helpText && <small className="form-text text-muted">{helpText}</small>}
           </>
