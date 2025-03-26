@@ -122,6 +122,11 @@ func (d *Discord) handleChannelMessage(a *agent.Agent, s *discordgo.Session, m *
 
 	conv := d.conversationTracker.GetConversation(m.ChannelID)
 
+	d.conversationTracker.AddMessage(m.ChannelID, openai.ChatCompletionMessage{
+		Role:    "user",
+		Content: m.Content,
+	})
+
 	jobResult := a.Ask(
 		types.WithConversationHistory(conv),
 	)
@@ -131,16 +136,15 @@ func (d *Discord) handleChannelMessage(a *agent.Agent, s *discordgo.Session, m *
 		return
 	}
 
+	d.conversationTracker.AddMessage(m.ChannelID, openai.ChatCompletionMessage{
+		Role:    "assistant",
+		Content: jobResult.Response,
+	})
+
 	_, err := s.ChannelMessageSend(m.ChannelID, jobResult.Response)
 	if err != nil {
 		xlog.Info("error sending message,", err)
 	}
-
-	d.conversationTracker.AddMessage(m.ChannelID, openai.ChatCompletionMessage{
-		Role:    "user",
-		Content: m.Content,
-	})
-
 }
 
 // This function will be called (due to AddHandler above) every time a new

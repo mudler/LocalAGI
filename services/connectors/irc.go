@@ -122,6 +122,12 @@ func (i *IRC) Start(a *agent.Agent) {
 				},
 			)
 
+			// Update the conversation history
+			i.conversationTracker.AddMessage(channel, openai.ChatCompletionMessage{
+				Content: cleanedMessage,
+				Role:    "user",
+			})
+
 			res := a.Ask(
 				types.WithConversationHistory(conv),
 			)
