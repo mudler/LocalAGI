@@ -394,7 +394,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 
  if err := job.GetContext().Err(); err != nil {
-   job.Result.Finish("expired"))
+   job.Result.Finish(fmt.Errorf("expired"))
    return
  }
 
