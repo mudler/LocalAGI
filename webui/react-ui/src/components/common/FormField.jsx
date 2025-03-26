@@ -25,6 +25,13 @@ const FormField = ({
   options = [],
   required = false,
 }) => {
+  // Create label with required indicator
+  const labelWithIndicator = required ? (
+    <>{label} <span style={{ color: 'var(--danger)' }}>*</span></>
+  ) : (
+    label
+  );
+
   // Render different input types
   const renderInput = () => {
     switch (type) {
@@ -38,7 +45,7 @@ const FormField = ({
                 checked={value === true || value === 'true'}
                 onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
               />
-              {label}
+              {labelWithIndicator}
             </label>
             {helpText && <small className="form-text text-muted d-block">{helpText}</small>}
           </div>
@@ -46,7 +53,7 @@ const FormField = ({
       case 'select':
         return (
           <>
-            <label htmlFor={id}>{label}</label>
+            <label htmlFor={id}>{labelWithIndicator}</label>
             <select
               id={id}
               value={value || ''}
@@ -66,7 +73,7 @@ const FormField = ({
       case 'textarea':
         return (
           <>
-            <label htmlFor={id}>{label}</label>
+            <label htmlFor={id}>{labelWithIndicator}</label>
             <textarea
               id={id}
               value={value || ''}
@@ -81,7 +88,7 @@ const FormField = ({
       default:
         return (
           <>
-            <label htmlFor={id}>{label}</label>
+            <label htmlFor={id}>{labelWithIndicator}</label>
             <input
               type={type}
               id={id}
