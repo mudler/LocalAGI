@@ -11,11 +11,10 @@ import (
 
 type GithubIssuesReader struct {
 	token, repository, owner, customActionName string
-	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueReader(ctx context.Context, config map[string]string) *GithubIssuesReader {
+func NewGithubIssueReader(config map[string]string) *GithubIssuesReader {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubIssuesReader{
@@ -24,7 +23,6 @@ func NewGithubIssueReader(ctx context.Context, config map[string]string) *Github
 		customActionName: config["customActionName"],
 		repository:       config["repository"],
 		owner:            config["owner"],
-		context:          ctx,
 	}
 }
 
@@ -45,7 +43,7 @@ func (g *GithubIssuesReader) Run(ctx context.Context, params types.ActionParams)
 		result.Owner = g.owner
 	}
 
-	issue, _, err := g.client.Issues.Get(g.context, result.Owner, result.Repository, result.IssueNumber)
+	issue, _, err := g.client.Issues.Get(ctx, result.Owner, result.Repository, result.IssueNumber)
 	if err == nil && issue != nil {
 		return types.ActionResult{
 			Result: fmt.Sprintf(

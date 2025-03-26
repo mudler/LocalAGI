@@ -94,23 +94,23 @@ func Action(name string, config map[string]string, pool *state.AgentPool) (types
 	case ActionSearch:
 		a = actions.NewSearch(config)
 	case ActionGithubIssueLabeler:
-		a = actions.NewGithubIssueLabeler(context.Background(), config)
+		a = actions.NewGithubIssueLabeler(config)
 	case ActionGithubIssueOpener:
-		a = actions.NewGithubIssueOpener(context.Background(), config)
+		a = actions.NewGithubIssueOpener(config)
 	case ActionGithubIssueCloser:
-		a = actions.NewGithubIssueCloser(context.Background(), config)
+		a = actions.NewGithubIssueCloser(config)
 	case ActionGithubIssueSearcher:
-		a = actions.NewGithubIssueSearch(context.Background(), config)
+		a = actions.NewGithubIssueSearch(config)
 	case ActionGithubIssueReader:
-		a = actions.NewGithubIssueReader(context.Background(), config)
+		a = actions.NewGithubIssueReader(config)
 	case ActionGithubIssueCommenter:
-		a = actions.NewGithubIssueCommenter(context.Background(), config)
+		a = actions.NewGithubIssueCommenter(config)
 	case ActionGithubRepositoryGet:
-		a = actions.NewGithubRepositoryGetContent(context.Background(), config)
+		a = actions.NewGithubRepositoryGetContent(config)
 	case ActionGithubRepositoryCreateOrUpdate:
-		a = actions.NewGithubRepositoryCreateOrUpdateContent(context.Background(), config)
+		a = actions.NewGithubRepositoryCreateOrUpdateContent(config)
 	case ActionGithubREADME:
-		a = actions.NewGithubRepositoryREADME(context.Background(), config)
+		a = actions.NewGithubRepositoryREADME(config)
 	case ActionScraper:
 		a = actions.NewScraper(config)
 	case ActionWikipedia:

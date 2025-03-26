@@ -11,18 +11,16 @@ import (
 
 type GithubRepositoryREADME struct {
 	token, customActionName string
-	context                 context.Context
 	client                  *github.Client
 }
 
-func NewGithubRepositoryREADME(ctx context.Context, config map[string]string) *GithubRepositoryREADME {
+func NewGithubRepositoryREADME(config map[string]string) *GithubRepositoryREADME {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubRepositoryREADME{
 		client:           client,
 		token:            config["token"],
 		customActionName: config["customActionName"],
-		context:          ctx,
 	}
 }
 
@@ -37,7 +35,7 @@ func (g *GithubRepositoryREADME) Run(ctx context.Context, params types.ActionPar
 
 		return types.ActionResult{}, err
 	}
-	fileContent, _, err := g.client.Repositories.GetReadme(g.context, result.Owner, result.Repository, &github.RepositoryContentGetOptions{})
+	fileContent, _, err := g.client.Repositories.GetReadme(ctx, result.Owner, result.Repository, &github.RepositoryContentGetOptions{})
 	if err != nil {
 		resultString := fmt.Sprintf("Error getting content : %v", err)
 		return types.ActionResult{Result: resultString}, err

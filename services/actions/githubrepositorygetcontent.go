@@ -11,11 +11,10 @@ import (
 
 type GithubRepositoryGetContent struct {
 	token, repository, owner, customActionName string
-	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubRepositoryGetContent(ctx context.Context, config map[string]string) *GithubRepositoryGetContent {
+func NewGithubRepositoryGetContent(config map[string]string) *GithubRepositoryGetContent {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubRepositoryGetContent{
@@ -24,7 +23,6 @@ func NewGithubRepositoryGetContent(ctx context.Context, config map[string]string
 		repository:       config["repository"],
 		owner:            config["owner"],
 		customActionName: config["customActionName"],
-		context:          ctx,
 	}
 }
 
@@ -46,7 +44,7 @@ func (g *GithubRepositoryGetContent) Run(ctx context.Context, params types.Actio
 		result.Owner = g.owner
 	}
 
-	fileContent, directoryContent, _, err := g.client.Repositories.GetContents(g.context, result.Owner, result.Repository, result.Path, nil)
+	fileContent, directoryContent, _, err := g.client.Repositories.GetContents(ctx, result.Owner, result.Repository, result.Path, nil)
 	if err != nil {
 		resultString := fmt.Sprintf("Error getting content : %v", err)
 		return types.ActionResult{Result: resultString}, err

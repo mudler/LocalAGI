@@ -14,11 +14,10 @@ import (
 type GithubIssuesLabeler struct {
 	token, repository, owner, customActionName string
 	availableLabels                            []string
-	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *GithubIssuesLabeler {
+func NewGithubIssueLabeler(config map[string]string) *GithubIssuesLabeler {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	// Get available labels
@@ -34,7 +33,6 @@ func NewGithubIssueLabeler(ctx context.Context, config map[string]string) *Githu
 		customActionName: config["customActionName"],
 		repository:       config["repository"],
 		owner:            config["owner"],
-		context:          ctx,
 		availableLabels:  availableLabels,
 	}
 }
@@ -56,7 +54,7 @@ func (g *GithubIssuesLabeler) Run(ctx context.Context, params types.ActionParams
 		result.Owner = g.owner
 	}
 
-	labels, _, err := g.client.Issues.AddLabelsToIssue(g.context, result.Owner, result.Repository, result.IssueNumber, []string{result.Label})
+	labels, _, err := g.client.Issues.AddLabelsToIssue(ctx, result.Owner, result.Repository, result.IssueNumber, []string{result.Label})
 	//labelsNames := []string{}
 	for _, l := range labels {
 		xlog.Info("Label added", "label", l.Name)

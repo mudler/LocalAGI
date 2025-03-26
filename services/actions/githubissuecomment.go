@@ -11,11 +11,10 @@ import (
 
 type GithubIssuesCommenter struct {
 	token, repository, owner, customActionName string
-	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueCommenter(ctx context.Context, config map[string]string) *GithubIssuesCommenter {
+func NewGithubIssueCommenter(config map[string]string) *GithubIssuesCommenter {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubIssuesCommenter{
@@ -24,7 +23,6 @@ func NewGithubIssueCommenter(ctx context.Context, config map[string]string) *Git
 		customActionName: config["customActionName"],
 		repository:       config["repository"],
 		owner:            config["owner"],
-		context:          ctx,
 	}
 }
 
@@ -45,7 +43,7 @@ func (g *GithubIssuesCommenter) Run(ctx context.Context, params types.ActionPara
 		result.Owner = g.owner
 	}
 
-	_, _, err = g.client.Issues.CreateComment(g.context, result.Owner, result.Repository, result.IssueNumber,
+	_, _, err = g.client.Issues.CreateComment(ctx, result.Owner, result.Repository, result.IssueNumber,
 		&github.IssueComment{
 			Body: &result.Comment,
 		})

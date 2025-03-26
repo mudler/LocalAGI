@@ -11,11 +11,10 @@ import (
 
 type GithubIssuesCloser struct {
 	token, repository, owner, customActionName string
-	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueCloser(ctx context.Context, config map[string]string) *GithubIssuesCloser {
+func NewGithubIssueCloser(config map[string]string) *GithubIssuesCloser {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 	return &GithubIssuesCloser{
 		client:           client,
@@ -23,7 +22,6 @@ func NewGithubIssueCloser(ctx context.Context, config map[string]string) *Github
 		repository:       config["repository"],
 		owner:            config["owner"],
 		customActionName: config["customActionName"],
-		context:          ctx,
 	}
 }
 
@@ -60,7 +58,7 @@ func (g *GithubIssuesCloser) Run(ctx context.Context, params types.ActionParams)
 	// 	return "", err
 	// }
 
-	_, _, err = g.client.Issues.Edit(g.context, result.Owner, result.Repository, result.IssueNumber, &github.IssueRequest{
+	_, _, err = g.client.Issues.Edit(ctx, result.Owner, result.Repository, result.IssueNumber, &github.IssueRequest{
 		State: github.String("closed"),
 	})
 

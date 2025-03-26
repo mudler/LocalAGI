@@ -12,11 +12,10 @@ import (
 
 type GithubIssueSearch struct {
 	token, repository, owner, customActionName string
-	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueSearch(ctx context.Context, config map[string]string) *GithubIssueSearch {
+func NewGithubIssueSearch(config map[string]string) *GithubIssueSearch {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubIssueSearch{
@@ -25,7 +24,6 @@ func NewGithubIssueSearch(ctx context.Context, config map[string]string) *Github
 		repository:       config["repository"],
 		owner:            config["owner"],
 		customActionName: config["customActionName"],
-		context:          ctx,
 	}
 }
 
@@ -49,7 +47,7 @@ func (g *GithubIssueSearch) Run(ctx context.Context, params types.ActionParams) 
 
 	query := fmt.Sprintf("%s in:%s user:%s", result.Query, result.Repository, result.Owner)
 	resultString := ""
-	issues, _, err := g.client.Search.Issues(g.context, query, &github.SearchOptions{
+	issues, _, err := g.client.Search.Issues(ctx, query, &github.SearchOptions{
 		ListOptions: github.ListOptions{PerPage: 5},
 		Order:       "desc",
 		//Sort:        "created",

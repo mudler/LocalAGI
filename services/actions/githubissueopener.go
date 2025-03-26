@@ -11,11 +11,10 @@ import (
 
 type GithubIssuesOpener struct {
 	token, repository, owner, customActionName string
-	context                                    context.Context
 	client                                     *github.Client
 }
 
-func NewGithubIssueOpener(ctx context.Context, config map[string]string) *GithubIssuesOpener {
+func NewGithubIssueOpener(config map[string]string) *GithubIssuesOpener {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubIssuesOpener{
@@ -24,7 +23,6 @@ func NewGithubIssueOpener(ctx context.Context, config map[string]string) *Github
 		repository:       config["repository"],
 		owner:            config["owner"],
 		customActionName: config["customActionName"],
-		context:          ctx,
 	}
 }
 
@@ -53,7 +51,7 @@ func (g *GithubIssuesOpener) Run(ctx context.Context, params types.ActionParams)
 	}
 
 	resultString := ""
-	createdIssue, _, err := g.client.Issues.Create(g.context, result.Owner, result.Repository, issue)
+	createdIssue, _, err := g.client.Issues.Create(ctx, result.Owner, result.Repository, issue)
 	if err != nil {
 		resultString = fmt.Sprintf("Error creating issue: %v", err)
 	} else {

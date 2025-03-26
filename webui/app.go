@@ -322,7 +322,7 @@ func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Second)
+		ctx, cancel := context.WithTimeout(c.Context(), 200*time.Second)
 		defer cancel()
 
 		res, err := a.Run(ctx, payload.Params)

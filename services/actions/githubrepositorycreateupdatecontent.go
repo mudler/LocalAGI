@@ -11,11 +11,10 @@ import (
 
 type GithubRepositoryCreateOrUpdateContent struct {
 	token, repository, owner, customActionName, defaultBranch, commitAuthor, commitMail string
-	context                                                                             context.Context
 	client                                                                              *github.Client
 }
 
-func NewGithubRepositoryCreateOrUpdateContent(ctx context.Context, config map[string]string) *GithubRepositoryCreateOrUpdateContent {
+func NewGithubRepositoryCreateOrUpdateContent(config map[string]string) *GithubRepositoryCreateOrUpdateContent {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
 	return &GithubRepositoryCreateOrUpdateContent{
@@ -27,7 +26,6 @@ func NewGithubRepositoryCreateOrUpdateContent(ctx context.Context, config map[st
 		commitAuthor:     config["commitAuthor"],
 		commitMail:       config["commitMail"],
 		defaultBranch:    config["defaultBranch"],
-		context:          ctx,
 	}
 }
 
@@ -65,12 +63,12 @@ func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params 
 	}
 
 	var sha *string
-	c, _, _, _ := g.client.Repositories.GetContents(g.context, result.Owner, result.Repository, result.Path, nil)
+	c, _, _, _ := g.client.Repositories.GetContents(ctx, result.Owner, result.Repository, result.Path, nil)
 	if c != nil {
 		sha = c.SHA
 	}
 
-	fileContent, _, err := g.client.Repositories.CreateFile(g.context, result.Owner, result.Repository, result.Path, &github.RepositoryContentFileOptions{
+	fileContent, _, err := g.client.Repositories.CreateFile(ctx, result.Owner, result.Repository, result.Path, &github.RepositoryContentFileOptions{
 		Message: &result.CommitMessage,
 		SHA:     sha,
 		Committer: &github.CommitAuthor{
