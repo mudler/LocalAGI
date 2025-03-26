@@ -3,6 +3,7 @@ package connectors
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"os/signal"
 	"slices"
@@ -99,12 +100,24 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		// coming from the gen image actions
 		if imagesUrls, exists := res.Metadata[actions.MetadataImages]; exists {
 			for _, url := range xstrings.UniqueSlice(imagesUrls.([]string)) {
-				b.SendPhoto(ctx, &bot.SendPhotoParams{
+				xlog.Debug("Sending photo", "url", url)
+
+				resp, err := http.Get(url)
+				if err != nil {
+					xlog.Error("Error downloading image", "error", err.Error())
+					continue
+				}
+				defer resp.Body.Close()
+				_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 					ChatID: update.Message.Chat.ID,
-					Photo: models.InputFileString{
-						Data: url,
+					Photo: models.InputFileUpload{
+						Filename: "image.jpg",
+						Data:     resp.Body,
 					},
 				})
+				if err != nil {
+					xlog.Error("Error sending photo", "error", err.Error())
+				}
 			}
 		}
 

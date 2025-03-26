@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -38,6 +37,11 @@ type Slack struct {
 	placeholderMutex sync.RWMutex
 	apiClient        *slack.Client
 
+	// Track active jobs for cancellation
+	activeJobs      map[string]bool // map[channelID]bool to track if a channel has active processing
+	activeJobsMutex sync.RWMutex
+	agent           *agent.Agent // Reference to the agent to call StopAction
+
 	conversationTracker *ConversationTracker[string]
 }
 
@@ -57,13 +61,20 @@ func NewSlack(config map[string]string) *Slack {
 		alwaysReply:         config["alwaysReply"] == "true",
 		conversationTracker: NewConversationTracker[string](duration),
 		placeholders:        make(map[string]string),
+		activeJobs:          make(map[string]bool),
 	}
 }
 
 func (t *Slack) AgentResultCallback() func(state types.ActionState) {
 	return func(state types.ActionState) {
-		// The final result callback is intentionally empty as we're handling
-		// the final update in the handleMention function directly
+		// Mark the job as completed when we get the final result
+		if state.ActionCurrentState.Job != nil && state.ActionCurrentState.Job.Metadata != nil {
+			if channel, ok := state.ActionCurrentState.Job.Metadata["channel"].(string); ok && channel != "" {
+				t.activeJobsMutex.Lock()
+				delete(t.activeJobs, channel)
+				t.activeJobsMutex.Unlock()
+			}
+		}
 	}
 }
 
@@ -99,6 +110,23 @@ func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 			xlog.Error(fmt.Sprintf("Error updating reasoning message: %v", err))
 		}
 		return true
+	}
+}
+
+// cancelActiveJobForChannel cancels any active job for the given channel
+func (t *Slack) cancelActiveJobForChannel(channelID string) {
+	t.activeJobsMutex.RLock()
+	isActive := t.activeJobs[channelID]
+	t.activeJobsMutex.RUnlock()
+
+	if isActive && t.agent != nil {
+		xlog.Info(fmt.Sprintf("Cancelling active job for channel: %s", channelID))
+		t.agent.StopAction()
+
+		// Mark the job as inactive
+		t.activeJobsMutex.Lock()
+		delete(t.activeJobs, channelID)
+		t.activeJobsMutex.Unlock()
 	}
 }
 
@@ -214,11 +242,26 @@ func (t *Slack) handleChannelMessage(
 		return
 	}
 
+	// Cancel any active job for this channel before starting a new one
+	t.cancelActiveJobForChannel(ev.Channel)
+
 	currentConv := t.conversationTracker.GetConversation(t.channelID)
 
 	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
 	go func() {
+		// Mark this channel as having an active job
+		t.activeJobsMutex.Lock()
+		t.activeJobs[ev.Channel] = true
+		t.activeJobsMutex.Unlock()
+
+		defer func() {
+			// Mark job as complete
+			t.activeJobsMutex.Lock()
+			delete(t.activeJobs, ev.Channel)
+			t.activeJobsMutex.Unlock()
+		}()
+
 		imageBytes, mimeType := scanImagesInMessages(api, ev)
 
 		agentOptions := []types.JobOption{
@@ -259,6 +302,12 @@ func (t *Slack) handleChannelMessage(
 
 		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
 
+		// Add channel to metadata for tracking
+		metadata := map[string]interface{}{
+			"channel": ev.Channel,
+		}
+		agentOptions = append(agentOptions, types.WithMetadata(metadata))
+
 		res := a.Ask(
 			agentOptions...,
 		)
@@ -291,9 +340,6 @@ func (t *Slack) handleChannelMessage(
 
 // Function to download the image from a URL and encode it to base64
 func encodeImageFromURL(imageBytes bytes.Buffer) (string, error) {
-
-	// WRITE THIS SOMEWHERE
-	ioutil.WriteFile("image.jpg", imageBytes.Bytes(), 0644)
 
 	// Encode the image data to base64
 	base64Image := base64.StdEncoding.EncodeToString(imageBytes.Bytes())
@@ -639,10 +685,18 @@ func (t *Slack) handleMention(
 }
 
 func (t *Slack) Start(a *agent.Agent) {
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
 	postMessageParams := slack.PostMessageParameters{
 		LinkNames: 1,
 		Markdown:  true,
 	}
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+	// Store the agent reference for use in cancellation
+	t.agent = a
 
 	api := slack.New(
 		t.botToken,
