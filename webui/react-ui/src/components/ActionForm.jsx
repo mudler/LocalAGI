@@ -7,6 +7,7 @@ import GithubIssueCommenterAction from './actions/GithubIssueCommenterAction';
 import GithubRepositoryAction from './actions/GithubRepositoryAction';
 import TwitterPostAction from './actions/TwitterPostAction';
 import SendMailAction from './actions/SendMailAction';
+import GenerateImageAction from './actions/GenerateImageAction';
 
 /**
  * ActionForm component for configuring an action
@@ -103,46 +104,7 @@ const ActionForm = ({ actions = [], onChange, onRemove, onAdd }) => {
       case 'send-mail':
         return <SendMailAction {...actionProps} />;
       case 'generate_image':
-        return (
-          <div className="generate-image-action">
-            <div className="form-group mb-3">
-              <label htmlFor={`apiKey${index}`}>OpenAI API Key</label>
-              <input
-                type="text"
-                id={`apiKey${index}`}
-                value={getConfigValue(action, 'apiKey', '')}
-                onChange={(e) => onActionConfigChange(index, 'apiKey', e.target.value)}
-                className="form-control"
-                placeholder="sk-..."
-              />
-            </div>
-            
-            <div className="form-group mb-3">
-              <label htmlFor={`apiURL${index}`}>API URL (Optional)</label>
-              <input
-                type="text"
-                id={`apiURL${index}`}
-                value={getConfigValue(action, 'apiURL', 'https://api.openai.com/v1')}
-                onChange={(e) => onActionConfigChange(index, 'apiURL', e.target.value)}
-                className="form-control"
-                placeholder="https://api.openai.com/v1"
-              />
-            </div>
-            
-            <div className="form-group mb-3">
-              <label htmlFor={`model${index}`}>Model</label>
-              <input
-                type="text"
-                id={`model${index}`}
-                value={getConfigValue(action, 'model', 'dall-e-3')}
-                onChange={(e) => onActionConfigChange(index, 'model', e.target.value)}
-                className="form-control"
-                placeholder="dall-e-3"
-              />
-              <small className="form-text text-muted">Image generation model (e.g., dall-e-3)</small>
-            </div>
-          </div>
-        );
+        return <GenerateImageAction {...actionProps} />;
       default:
         return <FallbackAction {...actionProps} />;
     }

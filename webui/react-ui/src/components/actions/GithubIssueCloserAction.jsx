@@ -1,61 +1,57 @@
 import React from 'react';
+import BaseAction from './BaseAction';
 
 /**
  * GitHub Issue Closer action component
  */
 const GithubIssueCloserAction = ({ index, onActionConfigChange, getConfigValue }) => {
+  // Field definitions for GitHub Issue Closer action
+  const fields = [
+    {
+      name: 'token',
+      label: 'GitHub Token',
+      type: 'text',
+      defaultValue: '',
+      placeholder: 'ghp_...',
+      helpText: 'Personal access token with repo scope',
+      required: true,
+    },
+    {
+      name: 'owner',
+      label: 'Repository Owner',
+      type: 'text',
+      defaultValue: '',
+      placeholder: 'username or organization',
+      helpText: '',
+      required: true,
+    },
+    {
+      name: 'repository',
+      label: 'Repository Name',
+      type: 'text',
+      defaultValue: '',
+      placeholder: 'repository-name',
+      helpText: '',
+      required: true,
+    },
+    {
+      name: 'customActionName',
+      label: 'Custom Action Name (Optional)',
+      type: 'text',
+      defaultValue: '',
+      placeholder: 'close_github_issue',
+      helpText: 'Custom name for this action (optional)',
+      required: false,
+    },
+  ];
+
   return (
-    <div className="github-issue-closer-action">
-      <div className="form-group mb-3">
-        <label htmlFor={`githubToken${index}`}>GitHub Token</label>
-        <input
-          type="text"
-          id={`githubToken${index}`}
-          value={getConfigValue('token', '')}
-          onChange={(e) => onActionConfigChange('token', e.target.value)}
-          className="form-control"
-          placeholder="ghp_..."
-        />
-        <small className="form-text text-muted">Personal access token with repo scope</small>
-      </div>
-      
-      <div className="form-group mb-3">
-        <label htmlFor={`githubOwner${index}`}>Repository Owner</label>
-        <input
-          type="text"
-          id={`githubOwner${index}`}
-          value={getConfigValue('owner', '')}
-          onChange={(e) => onActionConfigChange('owner', e.target.value)}
-          className="form-control"
-          placeholder="username or organization"
-        />
-      </div>
-      
-      <div className="form-group mb-3">
-        <label htmlFor={`githubRepo${index}`}>Repository Name</label>
-        <input
-          type="text"
-          id={`githubRepo${index}`}
-          value={getConfigValue('repository', '')}
-          onChange={(e) => onActionConfigChange('repository', e.target.value)}
-          className="form-control"
-          placeholder="repository-name"
-        />
-      </div>
-      
-      <div className="form-group mb-3">
-        <label htmlFor={`customActionName${index}`}>Custom Action Name (Optional)</label>
-        <input
-          type="text"
-          id={`customActionName${index}`}
-          value={getConfigValue('customActionName', '')}
-          onChange={(e) => onActionConfigChange('customActionName', e.target.value)}
-          className="form-control"
-          placeholder="close_github_issue"
-        />
-        <small className="form-text text-muted">Custom name for this action (optional)</small>
-      </div>
-    </div>
+    <BaseAction
+      index={index}
+      onActionConfigChange={onActionConfigChange}
+      getConfigValue={getConfigValue}
+      fields={fields}
+    />
   );
 };
 

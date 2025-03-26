@@ -1,24 +1,31 @@
 import React from 'react';
+import BaseConnector from './BaseConnector';
 
 /**
  * Telegram connector template
  */
 const TelegramConnector = ({ connector, index, onConnectorConfigChange, getConfigValue }) => {
+  // Field definitions for Telegram connector
+  const fields = [
+    {
+      name: 'token',
+      label: 'Telegram Bot Token',
+      type: 'text',
+      defaultValue: '',
+      placeholder: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11',
+      helpText: 'Get this from @BotFather on Telegram',
+      required: true,
+    },
+  ];
+
   return (
-    <div className="connector-template">
-      <div className="form-group mb-3">
-        <label htmlFor={`telegramToken${index}`}>Telegram Bot Token</label>
-        <input
-          type="text"
-          id={`telegramToken${index}`}
-          value={getConfigValue(connector, 'token', '')}
-          onChange={(e) => onConnectorConfigChange(index, 'token', e.target.value)}
-          className="form-control"
-          placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-        />
-        <small className="form-text text-muted">Get this from @BotFather on Telegram</small>
-      </div>
-    </div>
+    <BaseConnector
+      connector={connector}
+      index={index}
+      onConnectorConfigChange={onConnectorConfigChange}
+      getConfigValue={getConfigValue}
+      fields={fields}
+    />
   );
 };
 
