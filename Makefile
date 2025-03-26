@@ -1,5 +1,6 @@
 GOCMD?=go
 IMAGE_NAME?=webui
+ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 prepare-tests:
 	docker compose up -d
@@ -13,12 +14,15 @@ tests: prepare-tests
 run-nokb:
 	$(MAKE) run KBDISABLEINDEX=true
 
+webui/react-ui/dist:
+	docker run --entrypoint /bin/bash -v $(ROOT_DIR):/app oven/bun:1 -c "cd /app/webui/react-ui && bun install && bun run build"
+
 .PHONY: build
-build:
+build: webui/react-ui/dist
 	$(GOCMD) build -o localagent ./
 
 .PHONY: run
-run:
+run: webui/react-ui/dist
 	$(GOCMD) run ./
 
 build-image:

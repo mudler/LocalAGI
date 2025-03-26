@@ -528,7 +528,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
-	if err := a.handlePlanning(ctx, job, chosenAction, actionParams, reasoning, pickTemplate, conv); err != nil {
+	var err error
+	conv, err = a.handlePlanning(ctx, job, chosenAction, actionParams, reasoning, pickTemplate, conv)
+	if err != nil {
 		job.Result.Finish(fmt.Errorf("error running action: %w", err))
 		return
 	}

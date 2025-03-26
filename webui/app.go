@@ -138,7 +138,7 @@ func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		if err := pool.CreateAgent(config.Name, &config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
-		
+
 		return statusJSONMessage(c, "ok")
 	}
 }
