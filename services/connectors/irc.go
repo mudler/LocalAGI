@@ -7,6 +7,7 @@ import (
 
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
 	"github.com/sashabaranov/go-openai"
@@ -206,4 +207,45 @@ func (i *IRC) Start(a *agent.Agent) {
 
 	// Start the IRC client in a goroutine
 	go i.conn.Loop()
+}
+
+// IRCConfigMeta returns the metadata for IRC connector configuration fields
+func IRCConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "server",
+			Label:    "IRC Server",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:     "port",
+			Label:    "Port",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:     "nickname",
+			Label:    "Nickname",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:     "channel",
+			Label:    "Channel",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:  "alwaysReply",
+			Label: "Always Reply",
+			Type:  config.FieldTypeCheckbox,
+		},
+		{
+			Name:         "lastMessageDuration",
+			Label:        "Last Message Duration",
+			Type:         config.FieldTypeText,
+			DefaultValue: "5m",
+		},
+	}
 }

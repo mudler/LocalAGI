@@ -42,6 +42,51 @@ export const agentApi = {
     return handleResponse(response);
   },
   
+  // Get agent configuration metadata
+  getAgentConfigMetadata: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.agentConfigMetadata), {
+      headers: API_CONFIG.headers
+    });
+    const metadata = await handleResponse(response);
+    
+    // Process metadata to group by section
+    if (metadata) {
+      const groupedMetadata = {};
+      
+      // Handle Fields - Group by section
+      if (metadata.Fields) {
+        metadata.Fields.forEach(field => {
+          const section = field.tags?.section || 'Other';
+          const sectionKey = `${section}Section`; // Add "Section" postfix
+          
+          if (!groupedMetadata[sectionKey]) {
+            groupedMetadata[sectionKey] = [];
+          }
+          
+          groupedMetadata[sectionKey].push(field);
+        });
+      }
+      
+      // Pass through connectors and actions field groups directly
+      // Make sure to assign the correct metadata to each section
+      if (metadata.Connectors) {
+        console.log("Original Connectors metadata:", metadata.Connectors);
+        groupedMetadata.connectors = metadata.Connectors;
+      }
+      
+      if (metadata.Actions) {
+        console.log("Original Actions metadata:", metadata.Actions);
+        groupedMetadata.actions = metadata.Actions;
+      }
+
+      console.log("Processed metadata:", groupedMetadata);
+      
+      return groupedMetadata;
+    }
+    
+    return metadata;
+  },
+  
   // Create a new agent
   createAgent: async (config) => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.createAgent), {

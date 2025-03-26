@@ -3,60 +3,35 @@ import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * Model Settings section of the agent form
+ * 
+ * @param {Object} props Component props
+ * @param {Object} props.formData Current form data values
+ * @param {Function} props.handleInputChange Handler for input changes
+ * @param {Object} props.metadata Field metadata from the backend
  */
-const ModelSettingsSection = ({ formData, handleInputChange }) => {
-  // Define field definitions for Model Settings section
-  const fields = [
-    {
-      name: 'model',
-      label: 'Model',
-      type: 'text',
-      defaultValue: '',
-    },
-    {
-      name: 'multimodal_model',
-      label: 'Multimodal Model',
-      type: 'text',
-      defaultValue: '',
-    },
-    {
-      name: 'api_url',
-      label: 'API URL',
-      type: 'text',
-      defaultValue: '',
-    },
-    {
-      name: 'api_key',
-      label: 'API Key',
-      type: 'password',
-      defaultValue: '',
-    },
-    {
-      name: 'temperature',
-      label: 'Temperature',
-      type: 'number',
-      defaultValue: 0.7,
-      min: 0,
-      max: 2,
-      step: 0.1,
-    },
-    {
-      name: 'max_tokens',
-      label: 'Max Tokens',
-      type: 'number',
-      defaultValue: 2000,
-      min: 1,
-    },
-  ];
+const ModelSettingsSection = ({ formData, handleInputChange, metadata }) => {
+  // Get fields from metadata
+  const fields = metadata?.ModelSettingsSection || [];
 
   // Handle field value changes
   const handleFieldChange = (name, value) => {
-    handleInputChange({
-      target: {
-        name,
-        value
-      }
-    });
+    const field = fields.find(f => f.name === name);
+    if (field && field.type === 'checkbox') {
+      handleInputChange({
+        target: {
+          name,
+          type: 'checkbox',
+          checked: value === 'true'
+        }
+      });
+    } else {
+      handleInputChange({
+        target: {
+          name,
+          value
+        }
+      });
+    }
   };
 
   return (

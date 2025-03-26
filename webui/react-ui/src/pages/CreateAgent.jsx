@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { agentApi } from '../utils/api';
 import AgentForm from '../components/AgentForm';
@@ -7,6 +7,7 @@ function CreateAgent() {
   const navigate = useNavigate();
   const { showToast } = useOutletContext();
   const [loading, setLoading] = useState(false);
+  const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -36,6 +37,24 @@ function CreateAgent() {
     avatar_seed: '',
     avatar_style: 'default',
   });
+
+  // Fetch metadata on component mount
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      try {
+        // Fetch metadata from the dedicated endpoint
+        const response = await agentApi.getAgentConfigMetadata();
+        if (response) {
+          setMetadata(response);
+        }
+      } catch (error) {
+        console.error('Error fetching metadata:', error);
+        // Continue without metadata, the form will use default fields
+      }
+    };
+
+    fetchMetadata();
+  }, []);
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -80,6 +99,7 @@ function CreateAgent() {
             loading={loading}
             submitButtonText="Create Agent"
             isEdit={false}
+            metadata={metadata}
           />
         </div>
       </div>

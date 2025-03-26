@@ -6,6 +6,7 @@ import (
 	"net/smtp"
 
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -79,4 +80,46 @@ func (a *SendMailAction) Definition() types.ActionDefinition {
 
 func (a *SendMailAction) Plannable() bool {
 	return true
+}
+
+// SendMailConfigMeta returns the metadata for SendMail action configuration fields
+func SendMailConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "smtpHost",
+			Label:    "SMTP Host",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "SMTP server host (e.g., smtp.gmail.com)",
+		},
+		{
+			Name:     "smtpPort",
+			Label:    "SMTP Port",
+			Type:     config.FieldTypeText,
+			Required: true,
+			DefaultValue: "587",
+			HelpText: "SMTP server port (e.g., 587)",
+		},
+		{
+			Name:     "username",
+			Label:    "SMTP Username",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "SMTP username/email address",
+		},
+		{
+			Name:     "password",
+			Label:    "SMTP Password",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "SMTP password or app password",
+		},
+		{
+			Name:     "email",
+			Label:    "From Email",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "Sender email address",
+		},
+	}
 }

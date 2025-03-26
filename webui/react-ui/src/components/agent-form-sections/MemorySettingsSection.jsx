@@ -3,53 +3,35 @@ import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * Memory Settings section of the agent form
+ * 
+ * @param {Object} props Component props
+ * @param {Object} props.formData Current form data values
+ * @param {Function} props.handleInputChange Handler for input changes
+ * @param {Object} props.metadata Field metadata from the backend
  */
-const MemorySettingsSection = ({ formData, handleInputChange }) => {
-  // Define field definitions for Memory Settings section
-  const fields = [
-    {
-      name: 'memory_provider',
-      label: 'Memory Provider',
-      type: 'select',
-      defaultValue: 'local',
-      options: [
-        { value: 'local', label: 'Local' },
-        { value: 'redis', label: 'Redis' },
-        { value: 'postgres', label: 'PostgreSQL' },
-      ],
-    },
-    {
-      name: 'memory_collection',
-      label: 'Memory Collection',
-      type: 'text',
-      defaultValue: '',
-      placeholder: 'agent_memories',
-    },
-    {
-      name: 'memory_url',
-      label: 'Memory URL',
-      type: 'text',
-      defaultValue: '',
-      placeholder: 'redis://localhost:6379',
-      helpText: 'Connection URL for Redis or PostgreSQL',
-    },
-    {
-      name: 'memory_window_size',
-      label: 'Memory Window Size',
-      type: 'number',
-      defaultValue: 10,
-      helpText: 'Number of recent messages to include in context window',
-    },
-  ];
+const MemorySettingsSection = ({ formData, handleInputChange, metadata }) => {
+  // Get fields from metadata
+  const fields = metadata?.MemorySettingsSection || [];
 
   // Handle field value changes
   const handleFieldChange = (name, value) => {
-    handleInputChange({
-      target: {
-        name,
-        value
-      }
-    });
+    const field = fields.find(f => f.name === name);
+    if (field && field.type === 'checkbox') {
+      handleInputChange({
+        target: {
+          name,
+          type: 'checkbox',
+          checked: value === 'true'
+        }
+      });
+    } else {
+      handleInputChange({
+        target: {
+          name,
+          value
+        }
+      });
+    }
   };
 
   return (

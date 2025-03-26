@@ -24,6 +24,9 @@ const FormField = ({
   helpText = '',
   options = [],
   required = false,
+  min = 0,
+  max = 2**31,
+  step = 1,
 }) => {
   // Create label with required indicator
   const labelWithIndicator = required ? (
@@ -82,6 +85,25 @@ const FormField = ({
               placeholder={placeholder}
               required={required}
               rows={5}
+            />
+            {helpText && <small className="form-text text-muted">{helpText}</small>}
+          </>
+        );
+      case 'number':
+        return (
+          <>
+            <label htmlFor={id}>{labelWithIndicator}</label>
+            <input
+              type="number"
+              id={id}
+              value={value || ''}
+              onChange={(e) => onChange(e.target.value)}
+              className="form-control"
+              placeholder={placeholder}
+              required={required}
+              min={min}
+              max={max}
+              step={step}
             />
             {helpText && <small className="form-text text-muted">{helpText}</small>}
           </>

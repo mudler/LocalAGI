@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { useAgent } from '../hooks/useAgent';
+import { agentApi } from '../utils/api';
 import AgentForm from '../components/AgentForm';
 
 function AgentSettings() {
   const { name } = useParams();
   const { showToast } = useOutletContext();
   const navigate = useNavigate();
+  const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -47,9 +49,28 @@ function AgentSettings() {
     deleteAgent 
   } = useAgent(name);
 
+  // Fetch metadata on component mount
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      try {
+        // Fetch metadata from the dedicated endpoint
+        const response = await agentApi.getAgentConfigMetadata();
+        if (response) {
+          setMetadata(response);
+        }
+      } catch (error) {
+        console.error('Error fetching metadata:', error);
+        // Continue without metadata, the form will use default fields
+      }
+    };
+
+    fetchMetadata();
+  }, []);
+
   // Load agent data when component mounts
   useEffect(() => {
     if (agent) {
+      // Set form data from agent config
       setFormData({
         ...formData,
         ...agent,
@@ -162,6 +183,7 @@ function AgentSettings() {
             onSubmit={handleSubmit}
             loading={loading}
             submitButtonText="Save Changes"
+            metadata={metadata}
           />
         </div>
       </div>

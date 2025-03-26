@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/pkg/xstrings"
 	"github.com/mudler/LocalAgent/services/actions"
@@ -783,4 +784,38 @@ func (t *Slack) Start(a *agent.Agent) {
 	}()
 
 	client.RunContext(a.Context())
+}
+
+// SlackConfigMeta returns the metadata for Slack connector configuration fields
+func SlackConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "appToken",
+			Label:    "App Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:     "botToken",
+			Label:    "Bot Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:  "channelID",
+			Label: "Channel ID",
+			Type:  config.FieldTypeText,
+		},
+		{
+			Name:  "alwaysReply",
+			Label: "Always Reply",
+			Type:  config.FieldTypeCheckbox,
+		},
+		{
+			Name:         "lastMessageDuration",
+			Label:        "Last Message Duration",
+			Type:         config.FieldTypeText,
+			DefaultValue: "5m",
+		},
+	}
 }

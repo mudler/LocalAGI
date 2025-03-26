@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/connectors"
 
@@ -68,4 +69,44 @@ func Connectors(a *state.AgentConfig) []state.Connector {
 		}
 	}
 	return conns
+}
+
+func ConnectorsConfigMeta() []config.FieldGroup {
+	return []config.FieldGroup{
+		{
+			Name:   "discord",
+			Label:  "Discord",
+			Fields: connectors.DiscordConfigMeta(),
+		},
+		{
+			Name:   "slack",
+			Label:  "Slack",
+			Fields: connectors.SlackConfigMeta(),
+		},
+		{
+			Name:   "telegram",
+			Label:  "Telegram",
+			Fields: connectors.TelegramConfigMeta(),
+		},
+		{
+			Name:   "github-issues",
+			Label:  "GitHub Issues",
+			Fields: connectors.GithubIssueConfigMeta(),
+		},
+		{
+			Name:   "github-prs",
+			Label:  "GitHub PRs",
+			Fields: connectors.GithubPRConfigMeta(),
+		},
+		{
+			Name:   "irc",
+			Label:  "IRC",
+			Fields: connectors.IRCConfigMeta(),
+		},
+		{
+			Name:   "twitter",
+			Label:  "Twitter",
+			Fields: connectors.TwitterConfigMeta(),
+		},
+	}
 }

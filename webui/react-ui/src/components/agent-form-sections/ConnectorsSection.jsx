@@ -9,7 +9,8 @@ const ConnectorsSection = ({
   handleAddConnector, 
   handleRemoveConnector, 
   handleConnectorNameChange, 
-  handleConnectorConfigChange 
+  handleConnectorConfigChange,
+  metadata
 }) => {
   return (
     <div id="connectors-section">
@@ -24,6 +25,7 @@ const ConnectorsSection = ({
         onRemoveConnector={handleRemoveConnector}
         onConnectorNameChange={handleConnectorNameChange}
         onConnectorConfigChange={handleConnectorConfigChange}
+        fieldGroups={metadata?.connectors || []}
       />
     </div>
   );

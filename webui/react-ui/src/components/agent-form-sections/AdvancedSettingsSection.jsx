@@ -3,53 +3,20 @@ import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * Advanced Settings section of the agent form
+ * 
+ * @param {Object} props Component props
+ * @param {Object} props.formData Current form data values
+ * @param {Function} props.handleInputChange Handler for input changes
+ * @param {Object} props.metadata Field metadata from the backend
  */
-const AdvancedSettingsSection = ({ formData, handleInputChange }) => {
-  // Define field definitions for Advanced Settings section
-  const fields = [
-    {
-      name: 'max_steps',
-      label: 'Max Steps',
-      type: 'number',
-      defaultValue: 10,
-      helpText: 'Maximum number of steps the agent can take',
-      required: true,
-    },
-    {
-      name: 'max_iterations',
-      label: 'Max Iterations',
-      type: 'number',
-      defaultValue: 5,
-      helpText: 'Maximum number of iterations for each step',
-      required: true,
-    },
-    {
-      name: 'autonomous',
-      label: 'Autonomous Mode',
-      type: 'checkbox',
-      defaultValue: false,
-      helpText: 'Allow the agent to operate autonomously',
-    },
-    {
-      name: 'verbose',
-      label: 'Verbose Mode',
-      type: 'checkbox',
-      defaultValue: false,
-      helpText: 'Enable detailed logging',
-    },
-    {
-      name: 'allow_code_execution',
-      label: 'Allow Code Execution',
-      type: 'checkbox',
-      defaultValue: false,
-      helpText: 'Allow the agent to execute code (use with caution)',
-    },
-  ];
+const AdvancedSettingsSection = ({ formData, handleInputChange, metadata }) => {
+  // Get fields from metadata
+  const fields = metadata?.AdvancedSettingsSection || [];
 
   // Handle field value changes
   const handleFieldChange = (name, value) => {
-    // For checkboxes, convert string 'true'/'false' to boolean
-    if (['autonomous', 'verbose', 'allow_code_execution'].includes(name)) {
+    const field = fields.find(f => f.name === name);
+    if (field && field.type === 'checkbox') {
       handleInputChange({
         target: {
           name,

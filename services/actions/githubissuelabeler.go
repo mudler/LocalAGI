@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -119,4 +120,44 @@ func (g *GithubIssuesLabeler) Definition() types.ActionDefinition {
 
 func (a *GithubIssuesLabeler) Plannable() bool {
 	return true
+}
+
+// GithubIssueLabelerConfigMeta returns the metadata for GitHub Issue Labeler action configuration fields
+func GithubIssueLabelerConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "GitHub Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub API token with repository access",
+		},
+		{
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository name",
+		},
+		{
+			Name:     "owner",
+			Label:    "Owner",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository owner",
+		},
+		{
+			Name:     "availableLabels",
+			Label:    "Available Labels",
+			Type:     config.FieldTypeText,
+			HelpText: "Comma-separated list of available labels",
+			DefaultValue: "bug,enhancement",
+		},
+		{
+			Name:     "customActionName",
+			Label:    "Custom Action Name",
+			Type:     config.FieldTypeText,
+			HelpText: "Custom name for this action",
+		},
+	}
 }

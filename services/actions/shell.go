@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"golang.org/x/crypto/ssh"
 )
@@ -93,6 +94,43 @@ func (a *ShellAction) Definition() types.ActionDefinition {
 			},
 		},
 		Required: []string{"command", "host", "user"},
+	}
+}
+
+// ShellConfigMeta returns the metadata for Shell action configuration fields
+func ShellConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "privateKey",
+			Label:    "Private Key",
+			Type:     config.FieldTypeTextarea,
+			Required: true,
+			HelpText: "SSH private key for connecting to remote servers",
+		},
+		{
+			Name:     "user",
+			Label:    "Default User",
+			Type:     config.FieldTypeText,
+			HelpText: "Default SSH user for connecting to remote servers",
+		},
+		{
+			Name:     "host",
+			Label:    "Default Host",
+			Type:     config.FieldTypeText,
+			HelpText: "Default host for SSH connections (e.g., hostname:port)",
+		},
+		{
+			Name:     "customName",
+			Label:    "Custom Action Name",
+			Type:     config.FieldTypeText,
+			HelpText: "Custom name for this action",
+		},
+		{
+			Name:     "customDescription",
+			Label:    "Custom Description",
+			Type:     config.FieldTypeTextarea,
+			HelpText: "Custom description for this action",
+		},
 	}
 }
 

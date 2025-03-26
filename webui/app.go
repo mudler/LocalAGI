@@ -477,3 +477,15 @@ func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		return statusJSONMessage(c, "ok")
 	}
 }
+
+// GetAgentConfigMeta returns the metadata for agent configuration fields
+func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		// Create a new instance of AgentConfigMeta
+		configMeta := state.NewAgentConfigMeta(
+			services.ActionsConfigMeta(),
+			services.ConnectorsConfigMeta(),
+		)
+		return c.JSON(configMeta)
+	}
+}

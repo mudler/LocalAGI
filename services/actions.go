@@ -8,6 +8,7 @@ import (
 	"github.com/mudler/LocalAgent/core/action"
 	"github.com/mudler/LocalAgent/core/state"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"github.com/mudler/LocalAgent/services/actions"
@@ -30,7 +31,7 @@ const (
 	ActionWikipedia                      = "wikipedia"
 	ActionBrowse                         = "browse"
 	ActionTwitterPost                    = "twitter-post"
-	ActionSendMail                       = "send_mail"
+	ActionSendMail                       = "send-mail"
 	ActionGenerateImage                  = "generate_image"
 	ActionCounter                        = "counter"
 	ActionCallAgents                     = "call_agents"
@@ -137,4 +138,109 @@ func Action(name string, config map[string]string, pool *state.AgentPool) (types
 	}
 
 	return a, nil
+}
+
+func ActionsConfigMeta() []config.FieldGroup {
+	return []config.FieldGroup{
+		{
+			Name:   "search",
+			Label:  "Search",
+			Fields: actions.SearchConfigMeta(),
+		},
+		{
+			Name:   "generate_image",
+			Label:  "Generate Image",
+			Fields: actions.GenImageConfigMeta(),
+		},
+		{
+			Name:   "github-issue-labeler",
+			Label:  "GitHub Issue Labeler",
+			Fields: actions.GithubIssueLabelerConfigMeta(),
+		},
+		{
+			Name:   "github-issue-opener",
+			Label:  "GitHub Issue Opener",
+			Fields: actions.GithubIssueOpenerConfigMeta(),
+		},
+		{
+			Name:   "github-issue-closer",
+			Label:  "GitHub Issue Closer",
+			Fields: actions.GithubIssueCloserConfigMeta(),
+		},
+		{
+			Name:   "github-issue-commenter",
+			Label:  "GitHub Issue Commenter",
+			Fields: actions.GithubIssueCommenterConfigMeta(),
+		},
+		{
+			Name:   "github-issue-reader",
+			Label:  "GitHub Issue Reader",
+			Fields: actions.GithubIssueReaderConfigMeta(),
+		},
+		{
+			Name:   "github-issue-searcher",
+			Label:  "GitHub Issue Search",
+			Fields: actions.GithubIssueSearchConfigMeta(),
+		},
+		{
+			Name:   "github-repository-get-content",
+			Label:  "GitHub Repository Get Content",
+			Fields: actions.GithubRepositoryGetContentConfigMeta(),
+		},
+		{
+			Name:   "github-repository-create-or-update-content",
+			Label:  "GitHub Repository Create/Update Content",
+			Fields: actions.GithubRepositoryCreateOrUpdateContentConfigMeta(),
+		},
+		{
+			Name:   "github-readme",
+			Label:  "GitHub Repository README",
+			Fields: actions.GithubRepositoryREADMEConfigMeta(),
+		},
+		{
+			Name:   "twitter-post",
+			Label:  "Twitter Post",
+			Fields: actions.TwitterPostConfigMeta(),
+		},
+		{
+			Name:   "send-mail",
+			Label:  "Send Mail",
+			Fields: actions.SendMailConfigMeta(),
+		},
+		{
+			Name:   "shell-command",
+			Label:  "Shell Command",
+			Fields: actions.ShellConfigMeta(),
+		},
+		{
+			Name:   "custom",
+			Label:  "Custom",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "scraper",
+			Label:  "Scraper",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "wikipedia",
+			Label:  "Wikipedia",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "browse",
+			Label:  "Browse",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "counter",
+			Label:  "Counter",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "call_agents",
+			Label:  "Call Agents",
+			Fields: []config.Field{},
+		},
+	}
 }

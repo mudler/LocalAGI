@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -108,4 +109,37 @@ func (g *GithubRepositoryGetContent) Definition() types.ActionDefinition {
 
 func (a *GithubRepositoryGetContent) Plannable() bool {
 	return true
+}
+
+// GithubRepositoryGetContentConfigMeta returns the metadata for GitHub Repository Get Content action configuration fields
+func GithubRepositoryGetContentConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "GitHub Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub API token with repository access",
+		},
+		{
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository name",
+		},
+		{
+			Name:     "owner",
+			Label:    "Owner",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository owner",
+		},
+		{
+			Name:     "customActionName",
+			Label:    "Custom Action Name",
+			Type:     config.FieldTypeText,
+			HelpText: "Custom name for this action",
+		},
+	}
 }

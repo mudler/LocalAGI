@@ -171,6 +171,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
 	webapp.Put("/api/agent/:name/config", app.UpdateAgentConfig(pool))
+	
+	// Metadata endpoint for agent configuration fields
+	webapp.Get("/api/agent/config/metadata", app.GetAgentConfigMeta())
 
 	webapp.Post("/action/:name/run", app.ExecuteAction(pool))
 	webapp.Get("/actions", app.ListActions())
@@ -190,13 +193,13 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			}
 			statuses[a] = !agent.Paused()
 		}
-		
+
 		return c.JSON(fiber.Map{
-			"Agents": agents,
+			"Agents":     agents,
 			"AgentCount": len(agents),
-			"Actions": len(services.AvailableActions),
+			"Actions":    len(services.AvailableActions),
 			"Connectors": len(services.AvailableConnectors),
-			"Status": statuses,
+			"Status":     statuses,
 		})
 	})
 
@@ -206,9 +209,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		if history == nil {
 			history = &state.Status{ActionResults: []types.ActionState{}}
 		}
-		
+
 		return c.JSON(fiber.Map{
-			"Name": c.Params("name"),
+			"Name":    c.Params("name"),
 			"History": Reverse(history.Results()),
 		})
 	})

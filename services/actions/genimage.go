@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -95,4 +96,33 @@ func (a *GenImageAction) Definition() types.ActionDefinition {
 
 func (a *GenImageAction) Plannable() bool {
 	return true
+}
+
+// GenImageConfigMeta returns the metadata for GenImage action configuration fields
+func GenImageConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "apiKey",
+			Label:    "API Key",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "OpenAI API key for image generation",
+		},
+		{
+			Name:     "apiURL",
+			Label:    "API URL",
+			Type:     config.FieldTypeText,
+			Required: true,
+			DefaultValue: "https://api.openai.com/v1",
+			HelpText: "OpenAI API URL",
+		},
+		{
+			Name:     "model",
+			Label:    "Model",
+			Type:     config.FieldTypeText,
+			Required: true,
+			DefaultValue: "dall-e-3",
+			HelpText: "Image generation model to use (e.g., dall-e-3)",
+		},
+	}
 }

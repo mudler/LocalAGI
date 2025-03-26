@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/services/connectors/twitter"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -61,4 +62,23 @@ func (a *PostTweetAction) Definition() types.ActionDefinition {
 
 func (a *PostTweetAction) Plannable() bool {
 	return true
+}
+
+// TwitterPostConfigMeta returns the metadata for Twitter Post action configuration fields
+func TwitterPostConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "Twitter API Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "Twitter API token for posting tweets",
+		},
+		{
+			Name:  "noCharacterLimit",
+			Label: "No Character Limit",
+			Type:  config.FieldTypeCheckbox,
+			HelpText: "If checked, tweets longer than the character limit will be split into multiple tweets",
+		},
+	}
 }

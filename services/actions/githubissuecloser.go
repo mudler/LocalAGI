@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -117,4 +118,37 @@ func (g *GithubIssuesCloser) Definition() types.ActionDefinition {
 
 func (a *GithubIssuesCloser) Plannable() bool {
 	return true
+}
+
+// GithubIssueCloserConfigMeta returns the metadata for GitHub Issue Closer action configuration fields
+func GithubIssueCloserConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "GitHub Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub API token with repository access",
+		},
+		{
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository name",
+		},
+		{
+			Name:     "owner",
+			Label:    "Owner",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository owner",
+		},
+		{
+			Name:     "customActionName",
+			Label:    "Custom Action Name",
+			Type:     config.FieldTypeText,
+			HelpText: "Custom name for this action",
+		},
+	}
 }

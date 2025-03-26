@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
@@ -193,5 +194,41 @@ func (g *GithubIssues) issuesService() {
 		if err != nil {
 			xlog.Error("Error creating comment", "error", err, "agent", g.agent.Character.Name)
 		}
+	}
+}
+
+// GithubIssueConfigMeta returns the metadata for GitHub Issues connector configuration fields
+func GithubIssueConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "GitHub Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:     "owner",
+			Label:    "Owner",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:  "replyIfNoReplies",
+			Label: "Reply If No Replies",
+			Type:  config.FieldTypeCheckbox,
+		},
+		{
+			Name:         "pollInterval",
+			Label:        "Poll Interval",
+			Type:         config.FieldTypeText,
+			DefaultValue: "10m",
+			HelpText:     "How often to check for new issues (e.g., 10m, 1h)",
+		},
 	}
 }

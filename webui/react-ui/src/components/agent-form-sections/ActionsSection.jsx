@@ -4,7 +4,7 @@ import ActionForm from '../ActionForm';
 /**
  * ActionsSection component for the agent form
  */
-const ActionsSection = ({ formData, setFormData }) => {
+const ActionsSection = ({ formData, setFormData, metadata }) => {
   // Handle action change
   const handleActionChange = (index, updatedAction) => {
     const updatedActions = [...(formData.actions || [])];
@@ -47,6 +47,7 @@ const ActionsSection = ({ formData, setFormData }) => {
         onChange={handleActionChange}
         onRemove={handleActionRemove}
         onAdd={handleAddAction}
+        fieldGroups={metadata?.actions || []}
       />
     </div>
   );

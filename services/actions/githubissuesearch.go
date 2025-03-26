@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -107,4 +108,37 @@ func (g *GithubIssueSearch) Definition() types.ActionDefinition {
 
 func (a *GithubIssueSearch) Plannable() bool {
 	return true
+}
+
+// GithubIssueSearchConfigMeta returns the metadata for GitHub Issue Search action configuration fields
+func GithubIssueSearchConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "GitHub Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub API token with repository access",
+		},
+		{
+			Name:     "repository",
+			Label:    "Repository",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository name",
+		},
+		{
+			Name:     "owner",
+			Label:    "Owner",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "GitHub repository owner",
+		},
+		{
+			Name:     "customActionName",
+			Label:    "Custom Action Name",
+			Type:     config.FieldTypeText,
+			HelpText: "Custom name for this action",
+		},
+	}
 }

@@ -20,6 +20,7 @@ export const API_CONFIG = {
     // Agent endpoints
     agents: '/api/agents',
     agentConfig: (name) => `/api/agent/${name}/config`,
+    agentConfigMetadata: '/api/agent/config/metadata',
     createAgent: '/create',
     deleteAgent: (name) => `/delete/${name}`,
     pauseAgent: (name) => `/pause/${name}`,

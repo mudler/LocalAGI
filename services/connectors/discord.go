@@ -6,6 +6,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai"
 )
@@ -31,6 +32,28 @@ func NewDiscord(config map[string]string) *Discord {
 		conversationTracker: NewConversationTracker[string](duration),
 		token:               config["token"],
 		defaultChannel:      config["defaultChannel"],
+	}
+}
+
+func DiscordConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "Discord Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:  "defaultChannel",
+			Label: "Default Channel",
+			Type:  config.FieldTypeText,
+		},
+		{
+			Name:         "lastMessageDuration",
+			Label:        "Last Message Duration",
+			Type:         config.FieldTypeText,
+			DefaultValue: "5m",
+		},
 	}
 }
 

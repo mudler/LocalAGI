@@ -19,7 +19,8 @@ const AgentForm = ({
   loading = false, 
   submitButtonText, 
   isGroupForm = false,
-  noFormWrapper = false
+  noFormWrapper = false,
+  metadata = null
 }) => {
   const navigate = useNavigate();
   const { showToast } = useOutletContext();
@@ -239,70 +240,70 @@ const AgentForm = ({
           <div className='agent-form'>
             {/* Form Sections */}
             <div style={{ display: activeSection === 'basic-section' ? 'block' : 'none' }}>
-              <BasicInfoSection formData={formData} handleInputChange={handleInputChange} isEdit={isEdit} isGroupForm={isGroupForm} />
+              <BasicInfoSection formData={formData} handleInputChange={handleInputChange} isEdit={isEdit} isGroupForm={isGroupForm} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'model-section' ? 'block' : 'none' }}>
-              <ModelSettingsSection formData={formData} handleInputChange={handleInputChange} />
+              <ModelSettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'connectors-section' ? 'block' : 'none' }}>
-              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorNameChange={handleConnectorNameChange} handleConnectorConfigChange={handleConnectorConfigChange} />
+              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorNameChange={handleConnectorNameChange} handleConnectorConfigChange={handleConnectorConfigChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'actions-section' ? 'block' : 'none' }}>
-              <ActionsSection formData={formData} setFormData={setFormData} />
+              <ActionsSection formData={formData} setFormData={setFormData} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'mcp-section' ? 'block' : 'none' }}>
-              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange} />
+              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange}  />
             </div>
 
             <div style={{ display: activeSection === 'memory-section' ? 'block' : 'none' }}>
-              <MemorySettingsSection formData={formData} handleInputChange={handleInputChange} />
+              <MemorySettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'prompts-section' ? 'block' : 'none' }}>
-              <PromptsGoalsSection formData={formData} handleInputChange={handleInputChange} isGroupForm={isGroupForm} />
+              <PromptsGoalsSection formData={formData} handleInputChange={handleInputChange} isGroupForm={isGroupForm} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'advanced-section' ? 'block' : 'none' }}>
-              <AdvancedSettingsSection formData={formData} handleInputChange={handleInputChange} />
+              <AdvancedSettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
           </div>
         ) : (
-          <form className="agent-form" onSubmit={handleSubmit}>
+          <form className="agent-form" onSubmit={handleSubmit} noValidate>
             {/* Form Sections */}
             <div style={{ display: activeSection === 'basic-section' ? 'block' : 'none' }}>
-              <BasicInfoSection formData={formData} handleInputChange={handleInputChange} isEdit={isEdit} isGroupForm={isGroupForm} />
+              <BasicInfoSection formData={formData} handleInputChange={handleInputChange} isEdit={isEdit} isGroupForm={isGroupForm} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'model-section' ? 'block' : 'none' }}>
-              <ModelSettingsSection formData={formData} handleInputChange={handleInputChange} />
+              <ModelSettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'connectors-section' ? 'block' : 'none' }}>
-              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorNameChange={handleConnectorNameChange} handleConnectorConfigChange={handleConnectorConfigChange} />
+              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorNameChange={handleConnectorNameChange} handleConnectorConfigChange={handleConnectorConfigChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'actions-section' ? 'block' : 'none' }}>
-              <ActionsSection formData={formData} setFormData={setFormData} />
+              <ActionsSection formData={formData} setFormData={setFormData} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'mcp-section' ? 'block' : 'none' }}>
-              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange} />
+              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange}  />
             </div>
 
             <div style={{ display: activeSection === 'memory-section' ? 'block' : 'none' }}>
-              <MemorySettingsSection formData={formData} handleInputChange={handleInputChange} />
+              <MemorySettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'prompts-section' ? 'block' : 'none' }}>
-              <PromptsGoalsSection formData={formData} handleInputChange={handleInputChange} isGroupForm={isGroupForm} />
+              <PromptsGoalsSection formData={formData} handleInputChange={handleInputChange} isGroupForm={isGroupForm} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'advanced-section' ? 'block' : 'none' }}>
-              <AdvancedSettingsSection formData={formData} handleInputChange={handleInputChange} />
+              <AdvancedSettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
             {/* Form Controls */}

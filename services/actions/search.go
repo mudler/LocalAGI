@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/tools/duckduckgo"
 	"mvdan.cc/xurls/v2"
@@ -88,4 +89,20 @@ func (a *SearchAction) Definition() types.ActionDefinition {
 
 func (a *SearchAction) Plannable() bool {
 	return true
+}
+
+// SearchConfigMeta returns the metadata for Search action configuration fields
+func SearchConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:         "results",
+			Label:        "Number of Results",
+			Type:         config.FieldTypeNumber,
+			DefaultValue: 1,
+			Min:          1,
+			Max:          10,
+			Step:         1,
+			HelpText:     "Number of search results to return",
+		},
+	}
 }

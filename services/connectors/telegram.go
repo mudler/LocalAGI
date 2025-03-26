@@ -14,6 +14,7 @@ import (
 	"github.com/go-telegram/bot/models"
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/pkg/xstrings"
 	"github.com/mudler/LocalAgent/services/actions"
@@ -202,4 +203,28 @@ func NewTelegramConnector(config map[string]string) (*Telegram, error) {
 		lastMessageTime:     map[int64]time.Time{},
 		conversationTracker: NewConversationTracker[int64](duration),
 	}, nil
+}
+
+// TelegramConfigMeta returns the metadata for Telegram connector configuration fields
+func TelegramConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "Telegram Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:  "admins",
+			Label: "Admins",
+			Type:  config.FieldTypeText,
+			HelpText: "Comma-separated list of Telegram usernames that are allowed to interact with the bot",
+		},
+		{
+			Name:         "lastMessageDuration",
+			Label:        "Last Message Duration",
+			Type:         config.FieldTypeText,
+			DefaultValue: "5m",
+		},
+	}
 }

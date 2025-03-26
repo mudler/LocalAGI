@@ -3,54 +3,37 @@ import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * Basic Information section of the agent form
+ * 
+ * @param {Object} props Component props
+ * @param {Object} props.formData Current form data values
+ * @param {Function} props.handleInputChange Handler for input changes
+ * @param {boolean} props.isEdit Whether the form is in edit mode
+ * @param {boolean} props.isGroupForm Whether the form is for a group
+ * @param {Object} props.metadata Field metadata from the backend
  */
-const BasicInfoSection = ({ formData, handleInputChange, isEdit, isGroupForm }) => {
+const BasicInfoSection = ({ formData, handleInputChange, isEdit, isGroupForm, metadata }) => {
   // In group form context, we hide the basic info section entirely
   if (isGroupForm) {
     return null;
   }
   
-  // Define field definitions for Basic Information section
-  const fields = [
-    {
-      name: 'name',
-      label: 'Name',
-      type: 'text',
-      defaultValue: '',
-      required: true,
-      helpText: isEdit ? 'Agent name cannot be changed after creation' : '',
-      disabled: isEdit, // This will be handled in the component
-    },
-    {
-      name: 'description',
-      label: 'Description',
-      type: 'textarea',
-      defaultValue: '',
-    },
-    {
-      name: 'identity_guidance',
-      label: 'Identity Guidance',
-      type: 'textarea',
-      defaultValue: '',
-    },
-    {
-      name: 'random_identity',
-      label: 'Random Identity',
-      type: 'checkbox',
-      defaultValue: false,
-    },
-    {
-      name: 'hud',
-      label: 'HUD',
-      type: 'checkbox',
-      defaultValue: false,
+  // Get fields from metadata and apply any client-side overrides
+  const fields = metadata?.BasicInfoSection?.map(field => {
+    // Special case for name field in edit mode
+    if (field.name === 'name' && isEdit) {
+      return {
+        ...field,
+        disabled: true,
+        helpText: 'Agent name cannot be changed after creation'
+      };
     }
-  ];
+    return field;
+  }) || [];
 
   // Handle field value changes
   const handleFieldChange = (name, value) => {
-    // For checkboxes, convert string 'true'/'false' to boolean
-    if (name === 'random_identity' || name === 'hud') {
+    const field = fields.find(f => f.name === name);
+    if (field && field.type === 'checkbox') {
       handleInputChange({
         target: {
           name,

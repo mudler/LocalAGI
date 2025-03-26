@@ -8,6 +8,7 @@ import (
 
 	"github.com/mudler/LocalAgent/core/agent"
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/connectors/twitter"
 	"github.com/sashabaranov/go-openai"
@@ -133,4 +134,27 @@ func (t *Twitter) run(a *agent.Agent) error {
 	xlog.Debug("Replied successfully!")
 
 	return nil
+}
+
+// TwitterConfigMeta returns the metadata for Twitter connector configuration fields
+func TwitterConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "token",
+			Label:    "Twitter API Token",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:     "botUsername",
+			Label:    "Bot Username",
+			Type:     config.FieldTypeText,
+			Required: true,
+		},
+		{
+			Name:  "noCharacterLimit",
+			Label: "No Character Limit",
+			Type:  config.FieldTypeCheckbox,
+		},
+	}
 }

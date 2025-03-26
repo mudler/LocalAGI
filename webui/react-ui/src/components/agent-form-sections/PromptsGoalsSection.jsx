@@ -3,64 +3,47 @@ import FormFieldDefinition from '../common/FormFieldDefinition';
 
 /**
  * Prompts & Goals section of the agent form
+ * 
+ * @param {Object} props Component props
+ * @param {Object} props.formData Current form data values
+ * @param {Function} props.handleInputChange Handler for input changes
+ * @param {boolean} props.isGroupForm Whether the form is for a group
+ * @param {Object} props.metadata Field metadata from the backend
  */
-const PromptsGoalsSection = ({ formData, handleInputChange, isGroupForm }) => {
-  // Define field definitions for Prompts & Goals section
+const PromptsGoalsSection = ({ formData, handleInputChange, isGroupForm, metadata }) => {
+  // Get fields based on metadata and form context
   const getFields = () => {
-    // Base fields that are always shown
-    const baseFields = [
-      {
-        name: 'goals',
-        label: 'Goals',
-        type: 'textarea',
-        defaultValue: '',
-        helpText: 'Define the agent\'s goals (one per line)',
-        rows: 5,
-      },
-      {
-        name: 'constraints',
-        label: 'Constraints',
-        type: 'textarea',
-        defaultValue: '',
-        helpText: 'Define the agent\'s constraints (one per line)',
-        rows: 5,
-      },
-      {
-        name: 'tools',
-        label: 'Tools',
-        type: 'textarea',
-        defaultValue: '',
-        helpText: 'Define the agent\'s tools (one per line)',
-        rows: 5,
-      },
-    ];
-
-    // Only include system_prompt field if not in group form context
-    if (!isGroupForm) {
-      return [
-        {
-          name: 'system_prompt',
-          label: 'System Prompt',
-          type: 'textarea',
-          defaultValue: '',
-          helpText: 'Instructions that define the agent\'s behavior',
-          rows: 5,
-        },
-        ...baseFields
-      ];
+    if (!metadata?.PromptsGoalsSection) {
+      return [];
     }
-
-    return baseFields;
+    
+    // If in group form, filter out system_prompt
+    if (isGroupForm) {
+      return metadata.PromptsGoalsSection.filter(field => field.name !== 'system_prompt');
+    }
+    
+    return metadata.PromptsGoalsSection;
   };
 
   // Handle field value changes
   const handleFieldChange = (name, value) => {
-    handleInputChange({
-      target: {
-        name,
-        value
-      }
-    });
+    const field = getFields().find(f => f.name === name);
+    if (field && field.type === 'checkbox') {
+      handleInputChange({
+        target: {
+          name,
+          type: 'checkbox',
+          checked: value === 'true'
+        }
+      });
+    } else {
+      handleInputChange({
+        target: {
+          name,
+          value
+        }
+      });
+    }
   };
 
   return (
