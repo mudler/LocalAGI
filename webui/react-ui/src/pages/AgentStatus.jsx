@@ -54,6 +54,23 @@ function AgentStatus() {
     };
   }, [name]);
 
+  // Helper function to safely convert any value to a displayable string
+  const formatValue = (value) => {
+    if (value === null || value === undefined) {
+      return 'N/A';
+    }
+    
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch (err) {
+        return '[Complex Object]';
+      }
+    }
+    
+    return String(value);
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -102,20 +119,20 @@ function AgentStatus() {
                   <div className="status-details">
                     <div className="status-row">
                       <span className="status-label">Result:</span>
-                      <span className="status-value">{item.Result || 'N/A'}</span>
+                      <span className="status-value">{formatValue(item.Result)}</span>
                     </div>
                     <div className="status-row">
                       <span className="status-label">Action:</span>
-                      <span className="status-value">{item.Action || 'N/A'}</span>
+                      <span className="status-value">{formatValue(item.Action)}</span>
                     </div>
                     <div className="status-row">
                       <span className="status-label">Parameters:</span>
-                      <span className="status-value">{item.Params || 'N/A'}</span>
+                      <span className="status-value pre-wrap">{formatValue(item.Params)}</span>
                     </div>
                     {item.Reasoning && (
                       <div className="status-row">
                         <span className="status-label">Reasoning:</span>
-                        <span className="status-value reasoning">{item.Reasoning}</span>
+                        <span className="status-value reasoning">{formatValue(item.Reasoning)}</span>
                       </div>
                     )}
                   </div>
