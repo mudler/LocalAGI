@@ -41,64 +41,94 @@ function Chat() {
     }
   };
 
+  // Handle pressing Enter to send (Shift+Enter for new line)
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
   return (
-    <div className="chat-container">
-      <header className="chat-header">
+    <div className="agents-container">
+      <header className="page-header">
         <h1>Chat with {name}</h1>
-        <div className="connection-status">
-          <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
+        <div className="connection-status" style={{ display: 'flex', alignItems: 'center' }}>
+          <span 
+            className={isConnected ? 'active' : 'inactive'} 
+            style={{ 
+              position: 'static', 
+              display: 'inline-block',
+              padding: '5px 12px',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              fontWeight: '500',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              boxShadow: '0 0 10px rgba(0, 0, 0, 0.2)',
+              marginLeft: '10px'
+            }}
+          >
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
         </div>
         <button 
-          className="clear-chat-btn"
+          className="action-btn delete-btn"
           onClick={clearChat}
           disabled={messages.length === 0}
         >
-          Clear Chat
+          <i className="fas fa-trash-alt"></i> Clear Chat
         </button>
       </header>
 
-      <div className="messages-container">
-        {messages.length === 0 ? (
-          <div className="empty-chat">
-            <p>No messages yet. Start a conversation with {name}!</p>
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <div 
-              key={msg.id} 
-              className={`message ${msg.sender === 'user' ? 'user-message' : 'agent-message'}`}
-            >
-              <div className="message-content">
-                {msg.content}
-              </div>
-              <div className="message-timestamp">
-                {new Date(msg.timestamp).toLocaleTimeString()}
-              </div>
+      <div className="chat-container">
+        <div className="chat-messages">
+          {messages.length === 0 ? (
+            <div className="no-agents">
+              <h2>No messages yet</h2>
+              <p>Start a conversation with {name}!</p>
             </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+          ) : (
+            messages.map((msg) => (
+              <div 
+                key={msg.id} 
+                className={`message ${msg.sender === 'user' ? 'message-user' : 'message-agent'}`}
+              >
+                <div className="message-content">
+                  {msg.content}
+                </div>
+                <div className="message-timestamp">
+                  {new Date(msg.timestamp).toLocaleTimeString()}
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
-      <form className="message-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type your message..."
-          disabled={sending || !isConnected}
-          className="message-input"
-        />
-        <button 
-          type="submit" 
-          disabled={sending || !message.trim() || !isConnected}
-          className="send-button"
-        >
-          {sending ? 'Sending...' : 'Send'}
-        </button>
-      </form>
+        <div className="chat-input">
+          <form className="message-form" onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+              disabled={sending || !isConnected}
+              className="form-control"
+              rows={2}
+              style={{ flex: 1, resize: 'vertical', minHeight: '38px', maxHeight: '150px' }}
+            />
+            <button 
+              type="submit" 
+              disabled={sending || !message.trim() || !isConnected}
+              className="action-btn chat-btn"
+              style={{ alignSelf: 'flex-end' }}
+            >
+              <i className={`fas ${sending ? 'fa-spinner fa-spin' : 'fa-paper-plane'}`}></i> {sending ? 'Sending...' : 'Send'}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

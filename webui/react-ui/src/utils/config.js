@@ -34,6 +34,7 @@ export const API_CONFIG = {
     
     // Chat endpoints
     chat: (name) => `/chat/${name}`,
+    chatApi: (name) => `/api/chat/${name}`, 
     notify: (name) => `/notify/${name}`,
     responses: '/v1/responses',
     

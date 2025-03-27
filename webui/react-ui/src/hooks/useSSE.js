@@ -1,63 +1,130 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_CONFIG } from '../utils/config';
 
 /**
- * Helper function to build a full URL
- * @param {string} endpoint - API endpoint
- * @returns {string} - Full URL
- */
-const buildUrl = (endpoint) => {
-  return `${API_CONFIG.baseUrl}${endpoint.startsWith('/') ? endpoint.substring(1) : endpoint}`;
-};
-
-/**
- * Custom hook for handling Server-Sent Events (SSE)
+ * Custom hook for Server-Sent Events (SSE)
  * @param {string} agentName - Name of the agent to connect to
- * @returns {Object} - SSE data and connection status
+ * @returns {Object} - SSE state and messages
  */
 export function useSSE(agentName) {
-  const [data, setData] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [statusUpdates, setStatusUpdates] = useState([]);
+  const [errorMessages, setErrorMessages] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState(null);
+  const eventSourceRef = useRef(null);
 
-  useEffect(() => {
+  // Connect to SSE endpoint
+  const connect = useCallback(() => {
     if (!agentName) return;
-
-    // Create EventSource for SSE connection
-    const eventSource = new EventSource(buildUrl(API_CONFIG.endpoints.sse(agentName)));
     
-    // Connection opened
+    // Close existing connection if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    
+    // Create a new EventSource connection
+    const sseUrl = `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.sse(agentName)}`;
+    const eventSource = new EventSource(sseUrl);
+    eventSourceRef.current = eventSource;
+    
+    // Handle connection open
     eventSource.onopen = () => {
+      console.log('SSE connection opened');
       setIsConnected(true);
-      setError(null);
     };
     
-    // Handle incoming messages
-    eventSource.onmessage = (event) => {
-      try {
-        const parsedData = JSON.parse(event.data);
-        setData((prevData) => [...prevData, parsedData]);
-      } catch (err) {
-        console.error('Error parsing SSE data:', err);
-      }
-    };
-    
-    // Handle errors
-    eventSource.onerror = (err) => {
+    // Handle connection error
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
       setIsConnected(false);
-      setError('SSE connection error');
-      console.error('SSE connection error:', err);
+      
+      // Try to reconnect after a delay
+      setTimeout(() => {
+        if (eventSourceRef.current === eventSource) {
+          connect();
+        }
+      }, 5000);
     };
     
-    // Clean up on unmount
+    // Handle 'json_message' event
+    eventSource.addEventListener('json_message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const timestamp = data.timestamp || new Date().toISOString();
+        
+        setMessages(prev => [...prev, {
+          id: `json-message-${Date.now()}`,
+          type: 'json_message',
+          content: data,
+          timestamp,
+        }]);
+      } catch (error) {
+        console.error('Error parsing JSON message:', error);
+      }
+    });
+    
+    // Handle 'status' event
+    eventSource.addEventListener('status', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const timestamp = data.timestamp || new Date().toISOString();
+        
+        setStatusUpdates(prev => [...prev, {
+          id: `json-status-${Date.now()}`,
+          type: 'status',
+          content: data,
+          timestamp,
+        }]);
+      } catch (error) {
+        console.error('Error parsing status message:', error);
+      }
+    });
+    
+    // Handle 'error' event
+    eventSource.addEventListener('error', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const timestamp = data.timestamp || new Date().toISOString();
+        
+        setErrorMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          type: 'error',
+          content: data,
+          timestamp,
+        }]);
+      } catch (error) {
+        console.error('Error parsing error message:', error);
+      }
+    });
+    
     return () => {
       eventSource.close();
-      setIsConnected(false);
     };
   }, [agentName]);
 
-  // Function to clear the data
-  const clearData = () => setData([]);
+  // Connect on mount and when agentName changes
+  useEffect(() => {
+    connect();
+    
+    // Cleanup on unmount
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [connect]);
 
-  return { data, isConnected, error, clearData };
+  // Reconnect function
+  const reconnect = useCallback(() => {
+    connect();
+  }, [connect]);
+
+  return {
+    messages,
+    statusUpdates,
+    errorMessages,
+    isConnected,
+    reconnect,
+  };
 }

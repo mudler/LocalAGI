@@ -177,9 +177,9 @@ export const agentApi = {
 
 // Chat-related API calls
 export const chatApi = {
-  // Send a chat message to an agent
+  // Send a message to an agent using the JSON-based API
   sendMessage: async (name, message) => {
-    const response = await fetch(buildUrl(API_CONFIG.endpoints.chat(name)), {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.chatApi(name)), {
       method: 'POST',
       headers: API_CONFIG.headers,
       body: JSON.stringify({ message }),

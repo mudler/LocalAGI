@@ -134,6 +134,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Delete("/api/agent/:name", app.Delete(pool))
 	webapp.Put("/api/agent/:name/pause", app.Pause(pool))
 	webapp.Put("/api/agent/:name/start", app.Start(pool))
+	
+	// Add JSON-based chat API endpoint
+	webapp.Post("/api/chat/:name", app.ChatAPI(pool))
 
 	webapp.Post("/v1/responses", app.Responses(pool))
 
