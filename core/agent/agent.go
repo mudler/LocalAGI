@@ -392,11 +392,10 @@ func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Me
 
 func (a *Agent) consumeJob(job *types.Job, role string) {
 
-
- if err := job.GetContext().Err(); err != nil {
-   job.Result.Finish(fmt.Errorf("expired"))
-   return
- }
+	if err := job.GetContext().Err(); err != nil {
+		job.Result.Finish(fmt.Errorf("expired"))
+		return
+	}
 
 	a.Lock()
 	paused := a.pause
