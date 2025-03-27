@@ -100,7 +100,7 @@ func SearchConfigMeta() []config.Field {
 			Type:         config.FieldTypeNumber,
 			DefaultValue: 1,
 			Min:          1,
-			Max:          10,
+			Max:          100,
 			Step:         1,
 			HelpText:     "Number of search results to return",
 		},

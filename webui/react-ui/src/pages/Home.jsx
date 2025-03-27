@@ -20,11 +20,11 @@ function Home() {
       try {
         const agents = await agentApi.getAgents();
         setStats({
-          agents: agents.Agents || [],
-          agentCount: agents.AgentCount || 0,
-          actions: agents.Actions || 0,
-          connectors: agents.Connectors || 0,
-          status: agents.Status || {},
+          agents: agents.agents || [],
+          agentCount: agents.agentCount || 0,
+          actions: agents.actions || 0,
+          connectors: agents.connectors || 0,
+          status: agents.statuses || {},
         });
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -115,14 +115,14 @@ function Home() {
                 </div>
                 <h2><i className="fas fa-robot"></i> {agent}</h2>
                 <div className="agent-actions">
-                  <Link to={`/talk/${agent}`} className="agent-action">
-                    Chat
+                  <Link to={`/talk/${agent}`} className="action-btn chat-btn">
+                    <i className="fas fa-comment"></i> Chat
                   </Link>
-                  <Link to={`/settings/${agent}`} className="agent-action">
-                    Settings
+                  <Link to={`/settings/${agent}`} className="action-btn settings-btn">
+                    <i className="fas fa-cog"></i> Settings
                   </Link>
-                  <Link to={`/status/${agent}`} className="agent-action">
-                    Status
+                  <Link to={`/status/${agent}`} className="action-btn status-btn">
+                    <i className="fas fa-chart-line"></i> Status
                   </Link>
                 </div>
               </div>

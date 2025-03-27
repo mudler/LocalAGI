@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 // Import form sections
 import BasicInfoSection from './agent-form-sections/BasicInfoSection';
@@ -10,6 +10,7 @@ import MemorySettingsSection from './agent-form-sections/MemorySettingsSection';
 import ModelSettingsSection from './agent-form-sections/ModelSettingsSection';
 import PromptsGoalsSection from './agent-form-sections/PromptsGoalsSection';
 import AdvancedSettingsSection from './agent-form-sections/AdvancedSettingsSection';
+import ExportSection from './agent-form-sections/ExportSection';
 
 const AgentForm = ({ 
   isEdit = false, 
@@ -20,10 +21,9 @@ const AgentForm = ({
   submitButtonText, 
   isGroupForm = false,
   noFormWrapper = false,
-  metadata = null
+  metadata = null,
 }) => {
   const navigate = useNavigate();
-  const { showToast } = useOutletContext();
   const [activeSection, setActiveSection] = useState(isGroupForm ? 'model-section' : 'basic-section');
 
   // Handle input changes
@@ -57,7 +57,18 @@ const AgentForm = ({
 
   // Handle navigation between sections
   const handleSectionChange = (section) => {
+    console.log('Changing section to:', section);
     setActiveSection(section);
+  };
+
+  // Handle connector change (simplified)
+  const handleConnectorChange = (index, updatedConnector) => {
+    const updatedConnectors = [...formData.connectors];
+    updatedConnectors[index] = updatedConnector;
+    setFormData({
+      ...formData,
+      connectors: updatedConnectors
+    });
   };
 
   // Handle adding a connector
@@ -66,7 +77,7 @@ const AgentForm = ({
       ...formData,
       connectors: [
         ...(formData.connectors || []),
-        { name: '', config: '{}' }
+        { type: '', config: '{}' }
       ]
     });
   };
@@ -75,55 +86,6 @@ const AgentForm = ({
   const handleRemoveConnector = (index) => {
     const updatedConnectors = [...formData.connectors];
     updatedConnectors.splice(index, 1);
-    setFormData({
-      ...formData,
-      connectors: updatedConnectors
-    });
-  };
-
-  // Handle connector name change
-  const handleConnectorNameChange = (index, value) => {
-    const updatedConnectors = [...formData.connectors];
-    updatedConnectors[index] = {
-      ...updatedConnectors[index],
-      type: value
-    };
-    setFormData({
-      ...formData,
-      connectors: updatedConnectors
-    });
-  };
-
-  // Handle connector config change
-  const handleConnectorConfigChange = (index, key, value) => {
-    const updatedConnectors = [...formData.connectors];
-    const currentConnector = updatedConnectors[index];
-    
-    // Parse the current config if it's a string
-    let currentConfig = {};
-    if (typeof currentConnector.config === 'string') {
-      try {
-        currentConfig = JSON.parse(currentConnector.config);
-      } catch (err) {
-        console.error('Error parsing config:', err);
-        currentConfig = {};
-      }
-    } else if (currentConnector.config) {
-      currentConfig = currentConnector.config;
-    }
-    
-    // Update the config with the new key-value pair
-    currentConfig = {
-      ...currentConfig,
-      [key]: value
-    };
-    
-    // Update the connector with the stringified config
-    updatedConnectors[index] = {
-      ...currentConnector,
-      config: JSON.stringify(currentConfig)
-    };
-    
     setFormData({
       ...formData,
       connectors: updatedConnectors
@@ -231,6 +193,17 @@ const AgentForm = ({
             <i className="fas fa-cogs"></i>
             Advanced Settings
           </li>
+          {isEdit && (
+            <>
+              <li 
+                className={`wizard-nav-item ${activeSection === 'export-section' ? 'active' : ''}`} 
+                onClick={() => handleSectionChange('export-section')}
+              >
+                <i className="fas fa-file-export"></i>
+                Export Data
+              </li>
+            </>
+          )}
         </ul>
       </div>
 
@@ -248,7 +221,7 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'connectors-section' ? 'block' : 'none' }}>
-              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorNameChange={handleConnectorNameChange} handleConnectorConfigChange={handleConnectorConfigChange} metadata={metadata} />
+              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorChange={handleConnectorChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'actions-section' ? 'block' : 'none' }}>
@@ -270,6 +243,14 @@ const AgentForm = ({
             <div style={{ display: activeSection === 'advanced-section' ? 'block' : 'none' }}>
               <AdvancedSettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
+
+            {isEdit && (
+              <>
+                <div style={{ display: activeSection === 'export-section' ? 'block' : 'none' }}>
+                  <ExportSection agentName={formData.name} />
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <form className="agent-form" onSubmit={handleSubmit} noValidate>
@@ -283,7 +264,7 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'connectors-section' ? 'block' : 'none' }}>
-              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorNameChange={handleConnectorNameChange} handleConnectorConfigChange={handleConnectorConfigChange} metadata={metadata} />
+              <ConnectorsSection formData={formData} handleAddConnector={handleAddConnector} handleRemoveConnector={handleRemoveConnector} handleConnectorChange={handleConnectorChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'actions-section' ? 'block' : 'none' }}>
@@ -306,13 +287,21 @@ const AgentForm = ({
               <AdvancedSettingsSection formData={formData} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
+            {isEdit && (
+              <>
+                <div style={{ display: activeSection === 'export-section' ? 'block' : 'none' }}>
+                  <ExportSection agentName={formData.name} />
+                </div>
+              </>
+            )}
+
             {/* Form Controls */}
-            <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => navigate('/agents')}>
-                Cancel
+            <div className="form-actions" style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button type="button" className="action-btn" onClick={() => navigate('/agents')}>
+                <i className="fas fa-times"></i> Cancel
               </button>
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {submitButtonText || (isEdit ? 'Update Agent' : 'Create Agent')}
+              <button type="submit" className="action-btn" disabled={loading}>
+                <i className="fas fa-save"></i> {submitButtonText || (isEdit ? 'Update Agent' : 'Create Agent')}
               </button>
             </div>
           </form>

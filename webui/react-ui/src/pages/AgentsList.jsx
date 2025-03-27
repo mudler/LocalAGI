@@ -13,29 +13,14 @@ function AgentsList() {
   const fetchAgents = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/agents');
-      const html = await response.text();
+      const response = await fetch('/api/agents');
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
       
-      // Create a temporary element to parse the HTML
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = html;
-      
-      // Extract agent names and statuses from the HTML
-      const agentElements = tempDiv.querySelectorAll('[data-agent]');
-      const agentList = [];
-      const statusMap = {};
-      
-      agentElements.forEach(el => {
-        const name = el.getAttribute('data-agent');
-        const status = el.getAttribute('data-active') === 'true';
-        if (name) {
-          agentList.push(name);
-          statusMap[name] = status;
-        }
-      });
-      
-      setAgents(agentList);
-      setStatuses(statusMap);
+      const data = await response.json();
+      setAgents(data.agents || []);
+      setStatuses(data.statuses || {});
     } catch (err) {
       console.error('Error fetching agents:', err);
       setError('Failed to load agents');
@@ -47,7 +32,7 @@ function AgentsList() {
   // Toggle agent status (pause/start)
   const toggleAgentStatus = async (name, isActive) => {
     try {
-      const endpoint = isActive ? `/pause/${name}` : `/start/${name}`;
+      const endpoint = isActive ? `/api/agent/${name}/pause` : `/api/agent/${name}/start`;
       const response = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -64,8 +49,12 @@ function AgentsList() {
         // Show success toast
         const action = isActive ? 'paused' : 'started';
         showToast(`Agent "${name}" ${action} successfully`, 'success');
+        
+        // Refresh the agents list to ensure we have the latest data
+        fetchAgents();
       } else {
-        throw new Error(`Server responded with status: ${response.status}`);
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Server responded with status: ${response.status}`);
       }
     } catch (err) {
       console.error(`Error toggling agent status:`, err);
@@ -80,7 +69,7 @@ function AgentsList() {
     }
     
     try {
-      const response = await fetch(`/delete/${name}`, {
+      const response = await fetch(`/api/agent/${name}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -88,11 +77,17 @@ function AgentsList() {
       if (response.ok) {
         // Remove from local state
         setAgents(prev => prev.filter(agent => agent !== name));
+        setStatuses(prev => {
+          const newStatuses = { ...prev };
+          delete newStatuses[name];
+          return newStatuses;
+        });
         
         // Show success toast
         showToast(`Agent "${name}" deleted successfully`, 'success');
       } else {
-        throw new Error(`Server responded with status: ${response.status}`);
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Server responded with status: ${response.status}`);
       }
     } catch (err) {
       console.error(`Error deleting agent:`, err);
@@ -117,7 +112,7 @@ function AgentsList() {
     <div className="agents-container">
       <header className="page-header">
         <h1>Manage Agents</h1>
-        <Link to="/create" className="create-btn">
+        <Link to="/create" className="action-btn">
           <i className="fas fa-plus"></i> Create New Agent
         </Link>
       </header>
@@ -198,8 +193,8 @@ function AgentsList() {
         <div className="no-agents">
           <h2>No Agents Found</h2>
           <p>Get started by creating your first agent</p>
-          <Link to="/create" className="create-agent-btn">
-            Create Agent
+          <Link to="/create" className="action-btn">
+            <i className="fas fa-plus"></i> Create Agent
           </Link>
         </div>
       )}

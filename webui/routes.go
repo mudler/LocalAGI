@@ -130,6 +130,11 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Put("/pause/:name", app.Pause(pool))
 	webapp.Put("/start/:name", app.Start(pool))
 
+	// JSON API endpoints for agent operations
+	webapp.Delete("/api/agent/:name", app.Delete(pool))
+	webapp.Put("/api/agent/:name/pause", app.Pause(pool))
+	webapp.Put("/api/agent/:name/start", app.Start(pool))
+
 	webapp.Post("/v1/responses", app.Responses(pool))
 
 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
@@ -171,9 +176,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
 	webapp.Put("/api/agent/:name/config", app.UpdateAgentConfig(pool))
-	
-	// Metadata endpoint for agent configuration fields
-	webapp.Get("/api/agent/config/metadata", app.GetAgentConfigMeta())
+
+	// Add endpoint for getting agent config metadata
+	webapp.Get("/api/meta/agent/config", app.GetAgentConfigMeta())
 
 	webapp.Post("/action/:name/run", app.ExecuteAction(pool))
 	webapp.Get("/actions", app.ListActions())
@@ -195,11 +200,27 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		}
 
 		return c.JSON(fiber.Map{
-			"Agents":     agents,
-			"AgentCount": len(agents),
-			"Actions":    len(services.AvailableActions),
-			"Connectors": len(services.AvailableConnectors),
-			"Status":     statuses,
+			"agents":     agents,
+			"agentCount": len(agents),
+			"actions":    len(services.AvailableActions),
+			"connectors": len(services.AvailableConnectors),
+			"statuses":   statuses,
+		})
+	})
+
+	// API endpoint for getting a specific agent's details
+	webapp.Get("/api/agent/:name", func(c *fiber.Ctx) error {
+		name := c.Params("name")
+		agent := pool.GetAgent(name)
+		if agent == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent not found",
+			})
+		}
+
+		// Add the active status to the configuration
+		return c.JSON(fiber.Map{
+			"active": !agent.Paused(),
 		})
 	})
 

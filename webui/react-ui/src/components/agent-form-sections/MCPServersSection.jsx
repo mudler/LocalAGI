@@ -46,7 +46,7 @@ const MCPServersSection = ({
               <h4>MCP Server #{index + 1}</h4>
               <button 
                 type="button" 
-                className="remove-btn"
+                className="action-btn delete-btn"
                 onClick={() => handleRemoveMCPServer(index)}
               >
                 <i className="fas fa-times"></i>
@@ -64,7 +64,7 @@ const MCPServersSection = ({
         
         <button 
           type="button" 
-          className="add-btn"
+          className="action-btn"
           onClick={handleAddMCPServer}
         >
           <i className="fas fa-plus"></i> Add MCP Server

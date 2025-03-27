@@ -24,9 +24,6 @@ const ConfigForm = ({
   typeField = 'type',
   addButtonText = 'Add Item'
 }) => {
-  // Debug logging
-  console.log(`ConfigForm for ${itemType}:`, { items, fieldGroups });
-  
   // Generate options from fieldGroups
   const typeOptions = [
     { value: '', label: `Select a ${itemType} type` },
@@ -35,8 +32,6 @@ const ConfigForm = ({
       label: group.label
     }))
   ];
-
-  console.log(`${itemType} type options:`, typeOptions);
   
   // Parse the config JSON string to an object
   const parseConfig = (item) => {
@@ -82,15 +77,13 @@ const ConfigForm = ({
     // Find the field group that matches this item's type
     const fieldGroup = fieldGroups.find(group => group.name === itemTypeName);
     
-    console.log(`Item ${index} type: ${itemTypeName}, Found field group:`, fieldGroup);
-    
     return (
       <div key={index} className="config-item mb-4 card">
         <div className="config-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h4 style={{ margin: 0 }}>{itemType.charAt(0).toUpperCase() + itemType.slice(1)} #{index + 1}</h4>
           <button 
             type="button" 
-            className="remove-btn"
+            className="action-btn delete-btn"
             onClick={() => onRemove(index)}
           >
             <i className="fas fa-times"></i>
@@ -134,7 +127,7 @@ const ConfigForm = ({
       
       <button 
         type="button" 
-        className="add-btn"
+        className="action-btn"
         onClick={onAdd}
       >
         <i className="fas fa-plus"></i> {addButtonText}

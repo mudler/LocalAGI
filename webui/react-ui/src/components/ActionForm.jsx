@@ -6,12 +6,7 @@ import ConfigForm from './ConfigForm';
  * Renders action configuration forms based on field group metadata
  */
 const ActionForm = ({ actions = [], onChange, onRemove, onAdd, fieldGroups = [] }) => {
-  // Debug logging
-  console.log('ActionForm:', { actions, fieldGroups });
-  
-  // Handle action change
   const handleActionChange = (index, updatedAction) => {
-    console.log('Action change:', { index, updatedAction });
     onChange(index, updatedAction);
   };
   

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { agentApi } from '../utils/api';
 import AgentForm from '../components/AgentForm';
@@ -10,6 +10,7 @@ function GroupCreate() {
   const [generatingProfiles, setGeneratingProfiles] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
   const [selectedProfiles, setSelectedProfiles] = useState([]);
+  const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({
     description: '',
     model: '',
@@ -19,6 +20,24 @@ function GroupCreate() {
     actions: [],
     profiles: []
   });
+
+  // Fetch metadata on component mount
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      try {
+        // Fetch metadata from the dedicated endpoint
+        const response = await agentApi.getAgentConfigMetadata();
+        if (response) {
+          setMetadata(response);
+        }
+      } catch (error) {
+        console.error('Error fetching metadata:', error);
+        // Continue without metadata, the form will use default fields
+      }
+    };
+
+    fetchMetadata();
+  }, []);
 
   // Handle form field changes
   const handleInputChange = (e) => {
@@ -281,6 +300,7 @@ function GroupCreate() {
                 submitButtonText="Create Group"
                 isGroupForm={true}
                 noFormWrapper={true}
+                metadata={metadata}
               />
             </div>
             

@@ -20,11 +20,11 @@ export const API_CONFIG = {
     // Agent endpoints
     agents: '/api/agents',
     agentConfig: (name) => `/api/agent/${name}/config`,
-    agentConfigMetadata: '/api/agent/config/metadata',
+    agentConfigMetadata: '/api/meta/agent/config',
     createAgent: '/create',
-    deleteAgent: (name) => `/delete/${name}`,
-    pauseAgent: (name) => `/pause/${name}`,
-    startAgent: (name) => `/start/${name}`,
+    deleteAgent: (name) => `/api/agent/${name}`,
+    pauseAgent: (name) => `/api/agent/${name}/pause`,
+    startAgent: (name) => `/api/agent/${name}/start`,
     exportAgent: (name) => `/settings/export/${name}`,
     importAgent: '/settings/import',
     

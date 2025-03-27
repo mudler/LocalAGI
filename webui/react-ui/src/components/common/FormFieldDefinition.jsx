@@ -33,6 +33,9 @@ const FormFieldDefinition = ({
             helpText={field.helpText || ''}
             options={field.options || []}
             required={field.required || false}
+            min={field.min || 0}
+            max={field.max || 2**31}
+            step={field.step || 1}
           />
         </div>
       ))}

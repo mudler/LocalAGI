@@ -7,3 +7,5 @@ export { default as MemorySettingsSection } from './MemorySettingsSection';
 export { default as PromptsGoalsSection } from './PromptsGoalsSection';
 export { default as AdvancedSettingsSection } from './AdvancedSettingsSection';
 export { default as FormNavSidebar } from './FormNavSidebar';
+export { default as ExportSection } from './ExportSection';
+export { default as ControlSection } from './ControlSection';

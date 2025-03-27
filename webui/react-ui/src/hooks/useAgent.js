@@ -19,8 +19,21 @@ export function useAgent(agentName) {
     setError(null);
     
     try {
+      // Fetch the agent configuration
       const config = await agentApi.getAgentConfig(agentName);
-      setAgent(config);
+      
+      // Fetch the agent status
+      const response = await fetch(`/api/agent/${agentName}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agent status: ${response.status}`);
+      }
+      const statusData = await response.json();
+      
+      // Combine configuration with active status
+      setAgent({
+        ...config,
+        active: statusData.active
+      });
     } catch (err) {
       setError(err.message || 'Failed to fetch agent configuration');
       console.error('Error fetching agent:', err);
@@ -63,8 +76,13 @@ export function useAgent(agentName) {
       } else {
         await agentApi.startAgent(agentName);
       }
-      // Refresh agent data after status change
-      await fetchAgent();
+      
+      // Update the agent's active status in the local state
+      setAgent(prevAgent => ({
+        ...prevAgent,
+        active: !isActive
+      }));
+      
       return true;
     } catch (err) {
       setError(err.message || 'Failed to toggle agent status');
@@ -73,7 +91,7 @@ export function useAgent(agentName) {
     } finally {
       setLoading(false);
     }
-  }, [agentName, fetchAgent]);
+  }, [agentName]);
 
   // Delete agent
   const deleteAgent = useCallback(async () => {
