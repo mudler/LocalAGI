@@ -19,6 +19,7 @@ const (
 	UserRole      = "user"
 	AssistantRole = "assistant"
 	SystemRole    = "system"
+	maxRetries    = 5
 )
 
 type Agent struct {
@@ -29,10 +30,8 @@ type Agent struct {
 	jobQueue  chan *types.Job
 	context   *types.ActionContext
 
-	currentReasoning         string
-	currentState             *action.AgentInternalState
-	nextAction               types.Action
-	nextActionParams         *types.ActionParams
+	currentState *action.AgentInternalState
+
 	selfEvaluationInProgress bool
 	pause                    bool
 
@@ -175,19 +174,32 @@ func (a *Agent) Enqueue(j *types.Job) {
 	a.jobQueue <- j
 }
 
-func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletionMessage) (openai.ChatCompletionMessage, error) {
-	resp, err := a.client.CreateChatCompletion(ctx,
-		openai.ChatCompletionRequest{
-			Model:    a.options.LLMAPI.Model,
-			Messages: conversation,
-		},
-	)
+func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletionMessage, maxRetries int) (openai.ChatCompletionMessage, error) {
+	var resp openai.ChatCompletionResponse
+	var err error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		resp, err = a.client.CreateChatCompletion(ctx,
+			openai.ChatCompletionRequest{
+				Model:    a.options.LLMAPI.Model,
+				Messages: conversation,
+			},
+		)
+		if err == nil && len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
+			break
+		}
+		xlog.Warn("Error asking LLM, retrying", "attempt", attempt+1, "error", err)
+		if attempt < maxRetries {
+			time.Sleep(2 * time.Second) // Optional: Add a delay between retries
+		}
+	}
+
 	if err != nil {
 		return openai.ChatCompletionMessage{}, err
 	}
 
 	if len(resp.Choices) != 1 {
-		return openai.ChatCompletionMessage{}, fmt.Errorf("no enough choices: %w", err)
+		return openai.ChatCompletionMessage{}, fmt.Errorf("not enough choices: %w", err)
 	}
 
 	return resp.Choices[0].Message, nil
@@ -447,15 +459,26 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	var reasoning string
 	var actionParams types.ActionParams
 
-	if a.nextAction != nil {
+	if job.HasNextAction() {
 		// if we are being re-evaluated, we already have the action
 		// and the reasoning. Consume it here and reset it
-		chosenAction = a.nextAction
-		reasoning = a.currentReasoning
-		actionParams = *a.nextActionParams
-		a.currentReasoning = ""
-		a.nextActionParams = nil
-		a.nextAction = nil
+		action, params, reason := job.GetNextAction()
+		chosenAction = *action
+		reasoning = reason
+		if params == nil {
+			p, err := a.generateParameters(job.GetContext(), pickTemplate, chosenAction, conv, reasoning, maxRetries)
+			if err != nil {
+				xlog.Error("Error generating parameters, trying again", "error", err)
+				// try again
+				job.SetNextAction(&chosenAction, nil, reasoning)
+				a.consumeJob(job, role)
+				return
+			}
+			actionParams = p.actionParams
+		} else {
+			actionParams = *params
+		}
+		job.ResetNextAction()
 	} else {
 		var err error
 		chosenAction, actionParams, reasoning, err = a.pickAction(job.GetContext(), pickTemplate, conv)
@@ -501,9 +524,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			"reasoning", reasoning,
 		)
 
-		params, err := a.generateParameters(job.GetContext(), pickTemplate, chosenAction, conv, reasoning)
+		params, err := a.generateParameters(job.GetContext(), pickTemplate, chosenAction, conv, reasoning, maxRetries)
 		if err != nil {
-			job.Result.Finish(fmt.Errorf("error generating action's parameters: %w", err))
+			xlog.Error("Error generating parameters, trying again", "error", err)
+			// try again
+			job.SetNextAction(&chosenAction, nil, reasoning)
+			a.consumeJob(job, role)
 			return
 		}
 		actionParams = params.actionParams
@@ -625,9 +651,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			// We need to do another action (?)
 			// The agent decided to do another action
 			// call ourselves again
-			a.currentReasoning = reasoning
-			a.nextAction = followingAction
-			a.nextActionParams = &followingParams
+			job.SetNextAction(&followingAction, &followingParams, reasoning)
 			a.consumeJob(job, role)
 			return
 		} else if followingAction == nil {
@@ -731,7 +755,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", conv))
-	msg, err := a.askLLM(job.GetContext(), conv)
+	msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
 	if err != nil {
 		job.Result.Conversation = conv
 		job.Result.Finish(err)

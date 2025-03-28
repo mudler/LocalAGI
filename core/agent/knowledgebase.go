@@ -87,7 +87,7 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 		msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
 			Role:    "user",
 			Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(conv).String(),
-		}})
+		}}, maxRetries)
 		if err != nil {
 			xlog.Error("Error summarizing conversation", "error", err)
 		}

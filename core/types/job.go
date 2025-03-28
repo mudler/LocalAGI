@@ -21,6 +21,10 @@ type Job struct {
 	UUID                string
 	Metadata            map[string]interface{}
 
+	nextAction          *Action
+	nextActionParams    *ActionParams
+	nextActionReasoning string
+
 	context context.Context
 	cancel  context.CancelFunc
 }
@@ -83,6 +87,26 @@ func (j *Job) CallbackWithResult(stateResult ActionState) {
 		return
 	}
 	j.ResultCallback(stateResult)
+}
+
+func (j *Job) SetNextAction(action *Action, params *ActionParams, reasoning string) {
+	j.nextAction = action
+	j.nextActionParams = params
+	j.nextActionReasoning = reasoning
+}
+
+func (j *Job) GetNextAction() (*Action, *ActionParams, string) {
+	return j.nextAction, j.nextActionParams, j.nextActionReasoning
+}
+
+func (j *Job) HasNextAction() bool {
+	return j.nextAction != nil
+}
+
+func (j *Job) ResetNextAction() {
+	j.nextAction = nil
+	j.nextActionParams = nil
+	j.nextActionReasoning = ""
 }
 
 func WithTextImage(text, image string) JobOption {

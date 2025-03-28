@@ -135,18 +135,13 @@ func (m Messages) IsLastMessageFromRole(role string) bool {
 	return m[len(m)-1].Role == role
 }
 
-func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act types.Action, c []openai.ChatCompletionMessage, reasoning string) (*decisionResult, error) {
-
+func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act types.Action, c []openai.ChatCompletionMessage, reasoning string, maxAttempts int) (*decisionResult, error) {
 	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.availableActions(), reasoning)
 	if err != nil {
 		return nil, err
 	}
 
-	// check if there is already a message with the hud in the conversation already, otherwise
-	// add a message at the top with it
-
 	conversation := c
-
 	if !Messages(c).Exist(stateHUD) && a.options.enableHUD {
 		conversation = append([]openai.ChatCompletionMessage{
 			{
@@ -164,14 +159,25 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 		})
 	}
 
-	return a.decision(ctx,
-		cc,
-		a.availableActions().ToTools(),
-		openai.ToolChoice{
-			Type:     openai.ToolTypeFunction,
-			Function: openai.ToolFunction{Name: act.Definition().Name.String()},
-		},
-	)
+	var result *decisionResult
+	var attemptErr error
+
+	for attempts := 0; attempts < maxAttempts; attempts++ {
+		result, attemptErr = a.decision(ctx,
+			cc,
+			a.availableActions().ToTools(),
+			openai.ToolChoice{
+				Type:     openai.ToolTypeFunction,
+				Function: openai.ToolFunction{Name: act.Definition().Name.String()},
+			},
+		)
+		if attemptErr == nil && result.actionParams != nil {
+			return result, nil
+		}
+		xlog.Warn("Attempt to generate parameters failed", "attempt", attempts+1, "error", attemptErr)
+	}
+
+	return nil, fmt.Errorf("failed to generate parameters after %d attempts: %w", maxAttempts, attemptErr)
 }
 
 func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction types.Action, actionParams types.ActionParams, reasoning string, pickTemplate string, conv Messages) (Messages, error) {
@@ -221,7 +227,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		subTaskAction := a.availableActions().Find(subtask.Action)
 		subTaskReasoning := fmt.Sprintf("%s Overall goal is: %s", subtask.Reasoning, planResult.Goal)
 
-		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning)
+		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning, maxRetries)
 		if err != nil {
 			return conv, fmt.Errorf("error generating action's parameters: %w", err)
 
