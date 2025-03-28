@@ -492,6 +492,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		}
 	}()
 
+	xlog.Info("Agent started", "name", name)
+
 	return nil
 }
 
