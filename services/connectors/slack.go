@@ -31,7 +31,7 @@ type Slack struct {
 	appToken    string
 	botToken    string
 	channelID   string
-	alwaysReply bool
+	channelMode bool
 
 	// To track placeholder messages
 	placeholders     map[string]string // map[jobUUID]messageTS
@@ -58,7 +58,7 @@ func NewSlack(config map[string]string) *Slack {
 		appToken:            config["appToken"],
 		botToken:            config["botToken"],
 		channelID:           config["channelID"],
-		alwaysReply:         config["alwaysReply"] == "true",
+		channelMode:         config["channelMode"] == "true",
 		conversationTracker: NewConversationTracker[string](duration),
 		placeholders:        make(map[string]string),
 		activeJobs:          make(map[string][]*types.Job),
@@ -232,7 +232,8 @@ func scanImagesInMessages(api *slack.Client, ev *slackevents.MessageEvent) (*byt
 func (t *Slack) handleChannelMessage(
 	a *agent.Agent,
 	api *slack.Client, ev *slackevents.MessageEvent, b *slack.AuthTestResponse, postMessageParams slack.PostMessageParameters) {
-	if t.channelID == "" && !t.alwaysReply || // If we have set alwaysReply and no channelID
+	if t.channelID == "" ||
+		t.channelID != "" && !t.channelMode ||
 		t.channelID != ev.Channel { // If we have a channelID and it's not the same as the event channel
 		// Skip messages from other channels
 		xlog.Info("Skipping reply to channel", ev.Channel, t.channelID)
