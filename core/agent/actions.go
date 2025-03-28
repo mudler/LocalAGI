@@ -219,7 +219,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		)
 
 		subTaskAction := a.availableActions().Find(subtask.Action)
-		subTaskReasoning := fmt.Sprintf("%s, overall goal is: %s", subtask.Reasoning, planResult.Goal)
+		subTaskReasoning := fmt.Sprintf("%s Overall goal is: %s", subtask.Reasoning, planResult.Goal)
 
 		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning)
 		if err != nil {

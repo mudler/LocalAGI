@@ -10,14 +10,16 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-func NewCallAgent(config map[string]string, pool *state.AgentPoolInternalAPI) *CallAgentAction {
+func NewCallAgent(config map[string]string, agentName string, pool *state.AgentPoolInternalAPI) *CallAgentAction {
 	return &CallAgentAction{
-		pool: pool,
+		pool:   pool,
+		myName: agentName,
 	}
 }
 
 type CallAgentAction struct {
-	pool *state.AgentPoolInternalAPI
+	pool   *state.AgentPoolInternalAPI
+	myName string
 }
 
 func (a *CallAgentAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
@@ -57,9 +59,17 @@ func (a *CallAgentAction) Run(ctx context.Context, params types.ActionParams) (t
 func (a *CallAgentAction) Definition() types.ActionDefinition {
 	allAgents := a.pool.AllAgents()
 
+	agents := []string{}
+
+	for _, ag := range allAgents {
+		if ag != a.myName {
+			agents = append(agents, ag)
+		}
+	}
+
 	description := "Use this tool to call another agent. Available agents and their roles are:"
 
-	for _, agent := range allAgents {
+	for _, agent := range agents {
 		agentConfig := a.pool.GetConfig(agent)
 		if agentConfig == nil {
 			continue
@@ -74,7 +84,7 @@ func (a *CallAgentAction) Definition() types.ActionDefinition {
 			"agent_name": {
 				Type:        jsonschema.String,
 				Description: "The name of the agent to call.",
-				Enum:        allAgents,
+				Enum:        agents,
 			},
 			"message": {
 				Type:        jsonschema.String,

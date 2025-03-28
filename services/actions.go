@@ -65,6 +65,8 @@ func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPo
 	return func(ctx context.Context, pool *state.AgentPool) []types.Action {
 		allActions := []types.Action{}
 
+		agentName := a.Name
+
 		for _, a := range a.Actions {
 			var config map[string]string
 			if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
@@ -72,7 +74,7 @@ func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPo
 				continue
 			}
 
-			a, err := Action(a.Name, config, pool)
+			a, err := Action(a.Name, agentName, config, pool)
 			if err != nil {
 				continue
 			}
@@ -83,7 +85,7 @@ func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPo
 	}
 }
 
-func Action(name string, config map[string]string, pool *state.AgentPool) (types.Action, error) {
+func Action(name, agentName string, config map[string]string, pool *state.AgentPool) (types.Action, error) {
 	var a types.Action
 	var err error
 
@@ -125,7 +127,7 @@ func Action(name string, config map[string]string, pool *state.AgentPool) (types
 	case ActionCounter:
 		a = actions.NewCounter(config)
 	case ActionCallAgents:
-		a = actions.NewCallAgent(config, pool.InternalAPI())
+		a = actions.NewCallAgent(config, agentName, pool.InternalAPI())
 	case ActionShellcommand:
 		a = actions.NewShell(config)
 	default:
