@@ -10,14 +10,14 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-func NewCallAgent(config map[string]string, pool *state.AgentPool) *CallAgentAction {
+func NewCallAgent(config map[string]string, pool *state.AgentPoolInternalAPI) *CallAgentAction {
 	return &CallAgentAction{
 		pool: pool,
 	}
 }
 
 type CallAgentAction struct {
-	pool *state.AgentPool
+	pool *state.AgentPoolInternalAPI
 }
 
 func (a *CallAgentAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {

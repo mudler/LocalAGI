@@ -125,7 +125,7 @@ func Action(name string, config map[string]string, pool *state.AgentPool) (types
 	case ActionCounter:
 		a = actions.NewCounter(config)
 	case ActionCallAgents:
-		a = actions.NewCallAgent(config, pool)
+		a = actions.NewCallAgent(config, pool.InternalAPI())
 	case ActionShellcommand:
 		a = actions.NewShell(config)
 	default:

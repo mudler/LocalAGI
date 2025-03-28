@@ -591,6 +591,7 @@ func (a *AgentPool) save() error {
 	}
 	return os.WriteFile(a.file, data, 0644)
 }
+
 func (a *AgentPool) GetAgent(name string) *Agent {
 	a.Lock()
 	defer a.Unlock()
