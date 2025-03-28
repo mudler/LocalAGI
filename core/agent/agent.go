@@ -71,6 +71,7 @@ func New(opts ...Option) (*Agent, error) {
 		Character:              options.character,
 		currentState:           &action.AgentInternalState{},
 		context:                types.NewActionContext(ctx, cancel),
+		newConversations:       make(chan openai.ChatCompletionMessage),
 		newMessagesSubscribers: options.newConversationsSubscribers,
 	}
 
@@ -104,8 +105,6 @@ func New(opts ...Option) (*Agent, error) {
 		"model", a.options.LLMAPI.Model,
 	)
 
-	a.startNewConversationsConsumer()
-
 	return a, nil
 }
 
@@ -117,6 +116,7 @@ func (a *Agent) startNewConversationsConsumer() {
 				return
 
 			case msg := <-a.newConversations:
+				xlog.Debug("New conversation", "agent", a.Character.Name, "message", msg.Content)
 				a.subscriberMutex.Lock()
 				subs := a.newMessagesSubscribers
 				a.subscriberMutex.Unlock()
@@ -577,25 +577,28 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	if selfEvaluation && a.options.initiateConversations &&
 		chosenAction.Definition().Name.Is(action.ConversationActionName) {
 
+		xlog.Info("LLM decided to initiate a new conversation", "agent", a.Character.Name)
+
 		message := action.ConversationActionResponse{}
 		if err := actionParams.Unmarshal(&message); err != nil {
+			xlog.Error("Error unmarshalling conversation response", "error", err)
 			job.Result.Finish(fmt.Errorf("error unmarshalling conversation response: %w", err))
 			return
 		}
 
-		conv = []openai.ChatCompletionMessage{
-			{
-				Role:    "assistant",
-				Content: message.Message,
-			},
+		msg := openai.ChatCompletionMessage{
+			Role:    "assistant",
+			Content: message.Message,
 		}
-		go func() {
-			a.newConversations <- openai.ChatCompletionMessage{
-				Role:    "assistant",
-				Content: message.Message,
-			}
-		}()
-		job.Result.Conversation = conv
+
+		go func(agent *Agent) {
+			xlog.Info("Sending new conversation to channel", "agent", agent.Character.Name, "message", msg.Content)
+			agent.newConversations <- msg
+		}(a)
+
+		job.Result.Conversation = []openai.ChatCompletionMessage{
+			msg,
+		}
 		job.Result.SetResponse("decided to initiate a new conversation")
 		job.Result.Finish(nil)
 		return
@@ -881,6 +884,9 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 }
 
 func (a *Agent) Run() error {
+
+	a.startNewConversationsConsumer()
+	xlog.Debug("Agent is now running", "agent", a.Character.Name)
 	// The agent run does two things:
 	// picks up requests from a queue
 	// and generates a response/perform actions

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/actions"
@@ -12,6 +13,7 @@ import (
 	"github.com/mudler/LocalAgent/core/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -233,6 +235,43 @@ var _ = Describe("Agent test", func() {
 			Expect(actionsExecuted).To(ContainElement("search_internet"), fmt.Sprint(result))
 			Expect(actionsExecuted).To(ContainElement("plan"), fmt.Sprint(result))
 
+		})
+
+		It("Can initiate conversations", func() {
+
+			message := openai.ChatCompletionMessage{}
+			mu := &sync.Mutex{}
+			agent, err := New(
+				WithLLMAPIURL(apiURL),
+				WithModel(testModel),
+				WithLLMAPIKey(apiKeyURL),
+				WithNewConversationSubscriber(func(m openai.ChatCompletionMessage) {
+					mu.Lock()
+					message = m
+					mu.Unlock()
+				}),
+				WithActions(
+					actions.NewSearch(map[string]string{}),
+				),
+				EnablePlanning,
+				EnableForceReasoning,
+				EnableInitiateConversations,
+				EnableStandaloneJob,
+				EnableHUD,
+				WithPeriodicRuns("1s"),
+				WithPermanentGoal("use the new_conversation tool"),
+				//	EnableStandaloneJob,
+				//	WithRandomIdentity(),
+			)
+			Expect(err).ToNot(HaveOccurred())
+			go agent.Run()
+			defer agent.Stop()
+
+			Eventually(func() string {
+				mu.Lock()
+				defer mu.Unlock()
+				return message.Content
+			}, "10m", "10s").ShouldNot(BeEmpty())
 		})
 
 		/*
