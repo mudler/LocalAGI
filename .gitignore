@@ -5,3 +5,4 @@ uploads/
 local-agent-framework
 localagent
 **/.env
+.vscode
