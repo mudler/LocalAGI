@@ -74,7 +74,7 @@ func (a *CallAgentAction) Definition() types.ActionDefinition {
 		if agentConfig == nil {
 			continue
 		}
-		description += fmt.Sprintf("\n- %s: %s", agent, agentConfig.Description)
+		description += fmt.Sprintf("\n\t- %s: %s", agent, agentConfig.Description)
 	}
 
 	return types.ActionDefinition{
