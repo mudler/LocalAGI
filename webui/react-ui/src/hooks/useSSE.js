@@ -23,7 +23,7 @@ export function useSSE(agentName) {
     }
     
     // Create a new EventSource connection
-    const sseUrl = `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.sse(agentName)}`;
+    const sseUrl = new URL(`${API_CONFIG.endpoints.sse(agentName)}`, window.location.origin).href;
     const eventSource = new EventSource(sseUrl);
     eventSourceRef.current = eventSource;
     

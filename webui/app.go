@@ -318,7 +318,7 @@ func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		// Get agent name from URL parameter
 		agentName := c.Params("name")
-		
+
 		// Validate message
 		message := strings.TrimSpace(payload.Message)
 		if message == "" {
@@ -337,15 +337,15 @@ func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		// Get the SSE manager for this agent
 		manager := pool.GetManager(agentName)
-		
+
 		// Create a unique message ID
 		messageID := fmt.Sprintf("%d", time.Now().UnixNano())
-		
+
 		// Send user message event via SSE
 		userMessageData, err := json.Marshal(map[string]interface{}{
-			"id": messageID + "-user",
-			"sender": "user",
-			"content": message,
+			"id":        messageID + "-user",
+			"sender":    "user",
+			"content":   message,
 			"timestamp": time.Now().Format(time.RFC3339),
 		})
 		if err != nil {
@@ -354,29 +354,29 @@ func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			manager.Send(
 				sse.NewMessage(string(userMessageData)).WithEvent("json_message"))
 		}
-		
+
 		// Send processing status
 		statusData, err := json.Marshal(map[string]interface{}{
-			"status": "processing",
+			"status":    "processing",
 			"timestamp": time.Now().Format(time.RFC3339),
 		})
 		if err != nil {
 			xlog.Error("Error marshaling status message", "error", err)
 		} else {
 			manager.Send(
-				sse.NewMessage(string(statusData)).WithEvent("status"))
+				sse.NewMessage(string(statusData)).WithEvent("json_status"))
 		}
-		
+
 		// Process the message asynchronously
 		go func() {
 			// Ask the agent for a response
 			response := agent.Ask(coreTypes.WithText(message))
-			
+
 			if response.Error != nil {
 				// Send error message
 				xlog.Error("Error asking agent", "agent", agentName, "error", response.Error)
 				errorData, err := json.Marshal(map[string]interface{}{
-					"error": response.Error.Error(),
+					"error":     response.Error.Error(),
 					"timestamp": time.Now().Format(time.RFC3339),
 				})
 				if err != nil {
@@ -389,9 +389,9 @@ func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
 				// Send agent response
 				xlog.Info("Response from agent", "agent", agentName, "response", response.Response)
 				responseData, err := json.Marshal(map[string]interface{}{
-					"id": messageID + "-agent",
-					"sender": "agent",
-					"content": response.Response,
+					"id":        messageID + "-agent",
+					"sender":    "agent",
+					"content":   response.Response,
 					"timestamp": time.Now().Format(time.RFC3339),
 				})
 				if err != nil {
@@ -401,23 +401,23 @@ func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
 						sse.NewMessage(string(responseData)).WithEvent("json_message"))
 				}
 			}
-			
+
 			// Send completed status
 			completedData, err := json.Marshal(map[string]interface{}{
-				"status": "completed",
+				"status":    "completed",
 				"timestamp": time.Now().Format(time.RFC3339),
 			})
 			if err != nil {
 				xlog.Error("Error marshaling completed status", "error", err)
 			} else {
 				manager.Send(
-					sse.NewMessage(string(completedData)).WithEvent("status"))
+					sse.NewMessage(string(completedData)).WithEvent("json_status"))
 			}
 		}()
-		
+
 		// Return immediate success response
 		return c.Status(fiber.StatusAccepted).JSON(map[string]interface{}{
-			"status": "message_received",
+			"status":     "message_received",
 			"message_id": messageID,
 		})
 	}

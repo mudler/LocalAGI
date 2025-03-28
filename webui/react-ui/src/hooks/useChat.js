@@ -12,6 +12,7 @@ export function useChat(agentName) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const processedMessageIds = useRef(new Set());
+  const localMessageContents = useRef(new Set()); // Track locally added message contents
   
   // Use SSE hook to receive real-time messages
   const { messages: sseMessages, statusUpdates, errorMessages, isConnected } = useSSE(agentName);
@@ -41,6 +42,11 @@ export function useChat(agentName) {
         
         // Add to processed set to avoid duplicates
         processedMessageIds.current.add(messageData.id);
+        
+        // Skip user messages that we've already added locally
+        if (messageData.sender === 'user' && localMessageContents.current.has(messageData.content)) {
+          return;
+        }
         
         // Add the message to our state
         setMessages(prev => [...prev, {
@@ -115,6 +121,9 @@ export function useChat(agentName) {
     
     setMessages(prev => [...prev, userMessage]);
     
+    // Track this message content to avoid duplication from SSE
+    localMessageContents.current.add(content);
+    
     try {
       // Use the JSON-based API endpoint
       await chatApi.sendMessage(agentName, content);
@@ -131,6 +140,7 @@ export function useChat(agentName) {
   const clearChat = useCallback(() => {
     setMessages([]);
     processedMessageIds.current.clear();
+    localMessageContents.current.clear(); // Clear tracked local messages
   }, []);
 
   return {
