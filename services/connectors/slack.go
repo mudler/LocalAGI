@@ -667,10 +667,12 @@ func (t *Slack) handleMention(
 
 		if res.Response == "" {
 			xlog.Debug(fmt.Sprintf("Empty response from agent"))
-			_, _, err := api.DeleteMessage(ev.Channel, msgTs)
-			if err != nil {
-				xlog.Error(fmt.Sprintf("Error deleting message: %v", err))
-			}
+			replyToUpdateMessage("there was an internal error. try again!", api, ev, msgTs, ts, res)
+
+			// _, _, err := api.DeleteMessage(ev.Channel, msgTs)
+			// if err != nil {
+			// 	xlog.Error(fmt.Sprintf("Error deleting message: %v", err))
+			// }
 			return
 		}
 
