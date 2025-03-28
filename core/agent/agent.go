@@ -481,7 +481,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		job.ResetNextAction()
 	} else {
 		var err error
-		chosenAction, actionParams, reasoning, err = a.pickAction(job.GetContext(), pickTemplate, conv)
+		chosenAction, actionParams, reasoning, err = a.pickAction(job.GetContext(), pickTemplate, conv, maxRetries)
 		if err != nil {
 			xlog.Error("Error picking action", "error", err)
 			job.Result.Finish(err)
@@ -634,7 +634,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 		// given the result, we can now ask OpenAI to complete the conversation or
 		// to continue using another tool given the result
-		followingAction, followingParams, reasoning, err := a.pickAction(job.GetContext(), reEvaluationTemplate, conv)
+		followingAction, followingParams, reasoning, err := a.pickAction(job.GetContext(), reEvaluationTemplate, conv, maxRetries)
 		if err != nil {
 			job.Result.Conversation = conv
 			job.Result.Finish(fmt.Errorf("error picking action: %w", err))
