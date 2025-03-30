@@ -648,8 +648,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 		if followingAction != nil &&
 			!followingAction.Definition().Name.Is(action.ReplyActionName) &&
-			!chosenAction.Definition().Name.Is(action.ReplyActionName) &&
-			!followingAction.Definition().Name.Is(action.PlanActionName) {
+			!chosenAction.Definition().Name.Is(action.ReplyActionName) {
 
 			xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
 
@@ -679,8 +678,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				job.Result.Finish(nil)
 				return
 			}
-		} else if followingAction.Definition().Name.Is(action.PlanActionName) {
-			xlog.Debug("Following action is a plan action, skipping", "agent", a.Character.Name)
 		}
 	}
 
