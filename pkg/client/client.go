@@ -17,12 +17,15 @@ type Client struct {
 }
 
 // NewClient creates a new LocalAgent client
-func NewClient(baseURL string, apiKey string) *Client {
+func NewClient(baseURL string, apiKey string, timeout time.Duration) *Client {
+	if timeout == 0 {
+		timeout = time.Second * 30
+	}
 	return &Client{
 		BaseURL: baseURL,
 		APIKey:  apiKey,
 		HTTPClient: &http.Client{
-			Timeout: time.Second * 30,
+			Timeout: timeout,
 		},
 	}
 }

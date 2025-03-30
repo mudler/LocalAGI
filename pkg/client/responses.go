@@ -8,17 +8,16 @@ import (
 
 // RequestBody represents the message request to the AI model
 type RequestBody struct {
-	Model         string         `json:"model"`
-	Input         string         `json:"input"`
-	InputMessages []InputMessage `json:"input_messages,omitempty"`
-	Temperature   *float64       `json:"temperature,omitempty"`
-	MaxTokens     *int           `json:"max_output_tokens,omitempty"`
+	Model       string   `json:"model"`
+	Input       any      `json:"input"`
+	Temperature *float64 `json:"temperature,omitempty"`
+	MaxTokens   *int     `json:"max_output_tokens,omitempty"`
 }
 
 // InputMessage represents a user input message
 type InputMessage struct {
-	Role    string        `json:"role"`
-	Content []ContentItem `json:"content"`
+	Role    string `json:"role"`
+	Content any    `json:"content"`
 }
 
 // ContentItem represents an item in a content array
@@ -32,7 +31,7 @@ type ContentItem struct {
 type ResponseBody struct {
 	CreatedAt int64             `json:"created_at"`
 	Status    string            `json:"status"`
-	Error     interface{}       `json:"error,omitempty"`
+	Error     any               `json:"error,omitempty"`
 	Output    []ResponseMessage `json:"output"`
 }
 
@@ -103,9 +102,9 @@ func (c *Client) SimpleAIResponse(agentName, input string) (string, error) {
 func (c *Client) ChatAIResponse(agentName string, messages []InputMessage) (string, error) {
 	temperature := 0.7
 	request := &RequestBody{
-		Model:         agentName,
-		InputMessages: messages,
-		Temperature:   &temperature,
+		Model:       agentName,
+		Input:       messages,
+		Temperature: &temperature,
 	}
 
 	response, err := c.GetAIResponse(request)

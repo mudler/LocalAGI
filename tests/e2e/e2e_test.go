@@ -1,6 +1,8 @@
 package e2e_test
 
 import (
+	"time"
+
 	localagent "github.com/mudler/LocalAgent/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -8,9 +10,9 @@ import (
 )
 
 var _ = Describe("Agent test", func() {
-	Context("Creates an agent and it answer", func() {
+	Context("Creates an agent and it answers", func() {
 		It("create agent", func() {
-			client := localagent.NewClient(localagentURL, "")
+			client := localagent.NewClient(localagentURL, "", 5*time.Minute)
 
 			err := client.CreateAgent(&localagent.AgentConfig{
 				Name: "testagent",
