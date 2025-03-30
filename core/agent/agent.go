@@ -504,7 +504,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 		xlog.Debug("Finish job with reasoning", "reasoning", reasoning, "agent", a.Character.Name, "conversation", fmt.Sprintf("%+v", conv))
 		job.Result.Conversation = conv
-		a.saveCurrentConversation(conv)
+		job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
+			a.saveCurrentConversation(conv)
+		})
 		job.Result.SetResponse(reasoning)
 		job.Result.Finish(nil)
 		return
@@ -669,9 +671,11 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				}
 
 				conv = append(conv, msg)
-				a.saveCurrentConversation(conv)
 				job.Result.SetResponse(msg.Content)
 				job.Result.Conversation = conv
+				job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
+					a.saveCurrentConversation(conv)
+				})
 				job.Result.Finish(nil)
 				return
 			}
@@ -751,7 +755,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		conv = append(conv, msg)
 		job.Result.Conversation = conv
 		job.Result.SetResponse(msg.Content)
-		a.saveCurrentConversation(conv)
+		job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
+			a.saveCurrentConversation(conv)
+		})
 		job.Result.Finish(nil)
 		return
 	}
@@ -780,7 +786,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	job.Result.SetResponse(msg.Content)
 	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
 	job.Result.Conversation = conv
-	a.saveCurrentConversation(conv)
+	job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
+		a.saveCurrentConversation(conv)
+	})
 	job.Result.Finish(nil)
 }
 

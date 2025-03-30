@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"log"
-	"sync"
 
 	"github.com/google/uuid"
 	"github.com/sashabaranov/go-openai"
@@ -27,18 +26,6 @@ type Job struct {
 
 	context context.Context
 	cancel  context.CancelFunc
-}
-
-// JobResult is the result of a job
-type JobResult struct {
-	sync.Mutex
-	// The result of a job
-	State        []ActionState
-	Conversation []openai.ChatCompletionMessage
-
-	Response string
-	Error    error
-	ready    chan bool
 }
 
 type JobOption func(*Job)
