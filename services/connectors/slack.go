@@ -497,10 +497,7 @@ func (t *Slack) handleMention(
 
 		// Store the UUID->placeholder message mapping
 		// We'll use the thread timestamp as our UUID
-		jobUUID := ts
-		if jobUUID == "" {
-			jobUUID = ev.TimeStamp
-		}
+		jobUUID := msgTs
 
 		t.placeholderMutex.Lock()
 		t.placeholders[jobUUID] = msgTs
@@ -687,19 +684,12 @@ func (t *Slack) handleMention(
 		finalResponse := fmt.Sprintf("@%s %s", user.Name, res.Response)
 		xlog.Debug("Send final response to slack", "response", finalResponse)
 
-		// Update the placeholder message with the final result
-		t.placeholderMutex.RLock()
-		msgTs, exists := t.placeholders[jobUUID]
-		t.placeholderMutex.RUnlock()
+		replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, res)
 
-		if exists && msgTs != "" {
-			replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, res)
-
-			// Clean up the placeholder map
-			t.placeholderMutex.Lock()
-			delete(t.placeholders, jobUUID)
-			t.placeholderMutex.Unlock()
-		}
+		// Clean up the placeholder map
+		t.placeholderMutex.Lock()
+		delete(t.placeholders, jobUUID)
+		t.placeholderMutex.Unlock()
 	}()
 }
 
