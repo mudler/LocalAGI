@@ -94,9 +94,10 @@ const AgentForm = ({
   };
   
   const handleAddDynamicPrompt = () => {
+    console.log('Adding dynamic prompt');
     setFormData({
       ...formData,
-      connectors: [
+      dynamicPrompts: [
         ...(formData.dynamicPrompts || []),
         { type: '', config: '{}' }
       ]
@@ -108,7 +109,7 @@ const AgentForm = ({
     updatedDynamicPrompts.splice(index, 1);
     setFormData({
       ...formData,
-      DynamicPrompts: updatedDynamicPrompts,
+      dynamicPrompts: updatedDynamicPrompts,
     });
   };
   
@@ -266,7 +267,15 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'prompts-section' ? 'block' : 'none' }}>
-              <PromptsGoalsSection formData={formData} handleInputChange={handleInputChange} isGroupForm={isGroupForm} metadata={metadata} />
+              <PromptsGoalsSection 
+                formData={formData} 
+                handleInputChange={handleInputChange} 
+                isGroupForm={isGroupForm} 
+                metadata={metadata}
+                onAddPrompt={handleAddDynamicPrompt}
+                onRemovePrompt={handleRemoveDynamicPrompt}
+                handleDynamicPromptChange={handleDynamicPromptChange}
+              />
             </div>
 
             <div style={{ display: activeSection === 'advanced-section' ? 'block' : 'none' }}>
@@ -309,7 +318,15 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'prompts-section' ? 'block' : 'none' }}>
-              <PromptsGoalsSection formData={formData} handleInputChange={handleInputChange} isGroupForm={isGroupForm} metadata={metadata} />
+              <PromptsGoalsSection 
+                formData={formData} 
+                handleInputChange={handleInputChange} 
+                isGroupForm={isGroupForm} 
+                metadata={metadata}
+                onAddPrompt={handleAddDynamicPrompt}
+                onRemovePrompt={handleRemoveDynamicPrompt}
+                handleDynamicPromptChange={handleDynamicPromptChange}
+              />
             </div>
 
             <div style={{ display: activeSection === 'advanced-section' ? 'block' : 'none' }}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import FormFieldDefinition from '../common/FormFieldDefinition';
 import DynamicPromptForm from '../DynamicPromptForm';
+import DynamicPromptForm from '../DynamicPromptForm';
 
 /**
  * Prompts & Goals section of the agent form
@@ -17,7 +18,8 @@ const PromptsGoalsSection = ({
   isGroupForm, 
   metadata,
   onAddPrompt,
-  onRemovePrompt
+  onRemovePrompt,
+  handleDynamicPromptChange
 }) => {
   // Get fields based on metadata and form context
   const getFields = () => {
@@ -66,10 +68,10 @@ const PromptsGoalsSection = ({
       />
 
       <DynamicPromptForm
-        prompts={formData.prompts || []}
+        prompts={formData.dynamicPrompts || []}
         onAddPrompt={onAddPrompt}
         onRemovePrompt={onRemovePrompt}
-        onChange={handleInputChange}
+        onChange={handleDynamicPromptChange}
         fieldGroups={metadata?.dynamicPrompts || []}
       />
     </div>
