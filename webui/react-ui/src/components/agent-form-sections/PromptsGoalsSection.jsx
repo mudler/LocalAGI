@@ -1,7 +1,6 @@
 import React from 'react';
 import FormFieldDefinition from '../common/FormFieldDefinition';
 import DynamicPromptForm from '../DynamicPromptForm';
-import DynamicPromptForm from '../DynamicPromptForm';
 
 /**
  * Prompts & Goals section of the agent form

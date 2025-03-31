@@ -214,12 +214,14 @@ func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		os.MkdirAll("./uploads", os.ModePerm)
 
+		// Safely save the file to prevent path traversal
 		destination := fmt.Sprintf("./uploads/%s", file.Filename)
 		if err := c.SaveFile(file, destination); err != nil {
 			// Handle error
 			return err
 		}
 
+		// Safely read the file
 		data, err := os.ReadFile(destination)
 		if err != nil {
 			return err

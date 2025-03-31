@@ -21,10 +21,11 @@ export const API_CONFIG = {
     agents: '/api/agents',
     agentConfig: (name) => `/api/agent/${name}/config`,
     agentConfigMetadata: '/api/meta/agent/config',
-    createAgent: '/create',
+    createAgent: '/api/agent/create',
     deleteAgent: (name) => `/api/agent/${name}`,
     pauseAgent: (name) => `/api/agent/${name}/pause`,
     startAgent: (name) => `/api/agent/${name}/start`,
+    
     exportAgent: (name) => `/settings/export/${name}`,
     importAgent: '/settings/import',
     
@@ -33,8 +34,7 @@ export const API_CONFIG = {
     createGroup: '/api/agent/group/create',
     
     // Chat endpoints
-    chat: (name) => `/chat/${name}`,
-    chatApi: (name) => `/api/chat/${name}`, 
+    chat: (name) => `/api/chat/${name}`, 
     notify: (name) => `/notify/${name}`,
     responses: '/v1/responses',
     
@@ -42,8 +42,8 @@ export const API_CONFIG = {
     sse: (name) => `/sse/${name}`,
     
     // Action endpoints
-    listActions: '/actions',
-    executeAction: (name) => `/action/${name}/run`,
+    listActions: '/api/actions',
+    executeAction: (name) => `/api/action/${name}/run`,
     
     // Status endpoint
     status: (name) => `/status/${name}`,
