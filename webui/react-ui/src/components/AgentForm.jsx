@@ -71,6 +71,7 @@ const AgentForm = ({
     });
   };
 
+
   // Handle adding a connector
   const handleAddConnector = () => {
     setFormData({
@@ -89,6 +90,34 @@ const AgentForm = ({
     setFormData({
       ...formData,
       connectors: updatedConnectors
+    });
+  };
+  
+  const handleAddDynamicPrompt = () => {
+    setFormData({
+      ...formData,
+      connectors: [
+        ...(formData.dynamicPrompts || []),
+        { type: '', config: '{}' }
+      ]
+    });
+  };
+
+  const handleRemoveDynamicPrompt = (index) => {
+    const updatedDynamicPrompts = [...formData.dynamicPrompts];
+    updatedDynamicPrompts.splice(index, 1);
+    setFormData({
+      ...formData,
+      DynamicPrompts: updatedDynamicPrompts,
+    });
+  };
+  
+  const handleDynamicPromptChange = (index, updatedPrompt) => {
+    const updatedPrompts = [...formData.dynamicPrompts];
+    updatedPrompts[index] = updatedPrompt;
+    setFormData({
+      ...formData,
+      dynamicPrompts: updatedPrompts
     });
   };
 

@@ -9,35 +9,7 @@ function AgentSettings() {
   const { showToast } = useOutletContext();
   const navigate = useNavigate();
   const [metadata, setMetadata] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    identity_guidance: '',
-    random_identity: false,
-    hud: false,
-    model: '',
-    multimodal_model: '',
-    api_url: '',
-    api_key: '',
-    local_rag_url: '',
-    local_rag_api_key: '',
-    enable_reasoning: false,
-    enable_kb: false,
-    kb_results: 3,
-    long_term_memory: false,
-    summary_long_term_memory: false,
-    connectors: [],
-    actions: [],
-    mcp_servers: [],
-    system_prompt: '',
-    user_prompt: '',
-    goals: '',
-    standalone_job: false,
-    standalone_job_interval: 60,
-    avatar: '',
-    avatar_seed: '',
-    avatar_style: 'default',
-  });
+  const [formData, setFormData] = useState({});
   
   // Use our custom agent hook
   const { 

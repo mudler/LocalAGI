@@ -70,17 +70,14 @@ export const agentApi = {
       // Pass through connectors and actions field groups directly
       // Make sure to assign the correct metadata to each section
       if (metadata.Connectors) {
-        console.log("Original Connectors metadata:", metadata.Connectors);
         groupedMetadata.connectors = metadata.Connectors;
       }
       
       if (metadata.Actions) {
-        console.log("Original Actions metadata:", metadata.Actions);
         groupedMetadata.actions = metadata.Actions;
       }
+      groupedMetadata.dynamicPrompts = metadata.DynamicPrompts;
 
-      console.log("Processed metadata:", groupedMetadata);
-      
       return groupedMetadata;
     }
     
