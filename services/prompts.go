@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services/prompts"
 
@@ -11,7 +12,6 @@ import (
 )
 
 const (
-	// Connectors
 	DynamicPromptCustom = "custom"
 )
 
@@ -19,10 +19,16 @@ var AvailableBlockPrompts = []string{
 	DynamicPromptCustom,
 }
 
-func PromptBlocks(a *state.AgentConfig) []agent.PromptBlock {
-	promptblocks := []agent.PromptBlock{}
+func DynamicPromptsConfigMeta() []config.FieldGroup {
+	return []config.FieldGroup{
+					 prompts.NewDynamicPromptConfigMeta(),
+	}
+}
 
-	for _, c := range a.PromptBlocks {
+func DynamicPrompts(a *state.AgentConfig) []agent.DynamicPrompt {
+	promptblocks := []agent.DynamicPrompt{}
+
+	for _, c := range a.DynamicPrompts {
 		var config map[string]string
 		if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
 			xlog.Info("Error unmarshalling connector config", err)

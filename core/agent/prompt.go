@@ -1,6 +1,6 @@
 package agent
 
-type PromptBlock interface {
+type DynamicPrompt interface {
 	Render(a *Agent) (string, error)
 	Role() string
 }

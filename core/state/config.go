@@ -18,22 +18,22 @@ type ActionsConfig struct {
 	Config string `json:"config"`
 }
 
-type PromptBlocksConfig struct {
+type DynamicPromptsConfig struct {
 	Type   string `json:"type"`
 	Config string `json:"config"`
 }
 
-func (d PromptBlocksConfig) ToMap() map[string]string {
+func (d DynamicPromptsConfig) ToMap() map[string]string {
 	config := map[string]string{}
 	json.Unmarshal([]byte(d.Config), &config)
 	return config
 }
 
 type AgentConfig struct {
-	Connector    []ConnectorConfig    `json:"connectors" form:"connectors" `
-	Actions      []ActionsConfig      `json:"actions" form:"actions"`
-	PromptBlocks []PromptBlocksConfig `json:"promptblocks" form:"promptblocks"`
-	MCPServers   []agent.MCPServer    `json:"mcp_servers" form:"mcp_servers"`
+	Connector      []ConnectorConfig    `json:"connectors" form:"connectors" `
+	Actions        []ActionsConfig      `json:"actions" form:"actions"`
+	DynamicPrompts []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
+	MCPServers     []agent.MCPServer    `json:"mcp_servers" form:"mcp_servers"`
 
 	Description string `json:"description" form:"description"`
 
@@ -63,14 +63,18 @@ type AgentConfig struct {
 }
 
 type AgentConfigMeta struct {
-	Fields       []config.Field
-	Connectors   []config.FieldGroup
-	Actions      []config.FieldGroup
-	PromptBlocks []config.Field
-	MCPServers   []config.Field
+	Fields         []config.Field
+	Connectors     []config.FieldGroup
+	Actions        []config.FieldGroup
+	DynamicPrompts []config.FieldGroup
+	MCPServers     []config.Field
 }
 
-func NewAgentConfigMeta(actionsConfig []config.FieldGroup, connectorsConfig []config.FieldGroup) AgentConfigMeta {
+func NewAgentConfigMeta(
+	actionsConfig        []config.FieldGroup, 
+	connectorsConfig     []config.FieldGroup,
+	dynamicPromptsConfig []config.FieldGroup,
+) AgentConfigMeta {
 	return AgentConfigMeta{
 		Fields: []config.Field{
 			{
@@ -261,9 +265,9 @@ func NewAgentConfigMeta(actionsConfig []config.FieldGroup, connectorsConfig []co
 				Required: true,
 			},
 		},
-		PromptBlocks: []config.Field{},
-		Connectors:   connectorsConfig,
-		Actions:      actionsConfig,
+		DynamicPrompts: dynamicPromptsConfig,
+		Connectors:     connectorsConfig,
+		Actions:        actionsConfig,
 	}
 }
 

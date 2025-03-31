@@ -36,7 +36,7 @@ type AgentPool struct {
 	imageModel, localRAGAPI, localRAGKey, apiKey string
 	availableActions                             func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                   func(*AgentConfig) []Connector
-	promptBlocks                                 func(*AgentConfig) []PromptBlock
+	dynamicPrompt                                func(*AgentConfig) []DynamicPrompt
 	timeout                                      string
 	conversationLogs                             string
 }
@@ -76,7 +76,7 @@ func NewAgentPool(
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
-	promptBlocks func(*AgentConfig) []PromptBlock,
+	promptBlocks func(*AgentConfig) []DynamicPrompt,
 	timeout string,
 	withLogs bool,
 ) (*AgentPool, error) {
@@ -107,7 +107,7 @@ func NewAgentPool(
 			managers:               make(map[string]sse.Manager),
 			connectors:             connectors,
 			availableActions:       availableActions,
-			promptBlocks:           promptBlocks,
+			dynamicPrompt:           promptBlocks,
 			timeout:                timeout,
 			conversationLogs:       conversationPath,
 		}, nil
@@ -131,7 +131,7 @@ func NewAgentPool(
 		pool:                   *poolData,
 		connectors:             connectors,
 		localRAGAPI:            LocalRAGAPI,
-		promptBlocks:           promptBlocks,
+		dynamicPrompt:           promptBlocks,
 		availableActions:       availableActions,
 		timeout:                timeout,
 		conversationLogs:       conversationPath,
@@ -303,7 +303,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	}
 
 	connectors := a.connectors(config)
-	promptBlocks := a.promptBlocks(config)
+	promptBlocks := a.dynamicPrompt(config)
 	actions := a.availableActions(config)(ctx, a)
 	stateFile, characterFile := a.stateFiles(name)
 

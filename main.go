@@ -62,7 +62,7 @@ func main() {
 		localRAG,
 		services.Actions,
 		services.Connectors,
-		services.PromptBlocks,
+		services.DynamicPrompts,
 		timeout,
 		withLogs,
 	)

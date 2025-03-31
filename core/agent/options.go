@@ -39,7 +39,7 @@ type options struct {
 	kbResults             int
 	ragdb                 RAGDB
 
-	prompts []PromptBlock
+	prompts []DynamicPrompt
 
 	systemPrompt string
 
@@ -212,7 +212,7 @@ func WithCharacterFile(path string) Option {
 // WithPrompts adds additional block prompts to the agent
 // to be rendered internally in the conversation
 // when processing the conversation to the LLM
-func WithPrompts(prompts ...PromptBlock) Option {
+func WithPrompts(prompts ...DynamicPrompt) Option {
 	return func(o *options) error {
 		o.prompts = prompts
 		return nil

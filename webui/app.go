@@ -607,6 +607,7 @@ func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
 		configMeta := state.NewAgentConfigMeta(
 			services.ActionsConfigMeta(),
 			services.ConnectorsConfigMeta(),
+			services.DynamicPromptsConfigMeta(),
 		)
 		return c.JSON(configMeta)
 	}
