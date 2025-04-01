@@ -214,14 +214,6 @@ function GroupCreate() {
           </div>
         </div>
         
-        {/* Loader */}
-        {generatingProfiles && (
-          <div className="loader" style={{ display: 'block' }}>
-            <i className="fas fa-spinner fa-spin"></i>
-            <p>Generating agent profiles...</p>
-          </div>
-        )}
-        
         {/* Step 2: Review & Select Profiles */}
         <div className={`page-section ${activeStep === 2 ? 'section-active' : ''}`}>
           <h2>Review & Select Agent Profiles</h2>
