@@ -109,22 +109,22 @@ export function useChat(agentName) {
     setSending(true);
     setError(null);
     
-    // Add user message to the local state immediately for better UX
-    const messageId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    const userMessage = {
-      id: messageId,
-      sender: 'user',
-      content,
-      timestamp: new Date().toISOString(),
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    
-    // Track this message content to avoid duplication from SSE
-    localMessageContents.current.add(content);
-    
     try {
+      // Add user message to the local state immediately for better UX
+      const messageId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      const userMessage = {
+        id: messageId,
+        sender: 'user',
+        content,
+        timestamp: new Date().toISOString(),
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Track this message content to avoid duplication from SSE
+      localMessageContents.current.add(content);
+      
       // Use the JSON-based API endpoint
       await chatApi.sendMessage(agentName, content);
       return true;
@@ -133,8 +133,15 @@ export function useChat(agentName) {
       console.error('Error sending message:', err);
       setSending(false);
       return false;
+    } finally {
+      // Ensure sending state is reset after a timeout in case SSE doesn't update
+      setTimeout(() => {
+        if (sending) {
+          setSending(false);
+        }
+      }, 5000); // 5 second timeout
     }
-  }, [agentName]);
+  }, [agentName, sending]);
 
   // Clear chat history
   const clearChat = useCallback(() => {

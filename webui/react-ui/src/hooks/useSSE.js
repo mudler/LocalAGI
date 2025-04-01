@@ -63,8 +63,8 @@ export function useSSE(agentName) {
       }
     });
     
-    // Handle 'status' event
-    eventSource.addEventListener('status', (event) => {
+    // Handle 'json_status' event
+    eventSource.addEventListener('json_status', (event) => {
       try {
         const data = JSON.parse(event.data);
         const timestamp = data.timestamp || new Date().toISOString();
@@ -81,7 +81,7 @@ export function useSSE(agentName) {
     });
     
     // Handle 'error' event
-    eventSource.addEventListener('error', (event) => {
+    eventSource.addEventListener('json_error', (event) => {
       try {
         const data = JSON.parse(event.data);
         const timestamp = data.timestamp || new Date().toISOString();

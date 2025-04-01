@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -215,7 +216,7 @@ func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		os.MkdirAll("./uploads", os.ModePerm)
 
 		// Safely save the file to prevent path traversal
-		destination := fmt.Sprintf("./uploads/%s", file.Filename)
+		destination := filepath.Join("./uploads", file.Filename)
 		if err := c.SaveFile(file, destination); err != nil {
 			// Handle error
 			return err
@@ -385,7 +386,7 @@ func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
 					xlog.Error("Error marshaling error message", "error", err)
 				} else {
 					manager.Send(
-						sse.NewMessage(string(errorData)).WithEvent("error"))
+						sse.NewMessage(string(errorData)).WithEvent("json_error"))
 				}
 			} else {
 				// Send agent response
