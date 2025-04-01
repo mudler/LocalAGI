@@ -15,7 +15,8 @@ function Chat() {
     error, 
     isConnected, 
     sendMessage, 
-    clearChat 
+    clearChat,
+    clearError
   } = useChat(name);
 
   // Scroll to bottom when messages change
@@ -27,8 +28,9 @@ function Chat() {
   useEffect(() => {
     if (error) {
       showToast(error, 'error');
+      clearError();
     }
-  }, [error, showToast]);
+  }, [error, showToast, clearError]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -115,7 +117,7 @@ function Chat() {
               placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
               disabled={sending || !isConnected}
               className="form-control"
-              rows={2}
+              rows={5}
               style={{ flex: 1, resize: 'vertical', minHeight: '38px', maxHeight: '150px' }}
             />
             <button 

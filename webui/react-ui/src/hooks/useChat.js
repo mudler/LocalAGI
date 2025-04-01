@@ -150,6 +150,11 @@ export function useChat(agentName) {
     localMessageContents.current.clear(); // Clear tracked local messages
   }, []);
 
+  // Clear error state
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return {
     messages,
     sending,
@@ -157,5 +162,6 @@ export function useChat(agentName) {
     isConnected,
     sendMessage,
     clearChat,
+    clearError,
   };
 }
