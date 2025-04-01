@@ -76,11 +76,12 @@ const ConfigForm = ({
     
     // Find the field group that matches this item's type
     const fieldGroup = fieldGroups.find(group => group.name === itemTypeName);
+    const itemTypeLabel = itemType.charAt(0).toUpperCase() + itemType.slice(1).replace('_', ' ');
     
     return (
       <div key={index} className="config-item mb-4 card">
         <div className="config-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h4 style={{ margin: 0 }}>{itemType.charAt(0).toUpperCase() + itemType.slice(1)} #{index + 1}</h4>
+          <h4 style={{ margin: 0 }}>{itemTypeLabel} #{index + 1}</h4>
           <button 
             type="button" 
             className="action-btn delete-btn"
@@ -91,7 +92,7 @@ const ConfigForm = ({
         </div>
         
         <div className="config-type mb-3">
-          <label htmlFor={`${itemType}Type${index}`}>{itemType.charAt(0).toUpperCase() + itemType.slice(1)} Type</label>
+          <label htmlFor={`${itemType}Type${index}`}>{itemTypeLabel} Type</label>
           <select
             id={`${itemType}Type${index}`}
             value={safeItem[typeField] || ''}
