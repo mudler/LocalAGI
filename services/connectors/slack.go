@@ -45,7 +45,7 @@ type Slack struct {
 	conversationTracker *ConversationTracker[string]
 }
 
-const thinkingMessage = "thinking..."
+const thinkingMessage = ":hourglass: thinking..."
 
 func NewSlack(config map[string]string) *Slack {
 

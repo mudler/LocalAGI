@@ -86,7 +86,7 @@ Access your agents at `http://localhost:3000`
 | `LOCALAGENT_MODEL` | Your go-to model |
 | `LOCALAGENT_MULTIMODAL_MODEL` | Optional model for multimodal capabilities |
 | `LOCALAGENT_LLM_API_URL` | OpenAI-compatible API server URL |
-| `LOCALAGENT_API_KEY` | API authentication |
+| `LOCALAGENT_LLM_API_KEY` | API authentication |
 | `LOCALAGENT_TIMEOUT` | Request timeout settings |
 | `LOCALAGENT_STATE_DIR` | Where state gets stored |
 | `LOCALAGENT_LOCALRAG_URL` | LocalRAG connection |

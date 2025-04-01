@@ -14,7 +14,7 @@ import (
 var testModel = os.Getenv("LOCALAGENT_MODEL")
 var multimodalModel = os.Getenv("LOCALAGENT_MULTIMODAL_MODEL")
 var apiURL = os.Getenv("LOCALAGENT_LLM_API_URL")
-var apiKey = os.Getenv("LOCALAGENT_API_KEY")
+var apiKey = os.Getenv("LOCALAGENT_LLM_API_KEY")
 var timeout = os.Getenv("LOCALAGENT_TIMEOUT")
 var stateDir = os.Getenv("LOCALAGENT_STATE_DIR")
 var localRAG = os.Getenv("LOCALAGENT_LOCALRAG_URL")

@@ -53,7 +53,34 @@ func (a *CallAgentAction) Run(ctx context.Context, params types.ActionParams) (t
 		return types.ActionResult{}, err
 	}
 
-	return types.ActionResult{Result: resp.Response}, nil
+	metadata := make(map[string]interface{})
+
+	for _, s := range resp.State {
+		for k, v := range s.Metadata {
+			if existingValue, ok := metadata[k]; ok {
+				switch existingValue := existingValue.(type) {
+				case []string:
+					switch v := v.(type) {
+					case []string:
+						metadata[k] = append(existingValue, v...)
+					case string:
+						metadata[k] = append(existingValue, v)
+					}
+				case string:
+					switch v := v.(type) {
+					case []string:
+						metadata[k] = append([]string{existingValue}, v...)
+					case string:
+						metadata[k] = []string{existingValue, v}
+					}
+				}
+			} else {
+				metadata[k] = v
+			}
+		}
+	}
+
+	return types.ActionResult{Result: resp.Response, Metadata: metadata}, nil
 }
 
 func (a *CallAgentAction) Definition() types.ActionDefinition {
