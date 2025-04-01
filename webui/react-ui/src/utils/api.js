@@ -142,11 +142,11 @@ export const agentApi = {
   },
   
   // Import agent configuration
-  importAgentConfig: async (configData) => {
+  importAgent: async (formData) => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.importAgent), {
       method: 'POST',
       headers: API_CONFIG.headers,
-      body: JSON.stringify(configData),
+      body: formData,
     });
     return handleResponse(response);
   },

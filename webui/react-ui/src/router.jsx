@@ -8,6 +8,7 @@ import Chat from './pages/Chat';
 import ActionsPlayground from './pages/ActionsPlayground';
 import GroupCreate from './pages/GroupCreate';
 import AgentStatus from './pages/AgentStatus';
+import ImportAgent from './pages/ImportAgent';
 
 // Get the base URL from Vite's environment variables or default to '/app/'
 const BASE_URL = import.meta.env.BASE_URL || '/app';
@@ -45,6 +46,10 @@ export const router = createBrowserRouter([
       {
         path: 'group-create',
         element: <GroupCreate />
+      },
+      {
+        path: 'import',
+        element: <ImportAgent />
       },
       {
         path: 'status/:name',

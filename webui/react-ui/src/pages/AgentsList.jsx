@@ -112,9 +112,14 @@ function AgentsList() {
     <div className="agents-container">
       <header className="page-header">
         <h1>Manage Agents</h1>
-        <Link to="/create" className="action-btn">
-          <i className="fas fa-plus"></i> Create New Agent
-        </Link>
+        <div className="agent-actions">
+          <Link to="/create" className="action-btn">
+            <i className="fas fa-plus-circle"></i> Create Agent
+          </Link>
+          <Link to="/import" className="action-btn">
+            <i className="fas fa-upload"></i> Import Agent
+          </Link>
+        </div>
       </header>
 
       {agents.length > 0 ? (

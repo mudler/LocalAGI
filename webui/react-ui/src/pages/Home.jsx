@@ -99,9 +99,18 @@ function Home() {
         <Link to="/group-create" className="card-link">
           <div className="card">
             <h2><i className="fas fa-users"></i> Create Group</h2>
-            <p>Create agent groups for collaborative intelligence.</p>
+            <p>Create a group of agents with shared configurations and behaviors.</p>
           </div>
         </Link>
+
+        {/* Card for Import Agent */}
+        <Link to="/import" className="card-link">
+          <div className="card">
+            <h2><i className="fas fa-upload"></i> Import Agent</h2>
+            <p>Import an existing agent configuration from a file.</p>
+          </div>
+        </Link>
+
       </div>
 
       {stats.agents.length > 0 && (

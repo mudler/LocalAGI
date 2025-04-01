@@ -1933,3 +1933,124 @@ select.form-control {
   background-color: var(--light-bg);
   color: var(--primary);
 }
+
+.import-agent-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.import-agent-content {
+  margin-top: 20px;
+}
+
+.file-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+  background: rgba(30, 30, 30, 0.7);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+.file-dropzone:hover {
+  border-color: var(--primary);
+  background: rgba(30, 30, 30, 0.8);
+}
+
+.dropzone-content {
+  color: var(--text);
+}
+
+.dropzone-content i {
+  font-size: 48px;
+  color: var(--primary);
+  margin-bottom: 20px;
+}
+
+.dropzone-content h2 {
+  margin-bottom: 10px;
+  color: var(--primary);
+  text-shadow: var(--neon-glow);
+}
+
+.dropzone-content p {
+  margin: 10px 0;
+  color: var(--text);
+}
+
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--primary);
+  color: var(--dark-bg);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.file-button:hover {
+  background: rgba(0, 255, 149, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.file-button i {
+  font-size: 16px;
+}
+
+.selected-file-info {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(30, 30, 30, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+.selected-file-info p {
+  margin-bottom: 15px;
+  color: var(--text);
+}
+
+.import-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--primary);
+  color: var(--dark-bg);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 16px;
+}
+
+.import-button:hover:not(:disabled) {
+  background: rgba(0, 255, 149, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.import-button:disabled {
+  background: rgba(0, 255, 149, 0.3);
+  cursor: not-allowed;
+}
+
+.import-button i {
+  font-size: 16px;
+}
+
+.import-button .fa-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
