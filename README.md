@@ -215,24 +215,34 @@ Connect to IRC networks:
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
-| `/agents` | GET | List all available agents | [Example](#get-all-agents) |
-| `/status/:name` | GET | View agent status history | [Example](#get-agent-status) |
-| `/create` | POST | Create a new agent | [Example](#create-agent) |
-| `/delete/:name` | DELETE | Remove an agent | [Example](#delete-agent) |
-| `/pause/:name` | PUT | Pause agent activities | [Example](#pause-agent) |
-| `/start/:name` | PUT | Resume a paused agent | [Example](#start-agent) |
+| `/api/agents` | GET | List all available agents | [Example](#get-all-agents) |
+| `/api/agent/:name/status` | GET | View agent status history | [Example](#get-agent-status) |
+| `/api/agent/create` | POST | Create a new agent | [Example](#create-agent) |
+| `/api/agent/:name` | DELETE | Remove an agent | [Example](#delete-agent) |
+| `/api/agent/:name/pause` | PUT | Pause agent activities | [Example](#pause-agent) |
+| `/api/agent/:name/start` | PUT | Resume a paused agent | [Example](#start-agent) |
+| `/api/agent/:name/config` | GET | Get agent configuration | |
+| `/api/agent/:name/config` | PUT | Update agent configuration | |
+| `/api/meta/agent/config` | GET | Get agent configuration metadata | |
 | `/settings/export/:name` | GET | Export agent config | [Example](#export-agent) |
 | `/settings/import` | POST | Import agent config | [Example](#import-agent) |
-| `/api/agent/:name/config` | GET | Get agent configuration | |
-| `/api/agent/:name/config` | PUT | Update agent configuration | | 
+
+### Actions and Groups
+
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/api/actions` | GET | List available actions | |
+| `/api/action/:name/run` | POST | Execute an action | |
+| `/api/agent/group/generateProfiles` | POST | Generate group profiles | |
+| `/api/agent/group/create` | POST | Create a new agent group | |
 
 ### Chat Interactions
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
-| `/chat/:name` | POST | Send message & get response | [Example](#send-message) |
-| `/notify/:name` | GET | Send notification to agent | [Example](#notify-agent) |
-| `/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
+| `/api/chat/:name` | POST | Send message & get response | [Example](#send-message) |
+| `/api/notify/:name` | POST | Send notification to agent | [Example](#notify-agent) |
+| `/api/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
 | `/v1/responses` | POST | Send message & get response | [OpenAI's Responses](https://platform.openai.com/docs/api-reference/responses/create) |
 
 <details>
@@ -240,17 +250,17 @@ Connect to IRC networks:
 
 #### Get All Agents
 ```bash
-curl -X GET "http://localhost:3000/agents"
+curl -X GET "http://localhost:3000/api/agents"
 ```
 
 #### Get Agent Status
 ```bash
-curl -X GET "http://localhost:3000/status/my-agent"
+curl -X GET "http://localhost:3000/api/agent/my-agent/status"
 ```
 
 #### Create Agent
 ```bash
-curl -X POST "http://localhost:3000/create" \
+curl -X POST "http://localhost:3000/api/agent/create" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-agent",
@@ -263,17 +273,32 @@ curl -X POST "http://localhost:3000/create" \
 
 #### Delete Agent
 ```bash
-curl -X DELETE "http://localhost:3000/delete/my-agent"
+curl -X DELETE "http://localhost:3000/api/agent/my-agent"
 ```
 
 #### Pause Agent
 ```bash
-curl -X PUT "http://localhost:3000/pause/my-agent"
+curl -X PUT "http://localhost:3000/api/agent/my-agent/pause"
 ```
 
 #### Start Agent
 ```bash
-curl -X PUT "http://localhost:3000/start/my-agent"
+curl -X PUT "http://localhost:3000/api/agent/my-agent/start"
+```
+
+#### Get Agent Configuration
+```bash
+curl -X GET "http://localhost:3000/api/agent/my-agent/config"
+```
+
+#### Update Agent Configuration
+```bash
+curl -X PUT "http://localhost:3000/api/agent/my-agent/config" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "system_prompt": "You are an AI assistant."
+  }'
 ```
 
 #### Export Agent
@@ -289,26 +314,37 @@ curl -X POST "http://localhost:3000/settings/import" \
 
 #### Send Message
 ```bash
-curl -X POST "http://localhost:3000/chat/my-agent" \
+curl -X POST "http://localhost:3000/api/chat/my-agent" \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello, how are you today?"}'
 ```
 
 #### Notify Agent
 ```bash
-curl -X GET "http://localhost:3000/notify/my-agent" \
-  -d "message=Important notification"
+curl -X POST "http://localhost:3000/api/notify/my-agent" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Important notification"}'
 ```
 
 #### Agent SSE Stream
 ```bash
-curl -N -X GET "http://localhost:3000/sse/my-agent"
+curl -N -X GET "http://localhost:3000/api/sse/my-agent"
 ```
 Note: For proper SSE handling, you should use a client that supports SSE natively.
 
 </details>
 
 ### Agent Configuration Reference
+
+The agent configuration defines how an agent behaves and what capabilities it has. You can view the available configuration options and their descriptions by using the metadata endpoint:
+
+```bash
+curl -X GET "http://localhost:3000/api/meta/agent/config"
+```
+
+This will return a JSON object containing all available configuration fields, their types, and descriptions.
+
+Here's an example of the agent configuration structure:
 
 ```json
 {
