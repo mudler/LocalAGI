@@ -21,6 +21,7 @@ var localRAG = os.Getenv("LOCALAGENT_LOCALRAG_URL")
 var withLogs = os.Getenv("LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING") == "true"
 var apiKeysEnv = os.Getenv("LOCALAGENT_API_KEYS")
 var imageModel = os.Getenv("LOCALAGENT_IMAGE_MODEL")
+var conversationDuration = os.Getenv("LOCALAGENT_CONVERSATION_DURATION")
 
 func init() {
 	if testModel == "" {
@@ -73,6 +74,7 @@ func main() {
 	// Create the application
 	app := webui.NewApp(
 		webui.WithPool(pool),
+		webui.WithConversationStoreduration(conversationDuration),
 		webui.WithApiKeys(apiKeys...),
 		webui.WithLLMAPIUrl(apiURL),
 		webui.WithLLMAPIKey(apiKey),

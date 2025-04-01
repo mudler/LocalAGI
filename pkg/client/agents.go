@@ -54,7 +54,7 @@ func (c *Client) GetAgentConfig(name string) (*AgentConfig, error) {
 
 // CreateAgent creates a new agent with the given configuration
 func (c *Client) CreateAgent(config *AgentConfig) error {
-	resp, err := c.doRequest(http.MethodPost, "/create", config)
+	resp, err := c.doRequest(http.MethodPost, "/api/agent/create", config)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (c *Client) UpdateAgentConfig(name string, config *AgentConfig) error {
 
 // DeleteAgent removes an agent
 func (c *Client) DeleteAgent(name string) error {
-	path := fmt.Sprintf("/delete/%s", name)
+	path := fmt.Sprintf("/api/agent/%s", name)
 	resp, err := c.doRequest(http.MethodDelete, path, nil)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func (c *Client) DeleteAgent(name string) error {
 
 // PauseAgent pauses an agent
 func (c *Client) PauseAgent(name string) error {
-	path := fmt.Sprintf("/pause/%s", name)
+	path := fmt.Sprintf("/api/agent/pause/%s", name)
 	resp, err := c.doRequest(http.MethodPut, path, nil)
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (c *Client) PauseAgent(name string) error {
 
 // StartAgent starts a paused agent
 func (c *Client) StartAgent(name string) error {
-	path := fmt.Sprintf("/start/%s", name)
+	path := fmt.Sprintf("/api/agent/start/%s", name)
 	resp, err := c.doRequest(http.MethodPut, path, nil)
 	if err != nil {
 		return err

@@ -10,11 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	coreTypes "github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/llm"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/mudler/LocalAgent/services"
+	"github.com/mudler/LocalAgent/services/connectors"
 	"github.com/mudler/LocalAgent/webui/types"
+	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 
 	"github.com/mudler/LocalAgent/core/sse"
@@ -405,7 +408,7 @@ func (a *App) ListActions() func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Responses(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Responses(pool *state.AgentPool, tracker *connectors.ConversationTracker[string]) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		var request types.RequestBody
 		if err := c.BodyParser(&request); err != nil {
@@ -414,9 +417,15 @@ func (a *App) Responses(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		request.SetInputByType()
 
-		agentName := request.Model
+		var previousResponseID string
+		conv := []openai.ChatCompletionMessage{}
+		if request.PreviousResponseID != nil {
+			previousResponseID = *request.PreviousResponseID
+			conv = tracker.GetConversation(previousResponseID)
+		}
 
-		messages := request.ToChatCompletionMessages()
+		agentName := request.Model
+		messages := append(conv, request.ToChatCompletionMessages()...)
 
 		a := pool.GetAgent(agentName)
 		if a == nil {
@@ -435,7 +444,17 @@ func (a *App) Responses(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			xlog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
 		}
 
+		conv = append(conv, openai.ChatCompletionMessage{
+			Role:    "assistant",
+			Content: res.Response,
+		})
+
+		id := uuid.New().String()
+
+		tracker.SetConversation(id, conv)
+
 		response := types.ResponseBody{
+			ID:     id,
 			Object: "response",
 			//   "created_at": 1741476542,
 			CreatedAt: time.Now().Unix(),

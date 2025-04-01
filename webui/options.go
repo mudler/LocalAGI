@@ -1,15 +1,20 @@
 package webui
 
-import "github.com/mudler/LocalAgent/core/state"
+import (
+	"time"
+
+	"github.com/mudler/LocalAgent/core/state"
+)
 
 type Config struct {
-	DefaultChunkSize int
-	Pool             *state.AgentPool
-	ApiKeys          []string
-	LLMAPIURL        string
-	LLMAPIKey        string
-	LLMModel         string
-	StateDir         string
+	DefaultChunkSize          int
+	Pool                      *state.AgentPool
+	ApiKeys                   []string
+	LLMAPIURL                 string
+	LLMAPIKey                 string
+	LLMModel                  string
+	StateDir                  string
+	ConversationStoreDuration time.Duration
 }
 
 type Option func(*Config)
@@ -17,6 +22,16 @@ type Option func(*Config)
 func WithDefaultChunkSize(size int) Option {
 	return func(c *Config) {
 		c.DefaultChunkSize = size
+	}
+}
+
+func WithConversationStoreduration(duration string) Option {
+	return func(c *Config) {
+		d, err := time.ParseDuration(duration)
+		if err != nil {
+			d = 1 * time.Hour
+		}
+		c.ConversationStoreDuration = d
 	}
 }
 

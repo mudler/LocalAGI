@@ -73,3 +73,12 @@ func (c *ConversationTracker[K]) AddMessage(key K, message openai.ChatCompletion
 	c.currentconversation[key] = append(c.currentconversation[key], message)
 	c.lastMessageTime[key] = time.Now()
 }
+
+func (c *ConversationTracker[K]) SetConversation(key K, messages []openai.ChatCompletionMessage) {
+	// Lock the conversation mutex to update the conversation history
+	c.convMutex.Lock()
+	defer c.convMutex.Unlock()
+
+	c.currentconversation[key] = messages
+	c.lastMessageTime[key] = time.Now()
+}

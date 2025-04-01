@@ -13,6 +13,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/keyauth"
 	"github.com/mudler/LocalAgent/core/sse"
+	"github.com/mudler/LocalAgent/services/connectors"
+
 	"github.com/mudler/LocalAgent/core/state"
 	"github.com/mudler/LocalAgent/core/types"
 	"github.com/mudler/LocalAgent/pkg/xlog"
@@ -75,11 +77,16 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/api/chat/:name", app.Chat(pool))
 	webapp.Post("/api/notify/:name", app.Notify(pool))
 
-	webapp.Post("/v1/responses", app.Responses(pool))
+	conversationTracker := connectors.NewConversationTracker[string](app.config.ConversationStoreDuration)
+
+	webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
 
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
 	webapp.Put("/api/agent/:name/config", app.UpdateAgentConfig(pool))
+
+	// Metadata endpoint for agent configuration fields
+	webapp.Get("/api/agent/config/metadata", app.GetAgentConfigMeta())
 
 	// Add endpoint for getting agent config metadata
 	webapp.Get("/api/meta/agent/config", app.GetAgentConfigMeta())
