@@ -217,7 +217,7 @@ func ActionsConfigMeta() []config.FieldGroup {
 		{
 			Name:   "custom",
 			Label:  "Custom",
-			Fields: []config.Field{},
+			Fields: action.CustomConfigMeta(),
 		},
 		{
 			Name:   "scraper",

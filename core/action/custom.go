@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAgent/pkg/config"
 	"github.com/mudler/LocalAgent/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/traefik/yaegi/interp"
@@ -127,5 +128,36 @@ func (a *CustomAction) Definition() types.ActionDefinition {
 		Description: a.config["description"],
 		Properties:  prop,
 		Required:    requiredFields(),
+	}
+}
+
+func CustomConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "name",
+			Label:    "Action Name",
+			Type:     config.FieldTypeText,
+			Required: true,
+			HelpText: "Name of the custom action",
+		},
+		{
+			Name:     "description",
+			Label:    "Description",
+			Type:     config.FieldTypeTextarea,
+			HelpText: "Description of the custom action",
+		},
+		{
+			Name:     "code",
+			Label:    "Code",
+			Type:     config.FieldTypeTextarea,
+			Required: true,
+			HelpText: "Go code for the custom action",
+		},
+		{
+			Name:     "unsafe",
+			Label:    "Unsafe",
+			Type:     config.FieldTypeCheckbox,
+			HelpText: "Allow unsafe code execution",
+		},
 	}
 }
