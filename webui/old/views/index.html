@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <title>Smart Assistant Dashboard</title>
-    {{template "views/partials/header"}}
+    {{template "old/views/partials/header"}}
     <style>
         .image-container {
             display: flex;
@@ -132,12 +132,12 @@
     </style>
 </head>
 <body>
-    {{template "views/partials/menu"}}
+    {{template "old/views/partials/menu"}}
     <div class="container">
    
         
         <div class="image-container">
-            <img src="/public/logo_1.png" width="250" alt="Company Logo">
+            <img src="/old/public/logo_1.png" width="250" alt="Company Logo">
         </div>
         
         <h1 class="dashboard-title">LocalAgent</h1>
@@ -160,7 +160,7 @@
         
         <div class="cards-container">
             <!-- Card for Agent List Page -->
-            <a href="/agents" class="card-link">
+            <a href="/old/agents" class="card-link">
                 <div class="card">
                     <h2><i class="fas fa-robot"></i> Agent List</h2>
                     <p>View and manage your list of agents, including detailed profiles and statistics.</p>
@@ -168,7 +168,7 @@
             </a>
             
             <!-- Card for Create Agent -->
-            <a href="/create" class="card-link">
+            <a href="/old/create" class="card-link">
                 <div class="card">
                     <h2><i class="fas fa-plus-circle"></i> Create Agent</h2>
                     <p>Create a new intelligent agent with custom behaviors, connectors, and actions.</p>

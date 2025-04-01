@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent List</title>
-    {{template "views/partials/header"}}
+    {{template "old/views/partials/header"}}
     <style>
         .avatar-placeholder {
             width: 96px;
@@ -46,7 +46,7 @@
     </style>
 </head>
 <body>
-    {{template "views/partials/menu"}}
+    {{template "old/views/partials/menu"}}
     
     <!-- Toast for notifications -->
     <div id="toast" class="toast">
@@ -60,7 +60,7 @@
         </header>
         
         <div class="button-container justify-center mb-6">
-            <a href="/create" class="action-btn start-btn">
+            <a href="/old/create" class="action-btn start-btn">
                 <i class="fas fa-plus-circle"></i> Add New Agent
             </a>
             <button id="toggle-import" class="action-btn" style="background: linear-gradient(135deg, var(--tertiary), #4a76a8);">
@@ -121,11 +121,11 @@
                     </div>
                     
                     <div class="grid grid-cols-2 gap-2 w-full mb-4">
-                        <a href="/status/{{.}}" class="action-btn flex items-center justify-center" 
+                        <a href="/old/status/{{.}}" class="action-btn flex items-center justify-center" 
                            style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
                             <i class="fas fa-info-circle mr-2"></i> Status
                         </a>
-                        <a href="/talk/{{.}}" class="action-btn flex items-center justify-center"
+                        <a href="/old/talk/{{.}}" class="action-btn flex items-center justify-center"
                            style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
                             <i class="fas fa-comments mr-2"></i> Talk
                         </a>
@@ -141,7 +141,7 @@
                                 <i class="fas fa-play"></i> Start
                             {{ end }}
                         </button>
-                        <a href="/settings/{{.}}" class="action-btn col-span-1 flex items-center justify-center"
+                        <a href="/old/settings/{{.}}" class="action-btn col-span-1 flex items-center justify-center"
                            style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
                             <i class="fas fa-cog"></i> 
                         </a>
@@ -244,7 +244,7 @@
                 button.addEventListener('click', function() {
                     const agent = this.getAttribute('data-agent');
                     const isActive = this.getAttribute('data-active') === 'true';
-                    const endpoint = isActive ? `/pause/${agent}` : `/start/${agent}`;
+                    const endpoint = isActive ? `/api/agent/${agent}/pause` : `/api/agent/${agent}/start`;
                     
                     // Add animation
                     this.style.animation = 'pulse 0.5s';

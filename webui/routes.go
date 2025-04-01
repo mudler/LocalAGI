@@ -21,10 +21,10 @@ import (
 	"github.com/mudler/LocalAgent/services"
 )
 
-//go:embed views/*
+//go:embed old/views/*
 var viewsfs embed.FS
 
-//go:embed public/*
+//go:embed old/public/*
 var embeddedFiles embed.FS
 
 //go:embed react-ui/dist/*
@@ -39,12 +39,12 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		Browse: true,
 	}))
 
-	/* 	webapp.Use("/public", filesystem.New(filesystem.Config{
-	   		Root:       http.FS(embeddedFiles),
-	   		PathPrefix: "public",
-	   		Browse:     true,
-	   	}))
-	*/
+	webapp.Use("/old/public", filesystem.New(filesystem.Config{
+		Root:       http.FS(embeddedFiles),
+		PathPrefix: "/old/public",
+		Browse:     true,
+	}))
+
 	if len(app.config.ApiKeys) > 0 {
 		kaConfig, err := GetKeyAuthConfig(app.config.ApiKeys)
 		if err != nil || kaConfig == nil {
@@ -53,15 +53,18 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		webapp.Use(v2keyauth.New(*kaConfig))
 	}
 
-	/* 	webapp.Get("/", func(c *fiber.Ctx) error {
-	   		return c.Render("views/index", fiber.Map{
-	   			"Agents":     pool.List(),
-	   			"AgentCount": len(pool.List()),
-	   			"Actions":    len(services.AvailableActions),
-	   			"Connectors": len(services.AvailableConnectors),
-	   		})
-	   	})
-	*/
+	webapp.Get("/old", func(c *fiber.Ctx) error {
+		return c.Render("old/views/index", fiber.Map{
+			"Agents":     pool.List(),
+			"AgentCount": len(pool.List()),
+			"Actions":    len(services.AvailableActions),
+			"Connectors": len(services.AvailableConnectors),
+		})
+	})
+
+	webapp.Get("/", func(c *fiber.Ctx) error {
+		return c.Redirect("/app")
+	})
 	webapp.Use("/app", filesystem.New(filesystem.Config{
 		Root:       http.FS(reactUI),
 		PathPrefix: "react-ui/dist",
@@ -77,30 +80,29 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		return c.Send(indexHTML)
 	})
 
-	/* 	webapp.Get("/agents", func(c *fiber.Ctx) error {
-	   		statuses := map[string]bool{}
-	   		for _, a := range pool.List() {
-	   			agent := pool.GetAgent(a)
-	   			if agent == nil {
-	   				xlog.Error("Agent not found", "name", a)
-	   				continue
-	   			}
-	   			statuses[a] = !agent.Paused()
-	   		}
-	   		return c.Render("views/agents", fiber.Map{
-	   			"Agents": pool.List(),
-	   			"Status": statuses,
-	   		})
-	   	})
-	*/
-	/* 		webapp.Get("/api/create", func(c *fiber.Ctx) error {
-		return c.Render("views/create", fiber.Map{
+	webapp.Get("/old/agents", func(c *fiber.Ctx) error {
+		statuses := map[string]bool{}
+		for _, a := range pool.List() {
+			agent := pool.GetAgent(a)
+			if agent == nil {
+				xlog.Error("Agent not found", "name", a)
+				continue
+			}
+			statuses[a] = !agent.Paused()
+		}
+		return c.Render("old/views/agents", fiber.Map{
+			"Agents": pool.List(),
+			"Status": statuses,
+		})
+	})
+
+	webapp.Get("/old/create", func(c *fiber.Ctx) error {
+		return c.Render("old/views/create", fiber.Map{
 			"Actions":      services.AvailableActions,
 			"Connectors":   services.AvailableConnectors,
 			"PromptBlocks": services.AvailableBlockPrompts,
 		})
 	})
-	*/
 	// Define a route for the GET method on the root path '/'
 	webapp.Get("/sse/:name", func(c *fiber.Ctx) error {
 		m := pool.GetManager(c.Params("name"))
@@ -112,70 +114,69 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		return nil
 	})
 
-	/*webapp.Get("/status/:name", func(c *fiber.Ctx) error {
+	webapp.Get("/old/status/:name", func(c *fiber.Ctx) error {
 		history := pool.GetStatusHistory(c.Params("name"))
 		if history == nil {
 			history = &state.Status{ActionResults: []types.ActionState{}}
 		}
 		// reverse history
 
-		return c.Render("views/status", fiber.Map{
+		return c.Render("old/views/status", fiber.Map{
 			"Name":    c.Params("name"),
 			"History": Reverse(history.Results()),
 		})
 	})
 
-	webapp.Get("/notify/:name", app.Notify(pool))
-	webapp.Post("/chat/:name", app.Chat(pool))
-	*/
+	webapp.Get("/api/notify/:name", app.Notify(pool))
+	webapp.Post("/old/chat/:name", app.OldChat(pool))
+
 	webapp.Post("/api/agent/create", app.Create(pool))
 	webapp.Delete("/api/agent/:name", app.Delete(pool))
 	webapp.Put("/api/agent/:name/pause", app.Pause(pool))
 	webapp.Put("/api/agent/:name/start", app.Start(pool))
 
-	// Add JSON-based chat API endpoint
-	webapp.Post("/api/chat/:name", app.ChatAPI(pool))
+	webapp.Post("/api/chat/:name", app.Chat(pool))
 
 	conversationTracker := connectors.NewConversationTracker[string](app.config.ConversationStoreDuration)
 
 	webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
 
-	/* 	webapp.Get("/talk/:name", func(c *fiber.Ctx) error {
-	   		return c.Render("views/chat", fiber.Map{
-	   			//	"Character": agent.Character,
-	   			"Name": c.Params("name"),
-	   		})
-	   	})
+	webapp.Get("/old/talk/:name", func(c *fiber.Ctx) error {
+		return c.Render("old/views/chat", fiber.Map{
+			//	"Character": agent.Character,
+			"Name": c.Params("name"),
+		})
+	})
 
-	   	webapp.Get("/settings/:name", func(c *fiber.Ctx) error {
-	   		status := false
-	   		for _, a := range pool.List() {
-	   			if a == c.Params("name") {
-	   				status = !pool.GetAgent(a).Paused()
-	   			}
-	   		}
+	webapp.Get("/old/settings/:name", func(c *fiber.Ctx) error {
+		status := false
+		for _, a := range pool.List() {
+			if a == c.Params("name") {
+				status = !pool.GetAgent(a).Paused()
+			}
+		}
 
-	   		return c.Render("views/settings", fiber.Map{
-	   			"Name":         c.Params("name"),
-	   			"Status":       status,
-	   			"Actions":      services.AvailableActions,
-	   			"Connectors":   services.AvailableConnectors,
-	   			"PromptBlocks": services.AvailableBlockPrompts,
-	   		})
-	   	})
+		return c.Render("old/views/settings", fiber.Map{
+			"Name":         c.Params("name"),
+			"Status":       status,
+			"Actions":      services.AvailableActions,
+			"Connectors":   services.AvailableConnectors,
+			"PromptBlocks": services.AvailableBlockPrompts,
+		})
+	})
 
-	   	webapp.Get("/actions-playground", func(c *fiber.Ctx) error {
-	   		return c.Render("views/actions", fiber.Map{})
-	   	})
+	webapp.Get("/old/actions-playground", func(c *fiber.Ctx) error {
+		return c.Render("old/views/actions", fiber.Map{})
+	})
 
-	   	webapp.Get("/group-create", func(c *fiber.Ctx) error {
-	   		return c.Render("views/group-create", fiber.Map{
-	   			"Actions":      services.AvailableActions,
-	   			"Connectors":   services.AvailableConnectors,
-	   			"PromptBlocks": services.AvailableBlockPrompts,
-	   		})
-	   	})
-	*/
+	webapp.Get("/old/group-create", func(c *fiber.Ctx) error {
+		return c.Render("old/views/group-create", fiber.Map{
+			"Actions":      services.AvailableActions,
+			"Connectors":   services.AvailableConnectors,
+			"PromptBlocks": services.AvailableBlockPrompts,
+		})
+	})
+
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
 	webapp.Put("/api/agent/:name/config", app.UpdateAgentConfig(pool))
@@ -295,7 +296,7 @@ func getApiKeyErrorHandler(opaqueErrors bool, apiKeys []string) fiber.ErrorHandl
 			if opaqueErrors {
 				return ctx.SendStatus(401)
 			}
-			return ctx.Status(401).Render("views/login", fiber.Map{})
+			return ctx.Status(401).Render("old/views/login", fiber.Map{})
 		}
 		if opaqueErrors {
 			return ctx.SendStatus(500)

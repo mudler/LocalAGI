@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Actions Playground</title>
-    {{template "views/partials/header"}}
+    {{template "old/views/partials/header"}}
 </head>
 <body>
-    {{template "views/partials/menu"}}
+    {{template "old/views/partials/menu"}}
     
     <!-- Toast for notifications -->
     <div id="toast" class="toast">
@@ -97,7 +97,7 @@
         });
         
         function fetchActions() {
-            fetch('/actions')
+            fetch('/api/actions')
                 .then(response => response.json())
                 .then(actions => {
                     const select = document.getElementById('action-select');
@@ -173,7 +173,7 @@
             `;
             
             // Execute the action
-            fetch(`/action/${actionId}/run`, {
+            fetch(`/api/action/${actionId}/run`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

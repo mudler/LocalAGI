@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
     <title>Create Agent Group</title>
-    {{template "views/partials/header"}}
-    <script src="/public/js/wizard.js"></script>
-    <link rel="stylesheet" href="/public/css/wizard.css">
-    <script src="/public/js/connector-templates.js"></script>
-    <script src="/public/js/agent-form.js"></script>
+    {{template "old/views/partials/header"}}
+    <script src="/old/public/js/wizard.js"></script>
+    <link rel="stylesheet" href="/old/public/css/wizard.css">
+    <script src="/old/public/js/connector-templates.js"></script>
+    <script src="/old/public/js/agent-form.js"></script>
     <style>
         .agent-profile {
             border: 1px solid var(--medium-bg);
@@ -179,7 +179,7 @@
     </style>
 </head>
 <body>
-    {{template "views/partials/menu"}}
+    {{template "old/views/partials/menu"}}
     <div class="container">
         <div class="section-box">
             <h1>Create Agent Group</h1>
@@ -268,7 +268,7 @@
                     
                     <!-- Use the existing agent-form partial -->
                     <div id="group-agent-form">
-                        {{template "views/partials/agent-form" . }}
+                        {{template "old/views/partials/agent-form" . }}
                     </div>
                 </form>
                 
@@ -554,7 +554,7 @@
                         
                         // Redirect to agent list page after a delay
                         setTimeout(() => {
-                            window.location.href = '/agents';
+                            window.location.href = '/old/agents';
                         }, 2000);
                     } else if (data.error) {
                         // Show error toast

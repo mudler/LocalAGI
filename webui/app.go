@@ -249,7 +249,7 @@ func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) OldChat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
 			Message string `json:"message"`
@@ -307,9 +307,9 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-// ChatAPI provides a JSON-based API for chat functionality
+// Chat provides a JSON-based API for chat functionality
 // This is designed to work better with the React UI
-func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// Parse the request body
 		payload := struct {

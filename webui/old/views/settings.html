@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
     <title>Agent settings {{.Name}}</title>
-    {{template "views/partials/header"}}
-    <script src="/public/js/wizard.js"></script>
-    <link rel="stylesheet" href="/public/css/wizard.css">
-    <script src="/public/js/connector-templates.js"></script>
-    <script src="/public/js/agent-form.js"></script>
+    {{template "old/views/partials/header"}}
+    <script src="/old/public/js/wizard.js"></script>
+    <link rel="stylesheet" href="/old/public/css/wizard.css">
+    <script src="/old/public/js/connector-templates.js"></script>
+    <script src="/old/public/js/agent-form.js"></script>
 </head>
 <body>
-    {{template "views/partials/menu"}}
+    {{template "old/views/partials/menu"}}
     
     <!-- Toast notification container -->
     <div id="toast" class="toast">
@@ -29,7 +29,7 @@
                 <form id="edit-agent-form">
                     <input type="hidden" name="name" id="name" value="{{.Name}}">
                     
-                    {{template "views/partials/agent-form" .}}
+                    {{template "old/views/partials/agent-form" .}}
 
                     <button type="submit" id="update-button" class="action-btn" data-original-text="<i class='fas fa-save'></i> Update Agent">
                         <i class="fas fa-save"></i> Update Agent
@@ -58,7 +58,7 @@
                 <p class="mb-4">Export your agent configuration for backup or transfer.</p>
                 <button 
                     class="action-btn" 
-                    onclick="window.location.href='/settings/export/{{.Name}}'">
+                    onclick="window.location.href='/old/settings/export/{{.Name}}'">
                     <i class="fas fa-file-export"></i> Export Configuration
                 </button>
             </div>
@@ -69,7 +69,7 @@
                 <button 
                     class="action-btn"
                     style="background: linear-gradient(135deg, #ff4545, var(--secondary)); color: white;"
-                    hx-delete="/delete/{{.Name}}"
+                    hx-delete="/api/agent/{{.Name}}"
                     hx-swap="none"
                     data-action="delete"
                     data-agent="{{.Name}}">
@@ -114,7 +114,7 @@
                 toggleButton.addEventListener('click', function() {
                     const agent = this.getAttribute('data-agent');
                     const isActive = this.getAttribute('data-active') === "true";
-                    const endpoint = isActive ? `/pause/${agent}` : `/start/${agent}`;
+                    const endpoint = isActive ? `/api/agent/${agent}/pause` : `/api/agent/${agent}/start`;
                     
                     // Add animation
                     this.style.animation = 'pulse 0.5s';
@@ -277,7 +277,7 @@
                                 message = `Agent "${agent}" deleted successfully`;
                                 // Redirect to agent list page after short delay for delete
                                 setTimeout(() => {
-                                    window.location.href = "/agents";
+                                    window.location.href = "/old/agents";
                                 }, 2000);
                                 break;
                             default:

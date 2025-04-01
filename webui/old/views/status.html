@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <title>Smart Agent status</title>
-    {{template "views/partials/header"}}
+    {{template "old/views/partials/header"}}
     <style>
         body { overflow: hidden; }
         .chat-container { height: 90vh; display: flex; flex-direction: column; }
@@ -37,7 +37,7 @@
     </style>
 </head>
 <body class="bg-gray-900 p-4 text-white font-sans" hx-ext="sse" sse-connect="/sse/{{.Name}}">
-    {{template "views/partials/menu"}}
+    {{template "old/views/partials/menu"}}
     <div class="chat-container bg-gray-800 shadow-lg rounded-lg" >
         <!-- Chat Header -->
         <div class="border-b border-gray-700 p-4">
