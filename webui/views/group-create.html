@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Create Agent Group</title>
+    {{template "views/partials/header"}}
+    <script src="/public/js/wizard.js"></script>
+    <link rel="stylesheet" href="/public/css/wizard.css">
+    <script src="/public/js/connector-templates.js"></script>
+    <script src="/public/js/agent-form.js"></script>
+    <style>
+        .agent-profile {
+            border: 1px solid var(--medium-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: var(--lighter-bg);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .agent-profile:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        .agent-profile h3 {
+            color: var(--primary);
+            text-shadow: var(--neon-glow);
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--medium-bg);
+            padding-bottom: 10px;
+        }
+        .agent-profile .description {
+            color: var(--text);
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+        .agent-profile .system-prompt {
+            background-color: var(--darker-bg);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 0.85rem;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+        .agent-profile.selected {
+            border: 2px solid var(--primary);
+            background-color: rgba(var(--primary-rgb), 0.1);
+        }
+        .agent-profile .select-checkbox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .page-section {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        .page-section.active {
+            display: block;
+        }
+        .progress-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        .progress-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            padding: 0 20px;
+        }
+        .progress-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 12px;
+            right: -30px;
+            width: 60px;
+            height: 3px;
+            background-color: var(--medium-bg);
+        }
+        .progress-step.active:not(:last-child)::after {
+            background-color: var(--primary);
+        }
+        .step-circle {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background-color: var(--medium-bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text);
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+        .progress-step.active .step-circle {
+            background-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+        .step-label {
+            font-size: 0.9rem;
+            color: var(--muted-text);
+            transition: all 0.3s ease;
+        }
+        .progress-step.active .step-label {
+            color: var(--primary);
+            font-weight: bold;
+        }
+        .prompt-container {
+            margin-bottom: 30px;
+        }
+        .prompt-container textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border-radius: 6px;
+            background-color: var(--lighter-bg);
+            border: 1px solid var(--medium-bg);
+            color: var(--text);
+            font-size: 1rem;
+            resize: vertical;
+        }
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+        .select-all-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .loader {
+            display: none;
+            text-align: center;
+            margin: 40px 0;
+        }
+        .loader i {
+            color: var(--primary);
+            font-size: 2rem;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* Make form elements auto in group mode */
+        #wizard-container .form-section {
+            height: auto;
+            overflow: visible;
+        }
+        .info-message {
+            background-color: rgba(var(--primary-rgb), 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+            display: flex;
+            align-items: center;
+        }
+        .info-message i {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-right: 15px;
+        }
+        .info-message-content {
+            flex: 1;
+        }
+        .info-message-content h4 {
+            margin-top: 0;
+            margin-bottom: 5px;
+            color: var(--primary);
+        }
+        .info-message-content p {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    {{template "views/partials/menu"}}
+    <div class="container">
+        <div class="section-box">
+            <h1>Create Agent Group</h1>
+            
+            <!-- Progress Bar -->
+            <div class="progress-container">
+                <div class="progress-step active" data-step="1">
+                    <div class="step-circle">1</div>
+                    <div class="step-label">Generate Profiles</div>
+                </div>
+                <div class="progress-step" data-step="2">
+                    <div class="step-circle">2</div>
+                    <div class="step-label">Review & Select</div>
+                </div>
+                <div class="progress-step" data-step="3">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">Configure Settings</div>
+                </div>
+            </div>
+            
+            <!-- Step 1: Generate Profiles -->
+            <div id="step1" class="page-section active">
+                <h2>Generate Agent Profiles</h2>
+                <p>Describe the group of agents you want to create. Be specific about their roles, relationships, and purpose.</p>
+                
+                <div class="prompt-container">
+                    <textarea id="group-description" placeholder="Example: Create a team of agents for a software development project including a project manager, developer, tester, and designer. They should collaborate to build web applications."></textarea>
+                </div>
+                
+                <div class="action-buttons">
+                    <button type="button" id="generate-profiles-btn" class="action-btn">
+                        <i class="fas fa-magic"></i> Generate Profiles
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Loader -->
+            <div id="loader" class="loader">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Generating agent profiles...</p>
+            </div>
+            
+            <!-- Step 2: Review & Select Profiles -->
+            <div id="step2" class="page-section">
+                <h2>Review & Select Agent Profiles</h2>
+                <p>Select the agents you want to create. You can customize their details before creation.</p>
+                
+                <div class="select-all-container">
+                    <label for="select-all" class="checkbox-label">
+                        <span class="checkbox-custom">
+                            <input type="checkbox" id="select-all">
+                            <span class="checkmark"></span>
+                        </span>
+                        Select All
+                    </label>
+                </div>
+                
+                <div id="agent-profiles-container">
+                    <!-- Agent profiles will be generated here -->
+                </div>
+                
+                <div class="action-buttons">
+                    <button type="button" id="back-to-step1-btn" class="nav-btn">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button type="button" id="to-step3-btn" class="action-btn">
+                        Continue <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Step 3: Common Settings -->
+            <div id="step3" class="page-section">
+                <h2>Configure Common Settings</h2>
+                <p>Configure common settings for all selected agents. These settings will be applied to each agent.</p>
+                
+                <form id="group-settings-form">
+                    <!-- Informative message about profile data -->
+                    <div class="info-message">
+                        <i class="fas fa-info-circle"></i>
+                        <div class="info-message-content">
+                            <h4>Basic Information from Profiles</h4>
+                            <p>The name, description, and system prompt for each agent will be taken from the profiles you selected in the previous step.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Use the existing agent-form partial -->
+                    <div id="group-agent-form">
+                        {{template "views/partials/agent-form" . }}
+                    </div>
+                </form>
+                
+                <div class="action-buttons">
+                    <button type="button" id="back-to-step2-btn" class="nav-btn">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button type="button" id="create-group-btn" class="action-btn" data-original-text="<i class='fas fa-users'></i> Create Agent Group">
+                        <i class="fas fa-users"></i> Create Agent Group
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Messages Container -->
+        <div id="response-container">
+            <!-- Alert messages will be shown here -->
+            <div id="success-alert" class="alert alert-success" style="display: none;">
+                Agents created successfully! Redirecting to agent list...
+            </div>
+            
+            <div id="error-alert" class="alert alert-error" style="display: none;">
+                <span id="error-message">Error creating agents.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification container -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <script>
+        const actions = `{{ range .Actions }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        const connectors = `{{ range .Connectors }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        const promptBlocks = `{{ range .PromptBlocks }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        
+        // Store generated agent profiles
+        let agentProfiles = [];
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the form components
+            initAgentFormCommon({
+                actions: actions,
+                connectors: connectors,
+                promptBlocks: promptBlocks
+            });
+            
+            // Hide the Basic Information section
+            const basicSection = document.getElementById('basic-section');
+            if (basicSection) {
+                basicSection.style.display = 'none';
+            }
+            
+            // Update the wizard navigation items to skip Basic Information
+            const basicNavItem = document.querySelector('.wizard-nav-item[data-target="basic-section"]');
+            if (basicNavItem) {
+                basicNavItem.style.display = 'none';
+            }
+            
+            // Make sure Connectors section is active by default
+            const connectorsSection = document.getElementById('connectors-section');
+            if (connectorsSection) {
+                document.querySelectorAll('.form-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                connectorsSection.classList.add('active');
+            }
+            
+            // Update the active nav item
+            const connectorsNavItem = document.querySelector('.wizard-nav-item[data-target="connectors-section"]');
+            if (connectorsNavItem) {
+                document.querySelectorAll('.wizard-nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                connectorsNavItem.classList.add('active');
+            }
+            
+            // Update the current step label
+            const currentStepLabel = document.getElementById('currentStepLabel');
+            if (currentStepLabel) {
+                currentStepLabel.textContent = 'Connectors';
+            }
+            
+            // Navigation between steps
+            const goToStep = (stepNumber) => {
+                // Hide all steps
+                document.querySelectorAll('.page-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                
+                // Show the target step
+                document.getElementById(`step${stepNumber}`).classList.add('active');
+                
+                // Update progress bar
+                document.querySelectorAll('.progress-step').forEach(step => {
+                    step.classList.remove('active');
+                    if (parseInt(step.dataset.step) <= stepNumber) {
+                        step.classList.add('active');
+                    }
+                });
+            };
+            
+            // Step 1: Generate Profiles
+            document.getElementById('generate-profiles-btn').addEventListener('click', function() {
+                const description = document.getElementById('group-description').value.trim();
+                
+                if (!description) {
+                    showToast('Please enter a description for your agent group', 'error');
+                    return;
+                }
+                
+                // Show loader
+                document.getElementById('loader').style.display = 'block';
+                document.getElementById('step1').style.display = 'none';
+                
+                // Send request to generate profiles
+                fetch('/api/agent/group/generateProfiles', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ description: description })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loader
+                    document.getElementById('loader').style.display = 'none';
+                    
+                    agentProfiles = Array.isArray(data) ? data : [];
+                    
+                    if (agentProfiles.length === 0) {
+                        showToast('No agent profiles were generated. Please try again with a more detailed description.', 'error');
+                        document.getElementById('step1').style.display = 'block';
+                        return;
+                    }
+                    
+                    // Render agent profiles
+                    renderAgentProfiles();
+                    
+                    // Go to step 2
+                    goToStep(2);
+                })
+                .catch(error => {
+                    document.getElementById('loader').style.display = 'none';
+                    document.getElementById('step1').style.display = 'block';
+                    showToast('Error generating profiles: ' + error.message, 'error');
+                    console.error('Error:', error);
+                });
+            });
+            
+            // Render agent profiles in step 2
+            function renderAgentProfiles() {
+                const container = document.getElementById('agent-profiles-container');
+                container.innerHTML = '';
+                
+                agentProfiles.forEach((profile, index) => {
+                    const profileElement = document.createElement('div');
+                    profileElement.className = 'agent-profile';
+                    profileElement.dataset.index = index;
+                    profileElement.innerHTML = `
+                        <label class="select-checkbox checkbox-label">
+                            <span class="checkbox-custom">
+                                <input type="checkbox" class="profile-checkbox" checked>
+                                <span class="checkmark"></span>
+                            </span>
+                        </label>
+                        <h3>${profile.name}</h3>
+                        <div class="description">${profile.description}</div>
+                        <div class="system-prompt">${profile.system_prompt}</div>
+                    `;
+                    
+                    profileElement.querySelector('.profile-checkbox').addEventListener('change', function() {
+                        profileElement.classList.toggle('selected', this.checked);
+                        updateSelectAllCheckbox();
+                    });
+                    
+                    // Initially set as selected
+                    profileElement.classList.add('selected');
+                    
+                    container.appendChild(profileElement);
+                });
+            }
+            
+            // Select all checkbox functionality
+            document.getElementById('select-all').addEventListener('change', function() {
+                const isChecked = this.checked;
+                document.querySelectorAll('.profile-checkbox').forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                    checkbox.closest('.agent-profile').classList.toggle('selected', isChecked);
+                });
+            });
+            
+            function updateSelectAllCheckbox() {
+                const checkboxes = document.querySelectorAll('.profile-checkbox');
+                const selectAllCheckbox = document.getElementById('select-all');
+                const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
+                const someChecked = Array.from(checkboxes).some(checkbox => checkbox.checked);
+                
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = !allChecked && someChecked;
+            }
+            
+            // Navigation buttons
+            document.getElementById('back-to-step1-btn').addEventListener('click', () => goToStep(1));
+            document.getElementById('to-step3-btn').addEventListener('click', () => {
+                // Check if at least one profile is selected
+                const selectedProfiles = document.querySelectorAll('.profile-checkbox:checked');
+                if (selectedProfiles.length === 0) {
+                    showToast('Please select at least one agent profile', 'error');
+                    return;
+                }
+                goToStep(3);
+            });
+            document.getElementById('back-to-step2-btn').addEventListener('click', () => goToStep(2));
+            
+            // Create group button
+            document.getElementById('create-group-btn').addEventListener('click', function() {
+                // Get selected profiles
+                const selectedProfileIndices = Array.from(document.querySelectorAll('.profile-checkbox:checked'))
+                    .map(checkbox => parseInt(checkbox.closest('.agent-profile').dataset.index));
+                
+                if (selectedProfileIndices.length === 0) {
+                    showToast('Please select at least one agent profile', 'error');
+                    return;
+                }
+                
+                const selectedProfiles = selectedProfileIndices.map(index => agentProfiles[index]);
+                
+                // Process form data for common settings
+                const formData = new FormData(document.getElementById('group-settings-form'));
+                const commonSettings = AgentFormUtils.processFormData(formData);
+                
+                // Process special fields
+                commonSettings.connectors = AgentFormUtils.processConnectors(this);
+                if (commonSettings.connectors === null) return; // Validation failed
+                
+                commonSettings.mcp_servers = AgentFormUtils.processMCPServers();
+                
+                commonSettings.actions = AgentFormUtils.processActions(this);
+                if (commonSettings.actions === null) return; // Validation failed
+                
+                commonSettings.promptblocks = AgentFormUtils.processPromptBlocks(this);
+                if (commonSettings.promptblocks === null) return; // Validation failed
+                
+                // Show loading state
+                const createButton = document.getElementById('create-group-btn');
+                const originalButtonText = createButton.innerHTML;
+                createButton.setAttribute('data-original-text', originalButtonText);
+                createButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+                createButton.disabled = true;
+                
+                // Create payload
+                const payload = {
+                    agents: selectedProfiles,
+                    agent_config: commonSettings
+                };
+                
+                // Send request to create agents
+                fetch('/api/agent/group/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const successAlert = document.getElementById('success-alert');
+                    const errorAlert = document.getElementById('error-alert');
+                    const errorMessage = document.getElementById('error-message');
+                    
+                    // Hide both alerts initially
+                    successAlert.style.display = 'none';
+                    errorAlert.style.display = 'none';
+                    
+                    if (data.status === "ok") {
+                        // Show success toast
+                        showToast(`${selectedProfiles.length} agent(s) created successfully!`, 'success');
+                        
+                        // Show success message
+                        successAlert.style.display = 'block';
+                        
+                        // Redirect to agent list page after a delay
+                        setTimeout(() => {
+                            window.location.href = '/agents';
+                        }, 2000);
+                    } else if (data.error) {
+                        // Show error toast
+                        showToast('Error: ' + data.error, 'error');
+                        
+                        // Show error message
+                        errorMessage.textContent = data.error;
+                        errorAlert.style.display = 'block';
+                        
+                        // Restore button state
+                        createButton.innerHTML = originalButtonText;
+                        createButton.disabled = false;
+                    } else {
+                        // Handle unexpected response format
+                        showToast('Unexpected response format', 'error');
+                        errorMessage.textContent = "Unexpected response format";
+                        errorAlert.style.display = 'block';
+                        
+                        // Restore button state
+                        createButton.innerHTML = originalButtonText;
+                        createButton.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    // Handle network or other errors
+                    showToast('Network error: ' + error.message, 'error');
+                    const errorAlert = document.getElementById('error-alert');
+                    const errorMessage = document.getElementById('error-message');
+                    
+                    errorMessage.textContent = "Network error: " + error.message;
+                    errorAlert.style.display = 'block';
+                    
+                    // Restore button state
+                    createButton.innerHTML = originalButtonText;
+                    createButton.disabled = false;
+                });
+            });
+        });
+        
+        // Toast notification function - assuming this exists in your global scope
+    </script>
+</body>
+</html>

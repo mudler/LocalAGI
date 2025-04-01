@@ -25,6 +25,7 @@ import (
 
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/template/html/v2"
 )
 
 type (
@@ -37,10 +38,13 @@ type (
 
 func NewApp(opts ...Option) *App {
 	config := NewConfig(opts...)
+	engine := html.NewFileSystem(http.FS(viewsfs), ".html")
 
 	// Initialize a new Fiber app
 	// Pass the engine to the Views
-	webapp := fiber.New(fiber.Config{})
+	webapp := fiber.New(fiber.Config{
+		Views: engine,
+	})
 
 	a := &App{
 		htmx:   htmx.New(),
@@ -245,9 +249,67 @@ func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-// Chat provides a JSON-based API for chat functionality
-// This is designed to work better with the React UI
 func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		payload := struct {
+			Message string `json:"message"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			return err
+		}
+		agentName := c.Params("name")
+		manager := pool.GetManager(agentName)
+
+		query := strings.Clone(payload.Message)
+		if query == "" {
+			_, _ = c.Write([]byte("Please enter a message."))
+			return nil
+		}
+		manager.Send(
+			sse.NewMessage(
+				chatDiv(query, "gray"),
+			).WithEvent("messages"))
+
+		go func() {
+			a := pool.GetAgent(agentName)
+			if a == nil {
+				xlog.Info("Agent not found in pool", c.Params("name"))
+				return
+			}
+			res := a.Ask(
+				coreTypes.WithText(query),
+			)
+			if res.Error != nil {
+				xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
+			} else {
+				xlog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
+			}
+			manager.Send(
+				sse.NewMessage(
+					chatDiv(res.Response, "blue"),
+				).WithEvent("messages"))
+			manager.Send(
+				sse.NewMessage(
+					disabledElement("inputMessage", false), // show again the input
+				).WithEvent("message_status"))
+
+			//result := `<i>done</i>`
+			//	_, _ = w.Write([]byte(result))
+		}()
+
+		manager.Send(
+			sse.NewMessage(
+				loader() + disabledElement("inputMessage", true),
+			).WithEvent("message_status"))
+
+		return nil
+	}
+}
+
+// ChatAPI provides a JSON-based API for chat functionality
+// This is designed to work better with the React UI
+func (a *App) ChatAPI(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// Parse the request body
 		payload := struct {

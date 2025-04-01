@@ -1,0 +1,254 @@
+/* Agent Form Wizard Styles */
+.agent-form-container {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+/* Wizard Sidebar */
+.wizard-sidebar {
+    width: 250px;
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem 0;
+    flex-shrink: 0;
+}
+
+.wizard-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.wizard-nav-item {
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 4px solid transparent;
+    display: flex;
+    align-items: center;
+}
+
+.wizard-nav-item i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+}
+
+.wizard-nav-item:hover {
+    background: rgba(var(--primary-rgb), 0.1);
+}
+
+.wizard-nav-item.active {
+    background: rgba(var(--primary-rgb), 0.15);
+    border-left-color: var(--primary);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* Form Content Area */
+.form-content-area {
+    flex: 1;
+    padding: 1.5rem;
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.section-title {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(var(--border-rgb), 0.5);
+    color: var(--text);
+}
+
+.form-section {
+    display: none;
+}
+
+.form-section.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Improved input styles */
+.mb-4 {
+    margin-bottom: 1.5rem;
+}
+
+.form-section label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.form-section input[type="text"],
+.form-section input[type="number"],
+.form-section textarea,
+.form-section select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(var(--border-rgb), 0.8);
+    background-color: var(--input-bg);
+    color: var(--text);
+    font-size: 16px;
+    transition: border-color 0.2s ease;
+}
+
+.form-section textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.form-section input[type="text"]:focus,
+.form-section input[type="number"]:focus,
+.form-section textarea:focus,
+.form-section select:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
+}
+
+/* Button Styles */
+.button-container {
+    margin: 1.5rem 0;
+}
+
+.action-btn {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn i {
+    margin-right: 6px;
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+/* Navigation controls - improved layout */
+.wizard-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(var(--border-rgb), 0.5);
+}
+
+.wizard-controls-left {
+    flex: 1;
+    text-align: left;
+}
+
+.wizard-controls-center {
+    flex: 2;
+    text-align: center;
+}
+
+.wizard-controls-right {
+    flex: 1;
+    text-align: right;
+}
+
+.nav-btn {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid rgba(var(--border-rgb), 0.8);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+}
+
+.nav-btn i {
+    margin-right: 6px;
+}
+
+.nav-btn:last-child i {
+    margin-right: 0;
+    margin-left: 6px;
+}
+
+.nav-btn:hover {
+    background: rgba(var(--primary-rgb), 0.1);
+}
+
+.progress-indicator {
+    display: inline-block;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-top: 0.5rem;
+}
+
+.progress-dots {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+    gap: 6px;
+}
+
+.progress-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: rgba(var(--border-rgb), 0.4);
+    transition: all 0.2s ease;
+}
+
+.progress-dot.active {
+    background-color: var(--primary);
+    transform: scale(1.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .wizard-controls {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .wizard-controls-left,
+    .wizard-controls-center,
+    .wizard-controls-right {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .progress-dots {
+        margin: 12px 0;
+    }
+}
