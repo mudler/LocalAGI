@@ -195,13 +195,14 @@ func (d *Discord) messageCreate(a *agent.Agent) func(s *discordgo.Session, m *di
 		}
 
 		// check if the message is in a thread and get all messages in the thread
-		if m.MessageReference != nil {
+		if m.MessageReference != nil &&
+			((d.defaultChannel != "" && m.ChannelID == d.defaultChannel) || (mentioned && d.defaultChannel == "")) {
 			d.handleThreadMessage(a, s, m)
 			return
 		}
 
 		// Or we are in the default channel (if one is set!)
-		if d.defaultChannel != "" && m.ChannelID == d.defaultChannel {
+		if (d.defaultChannel != "" && m.ChannelID == d.defaultChannel) || (mentioned && d.defaultChannel == "") {
 			d.handleChannelMessage(a, s, m)
 			return
 		}
