@@ -145,7 +145,6 @@ export const agentApi = {
   importAgent: async (formData) => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.importAgent), {
       method: 'POST',
-      headers: API_CONFIG.headers,
       body: formData,
     });
     return handleResponse(response);

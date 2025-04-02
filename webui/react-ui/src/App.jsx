@@ -114,12 +114,6 @@ function App() {
         </div>
       </main>
       
-      {/* Footer */}
-      <footer className="main-footer">
-        <div className="container">
-          <p>&copy; {new Date().getFullYear()} LocalAgent - Cybernetic Intelligence</p>
-        </div>
-      </footer>
     </div>
   )
 }

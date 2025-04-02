@@ -26,7 +26,7 @@ function ImportAgent() {
       const formData = new FormData();
       formData.append('file', file);
 
-      await agentApi.importAgentConfig(formData);
+      await agentApi.importAgent(formData);
       showToast('Agent imported successfully', 'success');
       navigate('/agents');
     } catch (err) {
@@ -58,7 +58,7 @@ function ImportAgent() {
               <i className="fas fa-cloud-upload-alt"></i>
               <h2>Drop your agent file here</h2>
               <p>or</p>
-              <label htmlFor="fileInput" className="file-button">
+              <label htmlFor="fileInput" className="action-btn">
                 <i className="fas fa-folder-open"></i> Select File
               </label>
               <input
