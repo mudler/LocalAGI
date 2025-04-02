@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/304ad402-5ddc-441b-a4b9-55ff9eec72be" alt="LocalAgent Logo" width="220"/>
+  <img src="https://github.com/user-attachments/assets/f6548176-bdc5-4fc8-b9c6-cd951276cc2c" alt="LocalAgent Logo" width="220"/>
 </p>
 
 <h1 align="center">LOCAL AGENT</h1>
@@ -11,7 +11,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/mudler/LocalAgent)](https://github.com/mudler/LocalAgent/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/mudler/LocalAgent)](https://github.com/mudler/LocalAgent/issues)
-  
+
 </div>
 
 ## TAKE BACK CONTROL
