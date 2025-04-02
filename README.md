@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/f6548176-bdc5-4fc8-b9c6-cd951276cc2c" alt="LocalAgent Logo" width="220"/>
+  <img src="https://github.com/user-attachments/assets/6958ffb3-31cf-441e-b99d-ce34ec6fc88f" alt="LocalAgent Logo" width="220"/>
 </p>
 
 <h1 align="center">LOCAL AGENT</h1>
