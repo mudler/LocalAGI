@@ -95,6 +95,13 @@ function AgentsList() {
     }
   };
 
+  useEffect(() => {
+    document.title = 'Agents - LocalAgent';
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, []);
+
   // Load agents on mount
   useEffect(() => {
     fetchAgents();

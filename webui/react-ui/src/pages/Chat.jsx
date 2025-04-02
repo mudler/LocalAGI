@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { useParams, useOutletContext } from 'react-router-dom';
+import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 
 function Chat() {
   const { name } = useParams();
   const { showToast } = useOutletContext();
+  const navigate = useNavigate();
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef(null);
   
@@ -18,6 +19,16 @@ function Chat() {
     clearChat,
     clearError
   } = useChat(name);
+
+  // Update document title
+  useEffect(() => {
+    if (name) {
+      document.title = `Chat with ${name} - LocalAgent`;
+    }
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, [name]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

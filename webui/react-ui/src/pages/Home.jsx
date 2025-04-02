@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { agentApi } from '../utils/api';
 
 function Home() {
@@ -12,6 +12,15 @@ function Home() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const location = useLocation();
+
+  // Update document title
+  useEffect(() => {
+    document.title = 'Agent Dashboard - LocalAgent';
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, []);
 
   // Fetch dashboard data
   useEffect(() => {

@@ -21,6 +21,14 @@ function GroupCreate() {
     profiles: []
   });
 
+  // Update document title
+  useEffect(() => {
+    document.title = 'Create Agent Group - LocalAgent';
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, []);
+
   // Fetch metadata on component mount
   useEffect(() => {
     const fetchMetadata = async () => {

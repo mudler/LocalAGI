@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { actionApi } from '../utils/api';
 
 function ActionsPlayground() {
   const { showToast } = useOutletContext();
+  const navigate = useNavigate();
   const [actions, setActions] = useState([]);
   const [selectedAction, setSelectedAction] = useState('');
   const [configJson, setConfigJson] = useState('{}');
@@ -11,6 +12,14 @@ function ActionsPlayground() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingActions, setLoadingActions] = useState(true);
+
+  // Update document title
+  useEffect(() => {
+    document.title = 'Actions Playground - LocalAgent';
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, []);
 
   // Fetch available actions
   useEffect(() => {

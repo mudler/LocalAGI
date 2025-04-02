@@ -10,7 +10,17 @@ function AgentSettings() {
   const navigate = useNavigate();
   const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({});
-  
+
+  // Update document title
+  useEffect(() => {
+    if (name) {
+      document.title = `Agent Settings: ${name} - LocalAgent`;
+    }
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, [name]);
+
   // Use our custom agent hook
   const { 
     agent, 

@@ -1,13 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 
 function AgentStatus() {
   const { name } = useParams();
+  const navigate = useNavigate();
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [eventSource, setEventSource] = useState(null);
   const [liveUpdates, setLiveUpdates] = useState([]);
+
+  // Update document title
+  useEffect(() => {
+    if (name) {
+      document.title = `Agent Status: ${name} - LocalAgent`;
+    }
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, [name]);
 
   // Fetch initial status data
   useEffect(() => {

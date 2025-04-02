@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { agentApi } from '../utils/api';
 
@@ -7,6 +7,14 @@ function ImportAgent() {
   const { showToast } = useOutletContext();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Update document title
+  useEffect(() => {
+    document.title = 'Import Agent - LocalAgent';
+    return () => {
+      document.title = 'LocalAgent'; // Reset title when component unmounts
+    };
+  }, []);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
