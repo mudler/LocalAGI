@@ -19,6 +19,7 @@ services:
     - 8081:8080
     environment:
       - DEBUG=true
+      - LOCALAI_API_KEY=sk-1234567890
     volumes:
       - ./volumes/models:/build/models:cached
       - ./volumes/images:/tmp/generated/images
