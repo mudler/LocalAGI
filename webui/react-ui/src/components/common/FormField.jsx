@@ -16,6 +16,7 @@ import React from 'react';
  */
 const FormField = ({
   id,
+  name,
   label,
   type = 'text',
   value,
@@ -45,8 +46,9 @@ const FormField = ({
               <input
                 type="checkbox"
                 id={id}
+                name={name}
                 checked={value === true || value === 'true'}
-                onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
+                onChange={onChange}
               />
               {labelWithIndicator}
             </label>
@@ -59,8 +61,9 @@ const FormField = ({
             <label htmlFor={id}>{labelWithIndicator}</label>
             <select
               id={id}
+              name={name}
               value={value || ''}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={onChange}
               className="form-control"
               required={required}
             >
@@ -79,8 +82,9 @@ const FormField = ({
             <label htmlFor={id}>{labelWithIndicator}</label>
             <textarea
               id={id}
+              name={name}
               value={value || ''}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={onChange}
               className="form-control"
               placeholder={placeholder}
               required={required}
@@ -96,8 +100,9 @@ const FormField = ({
             <input
               type="number"
               id={id}
+              name={name}
               value={value || ''}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={onChange}
               className="form-control"
               placeholder={placeholder}
               required={required}
@@ -115,8 +120,9 @@ const FormField = ({
             <input
               type={type}
               id={id}
+              name={name}
               value={value || ''}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={onChange}
               className="form-control"
               placeholder={placeholder}
               required={required}

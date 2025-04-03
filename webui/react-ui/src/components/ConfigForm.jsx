@@ -57,10 +57,15 @@ const ConfigForm = ({
   };
 
   // Handle config field change
-  const handleConfigChange = (index, key, value) => {
+  const handleConfigChange = (index, e) => {
+    const { name: key, value, type, checked } = e.target;
     const item = items[index];
     const config = parseConfig(item);
-    config[key] = value;
+    
+    // Convert value to number if it's a number input
+    const processedValue = type === 'number' ? Number(value) : value;
+    
+    config[key] = type === 'checkbox' ? checked : processedValue;
     
     onChange(index, {
       ...item,
@@ -112,7 +117,7 @@ const ConfigForm = ({
           <FormFieldDefinition
             fields={fieldGroup.fields}
             values={parseConfig(item)}
-            onChange={(key, value) => handleConfigChange(index, key, value)}
+            onChange={(e) => handleConfigChange(index, e)}
             idPrefix={`${itemType}-${index}-`}
           />
         )}

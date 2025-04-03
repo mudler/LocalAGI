@@ -25,10 +25,11 @@ const FormFieldDefinition = ({
         <div key={field.name} style={{ marginBottom: '16px' }}>
           <FormField
             id={`${idPrefix}${field.name}`}
+            name={field.name}
             label={field.label}
             type={field.type}
             value={safeValues[field.name] !== undefined ? safeValues[field.name] : field.defaultValue}
-            onChange={(value) => onChange(field.name, value)}
+            onChange={onChange}
             placeholder={field.placeholder || ''}
             helpText={field.helpText || ''}
             options={field.options || []}

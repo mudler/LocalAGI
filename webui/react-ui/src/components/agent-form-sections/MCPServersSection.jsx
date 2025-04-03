@@ -28,8 +28,13 @@ const MCPServersSection = ({
   ];
 
   // Handle field value changes for a specific server
-  const handleFieldChange = (index, name, value) => {
-    handleMCPServerChange(index, name, value);
+  const handleFieldChange = (index, e) => {
+    const { name, value, type, checked } = e.target;
+    
+    // Convert value to number if it's a number input
+    const processedValue = type === 'number' ? Number(value) : value;
+    
+    handleMCPServerChange(index, name, type === 'checkbox' ? checked : processedValue);
   };
 
   return (
@@ -56,7 +61,7 @@ const MCPServersSection = ({
             <FormFieldDefinition
               fields={getServerFields()}
               values={server}
-              onChange={(name, value) => handleFieldChange(index, name, value)}
+              onChange={(e) => handleFieldChange(index, e)}
               idPrefix={`mcp_server_${index}_`}
             />
           </div>

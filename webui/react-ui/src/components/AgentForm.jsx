@@ -28,7 +28,10 @@ const AgentForm = ({
 
   // Handle input changes
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value, type, checked } = e.target.name.target;
+    
+    // Convert value to number if it's a number input
+    const processedValue = type === 'number' ? Number(value) : value;
     
     if (name.includes('.')) {
       const [parent, child] = name.split('.');
@@ -36,13 +39,13 @@ const AgentForm = ({
         ...formData,
         [parent]: {
           ...formData[parent],
-          [child]: type === 'checkbox' ? checked : value
+          [child]: type === 'checkbox' ? checked : processedValue
         }
       });
     } else {
       setFormData({
         ...formData,
-        [name]: type === 'checkbox' ? checked : value
+        [name]: type === 'checkbox' ? checked : processedValue
       });
     }
   };
@@ -57,7 +60,6 @@ const AgentForm = ({
 
   // Handle navigation between sections
   const handleSectionChange = (section) => {
-    console.log('Changing section to:', section);
     setActiveSection(section);
   };
 
@@ -94,7 +96,6 @@ const AgentForm = ({
   };
   
   const handleAddDynamicPrompt = () => {
-    console.log('Adding dynamic prompt');
     setFormData({
       ...formData,
       dynamicPrompts: [
