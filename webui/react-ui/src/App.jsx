@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, Link, useOutletContext } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom'
 import './App.css'
 
 function App() {
@@ -18,9 +18,6 @@ function App() {
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
-
-  // Provide showToast to children
-  const context = { showToast };
 
   return (
     <div className="app-container">
@@ -113,7 +110,7 @@ function App() {
       {/* Main Content Area */}
       <main className="main-content">
         <div className="container">
-          <Outlet context={context} />
+          <Outlet context={{ showToast }} />
         </div>
       </main>
       

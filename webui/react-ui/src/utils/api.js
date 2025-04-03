@@ -216,14 +216,6 @@ export const actionApi = {
     return handleResponse(response);
   },
   
-  // Get agent configuration metadata
-  getAgentConfigMeta: async () => {
-    const response = await fetch(buildUrl(API_CONFIG.endpoints.agentConfigMetadata), {
-      headers: API_CONFIG.headers
-    });
-    return handleResponse(response);
-  },
-  
   // Execute an action for an agent
   executeAction: async (name, actionData) => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.executeAction(name)), {
