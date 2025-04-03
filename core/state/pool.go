@@ -107,7 +107,7 @@ func NewAgentPool(
 			managers:               make(map[string]sse.Manager),
 			connectors:             connectors,
 			availableActions:       availableActions,
-			dynamicPrompt:           promptBlocks,
+			dynamicPrompt:          promptBlocks,
 			timeout:                timeout,
 			conversationLogs:       conversationPath,
 		}, nil
@@ -131,7 +131,7 @@ func NewAgentPool(
 		pool:                   *poolData,
 		connectors:             connectors,
 		localRAGAPI:            LocalRAGAPI,
-		dynamicPrompt:           promptBlocks,
+		dynamicPrompt:          promptBlocks,
 		availableActions:       availableActions,
 		timeout:                timeout,
 		conversationLogs:       conversationPath,
@@ -506,7 +506,7 @@ func (a *AgentPool) StartAll() error {
 			continue
 		}
 		if err := a.startAgentWithConfig(name, &config); err != nil {
-			return err
+			xlog.Error("Failed to start agent", "name", name, "error", err)
 		}
 	}
 	return nil
