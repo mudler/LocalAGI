@@ -31,8 +31,8 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
-  ragserver:
-    image: quay.io/mudler/localrag
+  localrecall:
+    image: quay.io/mudler/localrecall:master
     ports:
       - 8080
     environment:
@@ -45,29 +45,30 @@ services:
       - ./volumes/localrag/db:/db
       - ./volumes/localrag/assets/:/assets
 
-  ragserver-healthcheck:
+  localrecall-healthcheck:
     depends_on:
-      ragserver:
+      localrecall:
         condition: service_started
     image: busybox
-    command: ["sh", "-c", "until wget -q -O - http://ragserver:8080 > /dev/null 2>&1; do echo 'Waiting for ragserver...'; sleep 1; done; echo 'RagServer is up!'"]
+    command: ["sh", "-c", "until wget -q -O - http://localrecall:8080 > /dev/null 2>&1; do echo 'Waiting for localrecall...'; sleep 1; done; echo 'localrecall is up!'"]
 
   localagent:
     depends_on:
       localai:
         condition: service_healthy
-      ragserver-healthcheck:
+      localrecall-healthcheck:
         condition: service_completed_successfully
     build:
       context: .
       dockerfile: Dockerfile.webui
     ports:
       - 8080:3000
+    image: quay.io/mudler/localagi:master
     environment:
       - LOCALAGENT_MODEL=arcee-agent
       - LOCALAGENT_LLM_API_URL=http://localai:8080
       - LOCALAGENT_LLM_API_KEY=sk-1234567890
-      - LOCALAGENT_LOCALRAG_URL=http://ragserver:8080
+      - LOCALAGENT_LOCALRAG_URL=http://localrecall:8080
       - LOCALAGENT_STATE_DIR=/pool
       - LOCALAGENT_TIMEOUT=5m
       - LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING=false
