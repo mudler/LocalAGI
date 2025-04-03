@@ -1,83 +1,99 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6958ffb3-31cf-441e-b99d-ce34ec6fc88f" alt="LocalAgent Logo" width="220"/>
+  <img src="https://github.com/user-attachments/assets/6958ffb3-31cf-441e-b99d-ce34ec6fc88f" alt="LocalAGI Logo" width="220"/>
 </p>
 
-<h1 align="center">LOCAL AGENT</h1>
-<h3 align="center"><em>AI that stays where it belongs — on your machine.</em></h3>
+<h1 align="center">LocalAGI</h1>
+<h3 align="center"><em>Your AI. Your Hardware. Your Rules.</em></h3>
 
 <div align="center">
   
-[![Go Report Card](https://goreportcard.com/badge/github.com/mudler/LocalAgent)](https://goreportcard.com/report/github.com/mudler/LocalAgent)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mudler/LocalAGI)](https://goreportcard.com/report/github.com/mudler/LocalAGI)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub stars](https://img.shields.io/github/stars/mudler/LocalAgent)](https://github.com/mudler/LocalAgent/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/mudler/LocalAgent)](https://github.com/mudler/LocalAgent/issues)
+[![GitHub stars](https://img.shields.io/github/stars/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/issues)
 
 </div>
 
-## TAKE BACK CONTROL
+## 🚀 What is LocalAGI?
 
-**LocalAgent** is an AI platform that runs 100% on your hardware. No clouds. No data sharing. No compromises.
+**LocalAGI** is a powerful, self-hostable AI Agent platform designed for maximum privacy and flexibility. A complete drop-in replacement for OpenAI's Responses APIs—with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that respects your privacy.
 
-Built for those who value privacy as non-negotiable, LocalAgent lets you deploy intelligent agents that never phone home. Your data stays where you put it — period. Are you tired of agent wrappers to cloud APIs? me too.
+## 🛡️ Take Back Your Privacy
 
-## WHY LOCALAGENT?
+Are you tired of AI wrappers calling out to cloud APIs, risking your privacy? So were we.
 
-- **✓ TRUE PRIVACY** — Everything runs on your hardware, nothing leaves your machine
-- **✓ MODEL FREEDOM** — Works with local LLM formats (GGUF, GGML) you already have
-- **✓ BUILD YOUR WAY** — Extensible architecture for custom agents with specialized skills
-- **✓ SLICK INTERFACE** — Clean web UI for hassle-free agent interactions
-- **✓ DEV-FRIENDLY** — Comprehensive REST API for seamless integration
-- **✓ PLAYS WELL WITH OTHERS** — Optimized for [LocalAI](https://github.com/mudler/LocalAI)
-- **✓ RUN ANYWHERE** — Linux, macOS, Windows — we've got you covered
+LocalAGI ensures your data stays exactly where you want it—on your hardware. No API keys, no cloud subscriptions, no compromise.
 
-## THE LOCAL ECOSYSTEM
+## 🌟 Key Features
 
-LocalAgent is part of a trinity of tools designed to keep AI under your control:
+- 🎛 **No-Code Agents**: Easy-to-configure multiple agents via Web UI.
+- 🖥 **Web-Based Interface**: Simple and intuitive agent management.
+- 🤖 **Advanced Agent Teaming**: Instantly create cooperative agent teams from a single prompt.
+- 📡 **Connectors Galore**: Built-in integrations with Discord, Slack, Telegram, GitHub Issues, and IRC.
+- 🛠 **Comprehensive REST API**: Seamless integration into your workflows. Every agent created will support OpenAI Responses API out of the box.
+- 📚 **Short & Long-Term Memory**: Powered by [LocalRAG](https://github.com/mudler/LocalRAG).
+- 🧠 **Planning & Reasoning**: Agents intelligently plan, reason, and adapt.
+- 🖼 **Multimodal Support**: Ready for vision, text, and more.
+- 🔧 **Extensible Custom Actions**: Easily script dynamic agent behaviors in Go (interpreted, no compilation!).
+- 🛠 **Fully Customizable Models**: Use your own models or integrate seamlessly with [LocalAI](https://github.com/mudler/LocalAI).
 
-- [**LocalAI**](https://github.com/mudler/LocalAI) — Run LLMs on your hardware
-- [**LocalRAG**](https://github.com/mudler/LocalRAG) — Local Retrieval-Augmented Generation
-- [**LocalAgent**](https://github.com/mudler/LocalAgent) — Deploy AI agents that respect your privacy
-
-## Features
-
-### Powerful WebUI
-
-![Screenshot from 2025-03-11 22-50-24](https://github.com/user-attachments/assets/cd5228a3-4e67-4271-8fce-eccd229e6e58)
-![Screenshot from 2025-03-11 22-50-06](https://github.com/user-attachments/assets/0a5ddb03-85ff-4995-8217-785d3249ffb1)
-![Screenshot from 2025-03-11 22-49-56](https://github.com/user-attachments/assets/65af8ee6-ed2b-4e60-8906-ea12b28ecc58)
-
-
-### Connectors ready-to-go
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/4171072f-e4bf-4485-982b-55d55086f8fc" alt="Telegram Logo" width="60"/>
-  <img src="https://github.com/user-attachments/assets/9235da84-0187-4f26-8482-32dcc55702ef" alt="Discord Logo" width="220"/>
-  <img src="https://github.com/user-attachments/assets/a88c3d88-a387-4fb5-b513-22bdd5da7413" alt="Slack Logo" width="220"/>
-  <img src="https://github.com/user-attachments/assets/d249cdf5-ab34-4ab1-afdf-b99e2db182d2" alt="IRC Logo" width="220"/>
-  <img src="https://github.com/user-attachments/assets/52c852b0-4b50-4926-9fa0-aa50613ac622" alt="Github Logo" width="220"/>
-</p>
-
-## QUICK START
-
-### One-Command Docker Setup
-
-The fastest way to get everything running — LocalRAG, LocalAI, and LocalAgent pre-configured:
+## 🛠️ Quickstart
 
 ```bash
-docker-compose up
-```
+# Clone the repository
+git clone https://github.com/mudler/LocalAGI
+cd LocalAGI
 
-> No API keys. No cloud subscriptions. No external dependencies. Just AI that works.
+# CPU setup
+docker compose up -f docker-compose.yml
 
-### Manual Launch
-
-Run the binary and you're live:
-
-```bash
-./localagent
+# GPU setup
+docker compose up -f docker-compose.gpu.yml
 ```
 
 Access your agents at `http://localhost:3000`
+
+## 🏆 Why Choose LocalAGI?
+
+- **✓ Ultimate Privacy**: No data ever leaves your hardware.
+- **✓ Flexible Model Integration**: Supports GGUF, GGML, and more.
+- **✓ Developer-Friendly**: Rich APIs and intuitive interfaces.
+- **✓ Effortless Setup**: Simple Docker setups and pre-built binaries.
+- **✓ Platform Agnostic**: Works seamlessly on Linux, macOS, and Windows.
+
+## 🌐 The Local Ecosystem
+
+LocalAGI is part of the powerful Local family of privacy-focused AI tools:
+
+- [**LocalAI**](https://github.com/mudler/LocalAI): Run Large Language Models locally.
+- [**LocalRAG**](https://github.com/mudler/LocalRAG): Retrieval-Augmented Generation with local storage.
+- [**LocalAGI**](https://github.com/mudler/LocalAGI): Deploy intelligent AI agents securely and privately.
+
+## 🌟 Screenshots
+
+### Powerful Web UI
+
+![Web UI Example](https://github.com/user-attachments/assets/cd5228a3-4e67-4271-8fce-eccd229e6e58)
+![Web UI Example](https://github.com/user-attachments/assets/0a5ddb03-85ff-4995-8217-785d3249ffb1)
+![Web UI Example](https://github.com/user-attachments/assets/65af8ee6-ed2b-4e60-8906-ea12b28ecc58)
+
+### Connectors Ready-to-Go
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4171072f-e4bf-4485-982b-55d55086f8fc" alt="Telegram" width="60"/>
+  <img src="https://github.com/user-attachments/assets/9235da84-0187-4f26-8482-32dcc55702ef" alt="Discord" width="220"/>
+  <img src="https://github.com/user-attachments/assets/a88c3d88-a387-4fb5-b513-22bdd5da7413" alt="Slack" width="220"/>
+  <img src="https://github.com/user-attachments/assets/d249cdf5-ab34-4ab1-afdf-b99e2db182d2" alt="IRC" width="220"/>
+  <img src="https://github.com/user-attachments/assets/52c852b0-4b50-4926-9fa0-aa50613ac622" alt="GitHub" width="220"/>
+</p>
+
+## 📖 Full Documentation
+
+Explore detailed documentation including:
+- [Installation Options](#installation-options)
+- [REST API Documentation](#rest-api)
+- [Connector Configuration](#connectors)
+- [Agent Configuration](#agent-configuration-reference)
 
 ### Environment Configuration
 
@@ -93,7 +109,7 @@ Access your agents at `http://localhost:3000`
 | `LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGENT_API_KEYS` | A comma separated list of api keys used for authentication |
 
-## INSTALLATION OPTIONS
+## Installation Options
 
 ### Pre-Built Binaries
 

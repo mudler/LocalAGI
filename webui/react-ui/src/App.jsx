@@ -29,9 +29,9 @@ function App() {
               {/* Logo with glow effect */}
               <Link to="/" className="logo-link">
                 <div className="logo-image-container">
-                  <img src="/app/logo_1.png" alt="Logo" className="logo-image" />
+                  <img src="/app/logo_2.png" alt="Logo" className="logo-image" />
                 </div>
-                <span className="logo-text">LocalAgent</span>
+                 {/* <span className="logo-text">LocalAgent</span> */}
               </Link>
             </div>
             

@@ -189,7 +189,7 @@ a:hover {
 }
 
 .logo-image {
-  height: 40px;
+  height: 110px;
   width: auto;
   transition: transform 0.3s ease;
   filter: drop-shadow(0 0 5px var(--primary));

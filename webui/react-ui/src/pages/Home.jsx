@@ -60,7 +60,7 @@ function Home() {
         <img src="/app/logo_1.png" width="250" alt="LocalAgent Logo" />
       </div>
       
-      <h1 className="dashboard-title">LocalAgent</h1>
+      {/*<h1 className="dashboard-title">LocalAgent</h1>*/}
       
       {/* Dashboard Stats */}
       <div className="dashboard-stats">
