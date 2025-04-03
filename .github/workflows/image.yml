@@ -19,7 +19,7 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          DOCKER_IMAGE=quay.io/mudler/LocalAgent
+          DOCKER_IMAGE=quay.io/mudler/localagi
           # Use branch name as default
           VERSION=${GITHUB_REF#refs/heads/}
           BINARY_VERSION=$(git describe --always --tags --dirty)
@@ -59,7 +59,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@2a4836ac76fe8f5d0ee3a0d89aa12a80cc552ad3
         with:
-          images: quay.io/mudler/LocalAgent
+          images: quay.io/mudler/localagi
           tags: |
             type=ref,event=branch,suffix=-{{date 'YYYYMMDDHHmmss'}}
             type=semver,pattern={{raw}}
