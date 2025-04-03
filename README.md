@@ -2,7 +2,6 @@
   <img src="https://github.com/user-attachments/assets/6958ffb3-31cf-441e-b99d-ce34ec6fc88f" alt="LocalAGI Logo" width="220"/>
 </p>
 
-<h1 align="center">LocalAGI</h1>
 <h3 align="center"><em>Your AI. Your Hardware. Your Rules.</em></h3>
 
 <div align="center">
@@ -13,8 +12,6 @@
 [![GitHub issues](https://img.shields.io/github/issues/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/issues)
 
 </div>
-
-## 🚀 What is LocalAGI?
 
 **LocalAGI** is a powerful, self-hostable AI Agent platform designed for maximum privacy and flexibility. A complete drop-in replacement for OpenAI's Responses APIs—with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that respects your privacy.
 
