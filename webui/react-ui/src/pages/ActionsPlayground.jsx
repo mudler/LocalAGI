@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { actionApi } from '../utils/api';
+import FormFieldDefinition from '../components/common/FormFieldDefinition';
 
 function ActionsPlayground() {
   const { showToast } = useOutletContext();
-  const navigate = useNavigate();
   const [actions, setActions] = useState([]);
   const [selectedAction, setSelectedAction] = useState('');
-  const [configJson, setConfigJson] = useState('{}');
-  const [paramsJson, setParamsJson] = useState('{}');
+  const [actionMeta, setActionMeta] = useState(null);
+  const [configValues, setConfigValues] = useState({});
+  const [paramsValues, setParamsValues] = useState({});
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingActions, setLoadingActions] = useState(true);
@@ -24,19 +25,29 @@ function ActionsPlayground() {
   // Fetch available actions
   useEffect(() => {
     const fetchActions = async () => {
-      try {
-        const response = await actionApi.listActions();
-        setActions(response);
-      } catch (err) {
-        console.error('Error fetching actions:', err);
-        showToast('Failed to load actions', 'error');
-      } finally {
-        setLoadingActions(false);
-      }
+      const response = await actionApi.listActions();
+      setActions(response);
+      setLoadingActions(false);
     };
 
     fetchActions();
-  }, [showToast]);
+  }, []);
+
+  // Fetch action metadata when an action is selected
+  useEffect(() => {
+    if (selectedAction) {
+      const fetchActionMeta = async () => {
+        const response = await actionApi.getAgentConfigMeta();
+        const meta = response.actions.find(a => a.name === selectedAction);
+        setActionMeta(meta);
+        // Reset values when action changes
+        setConfigValues({});
+        setParamsValues({});
+      };
+
+      fetchActionMeta();
+    }
+  }, [selectedAction]);
 
   // Handle action selection
   const handleActionChange = (e) => {
@@ -44,13 +55,20 @@ function ActionsPlayground() {
     setResult(null);
   };
 
-  // Handle JSON input changes
-  const handleConfigChange = (e) => {
-    setConfigJson(e.target.value);
+  // Handle config field changes
+  const handleConfigChange = (fieldName, value) => {
+    setConfigValues(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
   };
 
-  const handleParamsChange = (e) => {
-    setParamsJson(e.target.value);
+  // Handle params field changes
+  const handleParamsChange = (fieldName, value) => {
+    setParamsValues(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
   };
 
   // Execute the selected action
@@ -66,31 +84,11 @@ function ActionsPlayground() {
     setResult(null);
     
     try {
-      // Parse JSON inputs
-      let config = {};
-      let params = {};
-      
-      try {
-        config = JSON.parse(configJson);
-      } catch (err) {
-        showToast('Invalid configuration JSON', 'error');
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        params = JSON.parse(paramsJson);
-      } catch (err) {
-        showToast('Invalid parameters JSON', 'error');
-        setLoading(false);
-        return;
-      }
-      
       // Prepare action data
       const actionData = {
         action: selectedAction,
-        config: config,
-        params: params
+        config: configValues,
+        params: paramsValues
       };
       
       // Execute action
@@ -98,114 +96,65 @@ function ActionsPlayground() {
       setResult(response);
       showToast('Action executed successfully', 'success');
     } catch (err) {
-      console.error('Error executing action:', err);
-      showToast(`Failed to execute action: ${err.message}`, 'error');
+      showToast('Failed to execute action', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="actions-playground-container">
-      <header className="page-header">
-        <h1>Actions Playground</h1>
-        <p>Test and execute actions directly from the UI</p>
-      </header>
+    <div className="actions-playground">
+      <h1>Actions Playground</h1>
       
-      <div className="actions-playground-content">
-        <div className="section-box">
-          <h2>Select an Action</h2>
-          
-          <div className="form-group mb-4">
-            <label htmlFor="action-select">Available Actions:</label>
-            <select 
-              id="action-select" 
-              value={selectedAction}
-              onChange={handleActionChange}
-              className="form-control"
-              disabled={loadingActions}
-            >
-              <option value="">-- Select an action --</option>
-              {actions.map((action) => (
-                <option key={action} value={action}>{action}</option>
-              ))}
-            </select>
-          </div>
+      <form onSubmit={handleExecuteAction}>
+        <div className="form-group">
+          <label htmlFor="actionSelect">Select Action</label>
+          <select
+            id="actionSelect"
+            value={selectedAction}
+            onChange={handleActionChange}
+            disabled={loadingActions}
+          >
+            <option value="">Select an action...</option>
+            {actions.map(action => (
+              <option key={action} value={action}>{action}</option>
+            ))}
+          </select>
         </div>
-        
-        {selectedAction && (
-          <div className="section-box">
-            <h2>Action Configuration</h2>
-            
-            <form onSubmit={handleExecuteAction}>
-              <div className="form-group mb-6">
-                <label htmlFor="config-json">Configuration (JSON):</label>
-                <textarea 
-                  id="config-json"
-                  value={configJson}
-                  onChange={handleConfigChange}
-                  className="form-control"
-                  rows="5"
-                  placeholder='{"key": "value"}'
-                />
-                <p className="text-xs text-gray-400 mt-1">Enter JSON configuration for the action</p>
-              </div>
-              
-              <div className="form-group mb-6">
-                <label htmlFor="params-json">Parameters (JSON):</label>
-                <textarea 
-                  id="params-json"
-                  value={paramsJson}
-                  onChange={handleParamsChange}
-                  className="form-control"
-                  rows="5"
-                  placeholder='{"key": "value"}'
-                />
-                <p className="text-xs text-gray-400 mt-1">Enter JSON parameters for the action</p>
-              </div>
-              
-              <div className="flex justify-end">
-                <button 
-                  type="submit" 
-                  className="action-btn"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <><i className="fas fa-spinner fa-spin"></i> Executing...</>
-                  ) : (
-                    <><i className="fas fa-play"></i> Execute Action</>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
+
+        {actionMeta && (
+          <>
+            <h2>Configuration</h2>
+            <FormFieldDefinition
+              fields={actionMeta.configFields || []}
+              values={configValues}
+              onChange={handleConfigChange}
+              idPrefix="config_"
+            />
+
+            <h2>Parameters</h2>
+            <FormFieldDefinition
+              fields={actionMeta.paramFields || []}
+              values={paramsValues}
+              onChange={handleParamsChange}
+              idPrefix="param_"
+            />
+          </>
         )}
-        
-        {result && (
-          <div className="section-box">
-            <h2>Action Results</h2>
-            
-            <div className="result-container" style={{ 
-              maxHeight: '400px', 
-              overflow: 'auto', 
-              border: '1px solid rgba(94, 0, 255, 0.2)',
-              borderRadius: '4px',
-              padding: '10px',
-              backgroundColor: 'rgba(30, 30, 30, 0.7)'
-            }}>
-              {typeof result === 'object' ? (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {JSON.stringify(result, null, 2)}
-                </pre>
-              ) : (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {result}
-                </pre>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+
+        <div className="form-group">
+          <button type="submit" disabled={loading || !selectedAction}>
+            {loading ? 'Executing...' : 'Execute Action'}
+          </button>
+        </div>
+      </form>
+
+      {result && (
+        <div className="result-section">
+          <h2>Result</h2>
+          <pre>{JSON.stringify(result, null, 2)}</pre>
+        </div>
+      )}
     </div>
   );
 }
