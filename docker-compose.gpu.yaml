@@ -8,11 +8,16 @@ services:
     image: localai/localai:master-gpu-nvidia-cuda-12
     command: 
     - mlabonne_gemma-3-27b-it-abliterated
+    # - qwen_qwq-32b
     # Other good alternative options:
     # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
-    # - qwen_qwq-32b
     # - arcee-agent
     - granite-embedding-107m-multilingual
+    - flux.1-dev
+    - minicpm-v-2_6
+    environment:
+      # Enable if you have a single GPU which don't fit all the models
+      - LOCALAI_SINGLE_ACTIVE_BACKEND=true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
       interval: 10s
@@ -73,6 +78,8 @@ services:
       - LOCALAGENT_STATE_DIR=/pool
       - LOCALAGENT_TIMEOUT=5m
       - LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING=false
+      - LOCALAGENT_MULTIMODAL_MODEL=minicpm-v-2_6
+      - LOCALAGENT_IMAGE_MODEL=flux.1-dev
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
