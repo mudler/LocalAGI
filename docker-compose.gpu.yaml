@@ -38,7 +38,7 @@ services:
               count: 1
               capabilities: [gpu]
   localrecall:
-    image: quay.io/mudler/localrecall:master
+    image: quay.io/mudler/localrecall:main
     ports:
       - 8080
     environment:
