@@ -1,0 +1,75 @@
+services:
+  localai:
+    # See https://localai.io/basics/container/#standard-container-images for
+    # a list of available container images (or build your own with the provided Dockerfile)
+    # Available images with CUDA, ROCm, SYCL, Vulkan
+    # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
+    # Image list (dockerhub): https://hub.docker.com/r/localai/localai
+    image: local-ai
+    command: 
+    # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
+    - arcee-agent # (smaller)
+    - granite-embedding-107m-multilingual
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      interval: 60s
+      timeout: 10m
+      retries: 120
+    ports:
+    - 8081:8080
+    environment:
+      - DEBUG=true
+      - LOCALAI_API_KEY=sk-1234567890
+    volumes:
+      - ./volumes/models:/build/models:cached
+      - ./volumes/images:/tmp/generated/images
+    devices:
+      # On a system with integrated GPU and an Arc 770, this is the Arc 770
+      - /dev/dri/card1
+      - /dev/dri/renderD129
+
+  localrecall:
+    image: quay.io/mudler/localrecall:main
+    ports:
+      - 8080
+    environment:
+      - COLLECTION_DB_PATH=/db
+      - EMBEDDING_MODEL=granite-embedding-107m-multilingual
+      - FILE_ASSETS=/assets
+      - OPENAI_API_KEY=sk-1234567890
+      - OPENAI_BASE_URL=http://localai:8080
+    volumes:
+      - ./volumes/localrag/db:/db
+      - ./volumes/localrag/assets/:/assets
+
+  localrecall-healthcheck:
+    depends_on:
+      localrecall:
+        condition: service_started
+    image: busybox
+    command: ["sh", "-c", "until wget -q -O - http://localrecall:8080 > /dev/null 2>&1; do echo 'Waiting for localrecall...'; sleep 1; done; echo 'localrecall is up!'"]
+
+  localagent:
+    depends_on:
+      localai:
+        condition: service_healthy
+      localrecall-healthcheck:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: Dockerfile.webui
+    ports:
+      - 8080:3000
+    image: quay.io/mudler/localagi:master
+    environment:
+      - LOCALAGENT_MODEL=arcee-agent
+      - LOCALAGENT_LLM_API_URL=http://localai:8080
+      - LOCALAGENT_LLM_API_KEY=sk-1234567890
+      - LOCALAGENT_LOCALRAG_URL=http://localrecall:8080
+      - LOCALAGENT_STATE_DIR=/pool
+      - LOCALAGENT_TIMEOUT=5m
+      - LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./volumes/localagent/:/pool
