@@ -62,10 +62,10 @@ const ConfigForm = ({
     const item = items[index];
     const config = parseConfig(item);
     
-    // Convert value to number if it's a number input
-    const processedValue = type === 'number' ? Number(value) : value;
-    
-    config[key] = type === 'checkbox' ? checked : processedValue;
+    if (type === 'checkbox')
+      config[key] = checked ? 'true' : 'false';
+    else
+      config[key] = value;
     
     onChange(index, {
       ...item,
