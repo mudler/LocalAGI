@@ -7,7 +7,6 @@ services:
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
     image: localai/localai:master-ffmpeg-core
     command: 
-    - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
     - arcee-agent # (smaller)
     - granite-embedding-107m-multilingual
     healthcheck:
@@ -23,8 +22,6 @@ services:
     volumes:
       - ./volumes/models:/build/models:cached
       - ./volumes/images:/tmp/generated/images
-    devices:
-      - /dev/dri
 
     # decomment the following piece if running with Nvidia GPUs
     # deploy:
