@@ -3,6 +3,7 @@ package agent_test
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -112,6 +113,15 @@ func (a *FakeInternetAction) Definition() types.ActionDefinition {
 
 var _ = Describe("Agent test", func() {
 	Context("jobs", func() {
+
+		BeforeEach(func() {
+			Eventually(func() error {
+				// test apiURL is working and available
+				_, err := http.Get(apiURL + "/readyz")
+				return err
+			}, "10m", "10s").ShouldNot(HaveOccurred())
+		})
+
 		It("pick the correct action", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
