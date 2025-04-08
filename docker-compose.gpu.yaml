@@ -18,6 +18,7 @@ services:
     environment:
       # Enable if you have a single GPU which don't fit all the models
       - LOCALAI_SINGLE_ACTIVE_BACKEND=true
+      - DEBUG=true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
       interval: 10s
@@ -25,8 +26,6 @@ services:
       retries: 20
     ports:
     - 8081:8080
-    environment:
-      - DEBUG=true
     volumes:
       - ./volumes/models:/build/models:cached
       - ./volumes/images:/tmp/generated/images
