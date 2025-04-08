@@ -419,6 +419,30 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
+func (a *App) GetActionDefinition(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		payload := struct {
+			Config map[string]string `json:"config"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			xlog.Error("Error parsing action payload", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		actionName := c.Params("name")
+
+		xlog.Debug("Executing action", "action", actionName, "config", payload.Config)
+		a, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
+		if err != nil {
+			xlog.Error("Error creating action", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		return c.JSON(a.Definition())
+	}
+}
+
 func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
