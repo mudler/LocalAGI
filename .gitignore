@@ -1,0 +1,9 @@
+models/
+data/
+pool
+uploads/
+local-agent-framework
+localagent
+LocalAgent
+**/.env
+.vscode

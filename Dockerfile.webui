@@ -1,0 +1,58 @@
+# Define argument for linker flags
+ARG LDFLAGS=-s -w
+
+# Use Bun container for building the React UI
+FROM oven/bun:1 as ui-builder
+
+# Set the working directory for the React UI
+WORKDIR /app
+
+# Copy package.json and bun.lockb (if exists)
+COPY webui/react-ui/package.json webui/react-ui/bun.lockb* ./
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy the rest of the React UI source code
+COPY webui/react-ui/ ./
+
+# Build the React UI
+RUN bun run build
+
+# Use a temporary build image based on Golang 1.22-alpine
+FROM golang:1.22-alpine as builder
+
+# Set environment variables: linker flags and disable CGO
+ENV LDFLAGS=$LDFLAGS CGO_ENABLED=0
+
+# Install git
+RUN apk add --no-cache git
+RUN rm -rf /tmp/* /var/cache/apk/*
+
+# Set the working directory
+WORKDIR /work
+
+# Copy go.mod and go.sum files first to leverage Docker cache
+COPY go.mod go.sum ./
+
+# Download dependencies - this layer will be cached as long as go.mod and go.sum don't change
+RUN go mod download
+
+# Now copy the rest of the source code
+COPY . .
+
+# Copy the built React UI from the ui-builder stage
+COPY --from=ui-builder /app/dist /work/webui/react-ui/dist
+
+# Build the application
+RUN go build -ldflags="$LDFLAGS" -o localagent ./
+
+FROM scratch
+
+# Copy the webui binary from the builder stage to the final image
+COPY --from=builder /work/localagent /localagent
+COPY --from=builder /etc/ssl/ /etc/ssl/
+COPY --from=builder /tmp /tmp
+
+# Define the command that will be run when the container is started
+ENTRYPOINT ["/localagent"]

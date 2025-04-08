@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Agent settings {{.Name}}</title>
+    {{template "old/views/partials/header"}}
+    <script src="/old/public/js/wizard.js"></script>
+    <link rel="stylesheet" href="/old/public/css/wizard.css">
+    <script src="/old/public/js/connector-templates.js"></script>
+    <script src="/old/public/js/agent-form.js"></script>
+</head>
+<body>
+    {{template "old/views/partials/menu"}}
+    
+    <!-- Toast notification container -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <div class="container">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-5xl font-bold">Agent settings - {{.Name}}</h1>
+        </header>
+        
+        <div class="max-w-4xl mx-auto">
+
+            <!-- Agent Configuration Form Section -->
+            <div class="section-box">
+                <h2>Edit Agent Configuration</h2>
+                <form id="edit-agent-form">
+                    <input type="hidden" name="name" id="name" value="{{.Name}}">
+                    
+                    {{template "old/views/partials/agent-form" .}}
+
+                    <button type="submit" id="update-button" class="action-btn" data-original-text="<i class='fas fa-save'></i> Update Agent">
+                        <i class="fas fa-save"></i> Update Agent
+                    </button>
+                </form>
+            </div>
+
+            <div class="section-box">
+                <h2>Agent Control</h2>
+                <div class="button-container">
+                    <button 
+                        class="action-btn toggle-btn" 
+                        data-agent="{{.Name}}"
+                        data-active="{{.Status}}">
+                        {{if .Status}}
+                            <i class="fas fa-pause"></i> Pause Agent
+                        {{else}}
+                            <i class="fas fa-play"></i> Start Agent
+                        {{end}}
+                    </button>
+                </div>
+            </div>
+
+            <div class="section-box">
+                <h2>Export Data</h2>
+                <p class="mb-4">Export your agent configuration for backup or transfer.</p>
+                <button 
+                    class="action-btn" 
+                    onclick="window.location.href='/old/settings/export/{{.Name}}'">
+                    <i class="fas fa-file-export"></i> Export Configuration
+                </button>
+            </div>
+
+            <div class="section-box">
+                <h2>Danger Zone</h2>
+                <p class="mb-4">Permanently delete this agent and all associated data. This action cannot be undone.</p>
+                <button 
+                    class="action-btn"
+                    style="background: linear-gradient(135deg, #ff4545, var(--secondary)); color: white;"
+                    hx-delete="/api/agent/{{.Name}}"
+                    hx-swap="none"
+                    data-action="delete"
+                    data-agent="{{.Name}}">
+                    <i class="fas fa-trash-alt"></i> Delete Agent
+                </button>
+            </div>
+          
+            <div class="user-info">
+                <span>Agent: {{.Name}}</span>
+                <span class="timestamp">Last modified: <span id="current-date"></span></span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const actions = `{{ range .Actions }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        const connectors = `{{ range .Connectors }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        const promptBlocks = `{{ range .PromptBlocks }}<option value="{{.}}">{{.}}</option>{{ end }}`;
+        let agentConfig = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize common form components
+            initAgentFormCommon({
+                actions: actions,
+                connectors: connectors,
+                promptBlocks: promptBlocks
+            });
+            
+            // Load agent configuration when page loads
+            loadAgentConfig();
+            
+            // Add event listener for delete button
+            document.querySelectorAll('[data-action="delete"]').forEach(button => {
+                button.addEventListener('htmx:afterRequest', function(event) {
+                    handleActionResponse(event, this);
+                });
+            });
+
+            // Handle toggle button
+            const toggleButton = document.querySelector('.toggle-btn');
+            if (toggleButton) {
+                toggleButton.addEventListener('click', function() {
+                    const agent = this.getAttribute('data-agent');
+                    const isActive = this.getAttribute('data-active') === "true";
+                    const endpoint = isActive ? `/api/agent/${agent}/pause` : `/api/agent/${agent}/start`;
+                    
+                    // Add animation
+                    this.style.animation = 'pulse 0.5s';
+                    
+                    // Create a new XMLHttpRequest
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('PUT', endpoint);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    
+                    xhr.onload = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                
+                                if (response.status === "ok") {
+                                    // Toggle the button state
+                                    const newState = !isActive;
+                                    this.setAttribute('data-active', newState.toString());
+                                    
+                                    // Update button text and icon
+                                    if (newState) {
+                                        this.innerHTML = '<i class="fas fa-pause"></i> Pause Agent';
+                                    } else {
+                                        this.innerHTML = '<i class="fas fa-play"></i> Start Agent';
+                                    }
+                                    
+                                    // Show success toast
+                                    const action = isActive ? 'pause' : 'start';
+                                    showToast(`Agent "${agent}" ${action}ed successfully`, 'success');
+                                    
+                                } else if (response.error) {
+                                    // Show error toast
+                                    showToast(`Error: ${response.error}`, 'error');
+                                }
+                            } catch (e) {
+                                // Handle parsing error
+                                showToast("Invalid response format", 'error');
+                                console.error("Error parsing response:", e);
+                            }
+                        } else {
+                            // Handle HTTP error
+                            showToast(`Server error: ${xhr.status}`, 'error');
+                        }
+                    };
+                    
+                    xhr.onerror = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        showToast("Network error occurred", 'error');
+                        console.error("Network error occurred");
+                    };
+                    
+                    // Send the request
+                    xhr.send(JSON.stringify({}));
+                });
+            }
+            
+            // Set current date for timestamp
+            const now = new Date();
+            document.getElementById('current-date').textContent = now.toISOString().split('T')[0];
+            
+            // Handle form submission for updating agent
+            const form = document.getElementById('edit-agent-form');
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Show a loading state
+                const updateButton = document.getElementById('update-button');
+                const originalButtonText = updateButton.innerHTML;
+                updateButton.setAttribute('data-original-text', originalButtonText);
+                updateButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+                updateButton.disabled = true;
+                
+                // Build a structured data object
+                const formData = new FormData(form);
+                const jsonData = AgentFormUtils.processFormData(formData);
+                
+                // Process special fields
+                jsonData.connectors = AgentFormUtils.processConnectors(updateButton);
+                if (jsonData.connectors === null) return; // Validation failed
+                
+                jsonData.mcp_servers = AgentFormUtils.processMCPServers();
+                
+                jsonData.actions = AgentFormUtils.processActions(updateButton);
+                if (jsonData.actions === null) return; // Validation failed
+                
+                jsonData.promptblocks = AgentFormUtils.processPromptBlocks(updateButton);
+                if (jsonData.promptblocks === null) return; // Validation failed
+                
+                console.log('Sending data:', jsonData);
+                
+                // Send the structured data as JSON
+                fetch(`/api/agent/${jsonData.name}/config`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(jsonData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => {
+                            throw new Error(err.error || `Server error: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Restore button state
+                    updateButton.innerHTML = originalButtonText;
+                    updateButton.disabled = false;
+                    
+                    if (data.status === "ok") {
+                        // Show success toast
+                        showToast('Agent updated successfully!', 'success');
+                        
+                        // Reload agent config to get updated values
+                        setTimeout(() => {
+                            loadAgentConfig();
+                        }, 500);
+                    } else if (data.error) {
+                        // Show error toast
+                        showToast('Error: ' + data.error, 'error');
+                    } else {
+                        // Handle unexpected response format
+                        showToast('Unexpected response format', 'error');
+                    }
+                })
+                .catch(error => {
+                    // Handle network or other errors
+                    showToast('Error: ' + error.message, 'error');
+                    console.error('Update error:', error);
+                    
+                    // Restore button state
+                    updateButton.innerHTML = originalButtonText;
+                    updateButton.disabled = false;
+                });
+            });
+        });
+        
+        // Function to handle API responses for delete action
+        function handleActionResponse(event, button) {
+            const xhr = event.detail.xhr;
+            const action = button.getAttribute('data-action');
+            const agent = button.getAttribute('data-agent');
+            
+            if (xhr.status === 200) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    
+                    if (response.status === "ok") {
+                        // Action successful
+                        let message = "";
+                        
+                        switch(action) {
+                            case 'delete':
+                                message = `Agent "${agent}" deleted successfully`;
+                                // Redirect to agent list page after short delay for delete
+                                setTimeout(() => {
+                                    window.location.href = "/old/agents";
+                                }, 2000);
+                                break;
+                            default:
+                                message = "Operation completed successfully";
+                        }
+                        
+                        // Show success message
+                        showToast(message, 'success');
+                        
+                    } else if (response.error) {
+                        // Show error message
+                        showToast(`Error: ${response.error}`, 'error');
+                    }
+                } catch (e) {
+                    // Handle JSON parsing error
+                    showToast("Invalid response format", 'error');
+                }
+            } else {
+                // Handle HTTP error
+                showToast(`Server error: ${xhr.status}`, 'error');
+            }
+        }
+
+        // Load agent configuration from server
+        function loadAgentConfig() {
+            const agentName = document.getElementById('name').value;
+            fetch(`/api/agent/${agentName}/config`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to load agent config: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    agentConfig = data;
+                    populateFormWithConfig(data);
+                    showToast('Agent configuration loaded', 'success');
+                })
+                .catch(error => {
+                    console.error('Error loading agent config:', error);
+                    showToast('Error loading agent configuration: ' + error.message, 'error');
+                });
+        }
+
+        // Populate form with agent configuration
+        function populateFormWithConfig(config) {
+            // Clear existing dynamic sections
+            document.getElementById('connectorsSection').innerHTML = '';
+            document.getElementById('mcpSection').innerHTML = '';
+            document.getElementById('action_box').innerHTML = '';
+            document.getElementById('dynamic_box').innerHTML = '';
+
+            // Populate simple fields
+            document.getElementById('hud').checked = config.hud || false;
+            document.getElementById('enable_kb').checked = config.enable_kb || false;
+            document.getElementById('enable_reasoning').checked = config.enable_reasoning || false;
+            document.getElementById('kb_results').value = config.kb_results || '';
+            document.getElementById('standalone_job').checked = config.standalone_job || false;
+            document.getElementById('initiate_conversations').checked = config.initiate_conversations || false;
+            document.getElementById('enable_planning').checked = config.enable_planning || false;
+            document.getElementById('can_stop_itself').checked = config.can_stop_itself || false;
+            document.getElementById('random_identity').checked = config.random_identity || false;
+            document.getElementById('long_term_memory').checked = config.long_term_memory || false;
+            document.getElementById('summary_long_term_memory').checked = config.summary_long_term_memory || false;
+            document.getElementById('identity_guidance').value = config.identity_guidance || '';
+            document.getElementById('description').value = config.description || '';
+            document.getElementById('periodic_runs').value = config.periodic_runs || '';
+            document.getElementById('model').value = config.model || '';
+            document.getElementById('multimodal_model').value = config.multimodal_model || '';
+            document.getElementById('api_url').value = config.api_url || '';
+            document.getElementById('api_key').value = config.api_key || '';
+            document.getElementById('local_rag_url').value = config.local_rag_url || '';
+            document.getElementById('local_rag_api_key').value = config.local_rag_token || '';
+            document.getElementById('permanent_goal').value = config.permanent_goal || '';
+            document.getElementById('system_prompt').value = config.system_prompt || '';
+
+            // Populate connectors
+            if (config.connectors && Array.isArray(config.connectors)) {
+                config.connectors.forEach((connector, index) => {
+                    // Add connector section
+                    document.getElementById('addConnectorButton').click();
+                    
+                    // Find the added connector elements
+                    const connectorType = document.getElementById(`connectorType${index}`);
+                    
+                    // Set values
+                    if (connectorType) {
+                        // First set the connector type
+                        AgentFormUtils.setSelectValue(connectorType, connector.type);
+                        
+                        // Parse the config if it's a string (from backend)
+                        let configObj = connector.config;
+                        if (typeof connector.config === 'string') {
+                            try {
+                                configObj = JSON.parse(connector.config);
+                            } catch (e) {
+                                console.error('Error parsing connector config:', e);
+                                configObj = {}; // Fallback to empty object if parsing fails
+                            }
+                        }
+                        
+                        // Now render the appropriate form for this connector type with the config values
+                        AgentFormUtils.renderConnectorForm(index, connector.type, configObj);
+                    }
+                });
+            }
+
+            // Populate MCP servers
+            if (config.mcp_servers && Array.isArray(config.mcp_servers)) {
+                config.mcp_servers.forEach((server, index) => {
+                    // Add MCP server section
+                    document.getElementById('addMCPButton').click();
+                    
+                    // Find the added MCP server elements
+                    const mcpURL = document.getElementById(`mcpURL${index}`);
+                    const mcpToken = document.getElementById(`mcpToken${index}`);
+                    
+                    // Set values
+                    if (mcpURL) {
+                        // If server is a string (old format), use it as URL
+                        if (typeof server === 'string') {
+                            mcpURL.value = server;
+                        } 
+                        // If server is an object (new format), extract URL
+                        else if (typeof server === 'object' && server !== null) {
+                            mcpURL.value = server.url || '';
+                            
+                            if (mcpToken && server.token) {
+                                mcpToken.value = server.token;
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Populate actions
+            if (config.actions && Array.isArray(config.actions)) {
+                config.actions.forEach((action, index) => {
+                    // Add action section
+                    document.getElementById('action_button').click();
+                    
+                    // Find the added action elements
+                    const actionName = document.getElementById(`actionsName${index}`);
+                    const actionConfig = document.getElementById(`actionsConfig${index}`);
+                    
+                    // Set values
+                    if (actionName) {
+                        AgentFormUtils.setSelectValue(actionName, action.name);
+                    }
+                    
+                    if (actionConfig) {
+                        // Format the config value
+                        AgentFormUtils.formatConfigValue(actionConfig, action.config);
+                    }
+                });
+            }
+
+            // Populate prompt blocks
+            if (config.promptblocks && Array.isArray(config.promptblocks)) {
+                config.promptblocks.forEach((block, index) => {
+                    // Add prompt block section
+                    document.getElementById('dynamic_button').click();
+                    
+                    // Find the added prompt block elements
+                    const promptName = document.getElementById(`promptName${index}`);
+                    const promptConfig = document.getElementById(`promptConfig${index}`);
+                    
+                    // Set values
+                    if (promptName) {
+                        AgentFormUtils.setSelectValue(promptName, block.name);
+                    }
+                    
+                    if (promptConfig) {
+                        // Format the config value
+                        AgentFormUtils.formatConfigValue(promptConfig, block.config);
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
