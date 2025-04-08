@@ -8,7 +8,7 @@ services:
     image: localai/localai:master-gpu-nvidia-cuda-12
     command: 
     - mlabonne_gemma-3-27b-it-abliterated
-    # - qwen_qwq-32b
+    - qwen_qwq-32b
     # Other good alternative options:
     # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
     # - arcee-agent
@@ -70,7 +70,7 @@ services:
       - 8080:3000
     image: quay.io/mudler/localagi:master
     environment:
-      - LOCALAGI_MODEL=mlabonne_gemma-3-27b-it-abliterated
+      - LOCALAGI_MODEL=qwen_qwq-32b
       - LOCALAGI_LLM_API_URL=http://localai:8080
       - LOCALAGI_LLM_API_KEY=sk-1234567890
       - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
