@@ -188,6 +188,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	// Add endpoint for getting agent config metadata
 	webapp.Get("/api/meta/agent/config", app.GetAgentConfigMeta())
 
+	webapp.Post("/api/action/:name/definition", app.GetActionDefinition(pool))
 	webapp.Post("/api/action/:name/run", app.ExecuteAction(pool))
 	webapp.Get("/api/actions", app.ListActions())
 
