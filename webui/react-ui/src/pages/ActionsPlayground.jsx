@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { actionApi } from '../utils/api';
+import { actionApi, agentApi } from '../utils/api';
+import FormFieldDefinition from '../components/common/FormFieldDefinition';
 
 function ActionsPlayground() {
   const { showToast } = useOutletContext();
@@ -12,6 +13,10 @@ function ActionsPlayground() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingActions, setLoadingActions] = useState(true);
+  const [actionMetadata, setActionMetadata] = useState(null);
+  const [agentMetadata, setAgentMetadata] = useState(null);
+  const [configFields, setConfigFields] = useState([]);
+  const [paramFields, setParamFields] = useState([]);
 
   // Update document title
   useEffect(() => {
@@ -36,21 +41,86 @@ function ActionsPlayground() {
     };
 
     fetchActions();
-  }, [showToast]);
+  }, []);
+
+  // Fetch agent metadata on mount
+  useEffect(() => {
+    const fetchAgentMetadata = async () => {
+      try {
+        const metadata = await agentApi.getAgentConfigMetadata();
+        setAgentMetadata(metadata);
+      } catch (err) {
+        console.error('Error fetching agent metadata:', err);
+        showToast('Failed to load agent metadata', 'error');
+      }
+    };
+
+    fetchAgentMetadata();
+  }, []);
+
+  // Fetch action definition when action is selected or config changes
+  useEffect(() => {
+    if (!selectedAction) return;
+
+    const fetchActionDefinition = async () => {
+      try {
+        // Get config fields from agent metadata
+        const actionMeta = agentMetadata?.actions?.find(action => action.name === selectedAction);
+        const configFields = actionMeta?.fields || [];
+        setConfigFields(configFields);
+
+        // Parse current config to pass to action definition
+        let currentConfig = {};
+        try {
+          currentConfig = JSON.parse(configJson);
+        } catch (err) {
+          console.error('Error parsing current config:', err);
+        }
+
+        // Get parameter fields from action definition
+        const paramFields = await actionApi.getActionDefinition(selectedAction, currentConfig);
+        setParamFields(paramFields);
+
+        // Reset JSON to match the new fields
+        setConfigJson(JSON.stringify(currentConfig, null, 2));
+        setParamsJson(JSON.stringify({}, null, 2));
+        setResult(null);
+      } catch (err) {
+        console.error('Error fetching action definition:', err);
+        showToast('Failed to load action definition', 'error');
+      }
+    };
+
+    fetchActionDefinition();
+  }, [selectedAction, configJson, agentMetadata]);
 
   // Handle action selection
   const handleActionChange = (e) => {
     setSelectedAction(e.target.value);
+    setConfigJson('{}');
+    setParamsJson('{}');
     setResult(null);
   };
 
-  // Handle JSON input changes
-  const handleConfigChange = (e) => {
-    setConfigJson(e.target.value);
+  // Handle form field changes
+  const handleConfigChange = (field, value) => {
+    try {
+      const config = JSON.parse(configJson);
+      config[field] = value;
+      setConfigJson(JSON.stringify(config, null, 2));
+    } catch (err) {
+      console.error('Error updating config:', err);
+    }
   };
 
-  const handleParamsChange = (e) => {
-    setParamsJson(e.target.value);
+  const handleParamsChange = (field, value) => {
+    try {
+      const params = JSON.parse(paramsJson);
+      params[field] = value;
+      setParamsJson(JSON.stringify(params, null, 2));
+    } catch (err) {
+      console.error('Error updating params:', err);
+    }
   };
 
   // Execute the selected action
@@ -138,31 +208,23 @@ function ActionsPlayground() {
             <h2>Action Configuration</h2>
             
             <form onSubmit={handleExecuteAction}>
-              <div className="form-group mb-6">
-                <label htmlFor="config-json">Configuration (JSON):</label>
-                <textarea 
-                  id="config-json"
-                  value={configJson}
+              {configFields.length > 0 && (
+                <FormFieldDefinition
+                  fields={configFields}
+                  values={JSON.parse(configJson)}
                   onChange={handleConfigChange}
-                  className="form-control"
-                  rows="5"
-                  placeholder='{"key": "value"}'
+                  idPrefix="config_"
                 />
-                <p className="text-xs text-gray-400 mt-1">Enter JSON configuration for the action</p>
-              </div>
+              )}
               
-              <div className="form-group mb-6">
-                <label htmlFor="params-json">Parameters (JSON):</label>
-                <textarea 
-                  id="params-json"
-                  value={paramsJson}
+              {paramFields.length > 0 && (
+                <FormFieldDefinition
+                  fields={paramFields}
+                  values={JSON.parse(paramsJson)}
                   onChange={handleParamsChange}
-                  className="form-control"
-                  rows="5"
-                  placeholder='{"key": "value"}'
+                  idPrefix="param_"
                 />
-                <p className="text-xs text-gray-400 mt-1">Enter JSON parameters for the action</p>
-              </div>
+              )}
               
               <div className="flex justify-end">
                 <button 
