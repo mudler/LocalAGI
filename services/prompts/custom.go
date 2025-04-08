@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/pkg/config"
-	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/traefik/yaegi/interp"
 	"github.com/traefik/yaegi/stdlib"
 )
@@ -50,33 +50,33 @@ func (a *DynamicPrompt) callInit() error {
 }
 
 func NewDynamicPromptConfigMeta() config.FieldGroup {
-	return config.FieldGroup {
-			Name:    "custom",
-			Label:  "Custom Prompt",
-			Fields: []config.Field{
-				{
-					Name:        "name",
-					Label:      "Name",
-					Type:       config.FieldTypeText,
-					Required:   true,
-					HelpText:   "A unique name for your custom prompt",
-					Placeholder: "Enter a unique name",
-				},
-				{
-					Name:        "code",
-					Label:       "Go Code",
-					Type:       config.FieldTypeTextarea,
-					Required:    true,
-					HelpText:    "Enter code that implements the Render and Role functions here",
-					Placeholder: "Write your Go code here",
-				},
-				{
-					Name:        "unsafe",
-					Label:      "Unsafe Code",
-					Type:       config.FieldTypeCheckbox,
-					Required:   false,
-					HelpText:   "Enable if the code needs to use unsafe Go features",
-				},
+	return config.FieldGroup{
+		Name:  "custom",
+		Label: "Custom Prompt",
+		Fields: []config.Field{
+			{
+				Name:        "name",
+				Label:       "Name",
+				Type:        config.FieldTypeText,
+				Required:    true,
+				HelpText:    "A unique name for your custom prompt",
+				Placeholder: "Enter a unique name",
+			},
+			{
+				Name:        "code",
+				Label:       "Go Code",
+				Type:        config.FieldTypeTextarea,
+				Required:    true,
+				HelpText:    "Enter code that implements the Render and Role functions here",
+				Placeholder: "Write your Go code here",
+			},
+			{
+				Name:     "unsafe",
+				Label:    "Unsafe Code",
+				Type:     config.FieldTypeCheckbox,
+				Required: false,
+				HelpText: "Enable if the code needs to use unsafe Go features",
+			},
 		},
 	}
 }

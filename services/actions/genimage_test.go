@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAGI/core/types"
 
-	. "github.com/mudler/LocalAgent/services/actions"
+	. "github.com/mudler/LocalAGI/services/actions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

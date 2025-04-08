@@ -45,14 +45,14 @@ COPY . .
 COPY --from=ui-builder /app/dist /work/webui/react-ui/dist
 
 # Build the application
-RUN go build -ldflags="$LDFLAGS" -o localagent ./
+RUN go build -ldflags="$LDFLAGS" -o localagi ./
 
 FROM scratch
 
 # Copy the webui binary from the builder stage to the final image
-COPY --from=builder /work/localagent /localagent
+COPY --from=builder /work/localagi /localagi
 COPY --from=builder /etc/ssl/ /etc/ssl/
 COPY --from=builder /tmp /tmp
 
 # Define the command that will be run when the container is started
-ENTRYPOINT ["/localagent"]
+ENTRYPOINT ["/localagi"]

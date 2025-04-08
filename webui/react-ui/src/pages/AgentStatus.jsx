@@ -13,10 +13,10 @@ function AgentStatus() {
   // Update document title
   useEffect(() => {
     if (name) {
-      document.title = `Agent Status: ${name} - LocalAgent`;
+      document.title = `Agent Status: ${name} - LocalAGI`;
     }
     return () => {
-      document.title = 'LocalAgent'; // Reset title when component unmounts
+      document.title = 'LocalAGI'; // Reset title when component unmounts
     };
   }, [name]);
 

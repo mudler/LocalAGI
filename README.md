@@ -96,21 +96,21 @@ Explore detailed documentation including:
 
 | Variable | What It Does |
 |----------|--------------|
-| `LOCALAGENT_MODEL` | Your go-to model |
-| `LOCALAGENT_MULTIMODAL_MODEL` | Optional model for multimodal capabilities |
-| `LOCALAGENT_LLM_API_URL` | OpenAI-compatible API server URL |
-| `LOCALAGENT_LLM_API_KEY` | API authentication |
-| `LOCALAGENT_TIMEOUT` | Request timeout settings |
-| `LOCALAGENT_STATE_DIR` | Where state gets stored |
-| `LOCALAGENT_LOCALRAG_URL` | LocalRAG connection |
-| `LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
-| `LOCALAGENT_API_KEYS` | A comma separated list of api keys used for authentication |
+| `LOCALAGI_MODEL` | Your go-to model |
+| `LOCALAGI_MULTIMODAL_MODEL` | Optional model for multimodal capabilities |
+| `LOCALAGI_LLM_API_URL` | OpenAI-compatible API server URL |
+| `LOCALAGI_LLM_API_KEY` | API authentication |
+| `LOCALAGI_TIMEOUT` | Request timeout settings |
+| `LOCALAGI_STATE_DIR` | Where state gets stored |
+| `LOCALAGI_LOCALRAG_URL` | LocalRAG connection |
+| `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
+| `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 
 ## Installation Options
 
 ### Pre-Built Binaries
 
-Download ready-to-run binaries from the [Releases](https://github.com/mudler/LocalAgent/releases) page.
+Download ready-to-run binaries from the [Releases](https://github.com/mudler/LocalAGI/releases) page.
 
 ### Source Build
 
@@ -121,16 +121,16 @@ Requirements:
 
 ```bash
 # Clone repo
-git clone https://github.com/mudler/LocalAgent.git
-cd LocalAgent
+git clone https://github.com/mudler/LocalAGI.git
+cd LocalAGI
 
 # Build it
 cd webui/react-ui && bun i && bun run build
 cd ../..
-go build -o localagent
+go build -o localagi
 
 # Run it
-./localagent
+./localagi
 ```
 
 ### Development
@@ -139,8 +139,8 @@ The development workflow is similar to the source build, but with additional ste
 
 ```bash
 # Clone repo
-git clone https://github.com/mudler/LocalAgent.git
-cd LocalAgent
+git clone https://github.com/mudler/LocalAGI.git
+cd LocalAGI
 
 # Install dependencies and start frontend development server
 cd webui/react-ui && bun i && bun run dev
@@ -216,7 +216,7 @@ Connect to IRC networks:
 {
   "server": "irc.example.com",
   "port": "6667",
-  "nickname": "LocalAgentBot",
+  "nickname": "LocalAGIBot",
   "channel": "#yourchannel",
   "alwaysReply": "false"
 }

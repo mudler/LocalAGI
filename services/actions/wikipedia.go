@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/tools/wikipedia"
 )
@@ -25,7 +25,7 @@ func (a *WikipediaAction) Run(ctx context.Context, params types.ActionParams) (t
 
 		return types.ActionResult{}, err
 	}
-	wiki := wikipedia.New("LocalAgent")
+	wiki := wikipedia.New("LocalAGI")
 	res, err := wiki.Call(ctx, result.Query)
 	if err != nil {
 		fmt.Printf("error: %v", err)

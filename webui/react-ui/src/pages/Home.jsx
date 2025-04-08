@@ -16,9 +16,9 @@ function Home() {
 
   // Update document title
   useEffect(() => {
-    document.title = 'Agent Dashboard - LocalAgent';
+    document.title = 'Agent Dashboard - LocalAGI';
     return () => {
-      document.title = 'LocalAgent'; // Reset title when component unmounts
+      document.title = 'LocalAGI'; // Reset title when component unmounts
     };
   }, []);
 
@@ -57,10 +57,10 @@ function Home() {
   return (
     <div>
       <div className="image-container">
-        <img src="/app/logo_1.png" width="250" alt="LocalAgent Logo" />
+        <img src="/app/logo_1.png" width="250" alt="LocalAGI Logo" />
       </div>
       
-      {/*<h1 className="dashboard-title">LocalAgent</h1>*/}
+      {/*<h1 className="dashboard-title">LocalAGI</h1>*/}
       
       {/* Dashboard Stats */}
       <div className="dashboard-stats">

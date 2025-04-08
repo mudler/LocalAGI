@@ -6,11 +6,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mudler/LocalAgent/pkg/xlog"
-	"github.com/mudler/LocalAgent/services/actions"
+	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/LocalAGI/services/actions"
 
-	. "github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/core/types"
+	. "github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sashabaranov/go-openai"

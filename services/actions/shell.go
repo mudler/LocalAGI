@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"golang.org/x/crypto/ssh"
 )

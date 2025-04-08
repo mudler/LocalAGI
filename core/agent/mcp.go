@@ -7,8 +7,8 @@ import (
 
 	mcp "github.com/metoro-io/mcp-golang"
 	"github.com/metoro-io/mcp-golang/transport/http"
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 

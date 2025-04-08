@@ -3,7 +3,7 @@ data/
 pool
 uploads/
 local-agent-framework
-localagent
-LocalAgent
+localagi
+LocalAGI
 **/.env
 .vscode

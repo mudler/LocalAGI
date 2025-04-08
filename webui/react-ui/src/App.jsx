@@ -31,7 +31,7 @@ function App() {
                 <div className="logo-image-container">
                   <img src="/app/logo_2.png" alt="Logo" className="logo-image" />
                 </div>
-                 {/* <span className="logo-text">LocalAgent</span> */}
+                 {/* <span className="logo-text">LocalAGI</span> */}
               </Link>
             </div>
             

@@ -1,4 +1,4 @@
-package localagent
+package localagi
 
 import (
 	"encoding/json"

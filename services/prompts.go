@@ -3,12 +3,12 @@ package services
 import (
 	"encoding/json"
 
-	"github.com/mudler/LocalAgent/pkg/config"
-	"github.com/mudler/LocalAgent/pkg/xlog"
-	"github.com/mudler/LocalAgent/services/prompts"
+	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/LocalAGI/services/prompts"
 
-	"github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/state"
 )
 
 const (
@@ -21,7 +21,7 @@ var AvailableBlockPrompts = []string{
 
 func DynamicPromptsConfigMeta() []config.FieldGroup {
 	return []config.FieldGroup{
-					 prompts.NewDynamicPromptConfigMeta(),
+		prompts.NewDynamicPromptConfigMeta(),
 	}
 }
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/smtp"
 
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -93,12 +93,12 @@ func SendMailConfigMeta() []config.Field {
 			HelpText: "SMTP server host (e.g., smtp.gmail.com)",
 		},
 		{
-			Name:     "smtpPort",
-			Label:    "SMTP Port",
-			Type:     config.FieldTypeText,
-			Required: true,
+			Name:         "smtpPort",
+			Label:        "SMTP Port",
+			Type:         config.FieldTypeText,
+			Required:     true,
 			DefaultValue: "587",
-			HelpText: "SMTP server port (e.g., 587)",
+			HelpText:     "SMTP server port (e.g., 587)",
 		},
 		{
 			Name:     "username",

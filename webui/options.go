@@ -3,7 +3,7 @@ package webui
 import (
 	"time"
 
-	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAGI/core/state"
 )
 
 type Config struct {

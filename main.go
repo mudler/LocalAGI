@@ -6,22 +6,22 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mudler/LocalAgent/core/state"
-	"github.com/mudler/LocalAgent/services"
-	"github.com/mudler/LocalAgent/webui"
+	"github.com/mudler/LocalAGI/core/state"
+	"github.com/mudler/LocalAGI/services"
+	"github.com/mudler/LocalAGI/webui"
 )
 
-var testModel = os.Getenv("LOCALAGENT_MODEL")
-var multimodalModel = os.Getenv("LOCALAGENT_MULTIMODAL_MODEL")
-var apiURL = os.Getenv("LOCALAGENT_LLM_API_URL")
-var apiKey = os.Getenv("LOCALAGENT_LLM_API_KEY")
-var timeout = os.Getenv("LOCALAGENT_TIMEOUT")
-var stateDir = os.Getenv("LOCALAGENT_STATE_DIR")
-var localRAG = os.Getenv("LOCALAGENT_LOCALRAG_URL")
-var withLogs = os.Getenv("LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING") == "true"
-var apiKeysEnv = os.Getenv("LOCALAGENT_API_KEYS")
-var imageModel = os.Getenv("LOCALAGENT_IMAGE_MODEL")
-var conversationDuration = os.Getenv("LOCALAGENT_CONVERSATION_DURATION")
+var testModel = os.Getenv("LOCALAGI_MODEL")
+var multimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
+var apiURL = os.Getenv("LOCALAGI_LLM_API_URL")
+var apiKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+var timeout = os.Getenv("LOCALAGI_TIMEOUT")
+var stateDir = os.Getenv("LOCALAGI_STATE_DIR")
+var localRAG = os.Getenv("LOCALAGI_LOCALRAG_URL")
+var withLogs = os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
+var apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
+var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
+var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
 
 func init() {
 	if testModel == "" {

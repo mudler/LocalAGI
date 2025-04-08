@@ -3,9 +3,9 @@ package state
 import (
 	"encoding/json"
 
-	"github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
+	"github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
 )
 
 type ConnectorConfig struct {
@@ -30,10 +30,10 @@ func (d DynamicPromptsConfig) ToMap() map[string]string {
 }
 
 type AgentConfig struct {
-	Connector      []ConnectorConfig    `json:"connectors" form:"connectors" `
-	Actions        []ActionsConfig      `json:"actions" form:"actions"`
+	Connector      []ConnectorConfig      `json:"connectors" form:"connectors" `
+	Actions        []ActionsConfig        `json:"actions" form:"actions"`
 	DynamicPrompts []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
-	MCPServers     []agent.MCPServer    `json:"mcp_servers" form:"mcp_servers"`
+	MCPServers     []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
 
 	Description string `json:"description" form:"description"`
 
@@ -71,8 +71,8 @@ type AgentConfigMeta struct {
 }
 
 func NewAgentConfigMeta(
-	actionsConfig        []config.FieldGroup, 
-	connectorsConfig     []config.FieldGroup,
+	actionsConfig []config.FieldGroup,
+	connectorsConfig []config.FieldGroup,
 	dynamicPromptsConfig []config.FieldGroup,
 ) AgentConfigMeta {
 	return AgentConfigMeta{

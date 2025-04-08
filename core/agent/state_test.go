@@ -1,7 +1,7 @@
 package agent_test
 
 import (
-	. "github.com/mudler/LocalAgent/core/agent"
+	. "github.com/mudler/LocalAGI/core/agent"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

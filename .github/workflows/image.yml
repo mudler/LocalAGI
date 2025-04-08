@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   containerImages:
-    runs-on: arc-runner-localagent
+    runs-on: arc-runner-localagi
     steps:
       - name: Checkout
         uses: actions/checkout@v4

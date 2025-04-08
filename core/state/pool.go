@@ -12,16 +12,16 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/core/sse"
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/llm"
-	"github.com/mudler/LocalAgent/pkg/localrag"
-	"github.com/mudler/LocalAgent/pkg/utils"
+	. "github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/sse"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/llm"
+	"github.com/mudler/LocalAGI/pkg/localrag"
+	"github.com/mudler/LocalAGI/pkg/utils"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 
-	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 )
 
 type AgentPool struct {

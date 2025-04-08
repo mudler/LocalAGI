@@ -5,7 +5,7 @@ import (
 	"html/template"
 	"time"
 
-	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai"
 )
 

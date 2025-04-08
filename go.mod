@@ -1,4 +1,4 @@
-module github.com/mudler/LocalAgent
+module github.com/mudler/LocalAGI
 
 go 1.22.0
 

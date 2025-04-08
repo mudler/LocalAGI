@@ -1,4 +1,4 @@
-package localagent
+package localagi
 
 import (
 	"bytes"
@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-// Client represents a client for the LocalAgent API
+// Client represents a client for the LocalAGI API
 type Client struct {
 	BaseURL    string
 	APIKey     string
 	HTTPClient *http.Client
 }
 
-// NewClient creates a new LocalAgent client
+// NewClient creates a new LocalAGI client
 func NewClient(baseURL string, apiKey string, timeout time.Duration) *Client {
 	if timeout == 0 {
 		timeout = time.Second * 30

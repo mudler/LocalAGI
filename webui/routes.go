@@ -12,13 +12,13 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/keyauth"
-	"github.com/mudler/LocalAgent/core/sse"
-	"github.com/mudler/LocalAgent/services/connectors"
+	"github.com/mudler/LocalAGI/core/sse"
+	"github.com/mudler/LocalAGI/services/connectors"
 
-	"github.com/mudler/LocalAgent/core/state"
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/xlog"
-	"github.com/mudler/LocalAgent/services"
+	"github.com/mudler/LocalAGI/core/state"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/LocalAGI/services"
 )
 
 //go:embed old/views/*

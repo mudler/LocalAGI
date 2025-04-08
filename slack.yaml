@@ -6,12 +6,12 @@
 ## When configuring the connector, supply the tokens with:
 ## { "botToken": "OAuth Tokens for Your Workspace", "appToken": "App-Level Tokens" }
 display_information:
-  name: LocalAgent
-  description: LocalAgent bot
+  name: LocalAGI
+  description: LocalAGI bot
   background_color: "#0040ff"
 features:
   bot_user:
-    display_name: LocalAgent
+    display_name: LocalAGI
     always_online: true
 oauth_config:
   scopes:

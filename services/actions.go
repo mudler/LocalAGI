@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/action"
-	"github.com/mudler/LocalAgent/core/state"
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
-	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAGI/core/action"
+	"github.com/mudler/LocalAGI/core/state"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 
-	"github.com/mudler/LocalAgent/services/actions"
+	"github.com/mudler/LocalAGI/services/actions"
 )
 
 const (

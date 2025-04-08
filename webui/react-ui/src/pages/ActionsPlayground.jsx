@@ -15,9 +15,9 @@ function ActionsPlayground() {
 
   // Update document title
   useEffect(() => {
-    document.title = 'Actions Playground - LocalAgent';
+    document.title = 'Actions Playground - LocalAGI';
     return () => {
-      document.title = 'LocalAgent'; // Reset title when component unmounts
+      document.title = 'LocalAGI'; // Reset title when component unmounts
     };
   }, []);
 

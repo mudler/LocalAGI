@@ -13,7 +13,7 @@ jobs:
   goreleaser:
     permissions:
       contents: write
-    runs-on: arc-runner-localagent
+    runs-on: arc-runner-localagi
     steps:
       - name: Checkout
         uses: actions/checkout@v4

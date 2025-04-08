@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
-    runs-on: arc-runner-localagent
+    runs-on: arc-runner-localagi
     steps:
     - name: Checkout code
       uses: actions/checkout@v2

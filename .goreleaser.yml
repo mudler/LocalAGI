@@ -2,8 +2,8 @@
 version: 2
 builds:
   - main: ./
-    id: "localagent"
-    binary: localagent
+    id: "localagi"
+    binary: localagi
     ldflags:
       - -w -s
       # - -X github.com/internal.Version={{.Tag}}

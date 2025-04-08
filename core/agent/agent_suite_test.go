@@ -13,7 +13,7 @@ func TestAgent(t *testing.T) {
 	RunSpecs(t, "Agent test suite")
 }
 
-var testModel = os.Getenv("LOCALAGENT_MODEL")
+var testModel = os.Getenv("LOCALAGI_MODEL")
 var apiURL = os.Getenv("LOCALAI_API_URL")
 var apiKeyURL = os.Getenv("LOCALAI_API_KEY")
 

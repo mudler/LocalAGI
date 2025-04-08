@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -109,20 +109,20 @@ func GenImageConfigMeta() []config.Field {
 			HelpText: "OpenAI API key for image generation",
 		},
 		{
-			Name:     "apiURL",
-			Label:    "API URL",
-			Type:     config.FieldTypeText,
-			Required: true,
+			Name:         "apiURL",
+			Label:        "API URL",
+			Type:         config.FieldTypeText,
+			Required:     true,
 			DefaultValue: "https://api.openai.com/v1",
-			HelpText: "OpenAI API URL",
+			HelpText:     "OpenAI API URL",
 		},
 		{
-			Name:     "model",
-			Label:    "Model",
-			Type:     config.FieldTypeText,
-			Required: true,
+			Name:         "model",
+			Label:        "Model",
+			Type:         config.FieldTypeText,
+			Required:     true,
 			DefaultValue: "dall-e-3",
-			HelpText: "Image generation model to use (e.g., dall-e-3)",
+			HelpText:     "Image generation model to use (e.g., dall-e-3)",
 		},
 	}
 }

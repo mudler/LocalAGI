@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 )
 
 var _ agent.RAGDB = &WrappedClient{}

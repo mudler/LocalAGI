@@ -9,7 +9,7 @@ cleanup-tests:
 	docker compose down
 
 tests: prepare-tests
-	LOCALAGENT_MODEL="arcee-agent" LOCALAI_API_URL="http://localhost:8081" LOCALAGENT_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --fail-fast -v -r ./...
+	LOCALAGI_MODEL="arcee-agent" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --fail-fast -v -r ./...
 
 run-nokb:
 	$(MAKE) run KBDISABLEINDEX=true
@@ -19,7 +19,7 @@ webui/react-ui/dist:
 
 .PHONY: build
 build: webui/react-ui/dist
-	$(GOCMD) build -o localagent ./
+	$(GOCMD) build -o localagi ./
 
 .PHONY: run
 run: webui/react-ui/dist

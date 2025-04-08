@@ -3,11 +3,11 @@ package services
 import (
 	"encoding/json"
 
-	"github.com/mudler/LocalAgent/pkg/config"
-	"github.com/mudler/LocalAgent/pkg/xlog"
-	"github.com/mudler/LocalAgent/services/connectors"
+	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/LocalAGI/services/connectors"
 
-	"github.com/mudler/LocalAgent/core/state"
+	"github.com/mudler/LocalAGI/core/state"
 )
 
 const (

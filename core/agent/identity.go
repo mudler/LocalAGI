@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mudler/LocalAgent/pkg/llm"
+	"github.com/mudler/LocalAGI/pkg/llm"
 )
 
 func (a *Agent) generateIdentity(guidance string) error {

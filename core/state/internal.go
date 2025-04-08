@@ -1,7 +1,7 @@
 package state
 
 import (
-	. "github.com/mudler/LocalAgent/core/agent"
+	. "github.com/mudler/LocalAGI/core/agent"
 )
 
 type AgentPoolInternalAPI struct {

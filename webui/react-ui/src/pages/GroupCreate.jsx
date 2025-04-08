@@ -23,9 +23,9 @@ function GroupCreate() {
 
   // Update document title
   useEffect(() => {
-    document.title = 'Create Agent Group - LocalAgent';
+    document.title = 'Create Agent Group - LocalAGI';
     return () => {
-      document.title = 'LocalAgent'; // Reset title when component unmounts
+      document.title = 'LocalAGI'; // Reset title when component unmounts
     };
   }, []);
 

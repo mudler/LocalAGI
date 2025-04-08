@@ -10,9 +10,9 @@ function ImportAgent() {
 
   // Update document title
   useEffect(() => {
-    document.title = 'Import Agent - LocalAgent';
+    document.title = 'Import Agent - LocalAGI';
     return () => {
-      document.title = 'LocalAgent'; // Reset title when component unmounts
+      document.title = 'LocalAGI'; // Reset title when component unmounts
     };
   }, []);
 

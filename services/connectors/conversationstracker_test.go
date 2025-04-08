@@ -3,7 +3,7 @@ package connectors_test
 import (
 	"time"
 
-	"github.com/mudler/LocalAgent/services/connectors"
+	"github.com/mudler/LocalAGI/services/connectors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sashabaranov/go-openai"

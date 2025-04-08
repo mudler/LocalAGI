@@ -3,7 +3,7 @@ package e2e_test
 import (
 	"time"
 
-	localagent "github.com/mudler/LocalAgent/pkg/client"
+	localagi "github.com/mudler/LocalAGI/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,9 +12,9 @@ import (
 var _ = Describe("Agent test", func() {
 	Context("Creates an agent and it answers", func() {
 		It("create agent", func() {
-			client := localagent.NewClient(localagentURL, "", 5*time.Minute)
+			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
 
-			err := client.CreateAgent(&localagent.AgentConfig{
+			err := client.CreateAgent(&localagi.AgentConfig{
 				Name: "testagent",
 			})
 			Expect(err).ToNot(HaveOccurred())

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
-	"github.com/mudler/LocalAgent/services/connectors/twitter"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/services/connectors/twitter"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -75,9 +75,9 @@ func TwitterPostConfigMeta() []config.Field {
 			HelpText: "Twitter API token for posting tweets",
 		},
 		{
-			Name:  "noCharacterLimit",
-			Label: "No Character Limit",
-			Type:  config.FieldTypeCheckbox,
+			Name:     "noCharacterLimit",
+			Label:    "No Character Limit",
+			Type:     config.FieldTypeCheckbox,
 			HelpText: "If checked, tweets longer than the character limit will be split into multiple tweets",
 		},
 	}

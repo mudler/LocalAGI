@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v69/github"
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
-	"github.com/mudler/LocalAgent/pkg/xlog"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -147,10 +147,10 @@ func GithubIssueLabelerConfigMeta() []config.Field {
 			HelpText: "GitHub repository owner",
 		},
 		{
-			Name:     "availableLabels",
-			Label:    "Available Labels",
-			Type:     config.FieldTypeText,
-			HelpText: "Comma-separated list of available labels",
+			Name:         "availableLabels",
+			Label:        "Available Labels",
+			Type:         config.FieldTypeText,
+			HelpText:     "Comma-separated list of available labels",
 			DefaultValue: "bug,enhancement",
 		},
 		{

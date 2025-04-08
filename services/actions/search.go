@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/mudler/LocalAgent/core/types"
-	"github.com/mudler/LocalAgent/pkg/config"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"github.com/tmc/langchaingo/tools/duckduckgo"
 	"mvdan.cc/xurls/v2"
@@ -45,7 +45,7 @@ func (a *SearchAction) Run(ctx context.Context, params types.ActionParams) (type
 
 		return types.ActionResult{}, err
 	}
-	ddg, err := duckduckgo.New(a.results, "LocalAgent")
+	ddg, err := duckduckgo.New(a.results, "LocalAGI")
 	if err != nil {
 		fmt.Printf("error: %v", err)
 

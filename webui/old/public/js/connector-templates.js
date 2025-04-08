@@ -1,7 +1,7 @@
 /**
  * Connector Templates
  * 
- * This file contains templates for all connector types supported by LocalAgent.
+ * This file contains templates for all connector types supported by LocalAGI.
  * Each template is a function that returns an HTML string for the connector's form.
  * 
  * Note: We don't need to escape HTML in the value attributes because browsers

@@ -3,7 +3,7 @@ package action
 import (
 	"context"
 
-	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 

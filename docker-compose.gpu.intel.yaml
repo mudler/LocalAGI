@@ -49,7 +49,7 @@ services:
     image: busybox
     command: ["sh", "-c", "until wget -q -O - http://localrecall:8080 > /dev/null 2>&1; do echo 'Waiting for localrecall...'; sleep 1; done; echo 'localrecall is up!'"]
 
-  localagent:
+  localagi:
     depends_on:
       localai:
         condition: service_healthy
@@ -62,14 +62,14 @@ services:
       - 8080:3000
     image: quay.io/mudler/localagi:master
     environment:
-      - LOCALAGENT_MODEL=arcee-agent
-      - LOCALAGENT_LLM_API_URL=http://localai:8080
-      - LOCALAGENT_LLM_API_KEY=sk-1234567890
-      - LOCALAGENT_LOCALRAG_URL=http://localrecall:8080
-      - LOCALAGENT_STATE_DIR=/pool
-      - LOCALAGENT_TIMEOUT=5m
-      - LOCALAGENT_ENABLE_CONVERSATIONS_LOGGING=false
+      - LOCALAGI_MODEL=arcee-agent
+      - LOCALAGI_LLM_API_URL=http://localai:8080
+      - LOCALAGI_LLM_API_KEY=sk-1234567890
+      - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
+      - LOCALAGI_STATE_DIR=/pool
+      - LOCALAGI_TIMEOUT=5m
+      - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./volumes/localagent/:/pool
+      - ./volumes/localagi/:/pool

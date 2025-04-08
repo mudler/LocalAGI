@@ -96,9 +96,9 @@ function AgentsList() {
   };
 
   useEffect(() => {
-    document.title = 'Agents - LocalAgent';
+    document.title = 'Agents - LocalAGI';
     return () => {
-      document.title = 'LocalAgent'; // Reset title when component unmounts
+      document.title = 'LocalAGI'; // Reset title when component unmounts
     };
   }, []);
 

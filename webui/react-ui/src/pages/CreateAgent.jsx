@@ -11,9 +11,9 @@ function CreateAgent() {
   const [formData, setFormData] = useState({});
 
   useEffect(() => {
-    document.title = 'Create Agent - LocalAgent';
+    document.title = 'Create Agent - LocalAGI';
     return () => {
-      document.title = 'LocalAgent'; // Reset title when component unmounts
+      document.title = 'LocalAGI'; // Reset title when component unmounts
     };
   }, []);
 

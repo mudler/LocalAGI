@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mudler/LocalAgent/core/action"
+	"github.com/mudler/LocalAGI/core/action"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 

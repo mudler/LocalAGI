@@ -10,14 +10,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mudler/LocalAgent/pkg/config"
-	"github.com/mudler/LocalAgent/pkg/xlog"
-	"github.com/mudler/LocalAgent/pkg/xstrings"
-	"github.com/mudler/LocalAgent/services/actions"
+	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/LocalAGI/pkg/xstrings"
+	"github.com/mudler/LocalAGI/services/actions"
 	"github.com/sashabaranov/go-openai"
 
-	"github.com/mudler/LocalAgent/core/agent"
-	"github.com/mudler/LocalAgent/core/types"
+	"github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/types"
 
 	"github.com/slack-go/slack/socketmode"
 
