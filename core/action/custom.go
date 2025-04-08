@@ -95,6 +95,11 @@ func (a *CustomAction) Run(ctx context.Context, params types.ActionParams) (type
 
 func (a *CustomAction) Definition() types.ActionDefinition {
 
+	if a.i == nil {
+		xlog.Error("Interpreter is not initialized for custom action", "action", a.config["name"])
+		return types.ActionDefinition{}
+	}
+
 	v, err := a.i.Eval(fmt.Sprintf("%s.Definition", a.config["name"]))
 	if err != nil {
 		xlog.Error("Error getting custom action definition", "error", err)
