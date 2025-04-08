@@ -5,7 +5,7 @@ services:
     # Available images with CUDA, ROCm, SYCL, Vulkan
     # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
-    image: local-ai
+    image: localai/localai:master-sycl-f32-ffmpeg-core
     command: 
     # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
     - arcee-agent # (smaller)
