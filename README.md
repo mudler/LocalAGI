@@ -13,7 +13,9 @@
 
 </div>
 
-**LocalAGI** is a powerful, self-hostable AI Agent platform designed for maximum privacy and flexibility. A complete drop-in replacement for OpenAI's Responses APIs—with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that respects your privacy.
+We empower you building AI Agents that you can run locally, without coding.
+
+**LocalAGI** is a powerful, self-hostable AI Agent platform designed for maximum privacy and flexibility. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
 
 ## 🛡️ Take Back Your Privacy
 
@@ -30,6 +32,8 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 🛠 **Comprehensive REST API**: Seamless integration into your workflows. Every agent created will support OpenAI Responses API out of the box.
 - 📚 **Short & Long-Term Memory**: Powered by [LocalRAG](https://github.com/mudler/LocalRAG).
 - 🧠 **Planning & Reasoning**: Agents intelligently plan, reason, and adapt.
+- 🔄 **Periodic Tasks**: Schedule tasks with cron-like syntax.
+- 💾 **Memory Management**: Control memory usage with options for long-term and summary memory.
 - 🖼 **Multimodal Support**: Ready for vision, text, and more.
 - 🔧 **Extensible Custom Actions**: Easily script dynamic agent behaviors in Go (interpreted, no compilation!).
 - 🛠 **Fully Customizable Models**: Use your own models or integrate seamlessly with [LocalAI](https://github.com/mudler/LocalAI).
@@ -53,10 +57,10 @@ Access your agents at `http://localhost:3000`
 ## 🏆 Why Choose LocalAGI?
 
 - **✓ Ultimate Privacy**: No data ever leaves your hardware.
-- **✓ Flexible Model Integration**: Supports GGUF, GGML, and more.
+- **✓ Flexible Model Integration**: Supports GGUF, GGML, and more thanks to [LocalAI](https://github.com/mudler/LocalAI).
 - **✓ Developer-Friendly**: Rich APIs and intuitive interfaces.
-- **✓ Effortless Setup**: Simple Docker setups and pre-built binaries.
-- **✓ Platform Agnostic**: Works seamlessly on Linux, macOS, and Windows.
+- **✓ Effortless Setup**: Simple Docker compose setups and pre-built binaries.
+- **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, LocalAGI has it all.
 
 ## 🌐 The Local Ecosystem
 
