@@ -134,7 +134,7 @@ func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		xlog.Info("Agent configuration: %+v\n", config)
+		xlog.Info("Agent configuration\n", "config", config)
 
 		if config.Name == "" {
 			return errorJSONMessage(c, "Name is required")
