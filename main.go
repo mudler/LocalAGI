@@ -11,7 +11,7 @@ import (
 	"github.com/mudler/LocalAGI/webui"
 )
 
-var testModel = os.Getenv("LOCALAGI_MODEL")
+var baseModel = os.Getenv("LOCALAGI_MODEL")
 var multimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
 var apiURL = os.Getenv("LOCALAGI_LLM_API_URL")
 var apiKey = os.Getenv("LOCALAGI_LLM_API_KEY")
@@ -24,11 +24,11 @@ var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
 var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
 
 func init() {
-	if testModel == "" {
-		testModel = "hermes-2-pro-mistral"
+	if baseModel == "" {
+		panic("LOCALAGI_MODEL not set")
 	}
 	if apiURL == "" {
-		apiURL = "http://192.168.68.113:8080"
+		panic("LOCALAGI_API_URL not set")
 	}
 	if timeout == "" {
 		timeout = "5m"
@@ -54,7 +54,7 @@ func main() {
 
 	// Create the agent pool
 	pool, err := state.NewAgentPool(
-		testModel,
+		baseModel,
 		multimodalModel,
 		imageModel,
 		apiURL,
@@ -78,7 +78,7 @@ func main() {
 		webui.WithApiKeys(apiKeys...),
 		webui.WithLLMAPIUrl(apiURL),
 		webui.WithLLMAPIKey(apiKey),
-		webui.WithLLMModel(testModel),
+		webui.WithLLMModel(baseModel),
 		webui.WithStateDir(stateDir),
 	)
 
