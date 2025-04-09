@@ -1,6 +1,8 @@
 package agent_test
 
 import (
+	"net/http"
+
 	. "github.com/mudler/LocalAGI/core/agent"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -9,6 +11,14 @@ import (
 var _ = Describe("Agent test", func() {
 	Context("identity", func() {
 		var agent *Agent
+
+		BeforeEach(func() {
+			Eventually(func() error {
+				// test apiURL is working and available
+				_, err := http.Get(apiURL + "/readyz")
+				return err
+			}, "10m", "10s").ShouldNot(HaveOccurred())
+		})
 
 		It("generates all the fields with random data", func() {
 			var err error
