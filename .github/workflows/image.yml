@@ -3,7 +3,7 @@ name: 'build container images'
 on:
   push:
     branches:
-      - master
+      - main
     tags:
       - '*'
 concurrency:
