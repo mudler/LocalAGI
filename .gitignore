@@ -7,3 +7,4 @@ localagi
 LocalAGI
 **/.env
 .vscode
+volumes/
