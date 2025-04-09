@@ -221,6 +221,7 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
 				WithLLMAPIKey(apiKeyURL),
+				WithTimeout("10m"),
 				WithActions(
 					actions.NewSearch(map[string]string{}),
 				),
