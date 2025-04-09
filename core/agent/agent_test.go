@@ -126,6 +126,7 @@ var _ = Describe("Agent test", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
+				WithLoopDetectionSteps(3),
 				//	WithRandomIdentity(),
 				WithActions(&TestAction{response: map[string]string{
 					"boston": testActionResult,

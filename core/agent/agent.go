@@ -489,6 +489,23 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		}
 	}
 
+	// check if the agent is looping over the same action
+	// if so, we need to stop it
+	if a.options.loopDetectionSteps > 0 && len(job.GetPastActions()) > 0 {
+		count := map[string]int{}
+		for i := len(job.GetPastActions()) - 1; i >= 0; i-- {
+			pastAction := job.GetPastActions()[i]
+			if pastAction.Action.Definition().Name == chosenAction.Definition().Name &&
+				pastAction.Params.String() == actionParams.String() {
+				count[chosenAction.Definition().Name.String()]++
+			}
+		}
+		if count[chosenAction.Definition().Name.String()] > a.options.loopDetectionSteps {
+			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
+			chosenAction = nil
+		}
+	}
+
 	//xlog.Debug("Picked action", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "reasoning", reasoning)
 	if chosenAction == nil {
 		// If no action was picked up, the reasoning is the message returned by the assistant
@@ -550,6 +567,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		xlog.Error("No parameters", "agent", a.Character.Name)
 		return
 	}
+
+	job.AddPastAction(chosenAction, &actionParams)
 
 	var err error
 	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)

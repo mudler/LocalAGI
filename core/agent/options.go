@@ -28,6 +28,7 @@ type options struct {
 
 	canStopItself         bool
 	initiateConversations bool
+	loopDetectionSteps    int
 	forceReasoning        bool
 	canPlan               bool
 	characterfile         string
@@ -109,6 +110,13 @@ var CanStopItself = func(o *options) error {
 func WithTimeout(timeout string) Option {
 	return func(o *options) error {
 		o.timeout = timeout
+		return nil
+	}
+}
+
+func WithLoopDetectionSteps(steps int) Option {
+	return func(o *options) error {
+		o.loopDetectionSteps = steps
 		return nil
 	}
 }

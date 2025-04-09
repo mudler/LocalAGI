@@ -56,6 +56,7 @@ type AgentConfig struct {
 	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
 	EnableReasoning       bool   `json:"enable_reasoning" form:"enable_reasoning"`
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
+	LoopDetectionSteps    int    `json:"loop_detection_steps" form:"loop_detection_steps"`
 	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
 	LongTermMemory        bool   `json:"long_term_memory" form:"long_term_memory"`
@@ -248,6 +249,15 @@ func NewAgentConfigMeta(
 				Type:         "checkbox",
 				DefaultValue: false,
 				HelpText:     "Enable agent to explain its reasoning process",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "loop_detection_steps",
+				Label:        "Max Loop Detection Steps",
+				Type:         "number",
+				DefaultValue: 5,
+				Min:          1,
+				Step:         1,
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 		},

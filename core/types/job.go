@@ -20,12 +20,18 @@ type Job struct {
 	UUID                string
 	Metadata            map[string]interface{}
 
+	pastActions         []*ActionRequest
 	nextAction          *Action
 	nextActionParams    *ActionParams
 	nextActionReasoning string
 
 	context context.Context
 	cancel  context.CancelFunc
+}
+
+type ActionRequest struct {
+	Action Action
+	Params *ActionParams
 }
 
 type JobOption func(*Job)
@@ -80,6 +86,17 @@ func (j *Job) SetNextAction(action *Action, params *ActionParams, reasoning stri
 	j.nextAction = action
 	j.nextActionParams = params
 	j.nextActionReasoning = reasoning
+}
+
+func (j *Job) AddPastAction(action Action, params *ActionParams) {
+	j.pastActions = append(j.pastActions, &ActionRequest{
+		Action: action,
+		Params: params,
+	})
+}
+
+func (j *Job) GetPastActions() []*ActionRequest {
+	return j.pastActions
 }
 
 func (j *Job) GetNextAction() (*Action, *ActionParams, string) {
