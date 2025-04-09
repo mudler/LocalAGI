@@ -10,6 +10,7 @@ services:
     # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
     - arcee-agent # (smaller)
     - granite-embedding-107m-multilingual
+    - flux.1-dev-ggml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
       interval: 60s
@@ -69,6 +70,7 @@ services:
       - LOCALAGI_STATE_DIR=/pool
       - LOCALAGI_TIMEOUT=5m
       - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
+      - LOCALAGI_IMAGE_MODEL=flux.1-dev-ggml
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
