@@ -1,0 +1,105 @@
+<nav class="relative z-10 w-full" style="background-color: var(--darker-bg); border-bottom: 1px solid var(--medium-bg);">
+    <div class="px-6 sm:px-8 lg:px-10">
+        <div class="flex justify-between h-16 items-center">
+            <div class="flex items-center">
+                <!-- Logo container -->
+                <div class="flex-shrink-0">
+                    <!-- Logo with glow effect -->
+                    <a href="/old" class="flex items-center group">
+                        <div class="relative">
+                            <img src="/old/public/logo_2.png" alt="Logo" class="h-10 w-auto mr-4 transition-transform duration-300 group-hover:scale-105" 
+                                 style="filter: drop-shadow(0 0 5px var(--primary));">
+                            <!-- Animated scan line on hover -->
+                            <div class="absolute inset-0 overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <div class="absolute inset-0 bg-gradient-to-b from-transparent via-var(--primary) to-transparent opacity-30"
+                                     style="height: 10px; animation: scanline 1.5s linear infinite;"></div>
+                            </div>
+                        </div>
+                        <span class="text-xl font-bold transition-colors duration-300" 
+                              style="color: var(--primary); text-shadow: var(--neon-glow);">LocalAGI</span>
+                    </a>
+                </div>
+                <div class="hidden md:block ml-10">
+                    <div class="flex space-x-4">
+                        <a href="/old" class="px-3 py-2 rounded-md text-lg font-medium text-white hover:bg-gray-800 transition duration-300 relative overflow-hidden group">
+                            <i class="fas fa-home mr-2"></i> Home
+                            <!-- Underline animation -->
+                            <span class="absolute bottom-0 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300" 
+                                  style="background: linear-gradient(90deg, var(--primary), var(--secondary));"></span>
+                        </a>
+                        <a href="/old/agents" class="px-3 py-2 rounded-md text-lg font-medium text-gray-400 hover:bg-gray-800 transition duration-300 relative overflow-hidden group">
+                            <i class="fas fa-users mr-2"></i> Agent List
+                            <!-- Underline animation -->
+                            <span class="absolute bottom-0 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300" 
+                                  style="background: linear-gradient(90deg, var(--secondary), var(--tertiary));"></span>
+                        </a>
+                        <a href="/old/actions-playground" class="px-3 py-2 rounded-md text-lg font-medium text-gray-400 hover:bg-gray-800 transition duration-300 relative overflow-hidden group">
+                            <i class="fas fa-bolt mr-2"></i> Actions Playground
+                            <!-- Underline animation -->
+                            <span class="absolute bottom-0 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300" 
+                                  style="background: linear-gradient(90deg, var(--tertiary), var(--primary));"></span>
+                        </a>
+                        <a href="/old/group-create" class="px-3 py-2 rounded-md text-lg font-medium text-gray-400 hover:bg-gray-800 transition duration-300 relative overflow-hidden group">
+                            <i class="fas fa-users-cog mr-2"></i> Create Agent Group
+                            <!-- Underline animation -->
+                            <span class="absolute bottom-0 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300" 
+                                  style="background: linear-gradient(90deg, var(--secondary), var(--primary));"></span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Status badge -->
+                <div class="hidden md:flex items-center">
+                    <span class="flex items-center text-sm">
+                        <span class="w-2 h-2 rounded-full mr-2" 
+                              style="background-color: var(--primary); box-shadow: 0 0 5px var(--primary); animation: pulse 2s infinite;"></span>
+                        <span>State: <span style="color: var(--secondary); text-shadow: var(--pink-glow);">active</span></span>
+                    </span>
+                </div>
+            </div>
+            <div class="md:hidden flex items-center">
+                <button class="text-gray-400 hover:text-white focus:outline-none focus:text-white transition duration-300"
+                        style="text-shadow: var(--neon-glow);" 
+                        onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars fa-lg"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile menu, toggle based on menu state -->
+    <div id="mobile-menu" class="md:hidden hidden"
+         style="background-color: var(--darker-bg); border-top: 1px solid var(--medium-bg);">
+        <div class="px-2 pt-2 pb-3 space-y-1">
+            <a href="/old" class="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-gray-800 transition duration-300"
+               style="border-left: 3px solid var(--primary);">
+                <i class="fas fa-home mr-2"></i> Home
+            </a>
+            <a href="/old/agents" class="block px-3 py-2 rounded-md text-base font-medium text-gray-400 hover:bg-gray-800 transition duration-300"
+               style="border-left: 3px solid var(--secondary);">
+                <i class="fas fa-users mr-2"></i> Agent List
+            </a>
+            <a href="/old/actions-playground" class="px-3 py-2 rounded-md text-lg font-medium text-gray-400 hover:bg-gray-800 transition duration-300 relative overflow-hidden group">
+                <i class="fas fa-bolt mr-2"></i> Actions Playground
+                <!-- Underline animation -->
+                <span class="absolute bottom-0 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300" 
+                      style="background: linear-gradient(90deg, var(--tertiary), var(--primary));"></span>
+            </a>
+            <a href="/old/group-create" class="px-3 py-2 rounded-md text-lg font-medium text-gray-400 hover:bg-gray-800 transition duration-300 relative overflow-hidden group">
+                <i class="fas fa-users-cog mr-2"></i> Create Agent Group
+                <!-- Underline animation -->
+                <span class="absolute bottom-0 left-0 w-0 h-0.5 group-hover:w-full transition-all duration-300" 
+                      style="background: linear-gradient(90deg, var(--secondary), var(--primary));"></span>
+            </a>
+        </div>
+    </div>
+</nav>
+<br>
+
+<script>
+    function toggleMobileMenu() {
+        const mobileMenu = document.getElementById('mobile-menu');
+        mobileMenu.classList.toggle('hidden');
+    }
+</script>

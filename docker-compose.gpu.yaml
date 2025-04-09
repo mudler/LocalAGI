@@ -1,0 +1,85 @@
+services:
+  localai:
+    # See https://localai.io/basics/container/#standard-container-images for
+    # a list of available container images (or build your own with the provided Dockerfile)
+    # Available images with CUDA, ROCm, SYCL, Vulkan
+    # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
+    # Image list (dockerhub): https://hub.docker.com/r/localai/localai
+    image: localai/localai:master-gpu-nvidia-cuda-12
+    command: 
+    - mlabonne_gemma-3-27b-it-abliterated
+    - qwen_qwq-32b
+    # Other good alternative options:
+    # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
+    # - arcee-agent
+    - granite-embedding-107m-multilingual
+    - flux.1-dev
+    - minicpm-v-2_6
+    environment:
+      # Enable if you have a single GPU which don't fit all the models
+      - LOCALAI_SINGLE_ACTIVE_BACKEND=true
+      - DEBUG=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 20m
+      retries: 20
+    ports:
+    - 8081:8080
+    volumes:
+      - ./volumes/models:/build/models:cached
+      - ./volumes/images:/tmp/generated/images
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  localrecall:
+    image: quay.io/mudler/localrecall:main
+    ports:
+      - 8080
+    environment:
+      - COLLECTION_DB_PATH=/db
+      - EMBEDDING_MODEL=granite-embedding-107m-multilingual
+      - FILE_ASSETS=/assets
+      - OPENAI_API_KEY=sk-1234567890
+      - OPENAI_BASE_URL=http://localai:8080
+    volumes:
+      - ./volumes/localrag/db:/db
+      - ./volumes/localrag/assets/:/assets
+
+  localrecall-healthcheck:
+    depends_on:
+      localrecall:
+        condition: service_started
+    image: busybox
+    command: ["sh", "-c", "until wget -q -O - http://localrecall:8080 > /dev/null 2>&1; do echo 'Waiting for localrecall...'; sleep 1; done; echo 'localrecall is up!'"]
+
+  localagi:
+    depends_on:
+      localai:
+        condition: service_healthy
+      localrecall-healthcheck:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: Dockerfile.webui
+    ports:
+      - 8080:3000
+    image: quay.io/mudler/localagi:master
+    environment:
+      - LOCALAGI_MODEL=qwen_qwq-32b
+      - LOCALAGI_LLM_API_URL=http://localai:8080
+      #- LOCALAGI_LLM_API_KEY=sk-1234567890
+      - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
+      - LOCALAGI_STATE_DIR=/pool
+      - LOCALAGI_TIMEOUT=5m
+      - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
+      - LOCALAGI_MULTIMODAL_MODEL=minicpm-v-2_6
+      - LOCALAGI_IMAGE_MODEL=flux.1-dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./volumes/localagi/:/pool

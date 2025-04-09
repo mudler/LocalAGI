@@ -1,184 +1,398 @@
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6958ffb3-31cf-441e-b99d-ce34ec6fc88f" alt="LocalAGI Logo" width="220"/>
+</p>
 
-<h1 align="center">
-  <br>
-  <img height="300" src="https://github.com/mudler/LocalAGI/assets/2420543/b69817ce-2361-4234-a575-8f578e159f33"> <br>
-    LocalAGI
-<br>
-</h1>
+<h3 align="center"><em>Your AI. Your Hardware. Your Rules.</em></h3>
 
-[AutoGPT](https://github.com/Significant-Gravitas/Auto-GPT), [babyAGI](https://github.com/yoheinakajima/babyagi), ... and now LocalAGI!
+<div align="center">
+  
+[![Go Report Card](https://goreportcard.com/badge/github.com/mudler/LocalAGI)](https://goreportcard.com/report/github.com/mudler/LocalAGI)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/issues)
 
-LocalAGI is a small 🤖 virtual assistant that you can run locally, made by the [LocalAI](https://github.com/go-skynet/LocalAI) author and powered by it.
+</div>
 
-The goal is:
-- Keep it simple, hackable and easy to understand
-- No API keys needed, No cloud services needed, 100% Local. Tailored for Local use, however still compatible with OpenAI.
-- Smart-agent/virtual assistant that can do tasks
-- Small set of dependencies
-- Run with Docker/Podman/Containers
-- Rather than trying to do everything, provide a good starting point for other projects
+We empower you building AI Agents that you can run locally, without coding.
 
-Note: Be warned! It was hacked in a weekend, and it's just an experiment to see what can be done with local LLMs. 
+**LocalAGI** is a powerful, self-hostable AI Agent platform designed for maximum privacy and flexibility. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
 
-![Screenshot from 2023-08-05 22-40-40](https://github.com/mudler/LocalAGI/assets/2420543/144da83d-3879-44f2-985c-efd690e2b136)
+## 🛡️ Take Back Your Privacy
 
-## 🚀 Features
+Are you tired of AI wrappers calling out to cloud APIs, risking your privacy? So were we.
 
-- 🧠 LLM for intent detection
-- 🧠 Uses functions for actions
-    - 📝 Write to long-term memory
-    - 📖 Read from long-term memory 
-    - 🌐 Internet access for search
-    - :card_file_box: Write files
-    - 🔌 Plan steps to achieve a goal
-- 🤖 Avatar creation with Stable Diffusion
-- 🗨️ Conversational
-- 🗣️ Voice synthesis with TTS
+LocalAGI ensures your data stays exactly where you want it—on your hardware. No API keys, no cloud subscriptions, no compromise.
 
-## Demo
+## 🌟 Key Features
 
-Search on internet (interactive mode)
+- 🎛 **No-Code Agents**: Easy-to-configure multiple agents via Web UI.
+- 🖥 **Web-Based Interface**: Simple and intuitive agent management.
+- 🤖 **Advanced Agent Teaming**: Instantly create cooperative agent teams from a single prompt.
+- 📡 **Connectors Galore**: Built-in integrations with Discord, Slack, Telegram, GitHub Issues, and IRC.
+- 🛠 **Comprehensive REST API**: Seamless integration into your workflows. Every agent created will support OpenAI Responses API out of the box.
+- 📚 **Short & Long-Term Memory**: Powered by [LocalRAG](https://github.com/mudler/LocalRAG).
+- 🧠 **Planning & Reasoning**: Agents intelligently plan, reason, and adapt.
+- 🔄 **Periodic Tasks**: Schedule tasks with cron-like syntax.
+- 💾 **Memory Management**: Control memory usage with options for long-term and summary memory.
+- 🖼 **Multimodal Support**: Ready for vision, text, and more.
+- 🔧 **Extensible Custom Actions**: Easily script dynamic agent behaviors in Go (interpreted, no compilation!).
+- 🛠 **Fully Customizable Models**: Use your own models or integrate seamlessly with [LocalAI](https://github.com/mudler/LocalAI).
 
-https://github.com/mudler/LocalAGI/assets/2420543/23199ca3-7380-4efc-9fac-a6bc2b52bdb3
-
-Plan a road trip (batch mode)
-
-https://github.com/mudler/LocalAGI/assets/2420543/9ba43b82-dec5-432a-bdb9-8318e7db59a4
-
-> Note: The demo is with a GPU and `30b` models size
-
-## :book: Quick start
-
-No frills, just run docker-compose and start chatting with your virtual assistant:
+## 🛠️ Quickstart
 
 ```bash
-# Modify the configuration
-# vim .env
-# first run (and pulling the container)
-docker-compose up
-# next runs 
-docker-compose run -i --rm localagi
+# Clone the repository
+git clone https://github.com/mudler/LocalAGI
+cd LocalAGI
+
+# CPU setup
+docker compose up -f docker-compose.yml
+
+# GPU setup
+docker compose up -f docker-compose.gpu.yml
 ```
 
-## How to use it
+Access your agents at `http://localhost:3000`
 
-By default localagi starts in interactive mode
+## 🏆 Why Choose LocalAGI?
 
-### Examples
+- **✓ Ultimate Privacy**: No data ever leaves your hardware.
+- **✓ Flexible Model Integration**: Supports GGUF, GGML, and more thanks to [LocalAI](https://github.com/mudler/LocalAI).
+- **✓ Developer-Friendly**: Rich APIs and intuitive interfaces.
+- **✓ Effortless Setup**: Simple Docker compose setups and pre-built binaries.
+- **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, LocalAGI has it all.
 
-Road trip planner by limiting searching to internet to 3 results only:
+## 🌐 The Local Ecosystem
+
+LocalAGI is part of the powerful Local family of privacy-focused AI tools:
+
+- [**LocalAI**](https://github.com/mudler/LocalAI): Run Large Language Models locally.
+- [**LocalRAG**](https://github.com/mudler/LocalRAG): Retrieval-Augmented Generation with local storage.
+- [**LocalAGI**](https://github.com/mudler/LocalAGI): Deploy intelligent AI agents securely and privately.
+
+## 🌟 Screenshots
+
+### Powerful Web UI
+
+![Web UI Example](https://github.com/user-attachments/assets/cd5228a3-4e67-4271-8fce-eccd229e6e58)
+![Web UI Example](https://github.com/user-attachments/assets/0a5ddb03-85ff-4995-8217-785d3249ffb1)
+![Web UI Example](https://github.com/user-attachments/assets/65af8ee6-ed2b-4e60-8906-ea12b28ecc58)
+
+### Connectors Ready-to-Go
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/4171072f-e4bf-4485-982b-55d55086f8fc" alt="Telegram" width="60"/>
+  <img src="https://github.com/user-attachments/assets/9235da84-0187-4f26-8482-32dcc55702ef" alt="Discord" width="220"/>
+  <img src="https://github.com/user-attachments/assets/a88c3d88-a387-4fb5-b513-22bdd5da7413" alt="Slack" width="220"/>
+  <img src="https://github.com/user-attachments/assets/d249cdf5-ab34-4ab1-afdf-b99e2db182d2" alt="IRC" width="220"/>
+  <img src="https://github.com/user-attachments/assets/52c852b0-4b50-4926-9fa0-aa50613ac622" alt="GitHub" width="220"/>
+</p>
+
+## 📖 Full Documentation
+
+Explore detailed documentation including:
+- [Installation Options](#installation-options)
+- [REST API Documentation](#rest-api)
+- [Connector Configuration](#connectors)
+- [Agent Configuration](#agent-configuration-reference)
+
+### Environment Configuration
+
+| Variable | What It Does |
+|----------|--------------|
+| `LOCALAGI_MODEL` | Your go-to model |
+| `LOCALAGI_MULTIMODAL_MODEL` | Optional model for multimodal capabilities |
+| `LOCALAGI_LLM_API_URL` | OpenAI-compatible API server URL |
+| `LOCALAGI_LLM_API_KEY` | API authentication |
+| `LOCALAGI_TIMEOUT` | Request timeout settings |
+| `LOCALAGI_STATE_DIR` | Where state gets stored |
+| `LOCALAGI_LOCALRAG_URL` | LocalRAG connection |
+| `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
+| `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
+
+## Installation Options
+
+### Pre-Built Binaries
+
+Download ready-to-run binaries from the [Releases](https://github.com/mudler/LocalAGI/releases) page.
+
+### Source Build
+
+Requirements:
+- Go 1.20+
+- Git
+- Bun 1.2+
 
 ```bash
-docker-compose run -i --rm localagi \
-  --skip-avatar \
-  --subtask-context \
-  --postprocess \
-  --search-results 3 \
-  --prompt "prepare a plan for my roadtrip to san francisco"
+# Clone repo
+git clone https://github.com/mudler/LocalAGI.git
+cd LocalAGI
+
+# Build it
+cd webui/react-ui && bun i && bun run build
+cd ../..
+go build -o localagi
+
+# Run it
+./localagi
 ```
 
-Limit results of planning to 3 steps:
+### Development
+
+The development workflow is similar to the source build, but with additional steps for hot reloading of the frontend:
 
 ```bash
-docker-compose run -i --rm localagi \
-  --skip-avatar \
-  --subtask-context \
-  --postprocess \
-  --search-results 1 \
-  --prompt "do a plan for my roadtrip to san francisco" \
-  --plan-message "The assistant replies with a plan of 3 steps to answer the request with a list of subtasks with logical steps. The reasoning includes a self-contained, detailed and descriptive instruction to fullfill the task."
+# Clone repo
+git clone https://github.com/mudler/LocalAGI.git
+cd LocalAGI
+
+# Install dependencies and start frontend development server
+cd webui/react-ui && bun i && bun run dev
 ```
 
-### Advanced
-
-localagi has several options in the CLI to tweak the experience:
-
-- `--system-prompt` is the system prompt to use. If not specified, it will use none.
-- `--prompt` is the prompt to use for batch mode. If not specified, it will default to interactive mode.
-- `--interactive` is the interactive mode. When used with `--prompt` will drop you in an interactive session after the first prompt is evaluated.
-- `--skip-avatar` will skip avatar creation. Useful if you want to run it in a headless environment.
-- `--re-evaluate` will re-evaluate if another action is needed or we have completed the user request.
-- `--postprocess` will postprocess the reasoning for analysis.
-- `--subtask-context` will include context in subtasks.
-- `--search-results` is the number of search results to use.
-- `--plan-message` is the message to use during planning. You can override the message for example to force a plan to have a different message.
-- `--tts-api-base` is the TTS API base. Defaults to `http://api:8080`.
-- `--localai-api-base` is the LocalAI API base. Defaults to `http://api:8080`.
-- `--images-api-base` is the Images API base. Defaults to `http://api:8080`.
-- `--embeddings-api-base` is the Embeddings API base. Defaults to `http://api:8080`.
-- `--functions-model` is the functions model to use. Defaults to `functions`.
-- `--embeddings-model` is the embeddings model to use. Defaults to `all-MiniLM-L6-v2`.
-- `--llm-model` is the LLM model to use. Defaults to `gpt-4`.
-- `--tts-model` is the TTS model to use. Defaults to `en-us-kathleen-low.onnx`.
-- `--stablediffusion-model` is the Stable Diffusion model to use. Defaults to `stablediffusion`.
-- `--stablediffusion-prompt` is the Stable Diffusion prompt to use. Defaults to `DEFAULT_PROMPT`.
-- `--force-action` will force a specific action.
-- `--debug` will enable debug mode.
-
-### Customize
-
-To use a different model, you can see the examples in the `config` folder.
-To select a model, modify the `.env` file and change the `PRELOAD_MODELS_CONFIG` variable to use a different configuration file.
-
-### Caveats
-
-The "goodness" of a model has a big impact on how LocalAGI works. Currently `13b` models are powerful enough to actually able to perform multi-step tasks or do more actions. However, it is quite slow when running on CPU (no big surprise here).
-
-The context size is a limitation - you can find in the `config` examples to run with superhot 8k context size, but the quality is not good enough to perform complex tasks.
-
-## What is LocalAGI?
-
-It is a dead simple experiment to show how to tie the various LocalAI functionalities to create a virtual assistant that can do tasks. It is simple on purpose, trying to be minimalistic and easy to understand and customize for everyone.
-
-It is different from babyAGI or AutoGPT as it uses [LocalAI functions](https://localai.io/features/openai-functions/) - it is a from scratch attempt built on purpose to run locally with [LocalAI](https://localai.io) (no API keys needed!) instead of expensive, cloud services. It sets apart from other projects as it strives to be small, and easy to fork on.
-
-### How it works?
-
-`LocalAGI` just does the minimal around LocalAI functions to create a virtual assistant that can do generic tasks. It works by an endless loop of `intent detection`, `function invocation`, `self-evaluation` and `reply generation` (if it decides to reply! :)). The agent is capable of planning complex tasks by invoking multiple functions, and remember things from the conversation.
-
-In a nutshell, it goes like this:
-
-- Decide based on the conversation history if it needs to take an action by using functions. It uses the LLM to detect the intent from the conversation.
-- if it need to take an action (e.g. "remember something from the conversation" ) or generate complex tasks ( executing a chain of functions to achieve a goal ) it invokes the functions
-- it re-evaluates if it needs to do any other action
-- return the result back to the LLM to generate a reply for the user
-
-Under the hood LocalAI converts functions to llama.cpp BNF grammars. While OpenAI fine-tuned a model to reply to functions, LocalAI constrains the LLM to follow grammars. This is a much more efficient way to do it, and it is also more flexible as you can define your own functions and grammars. For learning more about this, check out the [LocalAI documentation](https://localai.io/docs/llm) and my tweet that explains how it works under the hoods: https://twitter.com/mudler_it/status/1675524071457533953.
-
-### Agent functions
-
-The intention of this project is to keep the agent minimal, so can be built on top of it or forked. The agent is capable of doing the following functions:
-- remember something from the conversation
-- recall something from the conversation
-- search something from the internet
-- plan a complex task by invoking multiple functions
-- write files to disk
-
-## Roadmap
-
-- [x] 100% Local, with Local AI. NO API KEYS NEEDED!
-- [x] Create a simple virtual assistant
-- [x] Make the virtual assistant do functions like store long-term memory and autonomously search between them when needed
-- [x] Create the assistant avatar with Stable Diffusion
-- [x] Give it a voice 
-- [ ] Use weaviate instead of Chroma
-- [ ] Get voice input (push to talk or wakeword)
-- [ ] Make a REST API (OpenAI compliant?) so can be plugged by e.g. a third party service
-- [x] Take a system prompt so can act with a "character" (e.g. "answer in rick and morty style")
-
-## Development
-
-Run docker-compose with main.py checked-out:
+Then in seperate terminal:
 
 ```bash
-docker-compose run -v main.py:/app/main.py -i --rm localagi
+# Start development server
+cd ../.. && go run main.go
 ```
 
-## Notes
+> Note: see webui/react-ui/.vite.config.js for env vars that can be used to configure the backend URL
 
-- a 13b model is enough for doing contextualized research and search/retrieve memory
-- a 30b model is enough to generate a roadmap trip plan ( so cool! )
-- With superhot models looses its magic, but maybe suitable for search
-- Context size is your enemy. `--postprocess` some times helps, but not always
-- It can be silly!
-- It is slow on CPU, don't expect `7b` models to perform good, and `13b` models perform better but on CPU are quite slow.
+## CONNECTORS
+
+Link your agents to the services you already use. Configuration examples below.
+
+### GitHub Issues
+
+```json
+{
+  "token": "YOUR_PAT_TOKEN",
+  "repository": "repo-to-monitor",
+  "owner": "repo-owner",
+  "botUserName": "bot-username"
+}
+```
+
+### Discord
+
+After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/discord.html):
+
+```json
+{
+  "token": "Bot YOUR_DISCORD_TOKEN",
+  "defaultChannel": "OPTIONAL_CHANNEL_ID"
+}
+```
+> Don't forget to enable "Message Content Intent" in Bot(tab) settings!
+> Enable " Message Content Intent " in the Bot tab!
+
+### Slack
+
+Use the included `slack.yaml` manifest to create your app, then configure:
+
+```json
+{
+  "botToken": "xoxb-your-bot-token",
+  "appToken": "xapp-your-app-token"
+}
+```
+
+- Create Oauth token bot token from "OAuth & Permissions" -> "OAuth Tokens for Your Workspace"
+- Create App level token (from "Basic Information" -> "App-Level Tokens" ( scope connections:writeRoute authorizations:read ))
+
+
+### Telegram
+
+Get a token from @botfather, then:
+
+```json
+{ 
+  "token": "your-bot-father-token" 
+}
+```
+
+### IRC
+
+Connect to IRC networks:
+
+```json
+{
+  "server": "irc.example.com",
+  "port": "6667",
+  "nickname": "LocalAGIBot",
+  "channel": "#yourchannel",
+  "alwaysReply": "false"
+}
+```
+
+## REST API
+
+### Agent Management
+
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/api/agents` | GET | List all available agents | [Example](#get-all-agents) |
+| `/api/agent/:name/status` | GET | View agent status history | [Example](#get-agent-status) |
+| `/api/agent/create` | POST | Create a new agent | [Example](#create-agent) |
+| `/api/agent/:name` | DELETE | Remove an agent | [Example](#delete-agent) |
+| `/api/agent/:name/pause` | PUT | Pause agent activities | [Example](#pause-agent) |
+| `/api/agent/:name/start` | PUT | Resume a paused agent | [Example](#start-agent) |
+| `/api/agent/:name/config` | GET | Get agent configuration | |
+| `/api/agent/:name/config` | PUT | Update agent configuration | |
+| `/api/meta/agent/config` | GET | Get agent configuration metadata | |
+| `/settings/export/:name` | GET | Export agent config | [Example](#export-agent) |
+| `/settings/import` | POST | Import agent config | [Example](#import-agent) |
+
+### Actions and Groups
+
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/api/actions` | GET | List available actions | |
+| `/api/action/:name/run` | POST | Execute an action | |
+| `/api/agent/group/generateProfiles` | POST | Generate group profiles | |
+| `/api/agent/group/create` | POST | Create a new agent group | |
+
+### Chat Interactions
+
+| Endpoint | Method | Description | Example |
+|----------|--------|-------------|---------|
+| `/api/chat/:name` | POST | Send message & get response | [Example](#send-message) |
+| `/api/notify/:name` | POST | Send notification to agent | [Example](#notify-agent) |
+| `/api/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
+| `/v1/responses` | POST | Send message & get response | [OpenAI's Responses](https://platform.openai.com/docs/api-reference/responses/create) |
+
+<details>
+<summary><strong>Curl Examples</strong></summary>
+
+#### Get All Agents
+```bash
+curl -X GET "http://localhost:3000/api/agents"
+```
+
+#### Get Agent Status
+```bash
+curl -X GET "http://localhost:3000/api/agent/my-agent/status"
+```
+
+#### Create Agent
+```bash
+curl -X POST "http://localhost:3000/api/agent/create" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-agent",
+    "model": "gpt-4",
+    "system_prompt": "You are an AI assistant.",
+    "enable_kb": true,
+    "enable_reasoning": true
+  }'
+```
+
+#### Delete Agent
+```bash
+curl -X DELETE "http://localhost:3000/api/agent/my-agent"
+```
+
+#### Pause Agent
+```bash
+curl -X PUT "http://localhost:3000/api/agent/my-agent/pause"
+```
+
+#### Start Agent
+```bash
+curl -X PUT "http://localhost:3000/api/agent/my-agent/start"
+```
+
+#### Get Agent Configuration
+```bash
+curl -X GET "http://localhost:3000/api/agent/my-agent/config"
+```
+
+#### Update Agent Configuration
+```bash
+curl -X PUT "http://localhost:3000/api/agent/my-agent/config" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4",
+    "system_prompt": "You are an AI assistant."
+  }'
+```
+
+#### Export Agent
+```bash
+curl -X GET "http://localhost:3000/settings/export/my-agent" --output my-agent.json
+```
+
+#### Import Agent
+```bash
+curl -X POST "http://localhost:3000/settings/import" \
+  -F "file=@/path/to/my-agent.json"
+```
+
+#### Send Message
+```bash
+curl -X POST "http://localhost:3000/api/chat/my-agent" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello, how are you today?"}'
+```
+
+#### Notify Agent
+```bash
+curl -X POST "http://localhost:3000/api/notify/my-agent" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Important notification"}'
+```
+
+#### Agent SSE Stream
+```bash
+curl -N -X GET "http://localhost:3000/api/sse/my-agent"
+```
+Note: For proper SSE handling, you should use a client that supports SSE natively.
+
+</details>
+
+### Agent Configuration Reference
+
+The agent configuration defines how an agent behaves and what capabilities it has. You can view the available configuration options and their descriptions by using the metadata endpoint:
+
+```bash
+curl -X GET "http://localhost:3000/api/meta/agent/config"
+```
+
+This will return a JSON object containing all available configuration fields, their types, and descriptions.
+
+Here's an example of the agent configuration structure:
+
+```json
+{
+  "name": "my-agent",
+  "model": "gpt-4",
+  "multimodal_model": "gpt-4-vision",
+  "hud": true,
+  "standalone_job": false,
+  "random_identity": false,
+  "initiate_conversations": true,
+  "enable_planning": true,
+  "identity_guidance": "You are a helpful assistant.",
+  "periodic_runs": "0 * * * *",
+  "permanent_goal": "Help users with their questions.",
+  "enable_kb": true,
+  "enable_reasoning": true,
+  "kb_results": 5,
+  "can_stop_itself": false,
+  "system_prompt": "You are an AI assistant.",
+  "long_term_memory": true,
+  "summary_long_term_memory": false
+}
+```
+
+## LICENSE
+
+MIT License — See the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  <strong>LOCAL PROCESSING. GLOBAL THINKING.</strong><br>
+  Made with ❤️ by <a href="https://github.com/mudler">mudler</a>
+</p>

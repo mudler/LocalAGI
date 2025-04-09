@@ -1,0 +1,32 @@
+name: goreleaser
+
+on:
+  push:
+    tags:
+      - 'v*' # Add this line to trigger the workflow on tag pushes that match 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:  
+  goreleaser:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Smart Agent status</title>
+    {{template "old/views/partials/header"}}
+    <style>
+        body { overflow: hidden; }
+        .chat-container { height: 90vh; display: flex; flex-direction: column; }
+        .chat-messages { overflow-y: auto; flex-grow: 1; }
+        .htmx-indicator{
+                opacity:0;
+                transition: opacity 10ms ease-in;
+        }
+        .htmx-request .htmx-indicator{
+            opacity:1
+        }
+        /* Loader (https://cssloaders.github.io/) */
+        .loader {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          display: block;
+          margin:15px auto;
+          position: relative;
+          color: #FFF;
+          box-sizing: border-box;
+          animation: animloader 2s linear infinite;
+        }
+
+        @keyframes animloader {
+          0% { box-shadow: 14px 0 0 -2px,  38px 0 0 -2px,  -14px 0 0 -2px,  -38px 0 0 -2px; }
+          25% { box-shadow: 14px 0 0 -2px,  38px 0 0 -2px,  -14px 0 0 -2px,  -38px 0 0 2px; }
+          50% { box-shadow: 14px 0 0 -2px,  38px 0 0 -2px,  -14px 0 0 2px,  -38px 0 0 -2px; }
+          75% { box-shadow: 14px 0 0 2px,  38px 0 0 -2px,  -14px 0 0 -2px,  -38px 0 0 -2px; }
+          100% { box-shadow: 14px 0 0 -2px,  38px 0 0 2px,  -14px 0 0 -2px,  -38px 0 0 -2px; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 p-4 text-white font-sans" hx-ext="sse" sse-connect="/sse/{{.Name}}">
+    {{template "old/views/partials/menu"}}
+    <div class="chat-container bg-gray-800 shadow-lg rounded-lg" >
+        <!-- Chat Header -->
+        <div class="border-b border-gray-700 p-4">
+            <h1 class="text-lg font-semibold">{{.Name}}</h1>
+        </div>
+        <!-- Chat Messages -->
+        <div class="chat-messages p-4">
+            <div sse-swap="status" hx-swap="afterbegin" id="status"></div>
+            {{ range .History }}
+            <!-- Agent Status Box -->
+            <div class="bg-gray-700 p-4">
+                <h2 class="text-sm font-semibold">Agent:</h2>
+                <div id="agentStatus" class="text-sm text-gray-300">
+                    Result: {{.Result}} Action: {{.Action}} Params: {{.Params}} Reasoning: {{.Reasoning}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Actions Playground</title>
+    {{template "old/views/partials/header"}}
+</head>
+<body>
+    {{template "old/views/partials/menu"}}
+    
+    <!-- Toast for notifications -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <div class="container mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-6xl font-bold">Actions Playground</h1>
+            <p class="mt-4 text-gray-400">Test and execute actions directly from the UI</p>
+        </header>
+        
+        <section class="section-box mb-8">
+            <h2 class="mb-4">Select an Action</h2>
+            <div class="mb-4">
+                <label for="action-select" class="block mb-2">Available Actions:</label>
+                <select id="action-select" class="w-full">
+                    <option value="">-- Select an action --</option>
+                    <!-- Actions will be loaded here -->
+                </select>
+            </div>
+        </section>
+        
+        <section id="config-section" class="section-box mb-8 hidden">
+            <h2 class="mb-4">Action Configuration</h2>
+            <form id="action-form">
+                <div class="mb-6">
+                    <label for="config-json" class="block mb-2">Configuration (JSON):</label>
+                    <textarea id="config-json" class="w-full" rows="5" placeholder='{"key": "value"}'>{}</textarea>
+                    <p class="text-xs text-gray-400 mt-1">Enter JSON configuration for the action</p>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="params-json" class="block mb-2">Parameters (JSON):</label>
+                    <textarea id="params-json" class="w-full" rows="5" placeholder='{"key": "value"}'>{}</textarea>
+                    <p class="text-xs text-gray-400 mt-1">Enter JSON parameters for the action</p>
+                </div>
+                
+                <div class="flex justify-end">
+                    <button type="submit" class="action-btn start-btn">
+                        <i class="fas fa-play"></i> Execute Action
+                    </button>
+                </div>
+            </form>
+        </section>
+        
+        <section id="results-section" class="section-box mb-8 hidden">
+            <h2 class="mb-4">Action Results</h2>
+            <div id="action-results">
+                <!-- Results will appear here -->
+            </div>
+        </section>
+
+        <footer class="text-center text-gray-500 text-sm mb-8">
+            <p>&copy; 2025 LocalAGI.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load available actions
+            fetchActions();
+            
+            // Handle action selection
+            document.getElementById('action-select').addEventListener('change', function() {
+                const actionId = this.value;
+                if (actionId) {
+                    document.getElementById('config-section').classList.remove('hidden');
+                } else {
+                    document.getElementById('config-section').classList.add('hidden');
+                }
+                
+                // Hide results when changing actions
+                document.getElementById('results-section').classList.add('hidden');
+            });
+            
+            // Handle form submission
+            document.getElementById('action-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const actionId = document.getElementById('action-select').value;
+                if (actionId) {
+                    executeAction(actionId);
+                } else {
+                    showToast('Please select an action first', 'error');
+                }
+            });
+        });
+        
+        function fetchActions() {
+            fetch('/api/actions')
+                .then(response => response.json())
+                .then(actions => {
+                    const select = document.getElementById('action-select');
+                    
+                    // Clear existing options except the first one
+                    while (select.options.length > 1) {
+                        select.remove(1);
+                    }
+                    
+                    if (actions.length === 0) {
+                        const option = document.createElement('option');
+                        option.text = 'No actions available';
+                        option.disabled = true;
+                        select.add(option);
+                        return;
+                    }
+                    
+                    // Add options for each action
+                    actions.forEach(actionId => {
+                        const option = document.createElement('option');
+                        option.value = actionId;
+                        option.text = actionId; // Using actionId as display text
+                        select.add(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching actions:', error);
+                    showToast('Failed to load actions: ' + error.message, 'error');
+                    
+                    const select = document.getElementById('action-select');
+                    const option = document.createElement('option');
+                    option.text = 'Error loading actions';
+                    option.disabled = true;
+                    
+                    // Clear existing options except the first one
+                    while (select.options.length > 1) {
+                        select.remove(1);
+                    }
+                    
+                    select.add(option);
+                });
+        }
+        
+        function executeAction(actionId) {
+            // Get the JSON data from textareas
+            let config = {};
+            let params = {};
+            
+            try {
+                const configText = document.getElementById('config-json').value.trim();
+                if (configText && configText !== '{}') {
+                    config = JSON.parse(configText);
+                }
+                
+                const paramsText = document.getElementById('params-json').value.trim();
+                if (paramsText && paramsText !== '{}') {
+                    params = JSON.parse(paramsText);
+                }
+            } catch (error) {
+                showToast('Invalid JSON: ' + error.message, 'error');
+                return;
+            }
+            
+            // Show the results section with loading indicator
+            const resultsSection = document.getElementById('results-section');
+            resultsSection.classList.remove('hidden');
+            
+            const resultDiv = document.getElementById('action-results');
+            resultDiv.innerHTML = `
+                <div class="flex justify-center items-center py-8">
+                    <div class="loader"></div>
+                </div>
+            `;
+            
+            // Execute the action
+            fetch(`/api/action/${actionId}/run`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    config: config,
+                    params: params
+                })
+            })
+            .then(response => {
+                return response.json();
+            })
+            .then(result => {
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                // Display the results
+                showActionResult(result);
+                showToast('Action executed successfully!', 'success');
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error" style="display: block;">
+                        <i class="fas fa-exclamation-circle mr-2"></i> Error: ${error.message}
+                    </div>
+                `;
+                showToast('Error executing action', 'error');
+            });
+        }
+        
+        function showActionResult(result) {
+            const resultDiv = document.getElementById('action-results');
+            
+            let html = '';
+            
+            // Display result
+            if (result.Result) {
+                html += `
+                    <div class="mb-4">
+                        <h4 class="text-lg mb-2" style="color: var(--secondary);">Result:</h4>
+                        <div class="code-terminal">
+                            <pre>${escapeHtml(result.Result)}</pre>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Display metadata if available
+            if (result.Metadata && Object.keys(result.Metadata).length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h4 class="text-lg mb-2" style="color: var(--secondary);">Metadata:</h4>
+                        <div class="code-terminal">
+                            <pre>${escapeHtml(JSON.stringify(result.Metadata, null, 2))}</pre>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (!html) {
+                html = '<p class="text-gray-400">No results returned from the action.</p>';
+            }
+            
+            resultDiv.innerHTML = html;
+            
+            // Scroll to results
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            
+            toastMessage.textContent = message;
+            toast.className = 'toast toast-' + type;
+            toast.classList.add('toast-visible');
+            
+            setTimeout(() => {
+                toast.classList.remove('toast-visible');
+            }, 3000);
+        }
+    </script>
+    
+    <style>
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid var(--tertiary);
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .code-terminal {
+            margin-top: 0;
+        }
+    </style>
+</body>
+</html>

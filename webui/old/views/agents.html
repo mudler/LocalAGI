@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent List</title>
+    {{template "old/views/partials/header"}}
+    <style>
+        .avatar-placeholder {
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            border: 2px solid var(--primary);
+            box-shadow: var(--neon-glow);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .avatar-placeholder::after {
+            content: "";
+            position: absolute;
+            width: 100%;
+            height: 4px;
+            background: var(--primary);
+            bottom: 0;
+            left: 0;
+            animation: loading-progress 2s infinite linear;
+        }
+        
+        @keyframes loading-progress {
+            0% { width: 0; }
+            50% { width: 100%; }
+            100% { width: 0; }
+        }
+        
+        .placeholder-text {
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    {{template "old/views/partials/menu"}}
+    
+    <!-- Toast for notifications -->
+    <div id="toast" class="toast">
+        <span id="toast-message"></span>
+    </div>
+
+    <div class="container mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-6xl font-bold">Agent List</h1>
+            <p class="mt-4 text-gray-400">Manage and interact with your AI agents</p>
+        </header>
+        
+        <div class="button-container justify-center mb-6">
+            <a href="/old/create" class="action-btn start-btn">
+                <i class="fas fa-plus-circle"></i> Add New Agent
+            </a>
+            <button id="toggle-import" class="action-btn" style="background: linear-gradient(135deg, var(--tertiary), #4a76a8);">
+                <i class="fas fa-file-import"></i> Import Agent
+            </button>
+        </div>
+        
+        <section id="import-section" class="hidden mb-8">
+            <div class="section-box">
+                <h2>Import Agent</h2>
+                
+                <!-- Response Messages Container -->
+                <div id="response-container">
+                    <!-- Success Alert -->
+                    <div id="success-alert" class="alert alert-success" style="display: none;">
+                        Agent imported successfully! The page will refresh in a moment.
+                    </div>
+                    
+                    <!-- Error Alert -->
+                    <div id="error-alert" class="alert alert-error" style="display: none;">
+                        <span id="error-message">Error importing agent.</span>
+                    </div>
+                </div>
+                
+                <form id='import-form' hx-encoding='multipart/form-data' hx-post='/settings/import' hx-target="#response-container" hx-swap="none">
+                    <div class="mb-4">
+                        <label for="file" class="block mb-2">Select Agent File:</label>
+                        <input type='file' name='file' id='file'>
+                    </div>
+                    <div class="flex items-center">
+                        <button id="import-button" type="submit" class="action-btn">
+                            <i class="fas fa-cloud-upload-alt"></i> Import Agent
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+        
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {{ $status := .Status }}
+            {{ range .Agents }}
+            <div hx-ext="sse" data-agent-name="{{.}}" class="card">
+                <div class="flex flex-col items-center text-center p-4">
+                    <div class="avatar-container mb-4">
+                        <img src="/avatars/{{.}}.png" alt="{{.}}" class="w-24 h-24 rounded-full" 
+                             style="border: 2px solid var(--primary); box-shadow: var(--neon-glow); display: none;"
+                             onload="this.style.display = 'block'; this.nextElementSibling.style.display = 'none';"
+                             onerror="this.style.display = 'none'; this.nextElementSibling.style.display = 'flex';">
+                        <div class="avatar-placeholder">
+                            <span class="placeholder-text"><i class="fas fa-sync fa-spin"></i></span>
+                        </div>
+                    </div>
+                    <h2>{{.}}</h2>
+                    <div class="mb-4 flex items-center justify-center">
+                        <span class="badge {{ if eq (index $status .) true }}badge-primary{{ else }}badge-secondary{{ end }} mr-2">
+                            {{ if eq (index $status .) true }}Active{{ else }}Inactive{{ end }}
+                        </span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 w-full mb-4">
+                        <a href="/old/status/{{.}}" class="action-btn flex items-center justify-center" 
+                           style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
+                            <i class="fas fa-info-circle mr-2"></i> Status
+                        </a>
+                        <a href="/old/talk/{{.}}" class="action-btn flex items-center justify-center"
+                           style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
+                            <i class="fas fa-comments mr-2"></i> Talk
+                        </a>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 w-full">
+                        <button class="action-btn toggle-btn col-span-1" 
+                                data-agent="{{.}}"
+                                data-active="{{ if eq (index $status .) true }}true{{ else }}false{{ end }}">
+                            {{ if eq (index $status .) true }}
+                                <i class="fas fa-pause"></i> Pause
+                            {{ else }}
+                                <i class="fas fa-play"></i> Start
+                            {{ end }}
+                        </button>
+                        <a href="/old/settings/{{.}}" class="action-btn col-span-1 flex items-center justify-center"
+                           style="background: linear-gradient(135deg, #2a2a2a, #3a3a3a);">
+                            <i class="fas fa-cog"></i> 
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {{ end }}
+        </section>
+        
+        <div class="user-info mt-8 mb-4">
+            <span></span>
+            <span class="timestamp"></span>
+        </div>
+        
+        <footer class="text-center text-gray-500 text-sm mb-8">
+            <p>&copy; 2025 LocalAGI.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Image loading handler
+            document.querySelectorAll('.avatar-container img').forEach(img => {
+                // Check if image is already cached
+                if (img.complete) {
+                    if (img.naturalHeight === 0) {
+                        // Image failed to load
+                        img.style.display = 'none';
+                        img.nextElementSibling.style.display = 'flex';
+                    } else {
+                        // Image loaded successfully
+                        img.style.display = 'block';
+                        img.nextElementSibling.style.display = 'none';
+                    }
+                }
+                // onload and onerror handlers are already in the HTML
+            });
+    
+            const importSection = document.getElementById('import-section');
+            const toggleImport = document.getElementById('toggle-import');
+
+            // Toggle import section visibility
+            toggleImport.addEventListener('click', function() {
+                importSection.classList.toggle('hidden');
+                // Add glitch effect when showing
+                if (!importSection.classList.contains('hidden')) {
+                    importSection.style.animation = 'glitch 0.3s';
+                    setTimeout(() => {
+                        importSection.style.animation = '';
+                    }, 300);
+                }
+            });
+
+            // Handle import form submission
+            document.getElementById('import-form').addEventListener('htmx:afterRequest', function(event) {
+                const xhr = event.detail.xhr;
+                const successAlert = document.getElementById('success-alert');
+                const errorAlert = document.getElementById('error-alert');
+                const errorMessage = document.getElementById('error-message');
+                
+                // Hide both alerts initially
+                successAlert.style.display = 'none';
+                errorAlert.style.display = 'none';
+                
+                if (xhr.status === 200) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        
+                        if (response.status === "ok") {
+                            // Show success message
+                            successAlert.style.display = 'block';
+                            showToast("Agent imported successfully!", "success");
+                            
+                            // Refresh the page after a short delay
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000);
+                        } else if (response.error) {
+                            // Show error message
+                            errorMessage.textContent = response.error;
+                            errorAlert.style.display = 'block';
+                            showToast("Import failed: " + response.error, "error");
+                        }
+                    } catch (e) {
+                        // Handle parsing error
+                        errorMessage.textContent = "Invalid response format";
+                        errorAlert.style.display = 'block';
+                        showToast("Invalid response format", "error");
+                    }
+                } else {
+                    // Handle HTTP error
+                    errorMessage.textContent = "Server error: " + xhr.status;
+                    errorAlert.style.display = 'block';
+                    showToast("Server error: " + xhr.status, "error");
+                }
+            });
+
+            // Handle toggle buttons - using pure JavaScript
+            document.querySelectorAll('.toggle-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const agent = this.getAttribute('data-agent');
+                    const isActive = this.getAttribute('data-active') === 'true';
+                    const endpoint = isActive ? `/api/agent/${agent}/pause` : `/api/agent/${agent}/start`;
+                    
+                    // Add animation
+                    this.style.animation = 'pulse 0.5s';
+                    
+                    // Create a new XMLHttpRequest
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('PUT', endpoint);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    
+                    xhr.onload = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                const response = JSON.parse(xhr.responseText);
+                                
+                                if (response.status === "ok") {
+                                    // Toggle the button state
+                                    const newState = !isActive;
+                                    this.setAttribute('data-active', newState ? 'true' : 'false');
+                                    
+                                    // Update button text and icon
+                                    if (newState) {
+                                        this.innerHTML = '<i class="fas fa-pause"></i> Pause';
+                                    } else {
+                                        this.innerHTML = '<i class="fas fa-play"></i> Start';
+                                    }
+                                    
+                                    // Show success toast
+                                    const action = isActive ? 'pause' : 'start';
+                                    showToast(`Agent "${agent}" ${action}ed successfully`, 'success');
+                                    
+                                    // Update the status badge
+                                    updateAgentStatus(agent, newState);
+                                } else if (response.error) {
+                                    // Show error toast
+                                    showToast(`Error: ${response.error}`, 'error');
+                                }
+                            } catch (e) {
+                                // Handle parsing error
+                                showToast("Invalid response format", 'error');
+                                console.error("Error parsing response:", e);
+                            }
+                        } else {
+                            // Handle HTTP error
+                            showToast(`Server error: ${xhr.status}`, 'error');
+                        }
+                    };
+                    
+                    xhr.onerror = () => {
+                        // Clear animation
+                        this.style.animation = '';
+                        showToast("Network error occurred", 'error');
+                        console.error("Network error occurred");
+                    };
+                    
+                    // Send the request
+                    xhr.send(JSON.stringify({}));
+                });
+            });
+        });
+
+        // Function to update agent status in the UI
+        function updateAgentStatus(agentName, isOnline) {
+            // Find the card for this agent
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                const agentTitle = card.querySelector('h2').textContent;
+                if (agentTitle === agentName) {
+                    // Update the badge
+                    const badge = card.querySelector('.badge');
+                    if (isOnline) {
+                        badge.className = 'badge badge-primary mr-2';
+                        badge.textContent = 'Active';
+                    } else {
+                        badge.className = 'badge badge-secondary mr-2';
+                        badge.textContent = 'Inactive';
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

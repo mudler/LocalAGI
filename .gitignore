@@ -1,4 +1,10 @@
-db/
 models/
-config.ini
-.dockerenv
+data/
+pool
+uploads/
+local-agent-framework
+localagi
+LocalAGI
+**/.env
+.vscode
+volumes/
