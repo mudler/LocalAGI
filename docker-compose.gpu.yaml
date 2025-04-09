@@ -72,7 +72,7 @@ services:
     environment:
       - LOCALAGI_MODEL=qwen_qwq-32b
       - LOCALAGI_LLM_API_URL=http://localai:8080
-      - LOCALAGI_LLM_API_KEY=sk-1234567890
+      #- LOCALAGI_LLM_API_KEY=sk-1234567890
       - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
       - LOCALAGI_STATE_DIR=/pool
       - LOCALAGI_TIMEOUT=5m
