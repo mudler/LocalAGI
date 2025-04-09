@@ -502,7 +502,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		}
 		if count[chosenAction.Definition().Name.String()] > a.options.loopDetectionSteps {
 			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
-			chosenAction = nil
+			a.reply(job, role, conv, actionParams, chosenAction, reasoning)
+			return
 		}
 	}
 
@@ -570,13 +571,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	job.AddPastAction(chosenAction, &actionParams)
 
-	var err error
-	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)
-	if err != nil {
-		job.Result.Finish(fmt.Errorf("error running action: %w", err))
-		return
-	}
-
 	if !job.Callback(types.ActionCurrentState{
 		Job:       job,
 		Action:    chosenAction,
@@ -592,6 +586,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			ActionResult: types.ActionResult{Result: "stopped by callback"}})
 		job.Result.Conversation = conv
 		job.Result.Finish(nil)
+		return
+	}
+
+	var err error
+	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)
+	if err != nil {
+		job.Result.Finish(fmt.Errorf("error running action: %w", err))
 		return
 	}
 
@@ -625,81 +626,87 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
-	// If we don't have to reply , run the action!
-	if !chosenAction.Definition().Name.Is(action.ReplyActionName) {
+	// if we have a reply action, we need to run it
+	if chosenAction.Definition().Name.Is(action.ReplyActionName) {
+		a.reply(job, role, conv, actionParams, chosenAction, reasoning)
+		return
+	}
 
-		if !chosenAction.Definition().Name.Is(action.PlanActionName) {
-			result, err := a.runAction(job.GetContext(), chosenAction, actionParams)
-			if err != nil {
-				//job.Result.Finish(fmt.Errorf("error running action: %w", err))
-				//return
-				// make the LLM aware of the error of running the action instead of stopping the job here
-				result.Result = fmt.Sprintf("Error running tool: %v", err)
-			}
-
-			stateResult := types.ActionState{
-				ActionCurrentState: types.ActionCurrentState{
-					Job:       job,
-					Action:    chosenAction,
-					Params:    actionParams,
-					Reasoning: reasoning,
-				},
-				ActionResult: result,
-			}
-			job.Result.SetResult(stateResult)
-			job.CallbackWithResult(stateResult)
-			xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
-
-			conv = a.addFunctionResultToConversation(chosenAction, actionParams, result, conv)
-		}
-
-		//conv = append(conv, messages...)
-		//conv = messages
-
-		// given the result, we can now ask OpenAI to complete the conversation or
-		// to continue using another tool given the result
-		followingAction, followingParams, reasoning, err := a.pickAction(job.GetContext(), reEvaluationTemplate, conv, maxRetries)
+	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
+		result, err := a.runAction(job.GetContext(), chosenAction, actionParams)
 		if err != nil {
-			job.Result.Conversation = conv
-			job.Result.Finish(fmt.Errorf("error picking action: %w", err))
-			return
+			//job.Result.Finish(fmt.Errorf("error running action: %w", err))
+			//return
+			// make the LLM aware of the error of running the action instead of stopping the job here
+			result.Result = fmt.Sprintf("Error running tool: %v", err)
 		}
 
-		if followingAction != nil &&
-			!followingAction.Definition().Name.Is(action.ReplyActionName) &&
-			!chosenAction.Definition().Name.Is(action.ReplyActionName) {
+		stateResult := types.ActionState{
+			ActionCurrentState: types.ActionCurrentState{
+				Job:       job,
+				Action:    chosenAction,
+				Params:    actionParams,
+				Reasoning: reasoning,
+			},
+			ActionResult: result,
+		}
+		job.Result.SetResult(stateResult)
+		job.CallbackWithResult(stateResult)
+		xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
 
-			xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
+		conv = a.addFunctionResultToConversation(chosenAction, actionParams, result, conv)
+	}
 
-			// We need to do another action (?)
-			// The agent decided to do another action
-			// call ourselves again
-			job.SetNextAction(&followingAction, &followingParams, reasoning)
-			a.consumeJob(job, role)
-			return
-		} else if followingAction == nil {
-			xlog.Info("Not following another action", "agent", a.Character.Name)
+	//conv = append(conv, messages...)
+	//conv = messages
 
-			if !a.options.forceReasoning {
-				xlog.Info("Finish conversation with reasoning", "reasoning", reasoning, "agent", a.Character.Name)
+	// given the result, we can now ask OpenAI to complete the conversation or
+	// to continue using another tool given the result
+	followingAction, followingParams, reasoning, err := a.pickAction(job.GetContext(), reEvaluationTemplate, conv, maxRetries)
+	if err != nil {
+		job.Result.Conversation = conv
+		job.Result.Finish(fmt.Errorf("error picking action: %w", err))
+		return
+	}
 
-				msg := openai.ChatCompletionMessage{
-					Role:    "assistant",
-					Content: reasoning,
-				}
+	if followingAction != nil &&
+		!followingAction.Definition().Name.Is(action.ReplyActionName) &&
+		!chosenAction.Definition().Name.Is(action.ReplyActionName) {
 
-				conv = append(conv, msg)
-				job.Result.SetResponse(msg.Content)
-				job.Result.Conversation = conv
-				job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
-					a.saveCurrentConversation(conv)
-				})
-				job.Result.Finish(nil)
-				return
+		xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
+
+		// We need to do another action (?)
+		// The agent decided to do another action
+		// call ourselves again
+		job.SetNextAction(&followingAction, &followingParams, reasoning)
+		a.consumeJob(job, role)
+		return
+	} else if followingAction == nil {
+		xlog.Info("Not following another action", "agent", a.Character.Name)
+
+		if !a.options.forceReasoning {
+			xlog.Info("Finish conversation with reasoning", "reasoning", reasoning, "agent", a.Character.Name)
+
+			msg := openai.ChatCompletionMessage{
+				Role:    "assistant",
+				Content: reasoning,
 			}
+
+			conv = append(conv, msg)
+			job.Result.SetResponse(msg.Content)
+			job.Result.Conversation = conv
+			job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
+				a.saveCurrentConversation(conv)
+			})
+			job.Result.Finish(nil)
+			return
 		}
 	}
 
+	a.reply(job, role, conv, actionParams, chosenAction, reasoning)
+}
+
+func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams types.ActionParams, chosenAction types.Action, reasoning string) {
 	job.Result.Conversation = conv
 
 	// At this point can only be a reply action
@@ -760,8 +767,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	// 	},
 	// )
 
-	if !a.options.forceReasoning {
-		xlog.Info("No reasoning, return reply message", "reply", replyResponse.Message, "agent", a.Character.Name)
+	if replyResponse.Message != "" {
+		xlog.Info("Return reply message", "reply", replyResponse.Message, "agent", a.Character.Name)
 
 		msg := openai.ChatCompletionMessage{
 			Role:    "assistant",
