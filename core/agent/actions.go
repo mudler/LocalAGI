@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
@@ -358,7 +359,7 @@ func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage, maxRetries int) (types.Action, types.ActionParams, string, error) {
 	c := messages
 
-	xlog.Debug("picking action", "messages", messages)
+	xlog.Debug("[pickAction] picking action", "messages", messages)
 
 	if !a.options.forceReasoning {
 		xlog.Debug("not forcing reasoning")
@@ -389,7 +390,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return chosenAction, thought.actionParams, thought.message, nil
 	}
 
-	xlog.Debug("forcing reasoning")
+	xlog.Debug("[pickAction] forcing reasoning")
 
 	prompt, err := renderTemplate(templ, a.prepareHUD(), a.availableActions(), "")
 	if err != nil {
@@ -406,44 +407,77 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		}, c...)
 	}
 
-	// We also could avoid to use functions here and get just a reply from the LLM
-	// and then use the reply to get the action
-	thought, err := a.decision(ctx,
-		c,
-		types.Actions{action.NewReasoning()}.ToTools(),
-		action.NewReasoning().Definition().Name, maxRetries)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	reason := ""
-	response := &action.ReasoningResponse{}
-	if thought.actionParams != nil {
-		if err := thought.actionParams.Unmarshal(response); err != nil {
-			return nil, nil, "", err
-		}
-		reason = response.Reasoning
-	}
-	if thought.message != "" {
-		reason = thought.message
-	}
-
-	xlog.Debug("thought", "reason", reason)
-
-	// From the thought, get the action call
-	// Get all the available actions IDs
 	actionsID := []string{}
 	for _, m := range a.availableActions() {
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
-	intentionsTools := action.NewIntention(actionsID...)
+
+	thoughtPromptStringBuilder := strings.Builder{}
+	thoughtPromptStringBuilder.WriteString("You have to pick an action based on the conversation and the prompt. Describe the full reasoning process for your choice. Here is a list of actions: ")
+	for _, m := range a.availableActions() {
+		thoughtPromptStringBuilder.WriteString(
+			m.Definition().Name.String() + ": " + m.Definition().Description + "\n",
+		)
+	}
+
+	thoughtPromptStringBuilder.WriteString("To not use any action, respond with 'none'")
+
+	//thoughtPromptStringBuilder.WriteString("\n\nConversation: " + Messages(c).String())
+
+	thoughtPrompt := thoughtPromptStringBuilder.String()
+
+	xlog.Debug("[pickAction] thought", "prompt", thoughtPrompt)
+
+	thought, err := a.askLLM(ctx,
+		append(c, openai.ChatCompletionMessage{
+			Role:    "user",
+			Content: thoughtPrompt,
+		}),
+		maxRetries,
+	)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	originalReasoning := thought.Content
+
+	xlog.Debug("[pickAction] thought", "reason", originalReasoning)
+
+	thought, err = a.askLLM(ctx,
+		[]openai.ChatCompletionMessage{
+			{
+				Role:    "system",
+				Content: "Your only objective is to return the string of the action to take based on the user input",
+			},
+			{
+				Role:    "user",
+				Content: "Given the following sentence, answer with the only action to take: " + originalReasoning,
+			}},
+		maxRetries,
+	)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	reason := thought.Content
+
+	xlog.Debug("[pickAction] filtered thought", "reason", reason)
+
+	// From the thought, get the action call
+	// Get all the available actions IDs
+
+	intentionsTools := action.NewIntention(append(actionsID, "none")...)
 
 	// NOTE: we do not give the full conversation here to pick the action
 	// to avoid hallucinations
 	params, err := a.decision(ctx,
-		[]openai.ChatCompletionMessage{{
-			Role:    "assistant",
-			Content: reason,
-		},
+		[]openai.ChatCompletionMessage{
+			{
+				Role:    "system",
+				Content: "You have to pick the correct action based on the user reasoning",
+			},
+			{
+				Role:    "user",
+				Content: reason,
+			},
 		},
 		types.Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name, maxRetries)
@@ -463,7 +497,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	}
 
 	if actionChoice.Tool == "" || actionChoice.Tool == "none" {
-		return nil, nil, "", fmt.Errorf("no intent detected")
+		return nil, nil, "", nil
 	}
 
 	// Find the action
@@ -472,5 +506,5 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return nil, nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	}
 
-	return chosenAction, nil, actionChoice.Reasoning, nil
+	return chosenAction, nil, originalReasoning, nil
 }

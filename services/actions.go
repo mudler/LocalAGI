@@ -28,6 +28,7 @@ const (
 	ActionGithubIssueCommenter           = "github-issue-commenter"
 	ActionGithubPRReader                 = "github-pr-reader"
 	ActionGithubPRCommenter              = "github-pr-commenter"
+	ActionGithubPRReviewer               = "github-pr-reviewer"
 	ActionGithubREADME                   = "github-readme"
 	ActionScraper                        = "scraper"
 	ActionWikipedia                      = "wikipedia"
@@ -53,6 +54,7 @@ var AvailableActions = []string{
 	ActionGithubIssueCommenter,
 	ActionGithubPRReader,
 	ActionGithubPRCommenter,
+	ActionGithubPRReviewer,
 	ActionGithubREADME,
 	ActionScraper,
 	ActionBrowse,
@@ -114,6 +116,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubPRReader(config)
 	case ActionGithubPRCommenter:
 		a = actions.NewGithubPRCommenter(config)
+	case ActionGithubPRReviewer:
+		a = actions.NewGithubPRReviewer(config)
 	case ActionGithubIssueCommenter:
 		a = actions.NewGithubIssueCommenter(config)
 	case ActionGithubRepositoryGet:
@@ -216,6 +220,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "github-pr-commenter",
 			Label:  "GitHub PR Commenter",
 			Fields: actions.GithubPRCommenterConfigMeta(),
+		},
+		{
+			Name:   "github-pr-reviewer",
+			Label:  "GitHub PR Reviewer",
+			Fields: actions.GithubPRReviewerConfigMeta(),
 		},
 		{
 			Name:   "twitter-post",
