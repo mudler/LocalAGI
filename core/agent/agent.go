@@ -670,6 +670,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		!chosenAction.Definition().Name.Is(action.ReplyActionName) {
 
 		xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
+		job.ConversationHistory = conv
 
 		// We need to do another action (?)
 		// The agent decided to do another action
