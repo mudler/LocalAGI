@@ -52,7 +52,7 @@ docker compose up -f docker-compose.yml
 docker compose up -f docker-compose.gpu.yml
 ```
 
-Access your agents at `http://localhost:3000`
+Access your agents at `http://localhost:8080`
 
 ## 🏆 Why Choose LocalAGI?
 
