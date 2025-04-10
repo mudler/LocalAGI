@@ -11,7 +11,7 @@ require (
 	github.com/donseba/go-htmx v1.8.0
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
 	github.com/go-telegram/bot v1.2.1
-	github.com/gofiber/fiber/v2 v2.52.4
+	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/gofiber/template/html/v2 v2.1.1
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
