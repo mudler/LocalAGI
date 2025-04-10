@@ -30,7 +30,7 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 🤖 **Advanced Agent Teaming**: Instantly create cooperative agent teams from a single prompt.
 - 📡 **Connectors Galore**: Built-in integrations with Discord, Slack, Telegram, GitHub Issues, and IRC.
 - 🛠 **Comprehensive REST API**: Seamless integration into your workflows. Every agent created will support OpenAI Responses API out of the box.
-- 📚 **Short & Long-Term Memory**: Powered by [LocalRAG](https://github.com/mudler/LocalRAG).
+- 📚 **Short & Long-Term Memory**: Powered by [LocalRecall](https://github.com/mudler/LocalRecall).
 - 🧠 **Planning & Reasoning**: Agents intelligently plan, reason, and adapt.
 - 🔄 **Periodic Tasks**: Schedule tasks with cron-like syntax.
 - 💾 **Memory Management**: Control memory usage with options for long-term and summary memory.
@@ -67,7 +67,7 @@ Access your agents at `http://localhost:3000`
 LocalAGI is part of the powerful Local family of privacy-focused AI tools:
 
 - [**LocalAI**](https://github.com/mudler/LocalAI): Run Large Language Models locally.
-- [**LocalRAG**](https://github.com/mudler/LocalRAG): Retrieval-Augmented Generation with local storage.
+- [**LocalRecall**](https://github.com/mudler/LocalRecall): Retrieval-Augmented Generation with local storage.
 - [**LocalAGI**](https://github.com/mudler/LocalAGI): Deploy intelligent AI agents securely and privately.
 
 ## 🌟 Screenshots
@@ -106,7 +106,7 @@ Explore detailed documentation including:
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_LOCALRAG_URL` | LocalRAG connection |
+| `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 
