@@ -358,7 +358,10 @@ func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage, maxRetries int) (types.Action, types.ActionParams, string, error) {
 	c := messages
 
+	xlog.Debug("picking action", "messages", messages)
+
 	if !a.options.forceReasoning {
+		xlog.Debug("not forcing reasoning")
 		// We also could avoid to use functions here and get just a reply from the LLM
 		// and then use the reply to get the action
 		thought, err := a.decision(ctx,
@@ -385,6 +388,8 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		xlog.Debug(fmt.Sprintf("chosenAction: %v", chosenAction.Definition().Name))
 		return chosenAction, thought.actionParams, thought.message, nil
 	}
+
+	xlog.Debug("forcing reasoning")
 
 	prompt, err := renderTemplate(templ, a.prepareHUD(), a.availableActions(), "")
 	if err != nil {
@@ -422,6 +427,8 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		reason = thought.message
 	}
 
+	xlog.Debug("thought", "reason", reason)
+
 	// From the thought, get the action call
 	// Get all the available actions IDs
 	actionsID := []string{}
@@ -430,12 +437,14 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	}
 	intentionsTools := action.NewIntention(actionsID...)
 
-	//XXX: Why we add the reason here?
+	// NOTE: we do not give the full conversation here to pick the action
+	// to avoid hallucinations
 	params, err := a.decision(ctx,
-		append(c, openai.ChatCompletionMessage{
-			Role:    "system",
-			Content: "Given the assistant thought, pick the relevant action: " + reason,
-		}),
+		[]openai.ChatCompletionMessage{{
+			Role:    "assistant",
+			Content: reason,
+		},
+		},
 		types.Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name, maxRetries)
 	if err != nil {

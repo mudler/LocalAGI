@@ -657,11 +657,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		conv = a.addFunctionResultToConversation(chosenAction, actionParams, result, conv)
 	}
 
-	//conv = append(conv, messages...)
-	//conv = messages
-
-	// given the result, we can now ask OpenAI to complete the conversation or
-	// to continue using another tool given the result
+	// given the result, we can now re-evaluate the conversation
 	followingAction, followingParams, reasoning, err := a.pickAction(job.GetContext(), reEvaluationTemplate, conv, maxRetries)
 	if err != nil {
 		job.Result.Conversation = conv
