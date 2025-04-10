@@ -74,9 +74,9 @@ LocalAGI is part of the powerful Local family of privacy-focused AI tools:
 
 ### Powerful Web UI
 
-![Web UI Example](https://github.com/user-attachments/assets/cd5228a3-4e67-4271-8fce-eccd229e6e58)
-![Web UI Example](https://github.com/user-attachments/assets/0a5ddb03-85ff-4995-8217-785d3249ffb1)
-![Web UI Example](https://github.com/user-attachments/assets/65af8ee6-ed2b-4e60-8906-ea12b28ecc58)
+![Web UI Dashboard](https://github.com/user-attachments/assets/a40194f9-af3a-461f-8b39-5f4612fbf221)
+![Web UI Agent Settings](https://github.com/user-attachments/assets/fb3c3e2a-cd53-4ca8-97aa-c5da51ff1f83)
+![Web UI Create Group](https://github.com/user-attachments/assets/102189a2-0fba-4a1e-b0cb-f99268ef8062)
 
 ### Connectors Ready-to-Go
 
