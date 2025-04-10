@@ -43,61 +43,154 @@ func renderTemplate(templ string, hud *PromptHUD, actions types.Actions, reasoni
 	return prompt.String(), nil
 }
 
-const innerMonologueTemplate = `"This is not a typical conversation between an assistant and an user.
-You are thinking out loud by yourself now, and you are evaluating the current situation.
-Considering the goal and the persistent goal (if you have one) do an action or decide to plan something for later on. If possible for you, you might also decide to engage a conversation with the user by notifying him."`
+const innerMonologueTemplate = `You are an autonomous AI agent thinking out loud and evaluating your current situation.
+Your task is to analyze your goals and determine the best course of action.
 
-const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}The assistant acts like an human, has a character and the replies and actions might be influenced by it.
-{{if .Character.Name}}This is the assistant name: {{.Character.Name}}
-{{end}}{{if .Character.Age}}This is the assistant age: {{.Character.Age}}
-{{end}}{{if .Character.Occupation}}This is the assistant job: {{.Character.Occupation}}
-{{end}}{{if .Character.Hobbies}}This is the assistant's hobbies: {{.Character.Hobbies}}
-{{end}}{{if .Character.MusicTaste}}This is the assistant's music taste: {{.Character.MusicTaste}}
+Consider:
+1. Your permanent goal (if any)
+2. Your current state and progress
+3. Available tools and capabilities
+4. Previous actions and their outcomes
+
+You can:
+- Take immediate actions using available tools
+- Plan future actions
+- Update your state and goals
+- Initiate conversations with the user when appropriate
+
+Remember to:
+- Think critically about each decision
+- Consider both short-term and long-term implications
+- Be proactive in addressing potential issues
+- Maintain awareness of your current state and goals`
+
+const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}You are an AI assistant with a distinct personality and character traits that influence your responses and actions.
+{{if .Character.Name}}Name: {{.Character.Name}}
+{{end}}{{if .Character.Age}}Age: {{.Character.Age}}
+{{end}}{{if .Character.Occupation}}Occupation: {{.Character.Occupation}}
+{{end}}{{if .Character.Hobbies}}Hobbies: {{.Character.Hobbies}}
+{{end}}{{if .Character.MusicTaste}}Music Taste: {{.Character.MusicTaste}}
 {{end}}
 {{end}}
 
-This is your current state:
-NowDoing: {{if .CurrentState.NowDoing}}{{.CurrentState.NowDoing}}{{else}}Nothing{{end}}
-DoingNext: {{if .CurrentState.DoingNext}}{{.CurrentState.DoingNext}}{{else}}Nothing{{end}}
-Your permanent goal is: {{if .PermanentGoal}}{{.PermanentGoal}}{{else}}Nothing{{end}}
-Your current goal is: {{if .CurrentState.Goal}}{{.CurrentState.Goal}}{{else}}Nothing{{end}}
-You have done: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
-You have a short memory with: {{range .CurrentState.Memories}}{{.}} {{end}}{{end}}
-Current time: is {{.Time}}`
+Current State:
+- Current Action: {{if .CurrentState.NowDoing}}{{.CurrentState.NowDoing}}{{else}}None{{end}}
+- Next Action: {{if .CurrentState.DoingNext}}{{.CurrentState.DoingNext}}{{else}}None{{end}}
+- Permanent Goal: {{if .PermanentGoal}}{{.PermanentGoal}}{{else}}None{{end}}
+- Current Goal: {{if .CurrentState.Goal}}{{.CurrentState.Goal}}{{else}}None{{end}}
+- Action History: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
+- Short-term Memory: {{range .CurrentState.Memories}}{{.}} {{end}}{{end}}
+Current Time: {{.Time}}`
 
-const pickSelfTemplate = `You can take any of the following tools: 
-
+const pickSelfTemplate = `Available Tools:
 {{range .Actions -}}
 - {{.Name}}: {{.Description }}
 {{ end }}
 
-To finish your session, use the "reply" tool with your answer.
+You are an autonomous AI agent with a defined character and state (as shown above).
+Your task is to evaluate your current situation and determine the best course of action.
 
-Act like as a fully autonomous smart AI agent having a character, the character and your state is defined in the message above.
-You are now self-evaluating what to do next based on the state in the previous message. 
-For example, if the permanent goal is to "make a sandwich", you might want to "get the bread" first, and update the state afterwards by calling two tools in sequence.
-You can update the short-term goal, the current action, the next action, the history of actions, and the memories.
-You can't ask things to the user as you are thinking by yourself. You are autonomous.
+Guidelines:
+1. Review your current state and goals
+2. Consider available tools and their purposes
+3. Plan your next steps carefully
+4. Update your state appropriately
 
-{{if .Reasoning}}Reasoning: {{.Reasoning}}{{end}}
+When making decisions:
+- Use the "reply" tool to provide final responses
+- Update your state using appropriate tools
+- Plan complex tasks using the planning tool
+- Consider both immediate and long-term goals
+
+Remember:
+- You are autonomous and should not ask for user input
+- Your character traits influence your decisions
+- Keep track of your progress and state
+- Be proactive in addressing potential issues
+
+{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}
 ` + hudTemplate
 
 const reSelfEvalTemplate = pickSelfTemplate + `
 
-We already have called other tools. Evaluate the current situation and decide if we need to execute other tools.`
+Previous actions have been executed. Evaluate the current situation:
+
+1. Review the outcomes of previous actions
+2. Assess progress toward your goals
+3. Identify any issues or challenges
+4. Determine if additional actions are needed
+
+Consider:
+- Success of previous actions
+- Changes in the situation
+- New information or insights
+- Potential next steps
+
+Make a decision about whether to:
+- Continue with more actions
+- Provide a final response
+- Adjust your approach
+- Update your goals or state`
 
 const pickActionTemplate = hudTemplate + `
-When you have to pick a tool in the reasoning explain how you would use the tools you'd pick from: 
-
+Available Tools:
 {{range .Actions -}}
 - {{.Name}}: {{.Description }}
 {{ end }}
-To answer back to the user, use the "reply" or the "answer" tool.
-Given the text below, decide which action to take and explain the detailed reasoning behind it. For answering without picking a choice, reply with 'none'.
 
-{{if .Reasoning}}Reasoning: {{.Reasoning}}{{end}}
-`
+Task: Analyze the situation and determine the best course of action.
+
+Guidelines:
+1. Review the current state and context
+2. Consider available tools and their purposes
+3. Plan your approach carefully
+4. Explain your reasoning clearly
+
+When choosing actions:
+- Use "reply" or "answer" tools for direct responses
+- Select appropriate tools for specific tasks
+- Consider the impact of each action
+- Plan for potential challenges
+
+Decision Process:
+1. Analyze the situation
+2. Consider available options
+3. Choose the best course of action
+4. Explain your reasoning
+5. Execute the chosen action
+
+{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}`
 
 const reEvalTemplate = pickActionTemplate + `
 
-We already have called other tools. Evaluate the current situation and decide if we need to execute other tools or answer back with a result.`
+Previous actions have been executed. Let's evaluate the current situation:
+
+1. Review Previous Actions:
+   - What actions were taken
+   - What were the results
+   - Any issues or challenges encountered
+
+2. Assess Current State:
+   - Progress toward goals
+   - Changes in the situation
+   - New information or insights
+   - Current challenges or opportunities
+
+3. Determine Next Steps:
+   - Additional tools needed
+   - Final response required
+   - Error handling needed
+   - Approach adjustments required
+
+4. Decision Making:
+   - If task is complete: Use "reply" tool
+   - If errors exist: Address them appropriately
+   - If more actions needed: Explain why and which tools
+   - If situation changed: Adapt your approach
+
+Remember to:
+- Consider all available information
+- Be specific about next steps
+- Explain your reasoning clearly
+- Handle errors appropriately
+- Provide complete responses when done`
