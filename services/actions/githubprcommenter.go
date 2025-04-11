@@ -3,11 +3,8 @@ package actions
 import (
 	"context"
 	"fmt"
-	"io"
 	"regexp"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAGI/core/types"
@@ -124,16 +121,10 @@ func NewGithubPRCommenter(config map[string]string) *GithubPRCommenter {
 
 func (g *GithubPRCommenter) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
-		Repository     string `json:"repository"`
-		Owner          string `json:"owner"`
-		PRNumber       int    `json:"pr_number"`
-		GeneralComment string `json:"general_comment"`
-		Comments       []struct {
-			File      string `json:"file"`
-			Line      int    `json:"line"`
-			Comment   string `json:"comment"`
-			StartLine int    `json:"start_line,omitempty"`
-		} `json:"comments"`
+		Repository string `json:"repository"`
+		Owner      string `json:"owner"`
+		PRNumber   int    `json:"pr_number"`
+		Comment    string `json:"comment"`
 	}{}
 	err := params.Unmarshal(&result)
 	if err != nil {
@@ -159,134 +150,31 @@ func (g *GithubPRCommenter) Run(ctx context.Context, params types.ActionParams) 
 		return types.ActionResult{Result: fmt.Sprintf("Pull request #%d is not open (current state: %s)", result.PRNumber, *pr.State)}, nil
 	}
 
-	// Get the list of changed files to verify the files exist in the PR
-	files, _, err := g.client.PullRequests.ListFiles(ctx, result.Owner, result.Repository, result.PRNumber, &github.ListOptions{})
-	if err != nil {
-		return types.ActionResult{}, fmt.Errorf("failed to list PR files: %w", err)
+	if result.Comment == "" {
+		return types.ActionResult{Result: "No comment provided"}, nil
 	}
 
-	// Create a map of valid files with their commit info
-	validFiles := make(map[string]*commitFileInfo)
-	for _, file := range files {
-		if *file.Status != "deleted" {
-			info, err := getCommitInfo(file)
-			if err != nil {
-				continue
-			}
-			validFiles[*file.Filename] = info
-		}
-	}
+	// Try both PullRequests and Issues API for general comments
+	var resp *github.Response
 
-	// Process each comment
-	var results []string
-	for _, comment := range result.Comments {
-		// Check if file exists in PR
-		fileInfo, exists := validFiles[comment.File]
-		if !exists {
-			availableFiles := make([]string, 0, len(validFiles))
-			for f := range validFiles {
-				availableFiles = append(availableFiles, f)
-			}
-			results = append(results, fmt.Sprintf("Error: File %s not found in PR #%d. Available files: %v",
-				comment.File, result.PRNumber, availableFiles))
-			continue
-		}
+	// First try PullRequests API
+	_, resp, err = g.client.PullRequests.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, &github.PullRequestComment{
+		Body: &result.Comment,
+	})
 
-		// Check if line is in a changed hunk
-		if !fileInfo.isLineInChange(comment.Line) {
-			results = append(results, fmt.Sprintf("Error: Line %d is not in a changed hunk in file %s",
-				comment.Line, comment.File))
-			continue
-		}
-
-		// Calculate position
-		position := fileInfo.calculatePosition(comment.Line)
-		if position == nil {
-			results = append(results, fmt.Sprintf("Error: Could not calculate position for line %d in file %s",
-				comment.Line, comment.File))
-			continue
-		}
-
-		// Create the review comment
-		reviewComment := &github.PullRequestComment{
-			Path:     &comment.File,
-			Line:     &comment.Line,
-			Body:     &comment.Comment,
-			Position: position,
-			CommitID: &fileInfo.sha,
-		}
-
-		// Set start line if provided
-		if comment.StartLine > 0 {
-			reviewComment.StartLine = &comment.StartLine
-		}
-
-		// Create the comment with retries
-		var resp *github.Response
-		for i := 0; i < 6; i++ {
-			_, resp, err = g.client.PullRequests.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, reviewComment)
-			if err == nil {
-				break
-			}
-			if resp != nil && resp.StatusCode == 422 {
-				// Rate limit hit, wait and retry
-				retrySeconds := i * i
-				time.Sleep(time.Second * time.Duration(retrySeconds))
-				continue
-			}
-			break
-		}
-
-		if err != nil {
-			errorDetails := fmt.Sprintf("Error commenting on file %s, line %d: %s", comment.File, comment.Line, err.Error())
-			if resp != nil {
-				errorDetails += fmt.Sprintf("\nResponse Status: %s", resp.Status)
-				if resp.Body != nil {
-					body, _ := io.ReadAll(resp.Body)
-					errorDetails += fmt.Sprintf("\nResponse Body: %s", string(body))
-				}
-			}
-			results = append(results, errorDetails)
-			continue
-		}
-
-		results = append(results, fmt.Sprintf("Successfully commented on file %s, line %d", comment.File, comment.Line))
-	}
-
-	if result.GeneralComment != "" {
-		// Try both PullRequests and Issues API for general comments
-		var resp *github.Response
-		var err error
-
-		// First try PullRequests API
-		_, resp, err = g.client.PullRequests.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, &github.PullRequestComment{
-			Body: &result.GeneralComment,
+	// If that fails with 403, try Issues API
+	if err != nil && resp != nil && resp.StatusCode == 403 {
+		_, resp, err = g.client.Issues.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, &github.IssueComment{
+			Body: &result.Comment,
 		})
+	}
 
-		// If that fails with 403, try Issues API
-		if err != nil && resp != nil && resp.StatusCode == 403 {
-			_, resp, err = g.client.Issues.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, &github.IssueComment{
-				Body: &result.GeneralComment,
-			})
-		}
-
-		if err != nil {
-			errorDetails := fmt.Sprintf("Error adding general comment: %s", err.Error())
-			if resp != nil {
-				errorDetails += fmt.Sprintf("\nResponse Status: %s", resp.Status)
-				if resp.Body != nil {
-					body, _ := io.ReadAll(resp.Body)
-					errorDetails += fmt.Sprintf("\nResponse Body: %s", string(body))
-				}
-			}
-			results = append(results, errorDetails)
-		} else {
-			results = append(results, "Successfully added general comment to pull request")
-		}
+	if err != nil {
+		return types.ActionResult{Result: fmt.Sprintf("Error adding general comment: %s", err.Error())}, nil
 	}
 
 	return types.ActionResult{
-		Result: strings.Join(results, "\n"),
+		Result: "Successfully added general comment to pull request",
 	}, nil
 }
 
@@ -305,38 +193,12 @@ func (g *GithubPRCommenter) Definition() types.ActionDefinition {
 					Type:        jsonschema.Number,
 					Description: "The number of the pull request to comment on.",
 				},
-				"general_comment": {
+				"comment": {
 					Type:        jsonschema.String,
 					Description: "A general comment to add to the pull request.",
 				},
-				"comments": {
-					Type: jsonschema.Array,
-					Items: &jsonschema.Definition{
-						Type: jsonschema.Object,
-						Properties: map[string]jsonschema.Definition{
-							"file": {
-								Type:        jsonschema.String,
-								Description: "The file to comment on.",
-							},
-							"line": {
-								Type:        jsonschema.Number,
-								Description: "The line number to comment on.",
-							},
-							"comment": {
-								Type:        jsonschema.String,
-								Description: "The comment text.",
-							},
-							"start_line": {
-								Type:        jsonschema.Number,
-								Description: "Optional start line for multi-line comments.",
-							},
-						},
-						Required: []string{"file", "line", "comment"},
-					},
-					Description: "Array of comments to add to the pull request.",
-				},
 			},
-			Required: []string{"pr_number", "comments"},
+			Required: []string{"pr_number", "comment"},
 		}
 	}
 	return types.ActionDefinition{
@@ -355,38 +217,12 @@ func (g *GithubPRCommenter) Definition() types.ActionDefinition {
 				Type:        jsonschema.String,
 				Description: "The owner of the repository.",
 			},
-			"general_comment": {
+			"comment": {
 				Type:        jsonschema.String,
 				Description: "A general comment to add to the pull request.",
 			},
-			"comments": {
-				Type: jsonschema.Array,
-				Items: &jsonschema.Definition{
-					Type: jsonschema.Object,
-					Properties: map[string]jsonschema.Definition{
-						"file": {
-							Type:        jsonschema.String,
-							Description: "The file to comment on.",
-						},
-						"line": {
-							Type:        jsonschema.Number,
-							Description: "The line number to comment on.",
-						},
-						"comment": {
-							Type:        jsonschema.String,
-							Description: "The comment text.",
-						},
-						"start_line": {
-							Type:        jsonschema.Number,
-							Description: "Optional start line for multi-line comments.",
-						},
-					},
-					Required: []string{"file", "line", "comment"},
-				},
-				Description: "Array of comments to add to the pull request.",
-			},
 		},
-		Required: []string{"pr_number", "repository", "owner", "comments"},
+		Required: []string{"pr_number", "repository", "owner", "comment"},
 	}
 }
 

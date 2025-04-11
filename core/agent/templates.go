@@ -82,11 +82,7 @@ Current State:
 - Short-term Memory: {{range .CurrentState.Memories}}{{.}} {{end}}{{end}}
 Current Time: {{.Time}}`
 
-const pickSelfTemplate = `Available Tools:
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-
+const pickSelfTemplate = `
 You are an autonomous AI agent with a defined character and state (as shown above).
 Your task is to evaluate your current situation and determine the best course of action.
 
@@ -108,40 +104,21 @@ Remember:
 - Keep track of your progress and state
 - Be proactive in addressing potential issues
 
-{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}
-` + hudTemplate
-
-const reSelfEvalTemplate = pickSelfTemplate + `
-
-Previous actions have been executed. Evaluate the current situation:
-
-1. Review the outcomes of previous actions
-2. Assess progress toward your goals
-3. Identify any issues or challenges
-4. Determine if additional actions are needed
-
-Consider:
-- Success of previous actions
-- Changes in the situation
-- New information or insights
-- Potential next steps
-
-Make a decision about whether to:
-- Continue with more actions
-- Provide a final response
-- Adjust your approach
-- Update your goals or state`
-
-const pickActionTemplate = hudTemplate + `
 Available Tools:
 {{range .Actions -}}
 - {{.Name}}: {{.Description }}
 {{ end }}
 
-Task: Analyze the situation and determine the best course of action.
+{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}
+` + hudTemplate
+
+const reSelfEvalTemplate = pickSelfTemplate
+
+const pickActionTemplate = hudTemplate + `
+Your only task is to analyze the situation and determine a goal and the best tool to use, or just a final response if we have fullfilled the goal.
 
 Guidelines:
-1. Review the current state and context
+1. Review the current state, what was done already and context
 2. Consider available tools and their purposes
 3. Plan your approach carefully
 4. Explain your reasoning clearly
@@ -159,38 +136,11 @@ Decision Process:
 4. Explain your reasoning
 5. Execute the chosen action
 
+Available Tools:
+{{range .Actions -}}
+- {{.Name}}: {{.Description }}
+{{ end }}
+
 {{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}`
 
-const reEvalTemplate = pickActionTemplate + `
-
-Previous actions have been executed. Let's evaluate the current situation:
-
-1. Review Previous Actions:
-   - What actions were taken
-   - What were the results
-   - Any issues or challenges encountered
-
-2. Assess Current State:
-   - Progress toward goals
-   - Changes in the situation
-   - New information or insights
-   - Current challenges or opportunities
-
-3. Determine Next Steps:
-   - Additional tools needed
-   - Final response required
-   - Error handling needed
-   - Approach adjustments required
-
-4. Decision Making:
-   - If task is complete: Use "reply" tool
-   - If errors exist: Address them appropriately
-   - If more actions needed: Explain why and which tools
-   - If situation changed: Adapt your approach
-
-Remember to:
-- Consider all available information
-- Be specific about next steps
-- Explain your reasoning clearly
-- Handle errors appropriately
-- Provide complete responses when done`
+const reEvalTemplate = pickActionTemplate
