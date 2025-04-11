@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"embed"
 	"errors"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"path/filepath"
@@ -238,9 +239,20 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			history = &state.Status{ActionResults: []types.ActionState{}}
 		}
 
+		entries := []string{}
+		for _, h := range Reverse(history.Results()) {
+			entries = append(entries, fmt.Sprintf(
+				"Result: %v Action: %v Params: %v Reasoning: %v", 
+				h.Result,
+				h.Action.Definition().Name, 
+				h.Params, 
+				h.Reasoning,
+			))
+		}
+
 		return c.JSON(fiber.Map{
 			"Name":    c.Params("name"),
-			"History": Reverse(history.Results()),
+			"History": entries,
 		})
 	})
 
