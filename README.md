@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6958ffb3-31cf-441e-b99d-ce34ec6fc88f" alt="LocalAGI Logo" width="220"/>
+  <img src="./webui/react-ui/public/logo_1.png" alt="LocalAGI Logo" width="220"/>
 </p>
 
 <h3 align="center"><em>Your AI. Your Hardware. Your Rules.</em></h3>
