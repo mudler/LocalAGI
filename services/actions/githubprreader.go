@@ -64,20 +64,44 @@ func (g *GithubPRReader) Run(ctx context.Context, params types.ActionParams) (ty
 		return types.ActionResult{Result: fmt.Sprintf("Error fetching pull request files: %s", err.Error())}, err
 	}
 
+	// Get CI status information
+	ciStatus := "\n\nCI Status:\n"
+
+	// Get PR status checks
+	checkRuns, _, err := g.client.Checks.ListCheckRunsForRef(ctx, result.Owner, result.Repository, pr.GetHead().GetSHA(), &github.ListCheckRunsOptions{})
+	if err == nil && checkRuns != nil {
+		ciStatus += fmt.Sprintf("\nPR Status Checks:\n")
+		ciStatus += fmt.Sprintf("Total Checks: %d\n", checkRuns.GetTotal())
+		for _, check := range checkRuns.CheckRuns {
+			ciStatus += fmt.Sprintf("- %s: %s (%s)\n",
+				check.GetName(),
+				check.GetConclusion(),
+				check.GetStatus())
+		}
+	}
+
 	// Build the file changes summary with patches
 	fileChanges := "\n\nFile Changes:\n"
 	for _, file := range files {
-		fileChanges += fmt.Sprintf("\n--- %s\n+++ %s\n", *file.Filename, *file.Filename)
-		if g.showFullDiff && file.Patch != nil {
-			fileChanges += *file.Patch
+		fileChanges += fmt.Sprintf("\n--- %s\n+++ %s\n", file.GetFilename(), file.GetFilename())
+		if g.showFullDiff && file.GetPatch() != "" {
+			fileChanges += file.GetPatch()
 		}
-		fileChanges += fmt.Sprintf("\n(%d additions, %d deletions)\n", *file.Additions, *file.Deletions)
+		fileChanges += fmt.Sprintf("\n(%d additions, %d deletions)\n", file.GetAdditions(), file.GetDeletions())
 	}
 
 	return types.ActionResult{
 		Result: fmt.Sprintf(
-			"Pull Request %d Repository: %s\nTitle: %s\nBody: %s\nState: %s\nBase: %s\nHead: %s%s",
-			*pr.Number, *pr.Base.Repo.FullName, *pr.Title, *pr.Body, *pr.State, *pr.Base.Ref, *pr.Head.Ref, fileChanges)}, nil
+			"Pull Request %d Repository: %s\nTitle: %s\nBody: %s\nState: %s\nBase: %s\nHead: %s%s%s",
+			pr.GetNumber(),
+			pr.GetBase().GetRepo().GetFullName(),
+			pr.GetTitle(),
+			pr.GetBody(),
+			pr.GetState(),
+			pr.GetBase().GetRef(),
+			pr.GetHead().GetRef(),
+			ciStatus,
+			fileChanges)}, nil
 }
 
 func (g *GithubPRReader) Definition() types.ActionDefinition {

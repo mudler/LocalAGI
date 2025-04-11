@@ -515,10 +515,21 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		//job.Result.Finish(fmt.Errorf("no action to do"))\
 		xlog.Info("No action to do, just reply", "agent", a.Character.Name, "reasoning", reasoning)
 
-		conv = append(conv, openai.ChatCompletionMessage{
-			Role:    "assistant",
-			Content: reasoning,
-		})
+		if reasoning != "" {
+			conv = append(conv, openai.ChatCompletionMessage{
+				Role:    "assistant",
+				Content: reasoning,
+			})
+		} else {
+			xlog.Info("No reasoning, just reply", "agent", a.Character.Name)
+			msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
+			if err != nil {
+				job.Result.Finish(fmt.Errorf("error asking LLM for a reply: %w", err))
+				return
+			}
+			conv = append(conv, msg)
+			reasoning = msg.Content
+		}
 
 		xlog.Debug("Finish job with reasoning", "reasoning", reasoning, "agent", a.Character.Name, "conversation", fmt.Sprintf("%+v", conv))
 		job.Result.Conversation = conv

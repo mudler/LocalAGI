@@ -127,15 +127,15 @@ func (g *GithubPRReviewer) Run(ctx context.Context, params types.ActionParams) (
 		return types.ActionResult{Result: errorDetails}, err
 	}
 
-	actionResult := strings.Builder{}
+	actionResult := fmt.Sprintf(
+		"Pull request https://github.com/%s/%s/pull/%d reviewed successfully with status: %s",
+		result.Owner,
+		result.Repository,
+		result.PRNumber,
+		strings.ToLower(result.ReviewAction),
+	)
 
-	actionResult.WriteString("========================== PR Reviewer Result ==========================\n")
-	actionResult.WriteString(fmt.Sprintf("Pull request https://github.com/%s/%s/pull/%d", result.Owner, result.Repository, result.PRNumber))
-	actionResult.WriteString("\n")
-	actionResult.WriteString(fmt.Sprintf("Successfully reviewed with status: %s", strings.ToLower(result.ReviewAction)))
-	actionResult.WriteString("\n")
-
-	return types.ActionResult{Result: actionResult.String()}, nil
+	return types.ActionResult{Result: actionResult}, nil
 }
 
 func (g *GithubPRReviewer) Definition() types.ActionDefinition {
