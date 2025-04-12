@@ -605,7 +605,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	var err error
 	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)
 	if err != nil {
-		job.Result.Finish(fmt.Errorf("error running action: %w", err))
+		xlog.Error("error handling planning", "error", err)
+		//job.Result.Conversation = conv
+		//job.Result.SetResponse(msg.Content)
+		a.reply(job, role, append(conv, openai.ChatCompletionMessage{
+			Role:    "assistant",
+			Content: fmt.Sprintf("Error handling planning: %v", err),
+		}), actionParams, chosenAction, reasoning)
 		return
 	}
 

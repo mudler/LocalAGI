@@ -265,6 +265,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 
 		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning, maxRetries)
 		if err != nil {
+			xlog.Error("error generating action's parameters", "error", err)
 			return conv, fmt.Errorf("error generating action's parameters: %w", err)
 
 		}
@@ -294,6 +295,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 
 		result, err := a.runAction(ctx, subTaskAction, actionParams)
 		if err != nil {
+			xlog.Error("error running action", "error", err)
 			return conv, fmt.Errorf("error running action: %w", err)
 		}
 
