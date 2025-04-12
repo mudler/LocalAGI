@@ -126,6 +126,7 @@ var _ = Describe("Agent test", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
+				WithTimeout("10m"),
 				WithLoopDetectionSteps(3),
 				//	WithRandomIdentity(),
 				WithActions(&TestAction{response: map[string]string{
@@ -174,7 +175,7 @@ var _ = Describe("Agent test", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
-
+				WithTimeout("10m"),
 				//	WithRandomIdentity(),
 				WithActions(&TestAction{response: map[string]string{
 					"boston": testActionResult,
@@ -199,6 +200,7 @@ var _ = Describe("Agent test", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
+				WithTimeout("10m"),
 				EnableHUD,
 				//	EnableStandaloneJob,
 				//	WithRandomIdentity(),
