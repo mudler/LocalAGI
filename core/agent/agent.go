@@ -689,26 +689,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		job.SetNextAction(&followingAction, &followingParams, reasoning)
 		a.consumeJob(job, role)
 		return
-	} else if followingAction == nil {
-		xlog.Info("Not following another action", "agent", a.Character.Name)
-
-		if !a.options.forceReasoning {
-			xlog.Info("Finish conversation with reasoning", "reasoning", reasoning, "agent", a.Character.Name)
-
-			msg := openai.ChatCompletionMessage{
-				Role:    "assistant",
-				Content: reasoning,
-			}
-
-			conv = append(conv, msg)
-			job.Result.SetResponse(msg.Content)
-			job.Result.Conversation = conv
-			job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
-				a.saveCurrentConversation(conv)
-			})
-			job.Result.Finish(nil)
-			return
-		}
 	}
 
 	a.reply(job, role, conv, actionParams, chosenAction, reasoning)
