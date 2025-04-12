@@ -456,7 +456,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		return nil, nil, "", err
 	}
 	originalReasoning := thought.Content
-
+	xlog.Debug("[pickAction] original reasoning", "originalReasoning", originalReasoning)
 	// From the thought, get the action call
 	// Get all the available actions IDs
 
