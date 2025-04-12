@@ -10,12 +10,11 @@ import (
 // NewGoal creates a new intention action
 // The inention action is special as it tries to identify
 // a tool to use and a reasoning over to use it
-func NewGoal(s ...string) *GoalAction {
-	return &GoalAction{tools: s}
+func NewGoal() *GoalAction {
+	return &GoalAction{}
 }
 
 type GoalAction struct {
-	tools []string
 }
 type GoalResponse struct {
 	Goal     string `json:"goal"`
