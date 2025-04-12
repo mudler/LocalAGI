@@ -126,6 +126,7 @@ var _ = Describe("Agent test", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
+				EnableForceReasoning,
 				WithTimeout("10m"),
 				WithLoopDetectionSteps(3),
 				//	WithRandomIdentity(),
