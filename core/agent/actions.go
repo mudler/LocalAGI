@@ -429,96 +429,28 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		}, c...)
 	}
 
-	// thoughtPromptStringBuilder := strings.Builder{}
-	// thoughtPromptStringBuilder.WriteString("You have to pick an action based on the conversation and the prompt. Describe the full reasoning process for your choice. Here is a list of actions: ")
-	// for _, m := range a.availableActions() {
-	// 	thoughtPromptStringBuilder.WriteString(
-	// 		m.Definition().Name.String() + ": " + m.Definition().Description + "\n",
-	// 	)
-	// }
-
-	// thoughtPromptStringBuilder.WriteString("To not use any action, respond with 'none'")
-
-	//thoughtPromptStringBuilder.WriteString("\n\nConversation: " + Messages(c).RemoveIf(func(msg openai.ChatCompletionMessage) bool {
-	//	return msg.Role == "system"
-	//}).String())
-
-	//thoughtPrompt := thoughtPromptStringBuilder.String()
-
-	//thoughtConv := []openai.ChatCompletionMessage{}
+	thought, err := a.decision(ctx,
+		c,
+		types.Actions{action.NewReasoning()}.ToTools(),
+		action.NewReasoning().Definition().Name.String(), maxRetries)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	originalReasoning := ""
+	response := &action.ReasoningResponse{}
+	if thought.actionParams != nil {
+		if err := thought.actionParams.Unmarshal(response); err != nil {
+			return nil, nil, "", err
+		}
+		originalReasoning = response.Reasoning
+	}
+	if thought.message != "" {
+		originalReasoning = thought.message
+	}
 
 	xlog.Debug("[pickAction] picking action", "messages", c)
-	thought, err := a.askLLM(ctx,
-		c,
-		maxRetries,
-	)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	originalReasoning := thought.Content
-	xlog.Debug("[pickAction] original reasoning", "originalReasoning", originalReasoning)
-	// From the thought, get the action call
-	// Get all the available actions IDs
-
-	// by grammar, let's decide if we have achieved the goal
-	//  1. analyze response and check if  goal is achieved
-
-	// Extract the goal first
-	params, err := a.decision(ctx,
-		append(
-			[]openai.ChatCompletionMessage{
-				{
-					Role:    "system",
-					Content: "Your only task is to extract the goal from the following conversation",
-				}}, messages...),
-		types.Actions{action.NewGoal()}.ToTools(),
-		action.NewGoal().Definition().Name.String(), maxRetries)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)
-	}
-
-	goalResponse := action.GoalResponse{}
-	err = params.actionParams.Unmarshal(&goalResponse)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	if goalResponse.Goal == "" {
-		xlog.Debug("[pickAction] no goal found")
-		return nil, nil, "", nil
-	}
-
-	// Check if the goal was achieved
-	params, err = a.decision(ctx,
-		[]openai.ChatCompletionMessage{
-			{
-				Role:    "system",
-				Content: "You have to understand if the goal is achieved or not from the following reasoning. The goal: " + goalResponse.Goal,
-			},
-			{
-				Role:    "user",
-				Content: originalReasoning,
-			}},
-		types.Actions{action.NewGoal()}.ToTools(),
-		action.NewGoal().Definition().Name.String(), maxRetries)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)
-	}
-
-	err = params.actionParams.Unmarshal(&goalResponse)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	if goalResponse.Achieved {
-		xlog.Debug("[pickAction] goal achieved", "goal", goalResponse.Goal)
-		return nil, nil, "", nil
-	}
-
-	// if the goal is not achieved, pick an action
-	xlog.Debug("[pickAction] goal not achieved", "goal", goalResponse.Goal)
-
-	xlog.Debug("[pickAction] thought", "conv", c, "originalReasoning", originalReasoning)
+	// thought, err := a.askLLM(ctx,
+	// 	c,
 
 	actionsID := []string{"reply"}
 	for _, m := range a.availableActions() {
@@ -533,20 +465,11 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	// to avoid hallucinations
 
 	// Extract an action
-	params, err = a.decision(ctx,
-		[]openai.ChatCompletionMessage{
-			{
-				Role:    "system",
-				Content: prompt,
-			},
-			{
-				Role:    "system",
-				Content: "Extract an action to perform from the following reasoning: ",
-			},
-			{
-				Role:    "user",
-				Content: originalReasoning,
-			}},
+	params, err := a.decision(ctx,
+		append(c, openai.ChatCompletionMessage{
+			Role:    "system",
+			Content: "Pick the relevant action given the following reasoning: " + originalReasoning,
+		}),
 		types.Actions{intentionsTools}.ToTools(),
 		intentionsTools.Definition().Name.String(), maxRetries)
 	if err != nil {

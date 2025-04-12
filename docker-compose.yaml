@@ -8,7 +8,7 @@ services:
     image: localai/localai:master-ffmpeg-core
     command: 
     # - gemma-3-12b-it
-    - ${MODEL_NAME:-openthinker-7b}
+    - ${MODEL_NAME:-gemma-3-4b-it}
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -39,7 +39,7 @@ services:
               count: 1
               capabilities: [gpu]
     command: 
-    - ${MODEL_NAME:-openthinker-7b}
+    - ${MODEL_NAME:-gemma-3-4b-it}
     - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
     - ${IMAGE_MODEL:-flux.1-dev}
     - granite-embedding-107m-multilingual
@@ -57,7 +57,7 @@ services:
       - /dev/dri/card1
       - /dev/dri/renderD129
     command: 
-    - ${MODEL_NAME:-openthinker-7b}
+    - ${MODEL_NAME:-gemma-3-4b-it}
     - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
     - ${IMAGE_MODEL:-sd-1.5-ggml}
     - granite-embedding-107m-multilingual
@@ -96,7 +96,7 @@ services:
       - 8080:3000
     #image: quay.io/mudler/localagi:master
     environment:
-      - LOCALAGI_MODEL=${MODEL_NAME:-openthinker-7b}
+      - LOCALAGI_MODEL=${MODEL_NAME:-gemma-3-4b-it}
       - LOCALAGI_LLM_API_URL=http://localai:8080
       #- LOCALAGI_LLM_API_KEY=sk-1234567890
       - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
@@ -113,7 +113,7 @@ services:
     extends:
       service: localagi
     environment:
-      - LOCALAGI_MODEL=${MODEL_NAME:-openthinker-7b}
+      - LOCALAGI_MODEL=${MODEL_NAME:-gemma-3-4b-it}
       - LOCALAGI_MULTIMODAL_MODEL=${MULTIMODAL_MODEL:-minicpm-v-2_6}
       - LOCALAGI_IMAGE_MODEL=${IMAGE_MODEL:-flux.1-dev}
       - LOCALAGI_LLM_API_URL=http://localai:8080
@@ -127,7 +127,7 @@ services:
     extends:
       service: localagi
     environment:
-      - LOCALAGI_MODEL=${MODEL_NAME:-openthinker-7b}
+      - LOCALAGI_MODEL=${MODEL_NAME:-gemma-3-4b-it}
       - LOCALAGI_MULTIMODAL_MODEL=${MULTIMODAL_MODEL:-minicpm-v-2_6}
       - LOCALAGI_IMAGE_MODEL=${IMAGE_MODEL:-sd-1.5-ggml}
       - LOCALAGI_LLM_API_URL=http://localai:8080

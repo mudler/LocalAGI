@@ -83,7 +83,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose --profile nvidia up`
 - Default models:
-  - Text: `openthinker-7b`
+  - Text: `gemma-3-4b-it`
   - Multimodal: `minicpm-v-2_6`
   - Image: `flux.1-dev`
 - Environment variables:
@@ -99,7 +99,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose --profile intel up`
 - Default models:
-  - Text: `openthinker-7b`
+  - Text: `gemma-3-4b-it`
   - Multimodal: `minicpm-v-2_6`
   - Image: `sd-1.5-ggml`
 - Environment variables:
@@ -130,7 +130,7 @@ docker compose --profile intel up
 ```
 
 If no models are specified, it will use the defaults:
-- Text model: `openthinker-7b`
+- Text model: `gemma-3-4b-it`
 - Multimodal model: `minicpm-v-2_6`
 - Image model: `flux.1-dev` (NVIDIA) or `sd-1.5-ggml` (Intel)
 
