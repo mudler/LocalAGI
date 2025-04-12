@@ -115,7 +115,7 @@ Available Tools:
 const reSelfEvalTemplate = pickSelfTemplate
 
 const pickActionTemplate = hudTemplate + `
-Your only task is to analyze the situation and determine a goal and the best tool to use, or just a final response if we have fullfilled the goal.
+Your only task is to analyze the conversation and determine a goal and the best tool to use, or just a final response if we have fullfilled the goal.
 
 Guidelines:
 1. Review the current state, what was done already and context

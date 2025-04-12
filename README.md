@@ -45,14 +45,100 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 git clone https://github.com/mudler/LocalAGI
 cd LocalAGI
 
-# CPU setup
-docker compose up -f docker-compose.yml
+# CPU setup (default)
+docker compose up
 
-# GPU setup
-docker compose up -f docker-compose.gpu.yml
+# NVIDIA GPU setup
+docker compose --profile nvidia up
+
+# Intel GPU setup (for Intel Arc and integrated GPUs)
+docker compose --profile intel up
+
+# Start with a specific model (see available models in models.localai.io, or localai.io to use any model in huggingface)
+MODEL_NAME=gemma-3-12b-it docker compose up
+
+# NVIDIA GPU setup with custom multimodal and image models
+MODEL_NAME=gemma-3-12b-it \
+MULTIMODAL_MODEL=minicpm-v-2_6 \
+IMAGE_MODEL=flux.1-dev \
+docker compose --profile nvidia up
 ```
 
-Access your agents at `http://localhost:8080`
+Now you can access and manage your agents at [http://localhost:8080](http://localhost:8080)
+
+## 🖥️ Hardware Configurations
+
+LocalAGI supports multiple hardware configurations through Docker Compose profiles:
+
+### CPU (Default)
+- No special configuration needed
+- Runs on any system with Docker
+- Best for testing and development
+- Supports text models only
+
+### NVIDIA GPU
+- Requires NVIDIA GPU and drivers
+- Uses CUDA for acceleration
+- Best for high-performance inference
+- Supports text, multimodal, and image generation models
+- Run with: `docker compose --profile nvidia up`
+- Default models:
+  - Text: `arcee-agent`
+  - Multimodal: `minicpm-v-2_6`
+  - Image: `flux.1-dev`
+- Environment variables:
+  - `MODEL_NAME`: Text model to use
+  - `MULTIMODAL_MODEL`: Multimodal model to use
+  - `IMAGE_MODEL`: Image generation model to use
+  - `LOCALAI_SINGLE_ACTIVE_BACKEND`: Set to `true` to enable single active backend mode
+
+### Intel GPU
+- Supports Intel Arc and integrated GPUs
+- Uses SYCL for acceleration
+- Best for Intel-based systems
+- Supports text, multimodal, and image generation models
+- Run with: `docker compose --profile intel up`
+- Default models:
+  - Text: `arcee-agent`
+  - Multimodal: `minicpm-v-2_6`
+  - Image: `sd-1.5-ggml`
+- Environment variables:
+  - `MODEL_NAME`: Text model to use
+  - `MULTIMODAL_MODEL`: Multimodal model to use
+  - `IMAGE_MODEL`: Image generation model to use
+  - `LOCALAI_SINGLE_ACTIVE_BACKEND`: Set to `true` to enable single active backend mode
+
+## Customize models
+
+You can customize the models used by LocalAGI by setting environment variables when running docker-compose. For example:
+
+```bash
+# CPU with custom model
+MODEL_NAME=gemma-3-12b-it docker compose up
+
+# NVIDIA GPU with custom models
+MODEL_NAME=gemma-3-12b-it \
+MULTIMODAL_MODEL=minicpm-v-2_6 \
+IMAGE_MODEL=flux.1-dev \
+docker compose --profile nvidia up
+
+# Intel GPU with custom models
+MODEL_NAME=gemma-3-12b-it \
+MULTIMODAL_MODEL=minicpm-v-2_6 \
+IMAGE_MODEL=sd-1.5-ggml \
+docker compose --profile intel up
+```
+
+If no models are specified, it will use the defaults:
+- Text model: `arcee-agent`
+- Multimodal model: `minicpm-v-2_6`
+- Image model: `flux.1-dev` (NVIDIA) or `sd-1.5-ggml` (Intel)
+
+Good (relatively small) models that have been tested are:
+
+- `qwen_qwq-32b` (best in co-ordinating agents)
+- `gemma-3-12b-it`
+- `gemma-3-27b-it`
 
 ## 🏆 Why Choose LocalAGI?
 
@@ -97,6 +183,8 @@ Explore detailed documentation including:
 - [Agent Configuration](#agent-configuration-reference)
 
 ### Environment Configuration
+
+LocalAGI supports environment configurations. Note that these environment variables needs to be specified in the localagi container in the docker-compose file to have effect.
 
 | Variable | What It Does |
 |----------|--------------|

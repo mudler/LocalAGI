@@ -24,15 +24,27 @@ type decisionResult struct {
 func (a *Agent) decision(
 	ctx context.Context,
 	conversation []openai.ChatCompletionMessage,
-	tools []openai.Tool, toolchoice any, maxRetries int) (*decisionResult, error) {
+	tools []openai.Tool, toolchoice string, maxRetries int) (*decisionResult, error) {
+
+	var choice *openai.ToolChoice
+
+	if toolchoice != "" {
+		choice = &openai.ToolChoice{
+			Type:     openai.ToolTypeFunction,
+			Function: openai.ToolFunction{Name: toolchoice},
+		}
+	}
 
 	var lastErr error
 	for attempts := 0; attempts < maxRetries; attempts++ {
 		decision := openai.ChatCompletionRequest{
-			Model:      a.options.LLMAPI.Model,
-			Messages:   conversation,
-			Tools:      tools,
-			ToolChoice: toolchoice,
+			Model:    a.options.LLMAPI.Model,
+			Messages: conversation,
+			Tools:    tools,
+		}
+
+		if choice != nil {
+			decision.ToolChoice = *choice
 		}
 
 		resp, err := a.client.CreateChatCompletion(ctx, decision)
@@ -41,6 +53,9 @@ func (a *Agent) decision(
 			xlog.Warn("Attempt to make a decision failed", "attempt", attempts+1, "error", err)
 			continue
 		}
+
+		jsonResp, _ := json.Marshal(resp)
+		xlog.Debug("Decision response", "response", string(jsonResp))
 
 		if len(resp.Choices) != 1 {
 			lastErr = fmt.Errorf("no choices: %d", len(resp.Choices))
@@ -189,10 +204,7 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 		result, attemptErr = a.decision(ctx,
 			cc,
 			a.availableActions().ToTools(),
-			openai.ToolChoice{
-				Type:     openai.ToolTypeFunction,
-				Function: openai.ToolFunction{Name: act.Definition().Name.String()},
-			},
+			act.Definition().Name.String(),
 			maxAttempts,
 		)
 		if attemptErr == nil && result.actionParams != nil {
@@ -253,6 +265,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 
 		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning, maxRetries)
 		if err != nil {
+			xlog.Error("error generating action's parameters", "error", err)
 			return conv, fmt.Errorf("error generating action's parameters: %w", err)
 
 		}
@@ -282,6 +295,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 
 		result, err := a.runAction(ctx, subTaskAction, actionParams)
 		if err != nil {
+			xlog.Error("error running action", "error", err)
 			return conv, fmt.Errorf("error running action: %w", err)
 		}
 
@@ -367,7 +381,9 @@ func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {
 func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage, maxRetries int) (types.Action, types.ActionParams, string, error) {
 	c := messages
 
-	xlog.Debug("[pickAction] picking action", "messages", messages)
+	xlog.Debug("[pickAction] picking action starts", "messages", messages)
+
+	// Identify the goal of this conversation
 
 	if !a.options.forceReasoning {
 		xlog.Debug("not forcing reasoning")
@@ -376,7 +392,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		thought, err := a.decision(ctx,
 			messages,
 			a.availableActions().ToTools(),
-			nil,
+			"",
 			maxRetries)
 		if err != nil {
 			return nil, nil, "", err
@@ -415,120 +431,83 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		}, c...)
 	}
 
-	actionsID := []string{}
+	thought, err := a.decision(ctx,
+		c,
+		types.Actions{action.NewReasoning()}.ToTools(),
+		action.NewReasoning().Definition().Name.String(), maxRetries)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	originalReasoning := ""
+	response := &action.ReasoningResponse{}
+	if thought.actionParams != nil {
+		if err := thought.actionParams.Unmarshal(response); err != nil {
+			return nil, nil, "", err
+		}
+		originalReasoning = response.Reasoning
+	}
+	if thought.message != "" {
+		originalReasoning = thought.message
+	}
+
+	xlog.Debug("[pickAction] picking action", "messages", c)
+	// thought, err := a.askLLM(ctx,
+	// 	c,
+
+	actionsID := []string{"reply"}
 	for _, m := range a.availableActions() {
 		actionsID = append(actionsID, m.Definition().Name.String())
 	}
 
-	// thoughtPromptStringBuilder := strings.Builder{}
-	// thoughtPromptStringBuilder.WriteString("You have to pick an action based on the conversation and the prompt. Describe the full reasoning process for your choice. Here is a list of actions: ")
-	// for _, m := range a.availableActions() {
-	// 	thoughtPromptStringBuilder.WriteString(
-	// 		m.Definition().Name.String() + ": " + m.Definition().Description + "\n",
-	// 	)
-	// }
+	xlog.Debug("[pickAction] actionsID", "actionsID", actionsID)
 
-	// thoughtPromptStringBuilder.WriteString("To not use any action, respond with 'none'")
-
-	//thoughtPromptStringBuilder.WriteString("\n\nConversation: " + Messages(c).RemoveIf(func(msg openai.ChatCompletionMessage) bool {
-	//	return msg.Role == "system"
-	//}).String())
-
-	//thoughtPrompt := thoughtPromptStringBuilder.String()
-
-	//thoughtConv := []openai.ChatCompletionMessage{}
-
-	thought, err := a.askLLM(ctx,
-		c,
-		maxRetries,
-	)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	originalReasoning := thought.Content
-
-	// From the thought, get the action call
-	// Get all the available actions IDs
-
-	// by grammar, let's decide if we have achieved the goal
-	//  1. analyze response and check if  goal is achieved
-
-	params, err := a.decision(ctx,
-		[]openai.ChatCompletionMessage{
-			{
-				Role:    "system",
-				Content: "Extract an action to perform from the following reasoning: ",
-			},
-			{
-				Role:    "user",
-				Content: originalReasoning,
-			}},
-		types.Actions{action.NewGoal()}.ToTools(),
-		action.NewGoal().Definition().Name, maxRetries)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)
-	}
-
-	goalResponse := action.GoalResponse{}
-	err = params.actionParams.Unmarshal(&goalResponse)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	if goalResponse.Achieved {
-		xlog.Debug("[pickAction] goal achieved", "goal", goalResponse.Goal)
-		return nil, nil, "", nil
-	}
-
-	// if the goal is not achieved, pick an action
-	xlog.Debug("[pickAction] goal not achieved", "goal", goalResponse.Goal)
-
-	xlog.Debug("[pickAction] thought", "conv", c, "originalReasoning", originalReasoning)
-
+	intentionsTools := action.NewIntention(actionsID...)
 	// TODO: FORCE to select ana ction here
 	// NOTE: we do not give the full conversation here to pick the action
 	// to avoid hallucinations
-	params, err = a.decision(ctx,
-		[]openai.ChatCompletionMessage{
-			{
-				Role:    "system",
-				Content: "Extract an action to perform from the following reasoning: ",
-			},
-			{
-				Role:    "user",
-				Content: originalReasoning,
-			}},
-		a.availableActions().ToTools(),
-		nil, maxRetries)
+
+	// Extract an action
+	params, err := a.decision(ctx,
+		append(c, openai.ChatCompletionMessage{
+			Role:    "system",
+			Content: "Pick the relevant action given the following reasoning: " + originalReasoning,
+		}),
+		types.Actions{intentionsTools}.ToTools(),
+		intentionsTools.Definition().Name.String(), maxRetries)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to get the action tool parameters: %v", err)
 	}
 
-	chosenAction := a.availableActions().Find(params.actioName)
+	if params.actionParams == nil {
+		xlog.Debug("[pickAction] no action params found")
+		return nil, nil, params.message, nil
+	}
 
-	// xlog.Debug("[pickAction] params", "params", params)
+	actionChoice := action.IntentResponse{}
+	err = params.actionParams.Unmarshal(&actionChoice)
+	if err != nil {
+		return nil, nil, "", err
+	}
 
-	// if params.actionParams == nil {
-	// 	return nil, nil, params.message, nil
-	// }
+	if actionChoice.Tool == "" || actionChoice.Tool == "reply" {
+		xlog.Debug("[pickAction] no action found, replying")
+		return nil, nil, "", nil
+	}
 
-	// xlog.Debug("[pickAction] actionChoice", "actionChoice", params.actionParams, "message", params.message)
+	chosenAction := a.availableActions().Find(actionChoice.Tool)
 
-	// actionChoice := action.IntentResponse{}
+	xlog.Debug("[pickAction] chosenAction", "chosenAction", chosenAction, "actionName", actionChoice.Tool)
 
-	// err = params.actionParams.Unmarshal(&actionChoice)
-	// if err != nil {
-	// 	return nil, nil, "", err
-	// }
+	// // Let's double check if the action is correct by asking the LLM to judge it
 
-	// if actionChoice.Tool == "" || actionChoice.Tool == "none" {
-	// 	return nil, nil, "", nil
-	// }
+	// if chosenAction!= nil {
+	// 	promptString:= "Given the following goal and thoughts, is the action correct? \n\n"
+	// 	promptString+= fmt.Sprintf("Goal: %s\n", goalResponse.Goal)
+	// 	promptString+= fmt.Sprintf("Thoughts: %s\n", originalReasoning)
+	// 	promptString+= fmt.Sprintf("Action: %s\n", chosenAction.Definition().Name.String())
+	// 	promptString+= fmt.Sprintf("Action description: %s\n", chosenAction.Definition().Description)
+	// 	promptString+= fmt.Sprintf("Action parameters: %s\n", params.actionParams)
 
-	// // Find the action
-	// chosenAction := a.availableActions().Find(actionChoice.Tool)
-	// if chosenAction == nil {
-	// 	return nil, nil, "", fmt.Errorf("no action found for intent:" + actionChoice.Tool)
 	// }
 
 	return chosenAction, nil, originalReasoning, nil

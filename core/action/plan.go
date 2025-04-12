@@ -41,7 +41,7 @@ func (a *PlanAction) Plannable() bool {
 func (a *PlanAction) Definition() types.ActionDefinition {
 	return types.ActionDefinition{
 		Name:        PlanActionName,
-		Description: "Use this tool for solving complex tasks that involves calling more tools in sequence.",
+		Description: "Use it for situations that involves doing more actions in sequence.",
 		Properties: map[string]jsonschema.Definition{
 			"subtasks": {
 				Type:        jsonschema.Array,

@@ -3,7 +3,7 @@ IMAGE_NAME?=webui
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 prepare-tests:
-	docker compose up -d
+	docker compose up -d --build
 
 cleanup-tests:
 	docker compose down
