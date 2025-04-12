@@ -7,7 +7,8 @@ services:
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
     image: localai/localai:master-ffmpeg-core
     command: 
-    - gemma-3-12b-it
+    # - gemma-3-12b-it
+    - ${MODEL_NAME:-openthinker-7b}
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -65,7 +66,7 @@ services:
       - 8080:3000
     #image: quay.io/mudler/localagi:master
     environment:
-      - LOCALAGI_MODEL=gemma-3-12b-it
+      - LOCALAGI_MODEL=${MODEL_NAME:-openthinker-7b}
       - LOCALAGI_LLM_API_URL=http://localai:8080
       #- LOCALAGI_LLM_API_KEY=sk-1234567890
       - LOCALAGI_LOCALRAG_URL=http://localrecall:8080

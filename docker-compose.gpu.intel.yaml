@@ -8,7 +8,7 @@ services:
     image: localai/localai:master-sycl-f32-ffmpeg-core
     command: 
     # - rombo-org_rombo-llm-v3.0-qwen-32b # minimum suggested model
-    - gemma-3-12b-it # (smaller)
+    - openthinker-7b # (smaller)
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -62,7 +62,7 @@ services:
       - 8080:3000
     image: quay.io/mudler/localagi:master
     environment:
-      - LOCALAGI_MODEL=gemma-3-12b-it
+      - LOCALAGI_MODEL=openthinker-7b
       - LOCALAGI_LLM_API_URL=http://localai:8080
       #- LOCALAGI_LLM_API_KEY=sk-1234567890
       - LOCALAGI_LOCALRAG_URL=http://localrecall:8080

@@ -249,7 +249,7 @@ func (a *Agent) runAction(ctx context.Context, chosenAction types.Action, params
 		}
 	}
 
-	xlog.Info("Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name)
+	xlog.Info("[runAction] Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name, "params", params.String())
 
 	if chosenAction.Definition().Name.Is(action.StateActionName) {
 		// We need to store the result in the state
@@ -270,6 +270,8 @@ func (a *Agent) runAction(ctx context.Context, chosenAction types.Action, params
 		}
 	}
 
+	xlog.Debug("[runAction] Action result", "action", chosenAction.Definition().Name, "params", params.String(), "result", result.Result)
+	
 	return result, nil
 }
 

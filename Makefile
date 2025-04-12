@@ -9,7 +9,7 @@ cleanup-tests:
 	docker compose down
 
 tests: prepare-tests
-	LOCALAGI_MODEL="gemma-3-12b-it" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --fail-fast -v -r ./...
+	LOCALAGI_MODEL="openthinker-7b" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --fail-fast -v -r ./...
 
 run-nokb:
 	$(MAKE) run KBDISABLEINDEX=true
