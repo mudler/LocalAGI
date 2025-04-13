@@ -66,6 +66,35 @@ docker compose --profile nvidia up
 
 Now you can access and manage your agents at [http://localhost:8080](http://localhost:8080)
 
+## 📚🆕 Local Stack Family
+
+🆕 LocalAI is now part of a comprehensive suite of AI tools designed to work together:
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://github.com/mudler/LocalAI">
+        <img src="https://raw.githubusercontent.com/mudler/LocalAI/refs/heads/rebranding/core/http/static/logo_horizontal.png" width="300" alt="LocalAI Logo">
+      </a>
+    </td>
+    <td width="50%" valign="top">
+      <h3><a href="https://github.com/mudler/LocalRecall">LocalAI</a></h3>
+      <p>LocalAI is the free, Open Source OpenAI alternative. LocalAI act as a drop-in replacement REST API that's compatible with OpenAI (Elevenlabs, Anthropic... ) API specifications for local AI inferencing. It allows you to run LLMs, generate images, audio (and not only) locally or on-prem with consumer grade hardware, supporting multiple model families. Does not require GPU.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://github.com/mudler/LocalRecall">
+        <img src="https://raw.githubusercontent.com/mudler/LocalRecall/refs/heads/main/static/localrecall_horizontal.png" width="300" alt="LocalRecall Logo">
+      </a>
+    </td>
+    <td width="50%" valign="top">
+      <h3><a href="https://github.com/mudler/LocalRecall">LocalRecall</a></h3>
+      <p>A REST-ful API and knowledge base management system that provides persistent memory and storage capabilities for AI agents.</p>
+    </td>
+  </tr>
+</table>
+
 ## 🖥️ Hardware Configurations
 
 LocalAGI supports multiple hardware configurations through Docker Compose profiles:
