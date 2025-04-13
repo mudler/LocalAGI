@@ -1,0 +1,31 @@
+services:
+  localai:
+    extends:
+      file: docker-compose.yaml
+      service: localai
+    environment:
+      - LOCALAI_SINGLE_ACTIVE_BACKEND=true
+      - DEBUG=true
+    image: localai/localai:master-sycl-f32-ffmpeg-core
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  localrecall:
+    extends:
+      file: docker-compose.yaml
+      service: localrecall
+
+  localrecall-healthcheck:
+    extends:
+      file: docker-compose.yaml
+      service: localrecall-healthcheck
+
+  localagi:
+    extends:
+      file: docker-compose.yaml
+      service: localagi

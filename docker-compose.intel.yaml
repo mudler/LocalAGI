@@ -1,0 +1,42 @@
+services:
+  localai:
+    extends:
+      file: docker-compose.yaml
+      service: localai
+    environment:
+      - LOCALAI_SINGLE_ACTIVE_BACKEND=true
+      - DEBUG=true
+    image: localai/localai:master-sycl-f32-ffmpeg-core
+    devices:
+      # On a system with integrated GPU and an Arc 770, this is the Arc 770
+      - /dev/dri/card1
+      - /dev/dri/renderD129
+    command: 
+    - ${MODEL_NAME:-arcee-agent}
+    - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
+    - ${IMAGE_MODEL:-sd-1.5-ggml}
+    - granite-embedding-107m-multilingual
+
+  localrecall:
+    extends:
+      file: docker-compose.yaml
+      service: localrecall
+
+  localrecall-healthcheck:
+    extends:
+      file: docker-compose.yaml
+      service: localrecall-healthcheck
+
+  localagi:
+    extends:
+      file: docker-compose.yaml
+      service: localagi
+    environment:
+      - LOCALAGI_MODEL=${MODEL_NAME:-arcee-agent}
+      - LOCALAGI_MULTIMODAL_MODEL=${MULTIMODAL_MODEL:-minicpm-v-2_6}
+      - LOCALAGI_IMAGE_MODEL=${IMAGE_MODEL:-sd-1.5-ggml}
+      - LOCALAGI_LLM_API_URL=http://localai:8080
+      - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
+      - LOCALAGI_STATE_DIR=/pool
+      - LOCALAGI_TIMEOUT=5m
+      - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false

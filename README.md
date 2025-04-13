@@ -49,10 +49,10 @@ cd LocalAGI
 docker compose up
 
 # NVIDIA GPU setup
-docker compose --profile nvidia up
+docker compose -f docker-compose.nvidia.yaml up
 
 # Intel GPU setup (for Intel Arc and integrated GPUs)
-docker compose --profile intel up
+docker compose -f docker-compose.intel.yaml up
 
 # Start with a specific model (see available models in models.localai.io, or localai.io to use any model in huggingface)
 MODEL_NAME=gemma-3-12b-it docker compose up
@@ -61,7 +61,7 @@ MODEL_NAME=gemma-3-12b-it docker compose up
 MODEL_NAME=gemma-3-12b-it \
 MULTIMODAL_MODEL=minicpm-v-2_6 \
 IMAGE_MODEL=flux.1-dev \
-docker compose --profile nvidia up
+docker compose -f docker-compose.nvidia.yaml up
 ```
 
 Now you can access and manage your agents at [http://localhost:8080](http://localhost:8080)
@@ -149,13 +149,13 @@ MODEL_NAME=gemma-3-12b-it docker compose up
 MODEL_NAME=gemma-3-12b-it \
 MULTIMODAL_MODEL=minicpm-v-2_6 \
 IMAGE_MODEL=flux.1-dev \
-docker compose --profile nvidia up
+docker compose -f docker-compose.nvidia.yaml up
 
 # Intel GPU with custom models
 MODEL_NAME=gemma-3-12b-it \
 MULTIMODAL_MODEL=minicpm-v-2_6 \
 IMAGE_MODEL=sd-1.5-ggml \
-docker compose --profile intel up
+docker compose -f docker-compose.intel.yaml up
 ```
 
 If no models are specified, it will use the defaults:
