@@ -56,7 +56,7 @@ var _ = Describe("GithubPRCreator", func() {
 
 			result, err := action.Run(ctx, params)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result.Result).To(ContainSubstring("Created pull request #"))
+			Expect(result.Result).To(ContainSubstring("pull request #"))
 		})
 
 		It("should handle missing required fields", func() {
@@ -104,9 +104,10 @@ var _ = Describe("GithubPRCreator", func() {
 
 		It("should handle provided repository and owner in config", func() {
 			config := map[string]string{
-				"token":      "test-token",
-				"repository": "test-repo",
-				"owner":      "test-owner",
+				"token":         "test-token",
+				"repository":    "test-repo",
+				"defaultBranch": "main",
+				"owner":         "test-owner",
 			}
 			action := actions.NewGithubPRCreator(config)
 			def := action.Definition()

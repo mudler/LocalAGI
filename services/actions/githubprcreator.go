@@ -3,7 +3,6 @@ package actions
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAGI/core/types"
@@ -37,10 +36,10 @@ func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName s
 	}
 
 	// Try to get the branch if it exists
-	_, _, err = g.client.Git.GetRef(ctx, g.owner, g.repository, "refs/heads/"+branchName)
+	_, resp, err := g.client.Git.GetRef(ctx, g.owner, g.repository, "refs/heads/"+branchName)
 	if err != nil {
 		// If branch doesn't exist, create it
-		if strings.Contains(err.Error(), "404 Not Found") {
+		if resp != nil && resp.StatusCode == 404 {
 			newRef := &github.Reference{
 				Ref:    github.String("refs/heads/" + branchName),
 				Object: &github.GitObject{SHA: ref.Object.SHA},
@@ -132,15 +131,40 @@ func (g *GithubPRCreator) Run(ctx context.Context, params types.ActionParams) (t
 		}
 	}
 
-	// Create pull request
-	pr := &github.NewPullRequest{
+	// Check if PR already exists for this branch
+	prs, _, err := g.client.PullRequests.List(ctx, result.Owner, result.Repository, &github.PullRequestListOptions{
+		State: "open",
+		Head:  fmt.Sprintf("%s:%s", result.Owner, result.Branch),
+	})
+	if err != nil {
+		return types.ActionResult{}, fmt.Errorf("failed to list pull requests: %w", err)
+	}
+
+	if len(prs) > 0 {
+		// Update existing PR
+		pr := prs[0]
+		update := &github.PullRequest{
+			Title: &result.Title,
+			Body:  &result.Body,
+		}
+		updatedPR, _, err := g.client.PullRequests.Edit(ctx, result.Owner, result.Repository, pr.GetNumber(), update)
+		if err != nil {
+			return types.ActionResult{}, fmt.Errorf("failed to update pull request: %w", err)
+		}
+		return types.ActionResult{
+			Result: fmt.Sprintf("Updated pull request #%d: %s", updatedPR.GetNumber(), updatedPR.GetHTMLURL()),
+		}, nil
+	}
+
+	// Create new pull request
+	newPR := &github.NewPullRequest{
 		Title: &result.Title,
 		Body:  &result.Body,
 		Head:  &result.Branch,
 		Base:  &result.BaseBranch,
 	}
 
-	createdPR, _, err := g.client.PullRequests.Create(ctx, result.Owner, result.Repository, pr)
+	createdPR, _, err := g.client.PullRequests.Create(ctx, result.Owner, result.Repository, newPR)
 	if err != nil {
 		return types.ActionResult{}, fmt.Errorf("failed to create pull request: %w", err)
 	}
