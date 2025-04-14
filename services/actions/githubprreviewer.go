@@ -128,11 +128,13 @@ func (g *GithubPRReviewer) Run(ctx context.Context, params types.ActionParams) (
 	}
 
 	actionResult := fmt.Sprintf(
-		"Pull request https://github.com/%s/%s/pull/%d reviewed successfully with status: %s",
+		"Pull request https://github.com/%s/%s/pull/%d reviewed successfully with status: %s, comments: %v, message: %s",
 		result.Owner,
 		result.Repository,
 		result.PRNumber,
 		strings.ToLower(result.ReviewAction),
+		result.Comments,
+		result.ReviewComment,
 	)
 
 	return types.ActionResult{Result: actionResult}, nil
