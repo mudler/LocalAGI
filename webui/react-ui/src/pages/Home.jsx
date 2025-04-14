@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { agentApi } from '../utils/api';
+import { useState, useEffect } from "react";
+import { Link, useOutletContext } from "react-router-dom";
+import { agentApi } from "../utils/api";
 
 function Home() {
+  const { showToast } = useOutletContext();
   const [stats, setStats] = useState({
     agents: [],
     agentCount: 0,
@@ -12,13 +13,12 @@ function Home() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const location = useLocation();
 
   // Update document title
   useEffect(() => {
-    document.title = 'Agent Dashboard - LocalAGI';
+    document.title = "Agent Dashboard - LocalAGI";
     return () => {
-      document.title = 'LocalAGI'; // Reset title when component unmounts
+      document.title = "LocalAGI"; // Reset title when component unmounts
     };
   }, []);
 
@@ -36,15 +36,16 @@ function Home() {
           status: agents.statuses || {},
         });
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data');
+        console.error("Error fetching dashboard data:", err);
+        setError("Failed to load dashboard data");
+        showToast && showToast("Failed to load dashboard data", "error");
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [showToast]);
 
   if (loading) {
     return <div className="loading">Loading dashboard data...</div>;
@@ -54,100 +55,155 @@ function Home() {
     return <div className="error">{error}</div>;
   }
 
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
   return (
-    <div>
-      <div className="image-container">
-        <img src="/app/logo_1.png" width="250" alt="LocalAGI Logo" />
-      </div>
-      
-      {/*<h1 className="dashboard-title">LocalAGI</h1>*/}
-      
-      {/* Dashboard Stats */}
-      <div className="dashboard-stats">
-        <div className="stat-item">
-          <div className="stat-count">{stats.actions}</div>
-          <div className="stat-label">Available Actions</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-count">{stats.connectors}</div>
-          <div className="stat-label">Available Connectors</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-count">{stats.agentCount}</div>
-          <div className="stat-label">Agents</div>
+    <div className="dashboard-container">
+      <div className="sidebar">
+        <div className="logo-container sidebar-logo-container">
+          <img
+            src="/app/logo_1.png"
+            alt="BitGPT Network"
+            className="sidebar-logo"
+          />
+          <h2 className="sidebar-title">BitGPT Network</h2>
+          <p className="sidebar-subtitle">
+            Start by creating your agent or exploring available actions.
+          </p>
         </div>
       </div>
 
-      {/* Cards Container */}
-      <div className="cards-container">
-        {/* Card for Agent List Page */}
-        <Link to="/agents" className="card-link">
-          <div className="card">
-            <h2><i className="fas fa-robot"></i> Agent List</h2>
-            <p>View and manage your list of agents, including detailed profiles and statistics.</p>
-          </div>
-        </Link>
-        
-        {/* Card for Create Agent */}
-        <Link to="/create" className="card-link">
-          <div className="card">
-            <h2><i className="fas fa-plus-circle"></i> Create Agent</h2>
-            <p>Create a new intelligent agent with custom behaviors, connectors, and actions.</p>
-          </div>
-        </Link>
-        
-        {/* Card for Actions Playground */}
-        <Link to="/actions-playground" className="card-link">
-          <div className="card">
-            <h2><i className="fas fa-code"></i> Actions Playground</h2>
-            <p>Explore and test available actions for your agents.</p>
-          </div>
-        </Link>
-        
-        {/* Card for Group Create */}
-        <Link to="/group-create" className="card-link">
-          <div className="card">
-            <h2><i className="fas fa-users"></i> Create Group</h2>
-            <p>Create a group of agents with shared configurations and behaviors.</p>
-          </div>
-        </Link>
+      <div className="main-content-area">
+        <div className="welcome-section">
+          <div className="date-display">{currentDate}</div>
+          <h1 className="welcome-title">Welcome back</h1>
+        </div>
 
-        {/* Card for Import Agent */}
-        <Link to="/import" className="card-link">
-          <div className="card">
-            <h2><i className="fas fa-upload"></i> Import Agent</h2>
-            <p>Import an existing agent configuration from a file.</p>
+        {/* Dashboard Stats */}
+        <div className="dashboard-stats">
+          <div className="stat-card">
+            <div className="stat-icon">
+              <i className="fas fa-bolt"></i> Available Actions
+            </div>
+            <div className="stat-value">{stats.actions}</div>
           </div>
-        </Link>
+          <div className="stat-card">
+            <div className="stat-icon">
+              <i className="fas fa-plug"></i> Available Connectors
+            </div>
+            <div className="stat-value">{stats.connectors}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon">
+              <i className="fas fa-robot"></i> Agents
+            </div>
+            <div className="stat-value">{stats.agentCount}</div>
+          </div>
+        </div>
 
-      </div>
+        <div className="section-title">
+          <h2>Manage Agents</h2>
+          <p>
+            Easily manage, access, and interact with all your agents from one
+            place.
+          </p>
+        </div>
 
-      {stats.agents.length > 0 && (
-        <div className="recent-agents">
-          <h2>Your Agents</h2>
-          <div className="cards-container">
-            {stats.agents.map((agent) => (
-              <div key={agent} className="card">
-                <div className={`status-badge ${stats.status[agent] ? 'status-active' : 'status-paused'}`}>
-                  {stats.status[agent] ? 'Active' : 'Paused'}
+        {/* Features Cards */}
+        <div className="features-grid">
+          {/* Card for Create Agent */}
+          <Link to="/create" className="feature-card">
+            <div className="feature-icon create-agent-icon">
+              <i className="fas fa-plus"></i>
+            </div>
+            <div className="feature-content">
+              <h3>Create Agent</h3>
+              <p>Agent with custom behaviors, connectors, and actions.</p>
+            </div>
+          </Link>
+
+          {/* Card for Create Group */}
+          <Link to="/group-create" className="feature-card">
+            <div className="feature-icon create-group-icon">
+              <i className="fas fa-users"></i>
+            </div>
+            <div className="feature-content">
+              <h3>Create Group</h3>
+              <p>Group agents with shared configs and behaviors.</p>
+            </div>
+          </Link>
+
+          {/* Card for Import Agent */}
+          <Link to="/import" className="feature-card">
+            <div className="feature-icon import-icon">
+              <i className="fas fa-upload"></i>
+            </div>
+            <div className="feature-content">
+              <h3>Import Agent</h3>
+              <p>Import an existing agent configuration from a file.</p>
+            </div>
+          </Link>
+
+          {/* Card for Agent List */}
+          <Link to="/agents" className="feature-card">
+            <div className="feature-icon agent-list-icon">
+              <i className="fas fa-list"></i>
+            </div>
+            <div className="feature-content">
+              <h3>Agent List</h3>
+              <p>Manage agents, including detailed profiles and statistics.</p>
+            </div>
+          </Link>
+        </div>
+
+        {stats.agents.length > 0 && (
+          <div className="agents-section">
+            <h2>Your Agents</h2>
+            <div className="agents-grid">
+              {stats.agents.map((agent) => (
+                <div key={agent} className="agent-card">
+                  <div className="agent-header">
+                    <h3>
+                      <i className="fas fa-robot"></i> {agent}
+                    </h3>
+                    <div
+                      className={`status-badge ${
+                        stats.status[agent] ? "status-active" : "status-paused"
+                      }`}
+                    >
+                      {stats.status[agent] ? "Active" : "Paused"}
+                    </div>
+                  </div>
+                  <div className="agent-actions">
+                    <Link
+                      to={`/talk/${agent}`}
+                      className="agent-action-btn chat-btn"
+                    >
+                      <i className="fas fa-comment"></i> Chat
+                    </Link>
+                    <Link
+                      to={`/settings/${agent}`}
+                      className="agent-action-btn settings-btn"
+                    >
+                      <i className="fas fa-cog"></i> Settings
+                    </Link>
+                    <Link
+                      to={`/status/${agent}`}
+                      className="agent-action-btn status-btn"
+                    >
+                      <i className="fas fa-chart-line"></i> Status
+                    </Link>
+                  </div>
                 </div>
-                <h2><i className="fas fa-robot"></i> {agent}</h2>
-                <div className="agent-actions">
-                  <Link to={`/talk/${agent}`} className="action-btn chat-btn">
-                    <i className="fas fa-comment"></i> Chat
-                  </Link>
-                  <Link to={`/settings/${agent}`} className="action-btn settings-btn">
-                    <i className="fas fa-cog"></i> Settings
-                  </Link>
-                  <Link to={`/status/${agent}`} className="action-btn status-btn">
-                    <i className="fas fa-chart-line"></i> Status
-                  </Link>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
