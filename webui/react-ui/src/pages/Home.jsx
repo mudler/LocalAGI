@@ -65,16 +65,19 @@ function Home() {
     <div className="dashboard-container">
       <div className="sidebar">
         <div className="logo-container sidebar-logo-container">
+          <div className="dots-background">
+            <img src="/app/dots.png" alt="dots" className="dots-image" />
+          </div>
           <img
             src="/app/logo_1.png"
             alt="BitGPT Network"
             className="sidebar-logo"
           />
-          <h2 className="sidebar-title">BitGPT Network</h2>
-          <p className="sidebar-subtitle">
-            Start by creating your agent or exploring available actions.
-          </p>
         </div>
+        <h2 className="sidebar-title">BitGPT Network</h2>
+        <p className="sidebar-subtitle">
+          Start by creating your agent or exploring available actions.
+        </p>
       </div>
 
       <div className="main-content-area">

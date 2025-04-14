@@ -1,16 +1,16 @@
 /* Base styles */
 :root {
-  --primary: #2563eb;
+  --primary: #1e54bf;
   --primary-light: #dbeafe;
-  --primary-dark: #1d4ed8;
+  --primary-dark: #1e54bf;
   --secondary: #8b5cf6;
   --tertiary: #5e00ff;
   --success: #10b981;
   --danger: #ef4444;
   --warning: #f59e0b;
   --info: #6366f1;
-  --dark-bg: #2563eb;
-  --darker-bg: #2563eb;
+  --dark-bg: #1e54bf;
+  --darker-bg: #1e54bf;
   --medium-bg: #f3f4f6;
   --light-bg: #e5e7eb;
   --text: #1f2937;
@@ -78,13 +78,6 @@ a:hover {
   color: var(--primary-dark);
 }
 
-.container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
 /* App Container */
 .app-container {
   display: flex;
@@ -110,7 +103,7 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   padding: 0 1rem;
-  height: 64px;
+  height: 96px;
 }
 
 .nav-content {
@@ -125,6 +118,7 @@ a:hover {
 .logo-container {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .logo-link {
@@ -137,6 +131,8 @@ a:hover {
 .logo-image-container {
   position: relative;
   margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
 }
 
 .logo-image {
@@ -197,10 +193,12 @@ a:hover {
 /* Status badge */
 .status-text {
   display: flex;
+  background: var(--white-8, rgba(255, 255, 255, 0.08));
   align-items: center;
   color: white;
   font-size: 0.875rem;
-  margin-left: auto;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
 }
 
 .status-indicator {
@@ -352,10 +350,12 @@ a:hover {
 /* Dashboard Layout */
 .dashboard-container {
   display: flex;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 112px);
   background-color: white;
   border-radius: 1rem;
-  margin: 1rem;
+  margin-left: 1rem;
+  margin-right: 1rem;
+  margin-bottom: 1rem;
   overflow: hidden;
   box-shadow: var(--shadow);
 }
@@ -367,8 +367,10 @@ a:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
   border-right: 1px solid var(--border);
+  min-height: 100%;
 }
 
 .logo-container.sidebar-logo-container {
@@ -377,24 +379,47 @@ a:hover {
   align-items: center;
   text-align: center;
   margin-bottom: 2rem;
+  position: relative;
+}
+
+.dots-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dots-image {
+  max-width: 280px;
 }
 
 .sidebar-logo {
   width: 100px;
   height: 100px;
   margin-bottom: 1rem;
+  position: relative;
+  z-index: 2;
 }
 
 .sidebar-title {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
+  position: relative;
+  z-index: 2;
 }
 
 .sidebar-subtitle {
   font-size: 0.875rem;
   color: var(--text-light);
   margin-top: 0.5rem;
+  position: relative;
+  z-index: 2;
 }
 
 .main-content-area {

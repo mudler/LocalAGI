@@ -76,7 +76,7 @@ function App() {
 
           <div className="status-text">
             <span className="status-indicator"></span>
-            State: active
+            Active
           </div>
 
           <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
