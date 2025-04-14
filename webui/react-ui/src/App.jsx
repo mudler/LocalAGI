@@ -48,13 +48,15 @@ function App() {
               to="/"
               className={`nav-link ${isActive("/") ? "active" : ""}`}
             >
-              <i className="fas fa-home"></i> Home
+              <img src="/app/nav/house.svg" alt="House" className="nav-icon" />
+              Home
             </Link>
             <Link
               to="/agents"
               className={`nav-link ${isActive("/agents") ? "active" : ""}`}
             >
-              <i className="fas fa-robot"></i> Agent List
+              <img src="/app/nav/robot.svg" alt="Robot" className="nav-icon" />{" "}
+              Agent List
             </Link>
             <Link
               to="/actions-playground"
@@ -62,7 +64,8 @@ function App() {
                 isActive("/actions-playground") ? "active" : ""
               }`}
             >
-              <i className="fas fa-code"></i> Action Playground
+              <img src="/app/nav/bolt.svg" alt="Bolt" className="nav-icon" />
+              Action Playground
             </Link>
             <Link
               to="/group-create"
@@ -70,7 +73,12 @@ function App() {
                 isActive("/group-create") ? "active" : ""
               }`}
             >
-              <i className="fas fa-users"></i> Create Group Agent
+              <img
+                src="/app/nav/user-group.svg"
+                alt="User Group"
+                className="nav-icon"
+              />
+              Create Group Agent
             </Link>
           </div>
 
@@ -95,7 +103,12 @@ function App() {
                 className="mobile-nav-link"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <i className="fas fa-home"></i> Home
+                <img
+                  src="/app/nav/house.svg"
+                  alt="House"
+                  className="nav-icon"
+                />{" "}
+                Home
               </Link>
             </li>
             <li>
@@ -104,7 +117,12 @@ function App() {
                 className="mobile-nav-link"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <i className="fas fa-robot"></i> Agent List
+                <img
+                  src="/app/nav/robot.svg"
+                  alt="Robot"
+                  className="nav-icon"
+                />{" "}
+                Agent List
               </Link>
             </li>
             <li>
@@ -113,7 +131,8 @@ function App() {
                 className="mobile-nav-link"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <i className="fas fa-code"></i> Action Playground
+                <img src="/app/nav/bolt.svg" alt="Bolt" className="nav-icon" />{" "}
+                Action Playground
               </Link>
             </li>
             <li>
@@ -122,7 +141,12 @@ function App() {
                 className="mobile-nav-link"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <i className="fas fa-users"></i> Create Group Agent
+                <img
+                  src="/app/nav/user-group.svg"
+                  alt="User Group"
+                  className="nav-icon"
+                />{" "}
+                Create Group Agent
               </Link>
             </li>
           </ul>

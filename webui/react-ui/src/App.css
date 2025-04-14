@@ -190,6 +190,12 @@ a:hover {
   margin-right: 0.5rem;
 }
 
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 0.5rem;
+}
+
 /* Status badge */
 .status-text {
   display: flex;
@@ -669,6 +675,14 @@ a:hover {
 
   .mobile-menu {
     display: block;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .status-text {
+    display: none;
   }
 }
 
