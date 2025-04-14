@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 
 function AgentStatus() {
   const { name } = useParams();
-  const navigate = useNavigate();
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [eventSource, setEventSource] = useState(null);
+  const [_eventSource, setEventSource] = useState(null);
   const [liveUpdates, setLiveUpdates] = useState([]);
 
   // Update document title
@@ -49,7 +48,7 @@ function AgentStatus() {
         const data = JSON.parse(event.data);
         setLiveUpdates(prev => [data, ...prev.slice(0, 19)]); // Keep last 20 updates
       } catch (err) {
-        console.error('Error parsing SSE data:', err);
+        setLiveUpdates(prev => [event.data, ...prev.slice(0, 19)]);
       }
     });
 
@@ -129,23 +128,9 @@ function AgentStatus() {
                   <h2 className="text-sm font-semibold mb-2">Agent Action:</h2>
                   <div className="status-details">
                     <div className="status-row">
-                      <span className="status-label">Result:</span>
-                      <span className="status-value">{formatValue(item.Result)}</span>
+                      <span className="status-label">{index}</span>
+                      <span className="status-value">{formatValue(item)}</span>
                     </div>
-                    <div className="status-row">
-                      <span className="status-label">Action:</span>
-                      <span className="status-value">{formatValue(item.Action)}</span>
-                    </div>
-                    <div className="status-row">
-                      <span className="status-label">Parameters:</span>
-                      <span className="status-value pre-wrap">{formatValue(item.Params)}</span>
-                    </div>
-                    {item.Reasoning && (
-                      <div className="status-row">
-                        <span className="status-label">Reasoning:</span>
-                        <span className="status-value reasoning">{formatValue(item.Reasoning)}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
