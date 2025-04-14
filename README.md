@@ -79,7 +79,7 @@ Now you can access and manage your agents at [http://localhost:8080](http://loca
     </td>
     <td width="50%" valign="top">
       <h3><a href="https://github.com/mudler/LocalRecall">LocalAI</a></h3>
-      <p>LocalAI is the free, Open Source OpenAI alternative. LocalAI act as a drop-in replacement REST API that's compatible with OpenAI (Elevenlabs, Anthropic... ) API specifications for local AI inferencing. It allows you to run LLMs, generate images, audio (and not only) locally or on-prem with consumer grade hardware, supporting multiple model families. Does not require GPU.</p>
+      <p>LocalAI is the free, Open Source OpenAI alternative. LocalAI act as a drop-in replacement REST API that's compatible with OpenAI API specifications for local AI inferencing. Does not require GPU.</p>
     </td>
   </tr>
   <tr>
@@ -110,7 +110,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Uses CUDA for acceleration
 - Best for high-performance inference
 - Supports text, multimodal, and image generation models
-- Run with: `docker compose --profile nvidia up`
+- Run with: `docker compose -f docker-compose.nvidia.yaml up`
 - Default models:
   - Text: `arcee-agent`
   - Multimodal: `minicpm-v-2_6`
@@ -126,7 +126,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Uses SYCL for acceleration
 - Best for Intel-based systems
 - Supports text, multimodal, and image generation models
-- Run with: `docker compose --profile intel up`
+- Run with: `docker compose -f docker-compose.intel.yaml up`
 - Default models:
   - Text: `arcee-agent`
   - Multimodal: `minicpm-v-2_6`
