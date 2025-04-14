@@ -238,7 +238,7 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 
 			result := agent.Ask(
-				types.WithText("plan a trip to San Francisco from Venice, Italy"),
+				types.WithText("Thoroughly plan a trip to San Francisco from Venice, Italy; check flight times, visa requirements and whether electrical items are allowed in cabin luggage."),
 			)
 			Expect(len(result.State)).To(BeNumerically(">", 1))
 
