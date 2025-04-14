@@ -275,7 +275,7 @@ var _ = Describe("Agent test", func() {
 				EnableStandaloneJob,
 				EnableHUD,
 				WithPeriodicRuns("1s"),
-				WithPermanentGoal("use the new_conversation tool"),
+				WithPermanentGoal("use the new_conversation tool to initiate a conversation with the user"),
 				//	EnableStandaloneJob,
 				//	WithRandomIdentity(),
 			)
