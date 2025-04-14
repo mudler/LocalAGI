@@ -260,6 +260,7 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
 				WithLLMAPIKey(apiKeyURL),
+				WithTimeout("10m"),
 				WithNewConversationSubscriber(func(m openai.ChatCompletionMessage) {
 					mu.Lock()
 					message = m
