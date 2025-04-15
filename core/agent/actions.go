@@ -22,7 +22,7 @@ type decisionResult struct {
 
 // decision forces the agent to take one of the available actions
 func (a *Agent) decision(
-	ctx context.Context,
+	job *types.Job,
 	conversation []openai.ChatCompletionMessage,
 	tools []openai.Tool, toolchoice string, maxRetries int) (*decisionResult, error) {
 
@@ -35,31 +35,63 @@ func (a *Agent) decision(
 		}
 	}
 
+	decision := openai.ChatCompletionRequest{
+		Model:    a.options.LLMAPI.Model,
+		Messages: conversation,
+		Tools:    tools,
+	}
+
+	if choice != nil {
+		decision.ToolChoice = *choice
+	}
+
+	var obs *types.Observable
+	if job.Obs != nil {
+		obs = a.observer.NewObservable()
+		obs.Name = "decision"
+		obs.ParentID = job.Obs.ID
+		obs.Icon = "brain"
+		obs.Creation = &types.Creation{
+			ChatCompletionRequest: &decision,
+		}
+		a.observer.Update(*obs)
+	}
+
 	var lastErr error
 	for attempts := 0; attempts < maxRetries; attempts++ {
-		decision := openai.ChatCompletionRequest{
-			Model:    a.options.LLMAPI.Model,
-			Messages: conversation,
-			Tools:    tools,
-		}
-
-		if choice != nil {
-			decision.ToolChoice = *choice
-		}
-
-		resp, err := a.client.CreateChatCompletion(ctx, decision)
+		resp, err := a.client.CreateChatCompletion(job.GetContext(), decision)
 		if err != nil {
 			lastErr = err
 			xlog.Warn("Attempt to make a decision failed", "attempt", attempts+1, "error", err)
+
+			if obs != nil {
+				obs.Progress = append(obs.Progress, types.Progress{
+					Error: err.Error(),
+				})
+				a.observer.Update(*obs)
+			}
+
 			continue
 		}
 
 		jsonResp, _ := json.Marshal(resp)
 		xlog.Debug("Decision response", "response", string(jsonResp))
 
+		if obs != nil {
+			obs.AddProgress(types.Progress{
+				ChatCompletionResponse: &resp,
+			})
+		}
+
 		if len(resp.Choices) != 1 {
 			lastErr = fmt.Errorf("no choices: %d", len(resp.Choices))
 			xlog.Warn("Attempt to make a decision failed", "attempt", attempts+1, "error", lastErr)
+
+			if obs != nil {
+				obs.Progress[len(obs.Progress)-1].Error = lastErr.Error()
+				a.observer.Update(*obs)
+			}
+
 			continue
 		}
 
@@ -68,6 +100,12 @@ func (a *Agent) decision(
 			if err := a.saveConversation(append(conversation, msg), "decision"); err != nil {
 				xlog.Error("Error saving conversation", "error", err)
 			}
+
+			if obs != nil {
+				obs.MakeLastProgressCompletion()
+				a.observer.Update(*obs)
+			}
+
 			return &decisionResult{message: msg.Content}, nil
 		}
 
@@ -75,11 +113,22 @@ func (a *Agent) decision(
 		if err := params.Read(msg.ToolCalls[0].Function.Arguments); err != nil {
 			lastErr = err
 			xlog.Warn("Attempt to parse action parameters failed", "attempt", attempts+1, "error", err)
+
+			if obs != nil {
+				obs.Progress[len(obs.Progress)-1].Error = lastErr.Error()
+				a.observer.Update(*obs)
+			}
+
 			continue
 		}
 
 		if err := a.saveConversation(append(conversation, msg), "decision"); err != nil {
 			xlog.Error("Error saving conversation", "error", err)
+		}
+
+		if obs != nil {
+			obs.MakeLastProgressCompletion()
+			a.observer.Update(*obs)
 		}
 
 		return &decisionResult{actionParams: params, actioName: msg.ToolCalls[0].Function.Name, message: msg.Content}, nil
@@ -173,7 +222,7 @@ func (m Messages) IsLastMessageFromRole(role string) bool {
 	return m[len(m)-1].Role == role
 }
 
-func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act types.Action, c []openai.ChatCompletionMessage, reasoning string, maxAttempts int) (*decisionResult, error) {
+func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act types.Action, c []openai.ChatCompletionMessage, reasoning string, maxAttempts int) (*decisionResult, error) {
 	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.availableActions(), reasoning)
 	if err != nil {
 		return nil, err
@@ -201,7 +250,7 @@ func (a *Agent) generateParameters(ctx context.Context, pickTemplate string, act
 	var attemptErr error
 
 	for attempts := 0; attempts < maxAttempts; attempts++ {
-		result, attemptErr = a.decision(ctx,
+		result, attemptErr = a.decision(job,
 			cc,
 			a.availableActions().ToTools(),
 			act.Definition().Name.String(),
@@ -263,7 +312,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		subTaskAction := a.availableActions().Find(subtask.Action)
 		subTaskReasoning := fmt.Sprintf("%s Overall goal is: %s", subtask.Reasoning, planResult.Goal)
 
-		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning, maxRetries)
+		params, err := a.generateParameters(job, pickTemplate, subTaskAction, conv, subTaskReasoning, maxRetries)
 		if err != nil {
 			xlog.Error("error generating action's parameters", "error", err)
 			return conv, fmt.Errorf("error generating action's parameters: %w", err)
@@ -293,7 +342,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 			break
 		}
 
-		result, err := a.runAction(ctx, subTaskAction, actionParams)
+		result, err := a.runAction(job, subTaskAction, actionParams)
 		if err != nil {
 			xlog.Error("error running action", "error", err)
 			return conv, fmt.Errorf("error running action: %w", err)
@@ -378,7 +427,7 @@ func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {
 }
 
 // pickAction picks an action based on the conversation
-func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.ChatCompletionMessage, maxRetries int) (types.Action, types.ActionParams, string, error) {
+func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatCompletionMessage, maxRetries int) (types.Action, types.ActionParams, string, error) {
 	c := messages
 
 	xlog.Debug("[pickAction] picking action starts", "messages", messages)
@@ -389,7 +438,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		xlog.Debug("not forcing reasoning")
 		// We also could avoid to use functions here and get just a reply from the LLM
 		// and then use the reply to get the action
-		thought, err := a.decision(ctx,
+		thought, err := a.decision(job,
 			messages,
 			a.availableActions().ToTools(),
 			"",
@@ -431,7 +480,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 		}, c...)
 	}
 
-	thought, err := a.decision(ctx,
+	thought, err := a.decision(job,
 		c,
 		types.Actions{action.NewReasoning()}.ToTools(),
 		action.NewReasoning().Definition().Name.String(), maxRetries)
@@ -467,7 +516,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 	// to avoid hallucinations
 
 	// Extract an action
-	params, err := a.decision(ctx,
+	params, err := a.decision(job,
 		append(c, openai.ChatCompletionMessage{
 			Role:    "system",
 			Content: "Pick the relevant action given the following reasoning: " + originalReasoning,

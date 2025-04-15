@@ -27,6 +27,8 @@ type Job struct {
 
 	context context.Context
 	cancel  context.CancelFunc
+
+	Obs *Observable
 }
 
 type ActionRequest struct {
@@ -197,4 +199,10 @@ func (j *Job) Cancel() {
 
 func (j *Job) GetContext() context.Context {
 	return j.context
+}
+
+func WithObservable(obs *Observable) JobOption {
+	return func(j *Job) {
+		j.Obs = obs
+	}
 }
