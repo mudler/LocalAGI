@@ -29,6 +29,8 @@ const (
 	ActionGithubPRReader                 = "github-pr-reader"
 	ActionGithubPRCommenter              = "github-pr-commenter"
 	ActionGithubPRReviewer               = "github-pr-reviewer"
+	ActionGithubPRCreator                = "github-pr-creator"
+	ActionGithubGetAllContent            = "github-get-all-repository-content"
 	ActionGithubREADME                   = "github-readme"
 	ActionScraper                        = "scraper"
 	ActionWikipedia                      = "wikipedia"
@@ -49,12 +51,14 @@ var AvailableActions = []string{
 	ActionGithubIssueCloser,
 	ActionGithubIssueSearcher,
 	ActionGithubRepositoryGet,
+	ActionGithubGetAllContent,
 	ActionGithubRepositoryCreateOrUpdate,
 	ActionGithubIssueReader,
 	ActionGithubIssueCommenter,
 	ActionGithubPRReader,
 	ActionGithubPRCommenter,
 	ActionGithubPRReviewer,
+	ActionGithubPRCreator,
 	ActionGithubREADME,
 	ActionScraper,
 	ActionBrowse,
@@ -118,6 +122,10 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubPRCommenter(config)
 	case ActionGithubPRReviewer:
 		a = actions.NewGithubPRReviewer(config)
+	case ActionGithubPRCreator:
+		a = actions.NewGithubPRCreator(config)
+	case ActionGithubGetAllContent:
+		a = actions.NewGithubRepositoryGetAllContent(config)
 	case ActionGithubIssueCommenter:
 		a = actions.NewGithubIssueCommenter(config)
 	case ActionGithubRepositoryGet:
@@ -202,6 +210,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Fields: actions.GithubRepositoryGetContentConfigMeta(),
 		},
 		{
+			Name:   "github-get-all-repository-content",
+			Label:  "GitHub Get All Repository Content",
+			Fields: actions.GithubRepositoryGetAllContentConfigMeta(),
+		},
+		{
 			Name:   "github-repository-create-or-update-content",
 			Label:  "GitHub Repository Create/Update Content",
 			Fields: actions.GithubRepositoryCreateOrUpdateContentConfigMeta(),
@@ -225,6 +238,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "github-pr-reviewer",
 			Label:  "GitHub PR Reviewer",
 			Fields: actions.GithubPRReviewerConfigMeta(),
+		},
+		{
+			Name:   "github-pr-creator",
+			Label:  "GitHub PR Creator",
+			Fields: actions.GithubPRCreatorConfigMeta(),
 		},
 		{
 			Name:   "twitter-post",
