@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
-import { useAgent } from '../hooks/useAgent';
-import { agentApi } from '../utils/api';
-import AgentForm from '../components/AgentForm';
+import { useState, useEffect } from "react";
+import { useParams, useOutletContext, useNavigate } from "react-router-dom";
+import { useAgent } from "../hooks/useAgent";
+import { agentApi } from "../utils/api";
+import AgentForm from "../components/AgentForm";
 
 function AgentSettings() {
   const { name } = useParams();
@@ -17,156 +17,165 @@ function AgentSettings() {
       document.title = `Agent Settings: ${name} - LocalAGI`;
     }
     return () => {
-      document.title = 'LocalAGI'; // Reset title when component unmounts
+      document.title = "LocalAGI";
     };
   }, [name]);
 
   // Use our custom agent hook
-  const { 
-    agent, 
-    loading, 
-    error, 
-    updateAgent, 
-    toggleAgentStatus, 
-    deleteAgent 
-  } = useAgent(name);
+  const { agent, loading, updateAgent, toggleAgentStatus, deleteAgent } =
+    useAgent(name);
 
   // Fetch metadata on component mount
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        // Fetch metadata from the dedicated endpoint
         const response = await agentApi.getAgentConfigMetadata();
-        if (response) {
-          setMetadata(response);
-        }
-      } catch (error) {
-        console.error('Error fetching metadata:', error);
-        // Continue without metadata, the form will use default fields
+        setMetadata(response);
+      } catch (err) {
+        showToast("Failed to load agent metadata", "error");
       }
     };
-
     fetchMetadata();
-  }, []);
+  }, [showToast]);
 
-  // Load agent data when component mounts
   useEffect(() => {
     if (agent) {
-      // Set form data from agent config
-      setFormData({
-        ...formData,
-        ...agent,
-        name: name // Ensure name is set correctly
-      });
+      setFormData(agent);
     }
   }, [agent]);
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  // Header action handlers
+  const handlePauseResume = async () => {
     try {
-      const success = await updateAgent(formData);
-      if (success) {
-        showToast('Agent updated successfully', 'success');
-      }
+      await toggleAgentStatus();
+      showToast(agent?.active ? "Agent paused" : "Agent resumed", "success");
     } catch (err) {
-      showToast(`Error updating agent: ${err.message}`, 'error');
+      console.error("Error toggling agent status:", err);
+      showToast("Failed to update agent status", "error");
     }
   };
 
-  // Handle agent toggle (pause/start)
-  const handleToggleStatus = async () => {
-    const isActive = agent?.active || false;
-    try {
-      const success = await toggleAgentStatus(isActive);
-      if (success) {
-        const action = isActive ? 'paused' : 'started';
-        showToast(`Agent "${name}" ${action} successfully`, 'success');
-      }
-    } catch (err) {
-      showToast(`Error toggling agent status: ${err.message}`, 'error');
-    }
-  };
-
-  // Handle agent deletion
   const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete agent "${name}"? This action cannot be undone.`)) {
-      return;
-    }
-    
+    if (!window.confirm("Are you sure you want to delete this agent?")) return;
     try {
-      const success = await deleteAgent();
-      if (success) {
-        showToast(`Agent "${name}" deleted successfully`, 'success');
-        navigate('/agents');
-      }
+      await deleteAgent();
+      showToast("Agent deleted", "success");
+      navigate("/agents");
     } catch (err) {
-      showToast(`Error deleting agent: ${err.message}`, 'error');
+      console.error("Error deleting agent:", err);
+      showToast("Failed to delete agent", "error");
     }
   };
 
-  if (loading && !agent) {
-    return (
-      <div className="settings-container">
-        <div className="loading">
-          <i className="fas fa-spinner fa-spin"></i>
-          <p>Loading agent settings...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="settings-container">
-        <div className="error">
-          <i className="fas fa-exclamation-triangle"></i>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
+  // Header status
+  const statusColor = agent?.active ? "#22c55e" : "#f59e0b";
+  const statusText = agent?.active ? "Active" : "Paused";
 
   return (
-    <div className="settings-container">
-      <header className="page-header">
-        <h1>
-          <i className="fas fa-cog"></i> Agent Settings - {name}
-        </h1>
-        <div className="header-actions">
-          <button 
-            className={`action-btn ${agent?.active ? 'warning' : 'success'}`}
-            onClick={handleToggleStatus}
-          >
-            {agent?.active ? (
-              <><i className="fas fa-pause"></i> Pause Agent</>
-            ) : (
-              <><i className="fas fa-play"></i> Start Agent</>
-            )}
-          </button>
-          <button 
-            className="action-btn delete-btn"
-            onClick={handleDelete}
-          >
-            <i className="fas fa-trash"></i> Delete Agent
-          </button>
+    <div className="dashboard-container">
+      <div className="main-content-area">
+        {/* Refreshed Header */}
+        <div
+          className="agent-settings-header"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "2.5rem",
+            gap: 18,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <i
+              className="fas fa-cogs"
+              style={{ fontSize: 32, color: "var(--primary)" }}
+            />
+            <div>
+              <div style={{ fontSize: "2rem", fontWeight: 700, color: "#222" }}>
+                Agent Settings{" "}
+                <span style={{ color: "var(--primary)" }}>- {name}</span>
+              </div>
+              <div
+                style={{
+                  color: "var(--text-light)",
+                  fontSize: "1.1rem",
+                  marginTop: 2,
+                }}
+              >
+                Configure and manage the agent’s settings, connectors, and
+                capabilities.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                fontWeight: 500,
+                color: statusColor,
+                fontSize: "1rem",
+                background: "rgba(34,197,94,0.09)",
+                borderRadius: 16,
+                padding: "4px 14px",
+                marginRight: 8,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  background: statusColor,
+                  marginRight: 8,
+                }}
+              ></span>
+              {statusText}
+            </span>
+            <button
+              className="action-btn"
+              style={{ background: "#f6f8fa", color: "var(--primary)" }}
+              onClick={handlePauseResume}
+              disabled={loading}
+            >
+              <i
+                className={`fas ${agent?.active ? "fa-pause" : "fa-play"}`}
+              ></i>{" "}
+              {agent?.active ? "Pause Agent" : "Resume Agent"}
+            </button>
+            <button
+              className="action-btn"
+              style={{
+                background: "#fff0f0",
+                color: "#dc2626",
+                border: "1px solid #fca5a5",
+              }}
+              onClick={handleDelete}
+              disabled={loading}
+            >
+              <i className="fas fa-trash"></i> Delete Agent
+            </button>
+          </div>
         </div>
-      </header>
-      
-      <div className="settings-content">
-        {/* Agent Configuration Form Section */}
+
+        {/* Agent Form */}
         <div className="section-box">
-          
-          <AgentForm 
-            isEdit={true}
-            formData={formData}
-            setFormData={setFormData}
-            onSubmit={handleSubmit}
-            loading={loading}
-            submitButtonText="Save Changes"
-            metadata={metadata}
-          />
+          {metadata && formData ? (
+            <AgentForm
+              isEdit
+              formData={formData}
+              setFormData={setFormData}
+              onSubmit={updateAgent}
+              loading={loading}
+              submitButtonText="Save Changes"
+              metadata={metadata}
+            />
+          ) : (
+            <div style={{ color: "var(--text-light)", padding: 24 }}>
+              Loading agent configuration...
+            </div>
+          )}
         </div>
       </div>
     </div>

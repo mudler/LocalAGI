@@ -931,7 +931,8 @@ a:hover {
   padding: 10px 22px;
   border-radius: 5px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s,
+    box-shadow 0.15s;
   font-weight: 500;
   font-size: 1rem;
   display: inline-flex;
@@ -960,4 +961,9 @@ a:hover {
 .action-btn i {
   font-size: 1.05rem;
   color: inherit;
+}
+
+/* Section Description */
+.section-description {
+  margin-bottom: 0.5rem;
 }

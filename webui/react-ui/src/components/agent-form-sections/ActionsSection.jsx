@@ -1,5 +1,5 @@
-import React from 'react';
-import ActionForm from '../ActionForm';
+import React from "react";
+import ActionForm from "../ActionForm";
 
 /**
  * ActionsSection component for the agent form
@@ -11,16 +11,18 @@ const ActionsSection = ({ formData, setFormData, metadata }) => {
     updatedActions[index] = updatedAction;
     setFormData({
       ...formData,
-      actions: updatedActions
+      actions: updatedActions,
     });
   };
 
   // Handle action removal
   const handleActionRemove = (index) => {
-    const updatedActions = [...(formData.actions || [])].filter((_, i) => i !== index);
+    const updatedActions = [...(formData.actions || [])].filter(
+      (_, i) => i !== index
+    );
     setFormData({
       ...formData,
-      actions: updatedActions
+      actions: updatedActions,
     });
   };
 
@@ -28,17 +30,14 @@ const ActionsSection = ({ formData, setFormData, metadata }) => {
   const handleAddAction = () => {
     setFormData({
       ...formData,
-      actions: [
-        ...(formData.actions || []),
-        { name: '', config: '{}' }
-      ]
+      actions: [...(formData.actions || []), { name: "", config: "{}" }],
     });
   };
 
   return (
     <div className="actions-section">
       <h3>Actions</h3>
-      <p className="text-muted">
+      <p className="section-description">
         Configure actions that the agent can perform.
       </p>
 
