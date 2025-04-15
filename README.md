@@ -74,7 +74,7 @@ Now you can access and manage your agents at [http://localhost:8080](http://loca
   <tr>
     <td width="50%" valign="top">
       <a href="https://github.com/mudler/LocalAI">
-        <img src="https://raw.githubusercontent.com/mudler/LocalAI/refs/heads/rebranding/core/http/static/logo_horizontal.png" width="300" alt="LocalAI Logo">
+        <img src="https://raw.githubusercontent.com/mudler/LocalAI/refs/heads/master/core/http/static/logo_horizontal.png" width="300" alt="LocalAI Logo">
       </a>
     </td>
     <td width="50%" valign="top">
