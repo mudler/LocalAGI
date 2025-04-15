@@ -370,7 +370,7 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			xlog.Error("Error marshaling status message", "error", err)
 		} else {
 			manager.Send(
-				sse.NewMessage(string(statusData)).WithEvent("json_status"))
+				sse.NewMessage(string(statusData)).WithEvent("json_message_status"))
 		}
 
 		// Process the message asynchronously
@@ -417,7 +417,7 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 				xlog.Error("Error marshaling completed status", "error", err)
 			} else {
 				manager.Send(
-					sse.NewMessage(string(completedData)).WithEvent("json_status"))
+					sse.NewMessage(string(completedData)).WithEvent("json_message_status"))
 			}
 		}()
 

@@ -63,8 +63,8 @@ export function useSSE(agentName) {
       }
     });
     
-    // Handle 'json_status' event
-    eventSource.addEventListener('json_status', (event) => {
+    // Handle 'json_message_status' event
+    eventSource.addEventListener('json_message_status', (event) => {
       try {
         const data = JSON.parse(event.data);
         const timestamp = data.timestamp || new Date().toISOString();
