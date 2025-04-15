@@ -184,7 +184,11 @@ a:hover {
 }
 
 .nav-link.active {
-  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 32px;
+  background: linear-gradient(180deg, #2e74ff 0%, #165dea 100%);
+  box-shadow: 0px -1px 4px 0px rgba(255, 255, 255, 0.24) inset,
+    0px 1px 0px 0px rgba(255, 255, 255, 0.32) inset,
+    0px 1px 4px 0px rgba(19, 19, 22, 0.12);
 }
 
 .nav-link i {
