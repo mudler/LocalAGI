@@ -25,7 +25,7 @@ function Chat() {
       document.title = `Chat with ${name} - LocalAGI`;
     }
     return () => {
-      document.title = "LocalAGI"; // Reset title when component unmounts
+      document.title = "LocalAGI";
     };
   }, [name]);
 
@@ -42,118 +42,149 @@ function Chat() {
     }
   }, [error, showToast, clearError]);
 
-  // Handle form submission
-  const handleSubmit = async (e) => {
+  const handleSend = (e) => {
     e.preventDefault();
-    if (!message.trim()) return;
-
-    const success = await sendMessage(message.trim());
-    if (success) {
+    if (message.trim() !== "") {
+      sendMessage(message);
       setMessage("");
     }
   };
 
-  // Handle pressing Enter to send (Shift+Enter for new line)
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
   return (
-    <div className="agents-container">
-      <header className="page-header">
-        <h1>Chat with {name}</h1>
+    <div className="dashboard-container">
+      <div className="main-content-area">
+        {/* Header */}
         <div
-          className="connection-status"
-          style={{ display: "flex", alignItems: "center" }}
+          className="chat-header"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
+            marginBottom: "2.5rem",
+          }}
         >
-          <span
-            className={isConnected ? "active" : "inactive"}
+          <i
+            className="fas fa-comments"
+            style={{ fontSize: 32, color: "var(--primary)" }}
+          />
+          <div>
+            <div style={{ fontSize: "2rem", fontWeight: 700, color: "#222" }}>
+              Chat with <span style={{ color: "var(--primary)" }}>{name}</span>
+            </div>
+            <div
+              className="section-description"
+              style={{
+                color: "var(--text-light)",
+                fontSize: "1.1rem",
+                marginTop: 2,
+              }}
+            >
+              Send messages and interact with your agent in real time.
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Window */}
+        <div
+          className="section-box chat-section-box"
+          style={{
+            width: "100%",
+            height: "calc(100vh - 300px)",
+            display: "flex",
+            flexDirection: "column",
+            margin: 0,
+            maxWidth: "none",
+          }}
+        >
+          <div
             style={{
-              position: "static",
-              display: "inline-block",
-              padding: "5px 12px",
-              borderRadius: "20px",
-              fontSize: "0.8rem",
-              fontWeight: "500",
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              boxShadow: "0 0 10px rgba(0, 0, 0, 0.2)",
-              marginLeft: "10px",
+              flex: 1,
+              overflowY: "auto",
             }}
           >
-            {isConnected ? "Connected" : "Disconnected"}
-          </span>
-        </div>
-        <button
-          className="action-btn delete-btn"
-          onClick={clearChat}
-          disabled={messages.length === 0}
-        >
-          <i className="fas fa-trash-alt"></i> Clear Chat
-        </button>
-      </header>
-
-      <div className="chat-container">
-        <div className="chat-messages">
-          {messages.length === 0 ? (
-            <div className="no-agents">
-              <h2>No messages yet</h2>
-              <p>Start a conversation with {name}!</p>
-            </div>
-          ) : (
-            messages.map((msg) => (
+            {messages.length === 0 ? (
               <div
-                key={msg.id}
-                className={`message ${
-                  msg.sender === "user" ? "message-user" : "message-agent"
-                }`}
+                style={{
+                  color: "var(--text-light)",
+                  textAlign: "center",
+                  marginTop: 48,
+                }}
               >
-                <div className="message-content">{msg.content}</div>
-                <div className="message-timestamp">
-                  {new Date(msg.timestamp).toLocaleTimeString()}
-                </div>
+                No messages yet. Say hello!
               </div>
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+            ) : (
+              messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    marginBottom: 12,
+                    display: "flex",
+                    flexDirection: msg.role === "user" ? "row-reverse" : "row",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: msg.role === "user" ? "#e0e7ff" : "#f3f4f6",
+                      color: "#222",
+                      borderRadius: 18,
+                      padding: "12px 18px",
+                      maxWidth: "70%",
+                      fontSize: "1rem",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
+                      alignSelf:
+                        msg.role === "user" ? "flex-end" : "flex-start",
+                    }}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-        <div className="chat-input">
+          {/* Chat Input */}
           <form
-            className="message-form"
-            onSubmit={handleSubmit}
-            style={{ display: "flex", gap: "1rem", width: "100%" }}
+            onSubmit={handleSend}
+            style={{ display: "flex", gap: 12, alignItems: "center" }}
+            autoComplete="off"
           >
-            <textarea
+            <input
+              type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+              placeholder={
+                isConnected ? "Type your message..." : "Connecting..."
+              }
               disabled={sending || !isConnected}
-              className="form-control"
-              rows={5}
               style={{
                 flex: 1,
-                resize: "vertical",
-                minHeight: "38px",
-                maxHeight: "150px",
+                padding: "12px 16px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 8,
+                fontSize: "1rem",
+                background: sending || !isConnected ? "#f3f4f6" : "#fff",
+                color: "#222",
+                outline: "none",
+                transition: "border-color 0.15s",
               }}
             />
             <button
               type="submit"
-              disabled={sending || !message.trim() || !isConnected}
-              className="action-btn chat-btn"
-              style={{ alignSelf: "flex-end" }}
+              className="action-btn"
+              style={{ minWidth: 120 }}
+              disabled={sending || !isConnected || message.trim() === ""}
             >
-              <i
-                className={`fas ${
-                  sending ? "fa-spinner fa-spin" : "fa-paper-plane"
-                }`}
-              ></i>{" "}
-              {sending ? "Sending..." : "Send"}
+              <i className="fas fa-paper-plane"></i> Send
+            </button>
+            <button
+              type="button"
+              className="action-btn"
+              style={{ background: "#f6f8fa", color: "#222", minWidth: 120 }}
+              onClick={clearChat}
+              disabled={sending || messages.length === 0}
+            >
+              <i className="fas fa-trash"></i> Clear Chat
             </button>
           </form>
         </div>

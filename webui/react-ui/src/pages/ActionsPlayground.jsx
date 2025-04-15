@@ -58,6 +58,7 @@ function ActionsPlayground() {
       try {
         config = JSON.parse(configJson);
       } catch (err) {
+        console.error("Error parsing configuration JSON:", err);
         showToast("Invalid configuration JSON", "error");
         setLoading(false);
         return;
@@ -65,12 +66,16 @@ function ActionsPlayground() {
       try {
         params = JSON.parse(paramsJson);
       } catch (err) {
+        console.error("Error parsing parameters JSON:", err);
         showToast("Invalid parameters JSON", "error");
         setLoading(false);
         return;
       }
       const actionData = { action: selectedAction, config, params };
-      const response = await actionApi.executeAction(selectedAction, actionData);
+      const response = await actionApi.executeAction(
+        selectedAction,
+        actionData
+      );
       setResult(response);
       showToast("Action executed successfully", "success");
     } catch (err) {
@@ -86,15 +91,33 @@ function ActionsPlayground() {
       <div className="main-content-area">
         <div className="section-title" style={{ marginBottom: "2.5rem" }}>
           <h1 style={{ margin: 0, fontSize: "2rem" }}>Actions Playground</h1>
-          <div style={{ color: "var(--text-light)", fontSize: "1.1rem", marginTop: 8 }}>
+          <div
+            style={{
+              color: "var(--text-light)",
+              fontSize: "1.1rem",
+              marginTop: 8,
+            }}
+          >
             Test and execute actions directly from the UI.
           </div>
         </div>
 
-        <div className="agent-form-container" style={{ gap: 40 }}>
+        <div
+          className="agent-form-container"
+          style={{ gap: 40, display: "flex", width: "100%" }}
+        >
           {/* Left column: Action selection and config */}
-          <div style={{ flex: 1, minWidth: 320 }}>
-            <div className="section-box" style={{ marginBottom: 32 }}>
+          <div style={{ width: "100%" }}>
+            <div
+              className="section-box"
+              style={{
+                marginBottom: 32,
+                width: "100%",
+                maxWidth: "none",
+                marginLeft: 0,
+                marginRight: 0,
+              }}
+            >
               <div className="form-group mb-4">
                 <label htmlFor="action-select">Available Actions:</label>
                 <select
@@ -115,8 +138,22 @@ function ActionsPlayground() {
             </div>
 
             {selectedAction && (
-              <div className="section-box" style={{ marginBottom: 32 }}>
-                <h2 className="section-title" style={{ fontSize: "1.2rem", marginBottom: 18 }}>Action Configuration</h2>
+              <div
+                className="section-box"
+                style={{
+                  marginBottom: 32,
+                  width: "100%",
+                  maxWidth: "none",
+                  marginLeft: 0,
+                  marginRight: 0,
+                }}
+              >
+                <h2
+                  className="section-title"
+                  style={{ fontSize: "1.2rem", marginBottom: 18 }}
+                >
+                  Action Configuration
+                </h2>
                 <form onSubmit={handleExecuteAction} autoComplete="off">
                   <div className="form-group mb-4">
                     <label htmlFor="config-json">Configuration (JSON):</label>
@@ -129,7 +166,9 @@ function ActionsPlayground() {
                       placeholder='{"key": "value"}'
                       spellCheck={false}
                     />
-                    <small className="form-text text-muted">Enter JSON configuration for the action</small>
+                    <small className="form-text text-muted">
+                      Enter JSON configuration for the action
+                    </small>
                   </div>
                   <div className="form-group mb-4">
                     <label htmlFor="params-json">Parameters (JSON):</label>
@@ -142,7 +181,9 @@ function ActionsPlayground() {
                       placeholder='{"key": "value"}'
                       spellCheck={false}
                     />
-                    <small className="form-text text-muted">Enter JSON parameters for the action</small>
+                    <small className="form-text text-muted">
+                      Enter JSON parameters for the action
+                    </small>
                   </div>
                   <div className="form-actions">
                     <button
@@ -152,9 +193,14 @@ function ActionsPlayground() {
                       aria-label="Execute Action"
                     >
                       {loading ? (
-                        <><i className="fas fa-spinner fa-spin"></i> Executing...</>
+                        <>
+                          <i className="fas fa-spinner fa-spin"></i>{" "}
+                          Executing...
+                        </>
                       ) : (
-                        <><i className="fas fa-play"></i> Execute Action</>
+                        <>
+                          <i className="fas fa-play"></i> Execute Action
+                        </>
                       )}
                     </button>
                   </div>
@@ -164,10 +210,25 @@ function ActionsPlayground() {
           </div>
 
           {/* Right column: Results */}
-          <div style={{ flex: 1, minWidth: 320 }}>
+          <div>
             {result && (
-              <div className="section-box" style={{ minHeight: 220 }}>
-                <h2 className="section-title" style={{ fontSize: "1.2rem", marginBottom: 18 }}>Action Results</h2>
+              <div
+                className="section-box"
+                style={{
+                  minWidth: 420,
+                  minHeight: 220,
+                  width: "100%",
+                  maxWidth: "none",
+                  marginLeft: 0,
+                  marginRight: 0,
+                }}
+              >
+                <h2
+                  className="section-title"
+                  style={{ fontSize: "1.2rem", marginBottom: 18 }}
+                >
+                  Action Results
+                </h2>
                 <div
                   className="result-container"
                   style={{
@@ -183,11 +244,25 @@ function ActionsPlayground() {
                   }}
                 >
                   {typeof result === "object" ? (
-                    <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                    <pre
+                      style={{
+                        margin: 0,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
                       {JSON.stringify(result, null, 2)}
                     </pre>
                   ) : (
-                    <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{result}</pre>
+                    <pre
+                      style={{
+                        margin: 0,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {result}
+                    </pre>
                   )}
                 </div>
               </div>

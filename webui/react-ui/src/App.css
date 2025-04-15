@@ -598,17 +598,27 @@ a:hover {
 
 .agent-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.agent-actions.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.action-btn {
+  min-width: 120px;
+  justify-content: center;
+  text-align: center;
 }
 
 .agent-action-btn {
-  flex: 1;
-  padding: 0.5rem;
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 4px;
+  padding-bottom: 4px;
   border-radius: var(--radius);
-  text-align: center;
-  font-size: 0.75rem;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
 }
 
 .chat-btn {
@@ -743,6 +753,8 @@ a:hover {
 .wizard-nav-item {
   padding: 11px 24px;
   margin-bottom: 6px;
+  margin-left: 4px;
+  margin-right: 4px;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, transform 0.15s;
@@ -966,4 +978,28 @@ a:hover {
 /* Section Description */
 .section-description {
   margin-bottom: 0.5rem;
+}
+
+.section-box {
+  background: #fff;
+  border-radius: 8px;
+  padding: 32px;
+  margin: 0 auto 32px;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  transition: box-shadow 0.18s, border-color 0.18s;
+}
+
+.section-box h2 {
+  text-align: left;
+  margin-bottom: 18px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #222;
+  letter-spacing: -0.5px;
+}
+
+.section-box::before {
+  display: none;
 }
