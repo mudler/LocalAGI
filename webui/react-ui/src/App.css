@@ -41,6 +41,7 @@ body {
   position: relative;
   overflow-x: hidden;
   line-height: 1.5;
+  display: block !important;
 }
 
 h1,
@@ -714,4 +715,249 @@ a:hover {
   .agents-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.agent-form-container {
+  display: flex;
+  gap: 2.5rem;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+/* Sidebar navigation for wizard */
+.wizard-sidebar {
+  width: 220px;
+  background: #f6f8fa;
+  border-radius: 12px;
+  padding: 18px 0 18px 0;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.wizard-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.wizard-nav-item {
+  padding: 11px 24px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  background: none;
+  color: var(--text-light);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1rem;
+  border: none;
+}
+
+.wizard-nav-item i {
+  color: var(--primary);
+  width: 20px;
+  text-align: center;
+}
+
+.wizard-nav-item:hover,
+.wizard-nav-item.active {
+  background: var(--primary-light);
+  color: var(--primary);
+  transform: none;
+  box-shadow: none;
+}
+
+.form-content-area {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px 32px 24px 32px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+.form-section {
+  display: none;
+  animation: fadeIn 0.3s ease-in-out;
+}
+.form-section.active {
+  display: block;
+}
+
+.section-title {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--primary);
+  text-align: left;
+  text-shadow: none;
+}
+
+.form-actions {
+  margin-top: 2.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.form-actions .action-btn {
+  min-width: 140px;
+  padding: 10px 22px;
+  font-size: 1rem;
+}
+
+/* --- Input Styling --- */
+.form-group,
+.mb-4 {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label,
+.mb-4 label {
+  margin-bottom: 7px;
+  color: var(--primary);
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.form-control,
+.mb-4 input[type="text"],
+.mb-4 input[type="password"],
+.mb-4 input[type="number"],
+.mb-4 textarea,
+.mb-4 select {
+  width: 100%;
+  padding: 10px 14px;
+  background-color: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-size: 1rem;
+  box-shadow: none;
+}
+
+.form-control:focus,
+.mb-4 input:focus,
+.mb-4 textarea:focus,
+.mb-4 select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(30, 84, 191, 0.08);
+}
+
+.mb-4 textarea,
+.form-control[type="textarea"] {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.form-control:disabled,
+.mb-4 input:disabled,
+.mb-4 select:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+/* Checkbox styling - Modern, clean, and accessible */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 5px 0;
+  user-select: none;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #f9fafb;
+  border: 2px solid var(--border);
+  border-radius: 5px;
+  margin: 0;
+  position: relative;
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  outline: none;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-label input[type="checkbox"]:hover,
+.checkbox-label input[type="checkbox"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(30, 84, 191, 0.12);
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.checkbox-label input[type="checkbox"]:checked::after {
+  content: "";
+  display: block;
+  width: 10px;
+  height: 5px;
+  border-left: 2.5px solid #fff;
+  border-bottom: 2.5px solid #fff;
+  position: absolute;
+  left: 2px;
+  top: 3px;
+  transform: rotate(-45deg);
+}
+
+.checkbox-label span {
+  font-size: 1rem;
+  color: var(--text);
+  font-weight: 400;
+}
+
+/* Simpler, less bold action button */
+.action-btn {
+  background: #f6f8fa;
+  color: var(--primary);
+  border: 1px solid var(--border);
+  padding: 10px 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  font-weight: 500;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  justify-content: center;
+  position: relative;
+  box-shadow: none;
+  letter-spacing: 0.01em;
+}
+
+.action-btn:hover,
+.action-btn:focus {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  border-color: var(--primary);
+  outline: none;
+}
+
+.action-btn:active {
+  background: #e5e7eb;
+  color: var(--primary-dark);
+}
+
+.action-btn i {
+  font-size: 1.05rem;
+  color: inherit;
 }

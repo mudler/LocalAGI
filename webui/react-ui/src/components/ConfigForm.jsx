@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
-import FormFieldDefinition from './common/FormFieldDefinition';
+import FormFieldDefinition from "./common/FormFieldDefinition";
 
 /**
  * ConfigForm - A generic component for handling configuration forms based on FieldGroups
- * 
+ *
  * @param {Object} props Component props
  * @param {Array} props.items - Array of configuration items (actions, connectors, etc.)
  * @param {Array} props.fieldGroups - Array of FieldGroup objects that define the available types and their fields
@@ -14,32 +13,32 @@ import FormFieldDefinition from './common/FormFieldDefinition';
  * @param {String} props.typeField - The field name that determines the item's type (e.g., 'name' for actions, 'type' for connectors)
  * @param {String} props.addButtonText - Text for the add button
  */
-const ConfigForm = ({ 
-  items = [], 
+const ConfigForm = ({
+  items = [],
   fieldGroups = [],
-  onChange, 
-  onRemove, 
+  onChange,
+  onRemove,
   onAdd,
-  itemType = 'item',
-  typeField = 'type',
-  addButtonText = 'Add Item'
+  itemType = "item",
+  typeField = "type",
+  addButtonText = "Add Item",
 }) => {
   // Generate options from fieldGroups
   const typeOptions = [
-    { value: '', label: `Select a ${itemType} type` },
-    ...fieldGroups.map(group => ({
+    { value: "", label: `Select a ${itemType} type` },
+    ...fieldGroups.map((group) => ({
       value: group.name,
-      label: group.label
-    }))
+      label: group.label,
+    })),
   ];
-  
+
   // Parse the config JSON string to an object
   const parseConfig = (item) => {
     if (!item || !item.config) return {};
-    
+
     try {
-      return typeof item.config === 'string' 
-        ? JSON.parse(item.config || '{}') 
+      return typeof item.config === "string"
+        ? JSON.parse(item.config || "{}")
         : item.config;
     } catch (error) {
       console.error(`Error parsing ${itemType} config:`, error);
@@ -52,7 +51,7 @@ const ConfigForm = ({
     const item = items[index];
     onChange(index, {
       ...item,
-      [typeField]: value
+      [typeField]: value,
     });
   };
 
@@ -61,15 +60,13 @@ const ConfigForm = ({
     const { name: key, value, type, checked } = e.target;
     const item = items[index];
     const config = parseConfig(item);
-    
-    if (type === 'checkbox')
-      config[key] = checked ? 'true' : 'false';
-    else
-      config[key] = value;
-    
+
+    if (type === "checkbox") config[key] = checked ? "true" : "false";
+    else config[key] = value;
+
     onChange(index, {
       ...item,
-      config: JSON.stringify(config)
+      config: JSON.stringify(config),
     });
   };
 
@@ -77,30 +74,43 @@ const ConfigForm = ({
   const renderItemForm = (item, index) => {
     // Ensure item is an object with expected properties
     const safeItem = item || {};
-    const itemTypeName = safeItem[typeField] || '';
-    
+    const itemTypeName = safeItem[typeField] || "";
+
     // Find the field group that matches this item's type
-    const fieldGroup = fieldGroups.find(group => group.name === itemTypeName);
-    const itemTypeLabel = itemType.charAt(0).toUpperCase() + itemType.slice(1).replace('_', ' ');
-    
+    const fieldGroup = fieldGroups.find((group) => group.name === itemTypeName);
+    const itemTypeLabel =
+      itemType.charAt(0).toUpperCase() + itemType.slice(1).replace("_", " ");
+
     return (
       <div key={index} className="config-item mb-4 card">
-        <div className="config-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h4 style={{ margin: 0 }}>{itemTypeLabel} #{index + 1}</h4>
-          <button 
-            type="button" 
+        <div
+          className="config-header"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1rem",
+          }}
+        >
+          <h4 style={{ margin: 0 }}>
+            {itemTypeLabel} #{index + 1}
+          </h4>
+          <button
+            type="button"
             className="action-btn delete-btn"
             onClick={() => onRemove(index)}
           >
             <i className="fas fa-times"></i>
           </button>
         </div>
-        
+
         <div className="config-type mb-3">
-          <label htmlFor={`${itemType}Type${index}`}>{itemTypeLabel} Type</label>
+          <label htmlFor={`${itemType}Type${index}`}>
+            {itemTypeLabel} Type
+          </label>
           <select
             id={`${itemType}Type${index}`}
-            value={safeItem[typeField] || ''}
+            value={safeItem[typeField] || ""}
             onChange={(e) => handleTypeChange(index, e.target.value)}
             className="form-control"
           >
@@ -111,7 +121,7 @@ const ConfigForm = ({
             ))}
           </select>
         </div>
-        
+
         {/* Render fields based on the selected type */}
         {fieldGroup && fieldGroup.fields && (
           <FormFieldDefinition
@@ -127,15 +137,9 @@ const ConfigForm = ({
 
   return (
     <div className="config-container">
-      {items && items.map((item, index) => (
-        renderItemForm(item, index)
-      ))}
-      
-      <button 
-        type="button" 
-        className="action-btn"
-        onClick={onAdd}
-      >
+      {items && items.map((item, index) => renderItemForm(item, index))}
+
+      <button type="button" className="action-btn" onClick={onAdd}>
         <i className="fas fa-plus"></i> {addButtonText}
       </button>
     </div>
