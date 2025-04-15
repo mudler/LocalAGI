@@ -36,49 +36,36 @@ function CreateAgent() {
   }, []);
 
   // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.name.trim()) {
-      showToast('Agent name is required', 'error');
-      return;
-    }
-    
+  const handleSubmit = async (data) => {
     setLoading(true);
-    
     try {
-      const response = await agentApi.createAgent(formData);
-      showToast(`Agent "${formData.name}" created successfully`, 'success');
-      navigate(`/settings/${formData.name}`);
-    } catch (err) {
-      showToast(`Error creating agent: ${err.message}`, 'error');
+      await agentApi.createAgent(data);
+      showToast && showToast('Agent created successfully!', 'success');
+      navigate('/agents');
+    } catch (error) {
+      showToast && showToast('Failed to create agent', 'error');
+      console.error('Error creating agent:', error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="create-agent-container">
-      <header className="page-header">
-        <h1>
-          <i className="fas fa-plus-circle"></i> Create New Agent
-        </h1>
-      </header>
-      
-      <div className="create-agent-content">
-        <div className="section-box">
-          <h2>
-            <i className="fas fa-robot"></i> Agent Configuration
-          </h2>
-          
+    <div className="dashboard-container">
+      <div className="main-content-area">
+        <div className="welcome-section" style={{ marginBottom: 24 }}>
+          <h1 className="welcome-title" style={{ fontSize: 28, fontWeight: 700, marginBottom: 0 }}>Create Agent</h1>
+          <p style={{ color: '#6b7a90', fontSize: 15, marginTop: 8, marginBottom: 0 }}>
+            Fill out the form below to create a new agent. You can customize its configuration and capabilities.
+          </p>
+        </div>
+        <div style={{ marginTop: 32 }}>
           <AgentForm
+            metadata={metadata}
             formData={formData}
             setFormData={setFormData}
             onSubmit={handleSubmit}
             loading={loading}
-            submitButtonText="Create Agent"
-            isEdit={false}
-            metadata={metadata}
           />
         </div>
       </div>

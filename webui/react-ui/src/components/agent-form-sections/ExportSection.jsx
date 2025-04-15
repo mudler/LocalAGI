@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 
 const ExportSection = ({ agentName }) => {
   useEffect(() => {
-    console.log('ExportSection rendered with agentName:', agentName);
+    console.log("ExportSection rendered with agentName:", agentName);
   }, [agentName]);
 
   return (
@@ -10,13 +10,19 @@ const ExportSection = ({ agentName }) => {
       <div className="section-title">
         <h2>Export Data</h2>
       </div>
-      
+
       <div className="section-content">
-        <p className="mb-4">Export your agent configuration for backup or transfer.</p>
-        <a 
+        <p className="section-description">
+          Export your agent configuration for backup or transfer.
+        </p>
+        <a
           href={`/settings/export/${agentName}`}
           className="action-btn"
-          style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            textDecoration: "none",
+          }}
         >
           <i className="fas fa-file-export"></i> Export Configuration
         </a>
