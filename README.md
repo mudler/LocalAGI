@@ -267,7 +267,7 @@ cd LocalAGI
 cd webui/react-ui && bun i && bun run dev
 ```
 
-Then in seperate terminal:
+Then in separate terminal:
 
 ```bash
 # Start development server
