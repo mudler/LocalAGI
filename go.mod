@@ -10,7 +10,7 @@ require (
 	github.com/dave-gray101/v2keyauth v0.0.0-20240624150259-c45d584d25e2
 	github.com/donseba/go-htmx v1.12.0
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
-	github.com/go-telegram/bot v1.2.1
+	github.com/go-telegram/bot v1.14.2
 	github.com/gofiber/fiber/v2 v2.52.6
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/go-github/v69 v69.2.0
