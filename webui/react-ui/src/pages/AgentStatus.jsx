@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import Header from "../components/Header";
+import { AgentStatus as StatusIndicator } from "../components/AgentComponents";
 
 function AgentStatus() {
   const { name } = useParams();
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [_eventSource, setEventSource] = useState(null);
-  const [liveUpdates, setLiveUpdates] = useState([]);
 
   // Update document title
   useEffect(() => {
@@ -31,13 +31,12 @@ function AgentStatus() {
         setStatusData(data);
       } catch (err) {
         console.error("Error fetching agent status:", err);
-        setError(`Failed to load status for agent \"${name}\": ${err.message}`);
+        setError(`Failed to load status for agent "${name}": ${err.message}`);
       } finally {
         setLoading(false);
       }
     };
     fetchStatusData();
-    // eslint-disable-next-line
   }, [name]);
 
   // Header status helpers
@@ -55,6 +54,7 @@ function AgentStatus() {
       try {
         return JSON.stringify(value, null, 2);
       } catch (err) {
+        console.error("Error stringifying object:", err);
         return "[Complex Object]";
       }
     }
@@ -63,76 +63,32 @@ function AgentStatus() {
   };
 
   // Combine live updates with history
-  const allUpdates = [...liveUpdates, ...(statusData?.History || [])];
+  const allUpdates = statusData?.History || [];
+
+  // Create header right content
+  const headerRightContent = (
+    <div className="header-right">
+      <StatusIndicator status={statusText} color={statusColor} />
+      <Link
+        to={`/settings/${name}`}
+        className="action-btn pause-resume-btn"
+      >
+        <i className="fas fa-cogs"></i> Agent Settings
+      </Link>
+    </div>
+  );
 
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        {/* Refreshed Header */}
-        <div
-          className="agent-status-header"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "2.5rem",
-            gap: 18,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <i
-              className="fas fa-chart-bar"
-              style={{ fontSize: 32, color: "var(--primary)" }}
-            />
-            <div>
-              <div style={{ fontSize: "2rem", fontWeight: 700, color: "#222" }}>
-                Agent Status <span style={{ color: "var(--primary)" }}>- {name}</span>
-              </div>
-              <div
-                style={{
-                  color: "var(--text-light)",
-                  fontSize: "1.1rem",
-                  marginTop: 2,
-                }}
-              >
-                Live status, activity, and logs for this agent.
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                fontWeight: 500,
-                color: statusColor,
-                fontSize: "1rem",
-                background: "rgba(34,197,94,0.09)",
-                borderRadius: 16,
-                padding: "4px 14px",
-                marginRight: 8,
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 9,
-                  height: 9,
-                  borderRadius: "50%",
-                  background: statusColor,
-                  marginRight: 8,
-                }}
-              ></span>
-              {statusText}
-            </span>
-            <Link
-              to={`/settings/${name}`}
-              className="action-btn"
-              style={{ background: "#f6f8fa", color: "var(--primary)" }}
-            >
-              <i className="fas fa-cogs"></i> Agent Settings
-            </Link>
-          </div>
+        <div className="header-container">
+          <Header
+            icon="fas fa-chart-bar"
+            title="Agent Status"
+            description="Live status, activity, and logs for this agent."
+            name={name}
+          />
+          {headerRightContent}
         </div>
 
         {/* Main Content */}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { agentApi } from "../utils/api";
+import Header from "../components/Header";
 
 function ImportAgent() {
   const navigate = useNavigate();
@@ -37,44 +38,35 @@ function ImportAgent() {
       showToast("Agent imported successfully", "success");
       navigate("/agents");
     } catch (err) {
+      console.error("Error importing agent:", err);
       showToast("Failed to import agent", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  // Back button for the header
+  const backButton = (
+    <button
+      className="action-btn pause-resume-btn"
+      onClick={() => navigate('/agents')}
+      disabled={loading}
+    >
+      <i className="fas fa-arrow-left"></i> Back to Agents
+    </button>
+  );
+
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        {/* Header */}
-        <div
-          className="import-agent-header"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 18,
-            marginBottom: "2.5rem",
-          }}
-        >
-          <i
-            className="fas fa-file-import"
-            style={{ fontSize: 32, color: "var(--primary)" }}
+        <div className="header-container">
+          <Header
+            icon="fas fa-file-import"
+            title="Import Agent"
+            description="Upload a previously exported agent configuration file to restore or transfer an agent."
           />
-          <div>
-            <div style={{ fontSize: "2rem", fontWeight: 700, color: "#222" }}>
-              Import Agent
-            </div>
-            <div
-              className="section-description"
-              style={{
-                color: "var(--text-light)",
-                fontSize: "1.1rem",
-                marginTop: 2,
-              }}
-            >
-              Upload a previously exported agent configuration file to restore
-              or transfer an agent.
-            </div>
+          <div className="header-right">
+            {backButton}
           </div>
         </div>
 
@@ -108,16 +100,19 @@ function ImportAgent() {
               style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
             >
               <button
-                type="button"
+                type="submit"
                 className="action-btn"
-                style={{ background: "#f6f8fa", color: "var(--primary)" }}
-                onClick={() => navigate("/agents")}
-                disabled={loading}
+                disabled={loading || !file}
               >
-                <i className="fas fa-times"></i> Cancel
-              </button>
-              <button type="submit" className="action-btn" disabled={loading}>
-                <i className="fas fa-file-import"></i> Import Agent
+                {loading ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i> Importing...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-file-import"></i> Import Agent
+                  </>
+                )}
               </button>
             </div>
           </form>

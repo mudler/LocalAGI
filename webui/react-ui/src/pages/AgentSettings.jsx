@@ -3,6 +3,8 @@ import { useParams, useOutletContext, useNavigate } from "react-router-dom";
 import { useAgent } from "../hooks/useAgent";
 import { agentApi } from "../utils/api";
 import AgentForm from "../components/AgentForm";
+import Header from "../components/Header";
+import { AgentStatus, AgentActionButtons } from "../components/AgentComponents";
 
 function AgentSettings() {
   const { name } = useParams();
@@ -32,6 +34,7 @@ function AgentSettings() {
         const response = await agentApi.getAgentConfigMetadata();
         setMetadata(response);
       } catch (err) {
+        console.error("Error fetching agent metadata:", err);
         showToast("Failed to load agent metadata", "error");
       }
     };
@@ -74,88 +77,22 @@ function AgentSettings() {
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        {/* Refreshed Header */}
-        <div
-          className="agent-settings-header"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "2.5rem",
-            gap: 18,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <i
-              className="fas fa-cogs"
-              style={{ fontSize: 32, color: "var(--primary)" }}
+        <div className="header-container">
+          <Header
+            icon="fas fa-cogs"
+            title="Agent Settings"
+            description="Configure and manage the agent's settings, connectors, and capabilities."
+            name={name}
+          />
+
+          <div className="header-right">
+            <AgentStatus status={statusText} color={statusColor} />
+            <AgentActionButtons
+              agent={agent}
+              loading={loading}
+              onPauseResume={handlePauseResume}
+              onDelete={handleDelete}
             />
-            <div>
-              <div style={{ fontSize: "2rem", fontWeight: 700, color: "#222" }}>
-                Agent Settings{" "}
-                <span style={{ color: "var(--primary)" }}>- {name}</span>
-              </div>
-              <div
-                style={{
-                  color: "var(--text-light)",
-                  fontSize: "1.1rem",
-                  marginTop: 2,
-                }}
-              >
-                Configure and manage the agent’s settings, connectors, and
-                capabilities.
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                fontWeight: 500,
-                color: statusColor,
-                fontSize: "1rem",
-                background: "rgba(34,197,94,0.09)",
-                borderRadius: 16,
-                padding: "4px 14px",
-                marginRight: 8,
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 9,
-                  height: 9,
-                  borderRadius: "50%",
-                  background: statusColor,
-                  marginRight: 8,
-                }}
-              ></span>
-              {statusText}
-            </span>
-            <button
-              className="action-btn"
-              style={{ background: "#f6f8fa", color: "var(--primary)" }}
-              onClick={handlePauseResume}
-              disabled={loading}
-            >
-              <i
-                className={`fas ${agent?.active ? "fa-pause" : "fa-play"}`}
-              ></i>{" "}
-              {agent?.active ? "Pause Agent" : "Resume Agent"}
-            </button>
-            <button
-              className="action-btn"
-              style={{
-                background: "#fff0f0",
-                color: "#dc2626",
-                border: "1px solid #fca5a5",
-              }}
-              onClick={handleDelete}
-              disabled={loading}
-            >
-              <i className="fas fa-trash"></i> Delete Agent
-            </button>
           </div>
         </div>
 

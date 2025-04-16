@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { agentApi } from '../utils/api';
 import AgentForm from '../components/AgentForm';
+import Header from '../components/Header';
 
 function GroupCreate() {
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ function GroupCreate() {
   // Handle profile selection
   const handleProfileSelection = (index) => {
     const newSelectedProfiles = [...selectedProfiles];
-    
+
     if (newSelectedProfiles.includes(index)) {
       // Remove from selection
       const profileIndex = newSelectedProfiles.indexOf(index);
@@ -94,7 +95,7 @@ function GroupCreate() {
       // Add to selection
       newSelectedProfiles.push(index);
     }
-    
+
     setSelectedProfiles(newSelectedProfiles);
   };
 
@@ -114,39 +115,34 @@ function GroupCreate() {
     setActiveStep(activeStep + 1);
   };
 
-  // Navigate to previous step
-  const prevStep = () => {
-    setActiveStep(activeStep - 1);
-  };
-
   // Generate agent profiles
   const handleGenerateProfiles = async () => {
     if (!formData.description.trim()) {
       showToast('Please enter a description', 'warning');
       return;
     }
-    
+
     setGeneratingProfiles(true);
-    
+
     try {
       const response = await agentApi.generateGroupProfiles({
         description: formData.description
       });
-      
+
       // The API returns an array of agent profiles directly
       const profiles = Array.isArray(response) ? response : [];
-      
+
       setFormData({
         ...formData,
         profiles: profiles
       });
-      
+
       // Auto-select all profiles
       setSelectedProfiles(profiles.map((_, index) => index));
-      
+
       // Move to next step
       nextStep();
-      
+
       showToast('Agent profiles generated successfully', 'success');
     } catch (err) {
       console.error('Error generating profiles:', err);
@@ -156,13 +152,27 @@ function GroupCreate() {
     }
   };
 
+  // Back button for the header
+  const backButton = (
+    <button
+      className="action-btn pause-resume-btn"
+      onClick={() => navigate('/agents')}
+    >
+      <i className="fas fa-arrow-left"></i> Back to Agents
+    </button>
+  );
+
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        <div className="section-title" style={{ marginBottom: "2.5rem" }}>
-          <h1 style={{ margin: 0, fontSize: "2rem" }}>Create Agent Group</h1>
-          <div style={{ color: "var(--text-light)", fontSize: "1.1rem", marginTop: 8 }}>
-            Organize agents by creating a new group with shared configuration and profiles.
+        <div className="header-container">
+          <Header
+            icon="fas fa-users"
+            title="Create Agent Group"
+            description="Organize agents by creating a new group with shared configuration and profiles."
+          />
+          <div className="header-right">
+            {backButton}
           </div>
         </div>
 

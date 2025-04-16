@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import { agentApi } from "../utils/api";
+import Header from "../components/Header";
 
 function Home() {
   const { showToast } = useOutletContext();
@@ -61,6 +62,13 @@ function Home() {
     year: "numeric",
   });
 
+  // Create action buttons for the header
+  const createAgentButton = (
+    <Link to="/create" className="action-btn pause-resume-btn">
+      <i className="fas fa-plus"></i> Create Agent
+    </Link>
+  );
+
   return (
     <div className="dashboard-container">
       <div className="sidebar">
@@ -81,9 +89,15 @@ function Home() {
       </div>
 
       <div className="main-content-area">
-        <div className="welcome-section">
-          <div className="date-display">{currentDate}</div>
-          <h1 className="welcome-title">Welcome back</h1>
+        <div className="header-container">
+          <Header
+            icon="fas fa-home"
+            title="Welcome back"
+            description={currentDate}
+          />
+          <div className="header-right">
+            {createAgentButton}
+          </div>
         </div>
 
         {/* Dashboard Stats */}

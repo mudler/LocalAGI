@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { actionApi } from "../utils/api";
+import Header from "../components/Header";
 
 function ActionsPlayground() {
   const { showToast } = useOutletContext();
@@ -89,17 +90,13 @@ function ActionsPlayground() {
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        <div className="section-title" style={{ marginBottom: "2.5rem" }}>
-          <h1 style={{ margin: 0, fontSize: "2rem" }}>Actions Playground</h1>
-          <div
-            style={{
-              color: "var(--text-light)",
-              fontSize: "1.1rem",
-              marginTop: 8,
-            }}
-          >
-            Test and execute actions directly from the UI.
-          </div>
+        <div className="header-container">
+          <Header
+            icon="fas fa-bolt"
+            title="Actions Playground"
+            description="Test and execute actions directly from the UI."
+            name=""
+          />
         </div>
 
         <div

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useOutletContext } from "react-router-dom";
+import Header from "../components/Header";
 
 function AgentsList() {
   const [agents, setAgents] = useState([]);
@@ -127,14 +128,32 @@ function AgentsList() {
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        <div className="welcome-section" style={{ marginBottom: 24 }}>
-          <h1
-            className="welcome-title"
-            style={{ fontSize: 28, fontWeight: 700, marginBottom: 0 }}
+        <div className="header-container">
+          <Header
+            icon="fas fa-robot"
+            title="Agents"
+            description="Easily manage, access, and interact with all your agents from one place."
+          />
+
+          <Link
+            to="/create"
+            className="action-btn"
+            style={{
+              color: "#1857c7",
+              fontWeight: 600,
+              fontSize: 15,
+              padding: "8px 18px",
+              background: "#eaf1fb",
+              borderRadius: 8,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+            }}
           >
-            Agents
-          </h1>
+            <i className="fas fa-plus"></i> Create Agent
+          </Link>
         </div>
+
         <div
           className="dashboard-stats"
           style={{ display: "flex", gap: 16, marginBottom: 28 }}
@@ -170,22 +189,7 @@ function AgentsList() {
             </div>
           </div>
         </div>
-        <div className="section-title" style={{ marginBottom: 18 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
-            Manage Agents
-          </h2>
-          <p
-            style={{
-              color: "#6b7a90",
-              fontSize: 14,
-              marginTop: 6,
-              marginBottom: 0,
-            }}
-          >
-            Easily manage, access, and interact with all your agents from one
-            place.
-          </p>
-        </div>
+
         {agents.length > 0 ? (
           <div className="agents-grid" style={{ marginTop: 22 }}>
             {agents.map((name) => (

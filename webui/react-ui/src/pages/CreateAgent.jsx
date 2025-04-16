@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { agentApi } from '../utils/api';
 import AgentForm from '../components/AgentForm';
+import Header from '../components/Header';
 
 function CreateAgent() {
   const navigate = useNavigate();
@@ -50,15 +51,29 @@ function CreateAgent() {
     }
   };
 
+  const backButton = (
+    <button
+      className="action-btn pause-resume-btn"
+      onClick={() => navigate('/agents')}
+    >
+      <i className="fas fa-arrow-left"></i> Back to Agents
+    </button>
+  );
+
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        <div className="welcome-section" style={{ marginBottom: 24 }}>
-          <h1 className="welcome-title" style={{ fontSize: 28, fontWeight: 700, marginBottom: 0 }}>Create Agent</h1>
-          <p style={{ color: '#6b7a90', fontSize: 15, marginTop: 8, marginBottom: 0 }}>
-            Fill out the form below to create a new agent. You can customize its configuration and capabilities.
-          </p>
+        <div className="header-container">
+          <Header
+            icon="fas fa-plus-circle"
+            title="Create Agent"
+            description="Fill out the form below to create a new agent. You can customize its configuration and capabilities."
+          />
+          <div className="header-right">
+            {backButton}
+          </div>
         </div>
+
         <div style={{ marginTop: 32 }}>
           <AgentForm
             metadata={metadata}

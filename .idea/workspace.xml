@@ -4,8 +4,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="77851b10-1c14-4cae-aafd-549717e607be" name="Changes" comment="Delete old UI">
+    <list default="true" id="77851b10-1c14-4cae-aafd-549717e607be" name="Changes" comment="Fix Chrome style">
+      <change afterPath="$PROJECT_DIR$/webui/react-ui/src/components/AgentComponents.jsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/webui/react-ui/src/components/Header.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/bun.lockb" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/bun.lockb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/webui/react-ui/src/App.css" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/App.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/ActionsPlayground.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/ActionsPlayground.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentSettings.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentSettings.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentStatus.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentStatus.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentsList.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentsList.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/Chat.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/Chat.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/CreateAgent.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/CreateAgent.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/GroupCreate.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/GroupCreate.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/Home.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/Home.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/ImportAgent.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/ImportAgent.jsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/webui/react-ui/vite.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/vite.config.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -14,11 +29,15 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="RESET_MODE" value="MIXED" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 4
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4
+}</component>
   <component name="ProjectId" id="2vlsJskGdua3A8eBCZ9V8FotoJN" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="autoscrollFromSource" value="true" />
     <option name="foldersAlwaysOnTop" value="false" />
@@ -35,7 +54,8 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "advanced.settings"
+    "settings.editor.selected.configurable": "advanced.settings",
+    "ts.external.directory.path": "/Applications/WebStorm.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external"
   }
 }]]></component>
   <component name="SharedIndexes">
@@ -54,6 +74,8 @@
       <option name="presentableId" value="Default" />
       <updated>1744730926535</updated>
       <workItem from="1744730927636" duration="1976000" />
+      <workItem from="1744732984137" duration="1494000" />
+      <workItem from="1744827881432" duration="3850000" />
     </task>
     <task id="LOCAL-00001" summary="Delete old UI">
       <option name="closed" value="true" />
@@ -63,7 +85,15 @@
       <option name="project" value="LOCAL" />
       <updated>1744732742401</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Fix Chrome style">
+      <option name="closed" value="true" />
+      <created>1744733133021</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1744733133021</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -77,17 +107,17 @@
             <list>
               <RecentGroup>
                 <option name="FILTER_VALUES">
+                  <option value="HEAD" />
+                </option>
+              </RecentGroup>
+              <RecentGroup>
+                <option name="FILTER_VALUES">
                   <option value="origin/main" />
                 </option>
               </RecentGroup>
               <RecentGroup>
                 <option name="FILTER_VALUES">
                   <option value="main" />
-                </option>
-              </RecentGroup>
-              <RecentGroup>
-                <option name="FILTER_VALUES">
-                  <option value="HEAD" />
                 </option>
               </RecentGroup>
             </list>
@@ -105,7 +135,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="origin/main" />
+                        <option value="HEAD" />
                       </list>
                     </value>
                   </entry>
@@ -119,6 +149,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Delete old UI" />
-    <option name="LAST_COMMIT_MESSAGE" value="Delete old UI" />
+    <MESSAGE value="Fix Chrome style" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix Chrome style" />
   </component>
 </project>

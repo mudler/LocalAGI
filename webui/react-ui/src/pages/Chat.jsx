@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import { useChat } from "../hooks/useChat";
+import Header from "../components/Header";
 
 function Chat() {
   const { name } = useParams();
@@ -53,35 +54,14 @@ function Chat() {
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
-        {/* Header */}
-        <div
-          className="chat-header"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 18,
-            marginBottom: "2.5rem",
-          }}
-        >
-          <i
-            className="fas fa-comments"
-            style={{ fontSize: 32, color: "var(--primary)" }}
+        <div className="header-container">
+          <Header
+            icon="fas fa-comments"
+            title="Chat with"
+            description="Send messages and interact with your agent in real time."
+            name={name}
           />
-          <div>
-            <div style={{ fontSize: "2rem", fontWeight: 700, color: "#222" }}>
-              Chat with <span style={{ color: "var(--primary)" }}>{name}</span>
-            </div>
-            <div
-              className="section-description"
-              style={{
-                color: "var(--text-light)",
-                fontSize: "1.1rem",
-                marginTop: 2,
-              }}
-            >
-              Send messages and interact with your agent in real time.
-            </div>
-          </div>
+          {/* No right content for chat header */}
         </div>
 
         {/* Chat Window */}
