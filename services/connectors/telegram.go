@@ -119,7 +119,7 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 				defer resp.Body.Close()
 				_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 					ChatID: update.Message.Chat.ID,
-					Photo: models.InputFileUpload{
+					Photo: &models.InputFileUpload{
 						Filename: "image.jpg",
 						Data:     resp.Body,
 					},
