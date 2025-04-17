@@ -9,7 +9,7 @@ services:
     command: 
     - ${MODEL_NAME:-arcee-agent}
     - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
-    - ${IMAGE_MODEL:-flux.1-dev}
+    - ${IMAGE_MODEL:-sd-1.5-ggml}
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]

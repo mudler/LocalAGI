@@ -11,11 +11,6 @@ services:
       # On a system with integrated GPU and an Arc 770, this is the Arc 770
       - /dev/dri/card1
       - /dev/dri/renderD129
-    command: 
-    - ${MODEL_NAME:-arcee-agent}
-    - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
-    - ${IMAGE_MODEL:-sd-1.5-ggml}
-    - granite-embedding-107m-multilingual
 
   localrecall:
     extends:

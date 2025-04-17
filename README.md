@@ -60,7 +60,7 @@ MODEL_NAME=gemma-3-12b-it docker compose up
 # NVIDIA GPU setup with custom multimodal and image models
 MODEL_NAME=gemma-3-12b-it \
 MULTIMODAL_MODEL=minicpm-v-2_6 \
-IMAGE_MODEL=flux.1-dev \
+IMAGE_MODEL=flux.1-dev-ggml \
 docker compose -f docker-compose.nvidia.yaml up
 ```
 
@@ -116,7 +116,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Default models:
   - Text: `arcee-agent`
   - Multimodal: `minicpm-v-2_6`
-  - Image: `flux.1-dev`
+  - Image: `sd-1.5-ggml`
 - Environment variables:
   - `MODEL_NAME`: Text model to use
   - `MULTIMODAL_MODEL`: Multimodal model to use
@@ -150,7 +150,7 @@ MODEL_NAME=gemma-3-12b-it docker compose up
 # NVIDIA GPU with custom models
 MODEL_NAME=gemma-3-12b-it \
 MULTIMODAL_MODEL=minicpm-v-2_6 \
-IMAGE_MODEL=flux.1-dev \
+IMAGE_MODEL=flux.1-dev-ggml \
 docker compose -f docker-compose.nvidia.yaml up
 
 # Intel GPU with custom models
@@ -163,7 +163,7 @@ docker compose -f docker-compose.intel.yaml up
 If no models are specified, it will use the defaults:
 - Text model: `arcee-agent`
 - Multimodal model: `minicpm-v-2_6`
-- Image model: `flux.1-dev` (NVIDIA) or `sd-1.5-ggml` (Intel)
+- Image model: `sd-1.5-ggml`
 
 Good (relatively small) models that have been tested are:
 
