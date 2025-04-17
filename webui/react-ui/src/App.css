@@ -1086,18 +1086,6 @@ a:hover {
   gap: 12px;
 }
 
-/* Status indicator component */
-.status-indicator {
-  display: inline-flex;
-  align-items: center;
-  font-weight: 500;
-  font-size: 1rem;
-  background: rgba(34, 197, 94, 0.09);
-  border-radius: 16px;
-  padding: 4px 14px;
-  margin-right: 8px;
-}
-
 .status-dot {
   display: inline-block;
   width: 9px;

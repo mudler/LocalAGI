@@ -68,11 +68,7 @@ function AgentStatus() {
   // Create header right content
   const headerRightContent = (
     <div className="header-right">
-      <StatusIndicator status={statusText} color={statusColor} />
-      <Link
-        to={`/settings/${name}`}
-        className="action-btn pause-resume-btn"
-      >
+      <Link to={`/settings/${name}`} className="action-btn pause-resume-btn">
         <i className="fas fa-cogs"></i> Agent Settings
       </Link>
     </div>
@@ -109,9 +105,13 @@ function AgentStatus() {
                 <strong>Status:</strong> {statusText}
               </div>
               {/* Activity log or live updates */}
-              <h3 style={{ fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
+              <h3 style={{ fontWeight: 600, marginBottom: 12 }}>
+                Recent Activity
+              </h3>
               {allUpdates.length === 0 ? (
-                <div style={{ color: "var(--text-light)" }}>No recent activity.</div>
+                <div style={{ color: "var(--text-light)" }}>
+                  No recent activity.
+                </div>
               ) : (
                 <div className="chat-container bg-gray-800 shadow-lg rounded-lg">
                   {/* Chat Messages */}
@@ -119,11 +119,15 @@ function AgentStatus() {
                     {allUpdates.map((item, index) => (
                       <div key={index} className="status-item mb-4">
                         <div className="bg-gray-700 p-4 rounded-lg">
-                          <h2 className="text-sm font-semibold mb-2">Agent Action:</h2>
+                          <h2 className="text-sm font-semibold mb-2">
+                            Agent Action:
+                          </h2>
                           <div className="status-details">
                             <div className="status-row">
                               <span className="status-label">{index}</span>
-                              <span className="status-value">{formatValue(item)}</span>
+                              <span className="status-value">
+                                {formatValue(item)}
+                              </span>
                             </div>
                           </div>
                         </div>

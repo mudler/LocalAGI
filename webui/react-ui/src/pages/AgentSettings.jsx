@@ -70,10 +70,6 @@ function AgentSettings() {
     }
   };
 
-  // Header status
-  const statusColor = agent?.active ? "#22c55e" : "#f59e0b";
-  const statusText = agent?.active ? "Active" : "Paused";
-
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
@@ -86,7 +82,6 @@ function AgentSettings() {
           />
 
           <div className="header-right">
-            <AgentStatus status={statusText} color={statusColor} />
             <AgentActionButtons
               agent={agent}
               loading={loading}
