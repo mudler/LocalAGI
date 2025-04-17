@@ -18,38 +18,49 @@ type GithubPRCreator struct {
 func NewGithubPRCreator(config map[string]string) *GithubPRCreator {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
+	defaultBranch := config["defaultBranch"]
+	if defaultBranch == "" {
+		defaultBranch = "main" // Default to "main" if not specified
+	}
+
 	return &GithubPRCreator{
 		client:           client,
 		token:            config["token"],
 		repository:       config["repository"],
 		owner:            config["owner"],
 		customActionName: config["customActionName"],
-		defaultBranch:    config["defaultBranch"],
+		defaultBranch:    defaultBranch,
 	}
 }
 
-func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName string) error {
+func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName string, owner string, repository string) error {
 	// Get the latest commit SHA from the default branch
-	ref, _, err := g.client.Git.GetRef(ctx, g.owner, g.repository, "refs/heads/"+g.defaultBranch)
+	ref, _, err := g.client.Git.GetRef(ctx, owner, repository, "refs/heads/"+g.defaultBranch)
 	if err != nil {
-		return fmt.Errorf("failed to get reference: %w", err)
+		return fmt.Errorf("failed to get reference for default branch %s: %w", g.defaultBranch, err)
 	}
 
 	// Try to get the branch if it exists
-	_, resp, err := g.client.Git.GetRef(ctx, g.owner, g.repository, "refs/heads/"+branchName)
+	_, resp, err := g.client.Git.GetRef(ctx, owner, repository, "refs/heads/"+branchName)
 	if err != nil {
-		// If branch doesn't exist, create it
-		if resp != nil && resp.StatusCode == 404 {
+		if resp == nil {
+			return fmt.Errorf("failed to check branch existence: %w", err)
+		}
+
+		// If branch doesn't exist (404), create it
+		if resp.StatusCode == 404 {
 			newRef := &github.Reference{
 				Ref:    github.String("refs/heads/" + branchName),
 				Object: &github.GitObject{SHA: ref.Object.SHA},
 			}
-			_, _, err = g.client.Git.CreateRef(ctx, g.owner, g.repository, newRef)
+			_, _, err = g.client.Git.CreateRef(ctx, owner, repository, newRef)
 			if err != nil {
 				return fmt.Errorf("failed to create branch: %w", err)
 			}
 			return nil
 		}
+
+		// For other errors, return the error
 		return fmt.Errorf("failed to check branch existence: %w", err)
 	}
 
@@ -58,7 +69,7 @@ func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName s
 		Ref:    github.String("refs/heads/" + branchName),
 		Object: &github.GitObject{SHA: ref.Object.SHA},
 	}
-	_, _, err = g.client.Git.UpdateRef(ctx, g.owner, g.repository, updateRef, true)
+	_, _, err = g.client.Git.UpdateRef(ctx, owner, repository, updateRef, true)
 	if err != nil {
 		return fmt.Errorf("failed to update branch: %w", err)
 	}
@@ -66,10 +77,10 @@ func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName s
 	return nil
 }
 
-func (g *GithubPRCreator) createOrUpdateFile(ctx context.Context, branch string, filePath string, content string, message string) error {
+func (g *GithubPRCreator) createOrUpdateFile(ctx context.Context, branch string, filePath string, content string, message string, owner string, repository string) error {
 	// Get the current file content if it exists
 	var sha *string
-	fileContent, _, _, err := g.client.Repositories.GetContents(ctx, g.owner, g.repository, filePath, &github.RepositoryContentGetOptions{
+	fileContent, _, _, err := g.client.Repositories.GetContents(ctx, owner, repository, filePath, &github.RepositoryContentGetOptions{
 		Ref: branch,
 	})
 	if err == nil && fileContent != nil {
@@ -77,7 +88,7 @@ func (g *GithubPRCreator) createOrUpdateFile(ctx context.Context, branch string,
 	}
 
 	// Create or update the file
-	_, _, err = g.client.Repositories.CreateFile(ctx, g.owner, g.repository, filePath, &github.RepositoryContentFileOptions{
+	_, _, err = g.client.Repositories.CreateFile(ctx, owner, repository, filePath, &github.RepositoryContentFileOptions{
 		Message: &message,
 		Content: []byte(content),
 		Branch:  &branch,
@@ -118,14 +129,14 @@ func (g *GithubPRCreator) Run(ctx context.Context, params types.ActionParams) (t
 	}
 
 	// Create or update branch
-	err = g.createOrUpdateBranch(ctx, result.Branch)
+	err = g.createOrUpdateBranch(ctx, result.Branch, result.Owner, result.Repository)
 	if err != nil {
 		return types.ActionResult{}, fmt.Errorf("failed to create/update branch: %w", err)
 	}
 
 	// Create or update files
 	for _, file := range result.Files {
-		err = g.createOrUpdateFile(ctx, result.Branch, file.Path, file.Content, fmt.Sprintf("Update %s", file.Path))
+		err = g.createOrUpdateFile(ctx, result.Branch, file.Path, file.Content, fmt.Sprintf("Update %s", file.Path), result.Owner, result.Repository)
 		if err != nil {
 			return types.ActionResult{}, fmt.Errorf("failed to update file %s: %w", file.Path, err)
 		}

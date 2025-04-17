@@ -28,11 +28,11 @@ func NewGithubRepositoryGetAllContent(config map[string]string) *GithubRepositor
 	}
 }
 
-func (g *GithubRepositoryGetAllContent) getContentRecursively(ctx context.Context, path string) (string, error) {
+func (g *GithubRepositoryGetAllContent) getContentRecursively(ctx context.Context, path string, owner string, repository string) (string, error) {
 	var result strings.Builder
 
 	// Get content at the current path
-	_, directoryContent, _, err := g.client.Repositories.GetContents(ctx, g.owner, g.repository, path, nil)
+	_, directoryContent, _, err := g.client.Repositories.GetContents(ctx, owner, repository, path, nil)
 	if err != nil {
 		return "", fmt.Errorf("error getting content at path %s: %w", path, err)
 	}
@@ -41,14 +41,14 @@ func (g *GithubRepositoryGetAllContent) getContentRecursively(ctx context.Contex
 	for _, item := range directoryContent {
 		if item.GetType() == "dir" {
 			// Recursively get content for subdirectories
-			subContent, err := g.getContentRecursively(ctx, item.GetPath())
+			subContent, err := g.getContentRecursively(ctx, item.GetPath(), owner, repository)
 			if err != nil {
 				return "", err
 			}
 			result.WriteString(subContent)
 		} else if item.GetType() == "file" {
 			// Get file content
-			fileContent, _, _, err := g.client.Repositories.GetContents(ctx, g.owner, g.repository, item.GetPath(), nil)
+			fileContent, _, _, err := g.client.Repositories.GetContents(ctx, owner, repository, item.GetPath(), nil)
 			if err != nil {
 				return "", fmt.Errorf("error getting file content for %s: %w", item.GetPath(), err)
 			}
@@ -89,7 +89,7 @@ func (g *GithubRepositoryGetAllContent) Run(ctx context.Context, params types.Ac
 		result.Path = "."
 	}
 
-	content, err := g.getContentRecursively(ctx, result.Path)
+	content, err := g.getContentRecursively(ctx, result.Path, result.Owner, result.Repository)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
