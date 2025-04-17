@@ -49,7 +49,8 @@ func (g *GithubIssuesReader) Run(ctx context.Context, params types.ActionParams)
 		return types.ActionResult{
 			Result: fmt.Sprintf(
 				"Issue %d Repository: %s\nTitle: %s\nBody: %s",
-				*issue.Number, *issue.Repository.FullName, *issue.Title, *issue.Body)}, nil
+				issue.GetNumber(), issue.GetRepository().GetFullName(), issue.GetTitle(), issue.GetBody()),
+		}, nil
 	}
 	if err != nil {
 		return types.ActionResult{Result: fmt.Sprintf("Error fetching issue: %s", err.Error())}, err
