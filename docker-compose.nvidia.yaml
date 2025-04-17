@@ -6,7 +6,9 @@ services:
     environment:
       - LOCALAI_SINGLE_ACTIVE_BACKEND=true
       - DEBUG=true
-    image: localai/localai:master-sycl-f32-ffmpeg-core
+    image: localai/localai:master-cublas-cuda12-ffmpeg-core
+    # For images with python backends, use:
+    # image: localai/localai:master-cublas-cuda12-ffmpeg-core
     deploy:
       resources:
         reservations:
