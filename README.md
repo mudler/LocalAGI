@@ -66,6 +66,8 @@ docker compose -f docker-compose.nvidia.yaml up
 
 Now you can access and manage your agents at [http://localhost:8080](http://localhost:8080)
 
+Still having issues? see this Youtube video: https://youtu.be/HtVwIxW3ePg
+
 ## 📚🆕 Local Stack Family
 
 🆕 LocalAI is now part of a comprehensive suite of AI tools designed to work together:
