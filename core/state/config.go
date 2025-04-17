@@ -117,7 +117,7 @@ func NewAgentConfigMeta(
 			{
 				Name:         "model",
 				Label:        "Model",
-				Type:         "text",
+				Type:         "select",
 				DefaultValue: "",
 				Tags:         config.Tags{Section: "ModelSettings"},
 			},

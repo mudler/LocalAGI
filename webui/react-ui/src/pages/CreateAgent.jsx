@@ -38,6 +38,7 @@ function CreateAgent() {
 
   // Handle form submission
   const handleSubmit = async (data) => {
+    console.log("[CreateAgent] Submitting agent with model:", data.model); // DEBUG LOG
     setLoading(true);
     try {
       await agentApi.createAgent(data);

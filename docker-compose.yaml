@@ -20,6 +20,7 @@ services:
     - 8081:8080
     environment:
       - DEBUG=true
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       #- LOCALAI_API_KEY=sk-1234567890
     volumes:
       - ./volumes/models:/build/models:cached
@@ -34,6 +35,7 @@ services:
       - EMBEDDING_MODEL=granite-embedding-107m-multilingual
       - FILE_ASSETS=/assets
       - OPENAI_API_KEY=sk-1234567890
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENAI_BASE_URL=http://localai:8080
     volumes:
       - ./volumes/localrag/db:/db
@@ -68,6 +70,7 @@ services:
       - LOCALAGI_STATE_DIR=/pool
       - LOCALAGI_TIMEOUT=5m
       - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import "./App.css";
 
@@ -8,16 +8,27 @@ function App() {
     message: "",
     type: "success",
   });
+  const [toastQueue, setToastQueue] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
-  // Show toast notification
-  const showToast = (message, type = "success") => {
-    setToast({ visible: true, message, type });
-    setTimeout(() => {
-      setToast({ visible: false, message: "", type: "success" });
-    }, 3000);
+  // Show toast notification (queue support, can show same toast multiple times)
+  const showToast = (message, type = "success", duration = 10_000) => {
+    setToastQueue((prevQueue) => [...prevQueue, { message, type, duration }]);
   };
+
+  // Toast display logic: show next toast in queue
+  useEffect(() => {
+    if (!toast.visible && toastQueue.length > 0) {
+      const { message, type, duration } = toastQueue[0];
+      setToast({ visible: true, message, type });
+      const timer = setTimeout(() => {
+        setToast({ visible: false, message: "", type: "success" });
+        setToastQueue((prevQueue) => prevQueue.slice(1));
+      }, duration);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.visible, toastQueue]);
 
   // Toggle mobile menu
   const toggleMobileMenu = () => {
@@ -157,6 +168,13 @@ function App() {
       {toast.visible && (
         <div className={`toast ${toast.type}`}>
           <span>{toast.message}</span>
+          <button
+            className="toast-close"
+            onClick={() => setToast({ ...toast, visible: false })}
+            aria-label="Close notification"
+          >
+            ×
+          </button>
         </div>
       )}
 

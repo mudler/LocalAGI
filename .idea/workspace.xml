@@ -4,24 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="77851b10-1c14-4cae-aafd-549717e607be" name="Changes" comment="Fix Chrome style">
-      <change afterPath="$PROJECT_DIR$/webui/react-ui/src/components/AgentComponents.jsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/webui/react-ui/src/components/Header.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/bun.lockb" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/bun.lockb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/App.css" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/App.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/ActionsPlayground.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/ActionsPlayground.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentSettings.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentSettings.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentStatus.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentStatus.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentsList.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/AgentsList.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/Chat.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/Chat.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/CreateAgent.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/CreateAgent.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/GroupCreate.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/GroupCreate.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/Home.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/Home.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/src/pages/ImportAgent.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/src/pages/ImportAgent.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/webui/react-ui/vite.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/webui/react-ui/vite.config.js" afterDir="false" />
-    </list>
+    <list default="true" id="77851b10-1c14-4cae-aafd-549717e607be" name="Changes" comment="Generic Header component" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -75,7 +58,7 @@
       <updated>1744730926535</updated>
       <workItem from="1744730927636" duration="1976000" />
       <workItem from="1744732984137" duration="1494000" />
-      <workItem from="1744827881432" duration="3850000" />
+      <workItem from="1744827881432" duration="4043000" />
     </task>
     <task id="LOCAL-00001" summary="Delete old UI">
       <option name="closed" value="true" />
@@ -93,7 +76,15 @@
       <option name="project" value="LOCAL" />
       <updated>1744733133021</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Generic Header component">
+      <option name="closed" value="true" />
+      <created>1744831824658</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1744831824658</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -148,8 +139,11 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
+    <option name="CHECK_CODE_SMELLS_BEFORE_PROJECT_COMMIT" value="false" />
+    <option name="CHECK_NEW_TODO" value="false" />
     <MESSAGE value="Delete old UI" />
     <MESSAGE value="Fix Chrome style" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fix Chrome style" />
+    <MESSAGE value="Generic Header component" />
+    <option name="LAST_COMMIT_MESSAGE" value="Generic Header component" />
   </component>
 </project>

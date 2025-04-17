@@ -317,48 +317,72 @@ a:hover {
 
 /* Toast Notification */
 .toast {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius);
-  color: white;
-  z-index: 1000;
-  box-shadow: var(--shadow);
-  animation: fadeIn 0.3s, fadeOut 0.3s 2.7s;
+  position: fixed !important;
+  top: 1.5rem !important;
+  right: 1.5rem !important;
+  min-width: 160px !important;
+  max-width: 50vw !important;
+  padding: 0.5rem 1.2rem 0.5rem 0.8rem !important;
+  border-radius: 0.5rem !important;
+  color: #fff !important;
+  z-index: 1000 !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 1.5px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.85rem !important;
+  letter-spacing: 0.01em !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  margin-bottom: 1rem !important;
+  animation: toastIn 0.5s cubic-bezier(0.21, 1.02, 0.73, 1.01),
+    toastOut 0.4s 9.6s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+.toast .toast-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1em;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.toast .toast-close:hover {
+  opacity: 1;
 }
 
 .toast.success {
-  background-color: var(--success);
+  background: linear-gradient(90deg, #28c76f 0%, #00b894 100%);
 }
-
 .toast.error {
-  background-color: var(--danger);
+  background: linear-gradient(90deg, #ea5455 0%, #ff7675 100%);
 }
-
 .toast.warning {
-  background-color: var(--warning);
+  background: linear-gradient(90deg, #ff9f43 0%, #f6e58d 100%);
+  color: #222 !important;
 }
 
-@keyframes fadeIn {
+@keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateY(-20px);
+    transform: translateY(-30px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
-@keyframes fadeOut {
+@keyframes toastOut {
   from {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
   to {
     opacity: 0;
-    transform: translateY(-20px);
+    transform: translateY(-30px) scale(0.95);
   }
 }
 

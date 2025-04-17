@@ -2,14 +2,33 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import { useChat } from "../hooks/useChat";
 import Header from "../components/Header";
+import { agentApi } from "../utils/api";
 
 function Chat() {
   const { name } = useParams();
   const { showToast } = useOutletContext();
   const [message, setMessage] = useState("");
+  const [agentConfig, setAgentConfig] = useState(null);
+  const [isOpenRouter, setIsOpenRouter] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Use our custom chat hook
+  // Fetch agent config on mount
+  useEffect(() => {
+    const fetchAgentConfig = async () => {
+      try {
+        const config = await agentApi.getAgentConfig(name);
+        setAgentConfig(config);
+        setIsOpenRouter(config.model.split("/")[0] === "openrouter");
+      } catch (error) {
+        console.error("Failed to load agent config", error);
+        showToast && showToast(error?.message || String(error), "error");
+        setAgentConfig(null);
+      }
+    };
+    fetchAgentConfig();
+  }, [name, showToast]);
+
+  // Use our custom chat hook with model from agent config
   const {
     messages,
     sending,
@@ -18,9 +37,8 @@ function Chat() {
     sendMessage,
     clearChat,
     clearError,
-  } = useChat(name);
+  } = useChat(name, agentConfig?.model);
 
-  // Update document title
   useEffect(() => {
     if (name) {
       document.title = `Chat with ${name} - LocalAGI`;
@@ -30,15 +48,13 @@ function Chat() {
     };
   }, [name]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Show error toast if there's an error
   useEffect(() => {
     if (error) {
-      showToast(error, "error");
+      showToast && showToast(error?.message || String(error), "error");
       clearError();
     }
   }, [error, showToast, clearError]);
@@ -50,6 +66,16 @@ function Chat() {
       setMessage("");
     }
   };
+
+  if (!agentConfig) {
+    return (
+      <div className="dashboard-container">
+        <div className="main-content-area">
+          <p>Loading agent configuration...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container">
@@ -99,12 +125,13 @@ function Chat() {
                   style={{
                     marginBottom: 12,
                     display: "flex",
-                    flexDirection: msg.role === "user" ? "row-reverse" : "row",
+                    flexDirection:
+                      msg.sender === "user" ? "row-reverse" : "row",
                   }}
                 >
                   <div
                     style={{
-                      background: msg.role === "user" ? "#e0e7ff" : "#f3f4f6",
+                      background: msg.sender === "user" ? "#e0e7ff" : "#f3f4f6",
                       color: "#222",
                       borderRadius: 18,
                       padding: "12px 18px",
@@ -112,7 +139,7 @@ function Chat() {
                       fontSize: "1rem",
                       boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
                       alignSelf:
-                        msg.role === "user" ? "flex-end" : "flex-start",
+                        msg.sender === "user" ? "flex-end" : "flex-start",
                     }}
                   >
                     {msg.content}
@@ -134,16 +161,21 @@ function Chat() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={
-                isConnected ? "Type your message..." : "Connecting..."
+                isOpenRouter || isConnected
+                  ? "Type your message..."
+                  : "Connecting..."
               }
-              disabled={sending || !isConnected}
+              disabled={sending || (!isOpenRouter && !isConnected)}
               style={{
                 flex: 1,
                 padding: "12px 16px",
                 border: "1px solid #e5e7eb",
                 borderRadius: 8,
                 fontSize: "1rem",
-                background: sending || !isConnected ? "#f3f4f6" : "#fff",
+                background:
+                  sending || (!isOpenRouter && !isConnected)
+                    ? "#f3f4f6"
+                    : "#fff",
                 color: "#222",
                 outline: "none",
                 transition: "border-color 0.15s",
@@ -153,7 +185,11 @@ function Chat() {
               type="submit"
               className="action-btn"
               style={{ minWidth: 120 }}
-              disabled={sending || !isConnected || message.trim() === ""}
+              disabled={
+                sending ||
+                (!isOpenRouter && !isConnected) ||
+                message.trim() === ""
+              }
             >
               <i className="fas fa-paper-plane"></i> Send
             </button>

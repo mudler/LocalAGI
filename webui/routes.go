@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/dave-gray101/v2keyauth"
 	fiber "github.com/gofiber/fiber/v2"
@@ -138,7 +139,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Post("/api/chat/:name", app.Chat(pool))
 
-	conversationTracker := connectors.NewConversationTracker[string](app.config.ConversationStoreDuration)
+	conversationTracker := connectors.NewConversationTracker[string](time.Minute)
 
 	webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
 
@@ -258,6 +259,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
+
+	webapp.Post("/api/openrouter/chat", app.ProxyOpenRouterChat())
 
 }
 

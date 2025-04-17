@@ -6,6 +6,7 @@ services:
     environment:
       - LOCALAI_SINGLE_ACTIVE_BACKEND=true
       - DEBUG=true
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     image: localai/localai:master-sycl-f32-ffmpeg-core
     deploy:
       resources:

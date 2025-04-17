@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	coreTypes "github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/llm"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services"
@@ -26,6 +27,8 @@ import (
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
+	"bytes"
+	"io"
 )
 
 type (
@@ -622,15 +625,159 @@ func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-// GetAgentConfigMeta returns the metadata for agent configuration fields
+// ListModels endpoint returns available models (local + filtered OpenRouter)
+func (a *App) ListModels(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		allModels := getAvailableModels()
+		return c.JSON(fiber.Map{"models": allModels})
+	}
+}
+
+// GetAgentConfigMeta returns the metadata for agent configuration fields, including available models
 func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// Create a new instance of AgentConfigMeta
 		configMeta := state.NewAgentConfigMeta(
 			services.ActionsConfigMeta(),
 			services.ConnectorsConfigMeta(),
 			services.DynamicPromptsConfigMeta(),
 		)
+		models := getAvailableModels()
+		for i, field := range configMeta.Fields {
+			if field.Name == "model" {
+				options := []config.FieldOption{}
+				for _, m := range models {
+					label := m["name"].(string)
+					if src, ok := m["source"].(string); ok {
+						label = "[" + src + "] " + label
+					}
+					options = append(options, config.FieldOption{
+						Value: m["id"].(string),
+						Label: label,
+					})
+				}
+				configMeta.Fields[i].Options = options
+			}
+		}
 		return c.JSON(configMeta)
+	}
+}
+
+// getLocalModels returns the local model(s) configured via environment variables
+func getLocalModels() []map[string]interface{} {
+	modelName := os.Getenv("MODEL_NAME")
+	if modelName == "" {
+		modelName = os.Getenv("LOCALAGI_MODEL")
+	}
+	if modelName == "" {
+		return nil
+	}
+	return []map[string]interface{}{
+		{"id": "local/" + modelName, "name": modelName, "description": "Local model: " + modelName},
+	}
+}
+
+// getOpenRouterModels fetches and filters OpenRouter models for latest OpenAI, Anthropic, and Alibaba
+func getOpenRouterModels() []map[string]interface{} {
+	openrouterApiKey := os.Getenv("OPENROUTER_API_KEY")
+	if openrouterApiKey == "" {
+		return nil
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", "https://openrouter.ai/api/v1/models", nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Authorization", "Bearer "+openrouterApiKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer func() {
+		io.Copy(io.Discard, resp.Body) // Ensure full body is read
+		resp.Body.Close()
+	}()
+
+	var result struct { Data []map[string]interface{} `json:"data"` }
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil
+	}
+	// Only allow latest OpenAI, Anthropic, and Alibaba models
+	allowed := map[string]bool{
+		"openai/gpt-4o": true,
+		"openai/gpt-4-turbo": true,
+		"openai/gpt-4.1": true,
+		"openai/o4-mini": true,
+		"openai/o4-mini-high": true,
+		"openai/o3": true,
+		"anthropic/claude-3.5-sonnet": true,
+		"anthropic/claude-3.7-sonnet": true,
+		"qwen/qwen-2.5-7b-instruct": true,
+		"qwen/qwq-32b": true,
+		"qwen/qwen-2.5-72b-instruct": true,
+		"google/gemini-2.5-pro-exp-03-25:free": true,
+		"deepseek/deepseek-chat-v3-0324:free": true,
+		"qwen/qwq-32b:free": true,
+	}
+	models := []map[string]interface{}{}
+	for _, m := range result.Data {
+		id, _ := m["id"].(string)
+		if allowed[id] {
+			m["source"] = "openrouter"
+			m["id"] = "openrouter/" + id // Prefix to avoid collision
+			models = append(models, m)
+		}
+	}
+	return models
+}
+
+// getAvailableModels returns both local and filtered OpenRouter models
+func getAvailableModels() []map[string]interface{} {
+	localModels := getLocalModels()
+	openrouterModels := getOpenRouterModels()
+	return append(localModels, openrouterModels...)
+}
+
+// Proxy OpenRouter chat/completion endpoint
+func (a *App) ProxyOpenRouterChat() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		apiKey := os.Getenv("OPENROUTER_API_KEY")
+		if apiKey == "" {
+			return c.Status(500).JSON(fiber.Map{"error": "OpenRouter API key not configured"})
+		}
+		// Forward the JSON body as-is
+		body := c.Body()
+		openrouterURL := "https://openrouter.ai/api/v1/chat/completions"
+		if c.Query("type") == "completion" {
+			openrouterURL = "https://openrouter.ai/api/v1/completions"
+		}
+		req, err := http.NewRequest("POST", openrouterURL, bytes.NewReader(body))
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Timeout: 60 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		defer func() {
+			io.Copy(io.Discard, resp.Body) // Ensure full body is read
+			resp.Body.Close()
+		}()
+
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			xlog.Error("Error reading response body", "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to read response body"})
+		}
+		// xlog.Info("OpenRouter response status: %d", resp.StatusCode)
+		// xlog.Info("OpenRouter response headers: %v", resp.Header)
+		// xlog.Info("OpenRouter response body: %s", string(respBody))
+
+		c.Status(resp.StatusCode)
+		c.Set("Content-Type", resp.Header.Get("Content-Type"))
+		c.Send(respBody)
+		return nil
 	}
 }
