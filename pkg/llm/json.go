@@ -24,7 +24,7 @@ func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, mod
 			{
 
 				Type: openai.ToolTypeFunction,
-				Function: openai.FunctionDefinition{
+				Function: &openai.FunctionDefinition{
 					Name:       toolName,
 					Parameters: i,
 				},

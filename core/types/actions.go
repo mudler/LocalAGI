@@ -74,8 +74,8 @@ func (a ActionDefinitionName) String() string {
 	return string(a)
 }
 
-func (a ActionDefinition) ToFunctionDefinition() openai.FunctionDefinition {
-	return openai.FunctionDefinition{
+func (a ActionDefinition) ToFunctionDefinition() *openai.FunctionDefinition {
+	return &openai.FunctionDefinition{
 		Name:        a.Name.String(),
 		Description: a.Description,
 		Parameters: jsonschema.Definition{
