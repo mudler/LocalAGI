@@ -8,7 +8,7 @@ services:
       - DEBUG=true
     image: localai/localai:master-cublas-cuda12-ffmpeg-core
     # For images with python backends, use:
-    # image: localai/localai:master-cublas-cuda12-ffmpeg-core
+    # image: localai/localai:master-cublas-cuda12-ffmpeg
     deploy:
       resources:
         reservations:

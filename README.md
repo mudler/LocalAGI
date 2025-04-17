@@ -116,7 +116,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Default models:
   - Text: `arcee-agent`
   - Multimodal: `minicpm-v-2_6`
-  - Image: `flux.1-dev-ggml`
+  - Image: `sd-1.5-ggml`
 - Environment variables:
   - `MODEL_NAME`: Text model to use
   - `MULTIMODAL_MODEL`: Multimodal model to use
@@ -163,7 +163,7 @@ docker compose -f docker-compose.intel.yaml up
 If no models are specified, it will use the defaults:
 - Text model: `arcee-agent`
 - Multimodal model: `minicpm-v-2_6`
-- Image model: `flux.1-dev-ggml` (NVIDIA) or `sd-1.5-ggml` (Intel)
+- Image model: `sd-1.5-ggml`
 
 Good (relatively small) models that have been tested are:
 
