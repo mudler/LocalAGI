@@ -82,7 +82,6 @@ function Chat() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-comments"
             title="Chat with"
             description="Send messages and interact with your agent in real time."
             name={name}

@@ -92,10 +92,8 @@ function ActionsPlayground() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-bolt"
             title="Actions Playground"
             description="Test and execute actions directly from the UI."
-            name=""
           />
         </div>
 

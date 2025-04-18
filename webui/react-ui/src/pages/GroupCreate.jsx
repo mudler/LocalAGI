@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
-import { agentApi } from '../utils/api';
-import AgentForm from '../components/AgentForm';
-import Header from '../components/Header';
+import { useState, useEffect } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { agentApi } from "../utils/api";
+import AgentForm from "../components/AgentForm";
+import Header from "../components/Header";
 
 function GroupCreate() {
   const navigate = useNavigate();
@@ -13,20 +13,20 @@ function GroupCreate() {
   const [selectedProfiles, setSelectedProfiles] = useState([]);
   const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({
-    description: '',
-    model: '',
-    api_url: '',
-    api_key: '',
+    description: "",
+    model: "",
+    api_url: "",
+    api_key: "",
     connectors: [],
     actions: [],
-    profiles: []
+    profiles: [],
   });
 
   // Update document title
   useEffect(() => {
-    document.title = 'Create Agent Group - LocalAGI';
+    document.title = "Create Agent Group - LocalAGI";
     return () => {
-      document.title = 'LocalAGI'; // Reset title when component unmounts
+      document.title = "LocalAGI"; // Reset title when component unmounts
     };
   }, []);
 
@@ -40,8 +40,8 @@ function GroupCreate() {
           setMetadata(response);
         }
       } catch (error) {
-        console.error('Error fetching metadata:', error);
-        showToast('Failed to load agent group metadata', 'error');
+        console.error("Error fetching metadata:", error);
+        showToast("Failed to load agent group metadata", "error");
       }
     };
 
@@ -60,24 +60,24 @@ function GroupCreate() {
     try {
       // Structure the data according to what the server expects
       const groupData = {
-        agents: selectedProfiles.map(index => formData.profiles[index]),
+        agents: selectedProfiles.map((index) => formData.profiles[index]),
         agent_config: {
           // Don't set name/description as they'll be overridden by each agent's values
           model: formData.model,
           api_url: formData.api_url,
           api_key: formData.api_key,
           connectors: formData.connectors,
-          actions: formData.actions
-        }
+          actions: formData.actions,
+        },
       };
 
       // API call to create agent group
       await agentApi.createGroup(groupData);
-      showToast('Agent group created successfully!', 'success');
-      navigate('/agents');
+      showToast("Agent group created successfully!", "success");
+      navigate("/agents");
     } catch (err) {
-      console.error('Error creating group:', err);
-      showToast(`Failed to create group: ${err.message}`, 'error');
+      console.error("Error creating group:", err);
+      showToast(`Failed to create group: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }
@@ -118,7 +118,7 @@ function GroupCreate() {
   // Generate agent profiles
   const handleGenerateProfiles = async () => {
     if (!formData.description.trim()) {
-      showToast('Please enter a description', 'warning');
+      showToast("Please enter a description", "warning");
       return;
     }
 
@@ -126,7 +126,7 @@ function GroupCreate() {
 
     try {
       const response = await agentApi.generateGroupProfiles({
-        description: formData.description
+        description: formData.description,
       });
 
       // The API returns an array of agent profiles directly
@@ -134,7 +134,7 @@ function GroupCreate() {
 
       setFormData({
         ...formData,
-        profiles: profiles
+        profiles: profiles,
       });
 
       // Auto-select all profiles
@@ -143,10 +143,10 @@ function GroupCreate() {
       // Move to next step
       nextStep();
 
-      showToast('Agent profiles generated successfully', 'success');
+      showToast("Agent profiles generated successfully", "success");
     } catch (err) {
-      console.error('Error generating profiles:', err);
-      showToast(`Failed to generate profiles: ${err.message}`, 'error');
+      console.error("Error generating profiles:", err);
+      showToast(`Failed to generate profiles: ${err.message}`, "error");
     } finally {
       setGeneratingProfiles(false);
     }
@@ -156,7 +156,7 @@ function GroupCreate() {
   const backButton = (
     <button
       className="action-btn pause-resume-btn"
-      onClick={() => navigate('/agents')}
+      onClick={() => navigate("/agents")}
     >
       <i className="fas fa-arrow-left"></i> Back to Agents
     </button>
@@ -167,13 +167,10 @@ function GroupCreate() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-users"
             title="Create Agent Group"
             description="Organize agents by creating a new group with shared configuration and profiles."
           />
-          <div className="header-right">
-            {backButton}
-          </div>
+          <div className="header-right">{backButton}</div>
         </div>
 
         <div className="agent-form-container" style={{ gap: 40 }}>
@@ -197,7 +194,9 @@ function GroupCreate() {
                   handleSubmit={handleSubmit}
                 />
               ) : (
-                <div style={{ color: "var(--text-light)", padding: 24 }}>Loading group configuration...</div>
+                <div style={{ color: "var(--text-light)", padding: 24 }}>
+                  Loading group configuration...
+                </div>
               )}
             </div>
           </div>

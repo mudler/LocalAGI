@@ -79,7 +79,6 @@ function AgentStatus() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-chart-bar"
             title="Agent Status"
             description="Live status, activity, and logs for this agent."
             name={name}

@@ -62,13 +62,6 @@ function Home() {
     year: "numeric",
   });
 
-  // Create action buttons for the header
-  const createAgentButton = (
-    <Link to="/create" className="action-btn pause-resume-btn">
-      <i className="fas fa-plus"></i> Create Agent
-    </Link>
-  );
-
   return (
     <div className="dashboard-container">
       <div className="sidebar">
@@ -90,12 +83,7 @@ function Home() {
 
       <div className="main-content-area">
         <div className="header-container">
-          <Header
-            icon="fas fa-home"
-            title="Welcome back"
-            description={currentDate}
-          />
-          <div className="header-right">{createAgentButton}</div>
+          <Header title="Welcome back" description={currentDate} />
         </div>
 
         {/* Dashboard Stats */}
@@ -128,54 +116,7 @@ function Home() {
           </div>
         </div>
 
-        <div className="section-title">
-          <h2>Manage Agents</h2>
-          <p>
-            Easily manage, access, and interact with all your agents from one
-            place.
-          </p>
-        </div>
-
-        {/* Features Cards */}
-        <div className="features-grid">
-          {/* Card for Create Agent */}
-          <Link to="/create" className="feature-card">
-            <img src="/app/features/duplicate-plus.svg" alt="Duplicate Plus" />
-            <div className="feature-content">
-              <h3>Create Agent</h3>
-              <p>Agent with custom behaviors, connectors, and actions.</p>
-            </div>
-          </Link>
-
-          {/* Card for Create Group */}
-          <Link to="/group-create" className="feature-card">
-            <img src="/app/features/user-group.svg" alt="User Group" />
-            <div className="feature-content">
-              <h3>Create Group</h3>
-              <p>Group agents with shared configs and behaviors.</p>
-            </div>
-          </Link>
-
-          {/* Card for Import Agent */}
-          <Link to="/import" className="feature-card">
-            <img src="/app/features/dashed-upload.svg" alt="Dashed Upload" />
-            <div className="feature-content">
-              <h3>Import Agent</h3>
-              <p>Import an existing agent configuration from a file.</p>
-            </div>
-          </Link>
-
-          {/* Card for Agent List */}
-          <Link to="/agents" className="feature-card">
-            <img src="/app/features/robot.svg" alt="Robot" />
-            <div className="feature-content">
-              <h3>Agent List</h3>
-              <p>Manage agents, including detailed profiles and statistics.</p>
-            </div>
-          </Link>
-        </div>
-
-        {stats.agents.length > 0 && (
+        {stats.agents.length > 0 ? (
           <div className="agents-section">
             <h2>Your Agents</h2>
             <div className="agents-grid">
@@ -217,6 +158,61 @@ function Home() {
               ))}
             </div>
           </div>
+        ) : (
+          <>
+            <div className="section-title">
+              <h2>Manage Agents</h2>
+              <p>
+                Easily manage, access, and interact with all your agents from
+                one place.
+              </p>
+            </div>
+            <div className="features-grid">
+              {/* Card for Create Agent */}
+              <Link to="/create" className="feature-card">
+                <img
+                  src="/app/features/duplicate-plus.svg"
+                  alt="Duplicate Plus"
+                />
+                <div className="feature-content">
+                  <h3>Create Agent</h3>
+                  <p>Agent with custom behaviors, connectors, and actions.</p>
+                </div>
+              </Link>
+
+              {/* Card for Create Group */}
+              <Link to="/group-create" className="feature-card">
+                <img src="/app/features/user-group.svg" alt="User Group" />
+                <div className="feature-content">
+                  <h3>Create Group</h3>
+                  <p>Group agents with shared configs and behaviors.</p>
+                </div>
+              </Link>
+
+              {/* Card for Import Agent */}
+              <Link to="/import" className="feature-card">
+                <img
+                  src="/app/features/dashed-upload.svg"
+                  alt="Dashed Upload"
+                />
+                <div className="feature-content">
+                  <h3>Import Agent</h3>
+                  <p>Import an existing agent configuration from a file.</p>
+                </div>
+              </Link>
+
+              {/* Card for Agent List */}
+              <Link to="/agents" className="feature-card">
+                <img src="/app/features/robot.svg" alt="Robot" />
+                <div className="feature-content">
+                  <h3>Agent List</h3>
+                  <p>
+                    Manage agents, including detailed profiles and statistics.
+                  </p>
+                </div>
+              </Link>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -49,7 +49,7 @@ function ImportAgent() {
   const backButton = (
     <button
       className="action-btn pause-resume-btn"
-      onClick={() => navigate('/agents')}
+      onClick={() => navigate("/agents")}
       disabled={loading}
     >
       <i className="fas fa-arrow-left"></i> Back to Agents
@@ -61,13 +61,10 @@ function ImportAgent() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-file-import"
             title="Import Agent"
             description="Upload a previously exported agent configuration file to restore or transfer an agent."
           />
-          <div className="header-right">
-            {backButton}
-          </div>
+          <div className="header-right">{backButton}</div>
         </div>
 
         {/* Import Form */}

@@ -8,27 +8,21 @@
  * @returns {JSX.Element} Header component
  */
 const Header = ({
-                  icon = 'fas fa-comments',
-                  title = 'Chat with',
-                  description = 'Send messages and interact with your agent in real time.',
-                  name = ''
-                }) => {
+  title = "Chat with",
+  description = "Send messages and interact with your agent in real time.",
+  name = "",
+}) => {
   return (
     <div className="header-content">
-      <i className={`${icon} header-icon`} />
-      <div>
-        <div className="header-title">
-          {title}{" "}
-          {name && (
-            <span className="header-title-highlight">
-              {title === 'Agent Settings' ? `- ${name}` : name}
-            </span>
-          )}
-        </div>
-        <div className="header-description">
-          {description}
-        </div>
+      <div className="header-title">
+        {title}{" "}
+        {name && (
+          <span className="header-title-highlight">
+            {title === "Agent Settings" ? `- ${name}` : name}
+          </span>
+        )}
       </div>
+      <div className="header-description">{description}</div>
     </div>
   );
 };

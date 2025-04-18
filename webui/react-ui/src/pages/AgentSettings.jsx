@@ -75,7 +75,6 @@ function AgentSettings() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-cogs"
             title="Agent Settings"
             description="Configure and manage the agent's settings, connectors, and capabilities."
             name={name}

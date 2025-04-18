@@ -179,7 +179,6 @@ a:hover {
   text-decoration: none;
   transition: all 0.2s ease;
   border-radius: 9999px;
-  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .nav-link:hover {
@@ -545,8 +544,8 @@ a:hover {
 }
 
 .stat-value {
-  font-size: 2rem;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 500;
 }
 
 /* Section Title */
@@ -1095,8 +1094,9 @@ a:hover {
 /* Header left side content */
 .header-content {
   display: flex;
-  align-items: center;
-  gap: 18px;
+  align-items: start;
+  gap: 8px;
+  flex-direction: column;
 }
 
 /* Header icon styles */

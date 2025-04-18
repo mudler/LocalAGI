@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
-import { agentApi } from '../utils/api';
-import AgentForm from '../components/AgentForm';
-import Header from '../components/Header';
+import { useState, useEffect } from "react";
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { agentApi } from "../utils/api";
+import AgentForm from "../components/AgentForm";
+import Header from "../components/Header";
 
 function CreateAgent() {
   const navigate = useNavigate();
@@ -12,9 +12,9 @@ function CreateAgent() {
   const [formData, setFormData] = useState({});
 
   useEffect(() => {
-    document.title = 'Create Agent - LocalAGI';
+    document.title = "Create Agent - LocalAGI";
     return () => {
-      document.title = 'LocalAGI'; // Reset title when component unmounts
+      document.title = "LocalAGI"; // Reset title when component unmounts
     };
   }, []);
 
@@ -28,7 +28,7 @@ function CreateAgent() {
           setMetadata(response);
         }
       } catch (error) {
-        console.error('Error fetching metadata:', error);
+        console.error("Error fetching metadata:", error);
         // Continue without metadata, the form will use default fields
       }
     };
@@ -42,11 +42,11 @@ function CreateAgent() {
     setLoading(true);
     try {
       await agentApi.createAgent(data);
-      showToast && showToast('Agent created successfully!', 'success');
-      navigate('/agents');
+      showToast && showToast("Agent created successfully!", "success");
+      navigate("/agents");
     } catch (error) {
-      showToast && showToast('Failed to create agent', 'error');
-      console.error('Error creating agent:', error);
+      showToast && showToast("Failed to create agent", "error");
+      console.error("Error creating agent:", error);
     } finally {
       setLoading(false);
     }
@@ -55,7 +55,7 @@ function CreateAgent() {
   const backButton = (
     <button
       className="action-btn pause-resume-btn"
-      onClick={() => navigate('/agents')}
+      onClick={() => navigate("/agents")}
     >
       <i className="fas fa-arrow-left"></i> Back to Agents
     </button>
@@ -66,13 +66,10 @@ function CreateAgent() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-plus-circle"
             title="Create Agent"
             description="Fill out the form below to create a new agent. You can customize its configuration and capabilities."
           />
-          <div className="header-right">
-            {backButton}
-          </div>
+          <div className="header-right">{backButton}</div>
         </div>
 
         <div style={{ marginTop: 32 }}>

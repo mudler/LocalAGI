@@ -130,7 +130,6 @@ function AgentsList() {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            icon="fas fa-robot"
             title="Agents"
             description="Easily manage, access, and interact with all your agents from one place."
           />
