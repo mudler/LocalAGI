@@ -444,7 +444,7 @@ func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		actionName := c.Params("name")
 
 		xlog.Debug("Executing action", "action", actionName, "config", payload.Config, "params", payload.Params)
-		a, err := services.Action(actionName, "", payload.Config, pool)
+		a, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
 		if err != nil {
 			xlog.Error("Error creating action", "error", err)
 			return errorJSONMessage(c, err.Error())

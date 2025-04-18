@@ -18,6 +18,7 @@ const (
 	// Actions
 	ActionSearch                         = "search"
 	ActionCustom                         = "custom"
+	ActionBrowserAgentRunner             = "browser-agent-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
 	ActionGithubIssueOpener              = "github-issue-opener"
 	ActionGithubIssueCloser              = "github-issue-closer"
@@ -52,6 +53,7 @@ var AvailableActions = []string{
 	ActionGithubIssueSearcher,
 	ActionGithubRepositoryGet,
 	ActionGithubGetAllContent,
+	ActionBrowserAgentRunner,
 	ActionGithubRepositoryCreateOrUpdate,
 	ActionGithubIssueReader,
 	ActionGithubIssueCommenter,
@@ -71,31 +73,34 @@ var AvailableActions = []string{
 	ActionShellcommand,
 }
 
-func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
-	return func(ctx context.Context, pool *state.AgentPool) []types.Action {
-		allActions := []types.Action{}
+func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+		return func(ctx context.Context, pool *state.AgentPool) []types.Action {
+			allActions := []types.Action{}
 
-		agentName := a.Name
+			agentName := a.Name
 
-		for _, a := range a.Actions {
-			var config map[string]string
-			if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
-				xlog.Error("Error unmarshalling action config", "error", err)
-				continue
+			for _, a := range a.Actions {
+				var config map[string]string
+				if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
+					xlog.Error("Error unmarshalling action config", "error", err)
+					continue
+				}
+
+				a, err := Action(a.Name, agentName, config, pool, actionsConfigs)
+				if err != nil {
+					continue
+				}
+				allActions = append(allActions, a)
 			}
 
-			a, err := Action(a.Name, agentName, config, pool)
-			if err != nil {
-				continue
-			}
-			allActions = append(allActions, a)
+			return allActions
 		}
-
-		return allActions
 	}
+
 }
 
-func Action(name, agentName string, config map[string]string, pool *state.AgentPool) (types.Action, error) {
+func Action(name, agentName string, config map[string]string, pool *state.AgentPool, actionsConfigs map[string]string) (types.Action, error) {
 	var a types.Action
 	var err error
 
@@ -114,6 +119,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubIssueCloser(config)
 	case ActionGithubIssueSearcher:
 		a = actions.NewGithubIssueSearch(config)
+	case ActionBrowserAgentRunner:
+		a = actions.NewBrowserAgentRunner(config, actionsConfigs["browser-agent-runner-base-url"])
 	case ActionGithubIssueReader:
 		a = actions.NewGithubIssueReader(config)
 	case ActionGithubPRReader:
@@ -168,6 +175,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "search",
 			Label:  "Search",
 			Fields: actions.SearchConfigMeta(),
+		},
+		{
+			Name:   "browser-agent-runner",
+			Label:  "Browser Agent Runner",
+			Fields: actions.BrowserAgentRunnerConfigMeta(),
 		},
 		{
 			Name:   "generate_image",
