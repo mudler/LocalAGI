@@ -22,6 +22,7 @@ var withLogs = os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
 var apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
 var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
 var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
+var localOperatorBaseURL = os.Getenv("LOCALOPERATOR_BASE_URL")
 
 func init() {
 	if baseModel == "" {
@@ -61,7 +62,9 @@ func main() {
 		apiKey,
 		stateDir,
 		localRAG,
-		services.Actions,
+		services.Actions(map[string]string{
+			"browser-agent-runner-base-url": localOperatorBaseURL,
+		}),
 		services.Connectors,
 		services.DynamicPrompts,
 		timeout,
