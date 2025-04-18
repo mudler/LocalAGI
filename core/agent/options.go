@@ -53,6 +53,8 @@ type options struct {
 	mcpServers []MCPServer
 
 	newConversationsSubscribers []func(openai.ChatCompletionMessage)
+
+	observer Observer
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -333,6 +335,13 @@ func WithRandomIdentity(guidance ...string) Option {
 func WithActions(actions ...types.Action) Option {
 	return func(o *options) error {
 		o.userActions = actions
+		return nil
+	}
+}
+
+func WithObserver(observer Observer) Option {
+	return func(o *options) error {
+		o.observer = observer
 		return nil
 	}
 }

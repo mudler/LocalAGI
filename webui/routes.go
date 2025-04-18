@@ -241,18 +241,34 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 		entries := []string{}
 		for _, h := range Reverse(history.Results()) {
-			entries = append(entries, fmt.Sprintf(
-				"Result: %v Action: %v Params: %v Reasoning: %v", 
-				h.Result,
-				h.Action.Definition().Name, 
-				h.Params, 
+			entries = append(entries, fmt.Sprintf(`Reasoning: %s
+			Action taken: %+v
+			Parameters: %+v
+			Result: %s`,
 				h.Reasoning,
-			))
+				h.ActionCurrentState.Action.Definition().Name,
+				h.ActionCurrentState.Params,
+				h.Result))
 		}
 
 		return c.JSON(fiber.Map{
 			"Name":    c.Params("name"),
 			"History": entries,
+		})
+	})
+
+	webapp.Get("/api/agent/:name/observables", func(c *fiber.Ctx) error {
+		name := c.Params("name")
+		agent := pool.GetAgent(name)
+		if agent == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent not found",
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"Name": name,
+			"History": agent.Observer().History(),
 		})
 	})
 

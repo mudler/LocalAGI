@@ -407,6 +407,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 				c.AgentResultCallback()(state)
 			}
 		}),
+		WithObserver(NewSSEObserver(name, manager)),
 	}
 
 	if config.HUD {

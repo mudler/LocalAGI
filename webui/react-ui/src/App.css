@@ -1,4 +1,17 @@
 /* Base styles */
+pre.hljs {
+  background-color: var(--medium-bg);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.5;
+}
+
+code.json {
+  display: block;
+}
+
 :root {
   --primary: #00ff95;
   --secondary: #ff00b1;
@@ -1994,14 +2007,60 @@ select.form-control {
   text-decoration: none;
 }
 
-.file-button:hover {
-  background: rgba(0, 255, 149, 0.8);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
 .file-button i {
   font-size: 16px;
+}
+
+.card {
+  background: var(--medium-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  background: var(--light-bg);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.expand-button {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 5px;
+  margin-left: 10px;
+  transition: all 0.3s ease;
+}
+
+.expand-button:hover {
+  color: var(--success);
+  transform: scale(1.1);
+}
+
+.expand-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
 .selected-file-info {

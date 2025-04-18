@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mudler/LocalAGI/core/action"
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -15,7 +15,7 @@ import (
 // in the prompts
 type PromptHUD struct {
 	Character     Character                 `json:"character"`
-	CurrentState  action.AgentInternalState `json:"current_state"`
+	CurrentState  types.AgentInternalState `json:"current_state"`
 	PermanentGoal string                    `json:"permanent_goal"`
 	ShowCharacter bool                      `json:"show_character"`
 }
@@ -80,7 +80,7 @@ func Load(path string) (*Character, error) {
 	return &c, nil
 }
 
-func (a *Agent) State() action.AgentInternalState {
+func (a *Agent) State() types.AgentInternalState {
 	return *a.currentState
 }
 
