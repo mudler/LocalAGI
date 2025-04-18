@@ -23,7 +23,7 @@
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 }
 
 * {
@@ -193,6 +193,7 @@ a:hover {
   box-shadow: 0px -1px 4px 0px rgba(255, 255, 255, 0.24) inset,
     0px 1px 0px 0px rgba(255, 255, 255, 0.32) inset,
     0px 1px 4px 0px rgba(19, 19, 22, 0.12);
+  box-shadow: 0px 60px 30px 3px rgba(255, 255, 255, 0.4);
 }
 
 .nav-link i {
@@ -463,7 +464,12 @@ a:hover {
 
 .main-content-area {
   flex: 1;
-  padding: 2rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+  padding-left: 10%;
+  padding-right: 10%;
+  background-color: #f9fafc;
+  margin: 0 auto;
 }
 
 /* Welcome Section */
@@ -491,10 +497,42 @@ a:hover {
 }
 
 .stat-card {
-  background-color: var(--primary-light);
+  background-color: white;
   border-radius: var(--radius);
   padding: 1rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 0 0 1px rgba(19, 19, 22, 0.1);
+}
+
+.stat-card-outer {
+  background-color: #ecf2fc;
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.stat-card-inner {
+  background-color: white;
+  border-radius: var(--radius);
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+  box-shadow: 0 0 0 1px #e2e2e2;
+  margin-top: auto;
+}
+
+.stat-header {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.stat-header i {
+  color: var(--primary);
 }
 
 .stat-icon {
@@ -547,6 +585,10 @@ a:hover {
   height: 100%;
 }
 
+.feature-card img {
+  width: 24px;
+  height: 24px;
+}
 .feature-card:hover {
   transform: translateY(-5px);
   box-shadow: var(--shadow);
@@ -578,6 +620,10 @@ a:hover {
 
 .agent-list-icon {
   background-color: var(--secondary);
+}
+
+.feature-content {
+  margin-top: 4rem;
 }
 
 .feature-content h3 {
@@ -835,7 +881,6 @@ a:hover {
 .section-title {
   margin-bottom: 1.5rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
   color: var(--primary);
   text-align: left;
   text-shadow: none;

@@ -95,30 +95,36 @@ function Home() {
             title="Welcome back"
             description={currentDate}
           />
-          <div className="header-right">
-            {createAgentButton}
-          </div>
+          <div className="header-right">{createAgentButton}</div>
         </div>
 
         {/* Dashboard Stats */}
         <div className="dashboard-stats">
-          <div className="stat-card">
-            <div className="stat-icon">
+          <div className="stat-card-outer">
+            <div className="stat-header">
               <i className="fas fa-bolt"></i> Available Actions
             </div>
-            <div className="stat-value">{stats.actions}</div>
+            <div className="stat-card-inner">
+              <div className="stat-value">{stats.actions}</div>
+            </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">
+
+          <div className="stat-card-outer">
+            <div className="stat-header">
               <i className="fas fa-plug"></i> Available Connectors
             </div>
-            <div className="stat-value">{stats.connectors}</div>
+            <div className="stat-card-inner">
+              <div className="stat-value">{stats.connectors}</div>
+            </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">
+
+          <div className="stat-card-outer">
+            <div className="stat-header">
               <i className="fas fa-robot"></i> Agents
             </div>
-            <div className="stat-value">{stats.agentCount}</div>
+            <div className="stat-card-inner">
+              <div className="stat-value">{stats.agentCount}</div>
+            </div>
           </div>
         </div>
 
@@ -134,9 +140,7 @@ function Home() {
         <div className="features-grid">
           {/* Card for Create Agent */}
           <Link to="/create" className="feature-card">
-            <div className="feature-icon create-agent-icon">
-              <i className="fas fa-plus"></i>
-            </div>
+            <img src="/app/features/duplicate-plus.svg" alt="Duplicate Plus" />
             <div className="feature-content">
               <h3>Create Agent</h3>
               <p>Agent with custom behaviors, connectors, and actions.</p>
@@ -145,9 +149,7 @@ function Home() {
 
           {/* Card for Create Group */}
           <Link to="/group-create" className="feature-card">
-            <div className="feature-icon create-group-icon">
-              <i className="fas fa-users"></i>
-            </div>
+            <img src="/app/features/user-group.svg" alt="User Group" />
             <div className="feature-content">
               <h3>Create Group</h3>
               <p>Group agents with shared configs and behaviors.</p>
@@ -156,9 +158,7 @@ function Home() {
 
           {/* Card for Import Agent */}
           <Link to="/import" className="feature-card">
-            <div className="feature-icon import-icon">
-              <i className="fas fa-upload"></i>
-            </div>
+            <img src="/app/features/dashed-upload.svg" alt="Dashed Upload" />
             <div className="feature-content">
               <h3>Import Agent</h3>
               <p>Import an existing agent configuration from a file.</p>
@@ -167,9 +167,7 @@ function Home() {
 
           {/* Card for Agent List */}
           <Link to="/agents" className="feature-card">
-            <div className="feature-icon agent-list-icon">
-              <i className="fas fa-list"></i>
-            </div>
+            <img src="/app/features/robot.svg" alt="Robot" />
             <div className="feature-content">
               <h3>Agent List</h3>
               <p>Manage agents, including detailed profiles and statistics.</p>
