@@ -7,7 +7,7 @@ services:
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
     image: localai/localai:master-ffmpeg-core
     command: 
-    - ${MODEL_NAME:-arcee-agent}
+    - ${MODEL_NAME:-gemma-3-12b-it-qat}
     - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
     - ${IMAGE_MODEL:-sd-1.5-ggml}
     - granite-embedding-107m-multilingual
@@ -59,7 +59,7 @@ services:
       - 8080:3000
     #image: quay.io/mudler/localagi:master
     environment:
-      - LOCALAGI_MODEL=${MODEL_NAME:-arcee-agent}
+      - LOCALAGI_MODEL=${MODEL_NAME:-gemma-3-12b-it-qat}
       - LOCALAGI_MULTIMODAL_MODEL=${MULTIMODAL_MODEL:-minicpm-v-2_6}
       - LOCALAGI_IMAGE_MODEL=${IMAGE_MODEL:-sd-1.5-ggml}
       - LOCALAGI_LLM_API_URL=http://localai:8080
