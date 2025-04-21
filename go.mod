@@ -19,7 +19,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/philippgille/chromem-go v0.7.0
-	github.com/sashabaranov/go-openai v1.38.1
+	github.com/sashabaranov/go-openai v1.38.2
 	github.com/slack-go/slack v0.16.0
 	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64
 	github.com/tmc/langchaingo v0.1.13
