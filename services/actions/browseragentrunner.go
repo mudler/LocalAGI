@@ -61,7 +61,8 @@ func (b *BrowserAgentRunner) Run(ctx context.Context, params types.ActionParams)
 	historyStr += fmt.Sprintf("  Description: %s\n\n", stateHistory.States[len(stateHistory.States)-1].PageContentDescription)
 
 	return types.ActionResult{
-		Result: fmt.Sprintf("Browser agent completed successfully. History:\n%s", historyStr),
+		Result:   fmt.Sprintf("Browser agent completed successfully. History:\n%s", historyStr),
+		Metadata: map[string]interface{}{"browser_agent_history": stateHistory},
 	}, nil
 }
 
