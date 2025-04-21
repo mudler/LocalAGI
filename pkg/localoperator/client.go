@@ -33,6 +33,8 @@ type StateDescription struct {
 	CurrentURL             string `json:"current_url"`
 	PageTitle              string `json:"page_title"`
 	PageContentDescription string `json:"page_content_description"`
+	Screenshot             string `json:"screenshot"`
+	ScreenshotMimeType     string `json:"screenshot_mime_type"` // MIME type of the screenshot (e.g., "image/png")
 }
 
 // StateHistory represents the complete history of states during agent execution
