@@ -226,7 +226,10 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIKey(apiKeyURL),
 				WithTimeout("10m"),
 				WithActions(
-					actions.NewSearch(map[string]string{}),
+					&TestAction{response: map[string]string{
+						"boston": testActionResult,
+						"milan":  testActionResult2,
+					}},
 				),
 				EnablePlanning,
 				EnableForceReasoning,
@@ -238,18 +241,21 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 
 			result := agent.Ask(
-				types.WithText("Thoroughly plan a trip to San Francisco from Venice, Italy; check flight times, visa requirements and whether electrical items are allowed in cabin luggage."),
+				types.WithText("Use the plan tool to do two actions in sequence: search for the weather in boston and search for the weather in milan"),
 			)
 			Expect(len(result.State)).To(BeNumerically(">", 1))
 
 			actionsExecuted := []string{}
+			actionResults := []string{}
 			for _, r := range result.State {
 				xlog.Info(r.Result)
 				actionsExecuted = append(actionsExecuted, r.Action.Definition().Name.String())
+				actionResults = append(actionResults, r.ActionResult.Result)
 			}
-			Expect(actionsExecuted).To(ContainElement("search_internet"), fmt.Sprint(result))
+			Expect(actionsExecuted).To(ContainElement("get_weather"), fmt.Sprint(result))
 			Expect(actionsExecuted).To(ContainElement("plan"), fmt.Sprint(result))
-
+			Expect(actionResults).To(ContainElement(testActionResult), fmt.Sprint(result))
+			Expect(actionResults).To(ContainElement(testActionResult2), fmt.Sprint(result))
 		})
 
 		It("Can initiate conversations", func() {
