@@ -15,7 +15,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
-	github.com/metoro-io/mcp-golang v0.9.0
+	github.com/metoro-io/mcp-golang v0.11.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/philippgille/chromem-go v0.7.0
