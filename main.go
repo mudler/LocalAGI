@@ -62,6 +62,7 @@ func main() {
 		apiURL,
 		apiKey,
 		stateDir,
+		mcpboxURL,
 		localRAG,
 		services.Actions(map[string]string{
 			"browser-agent-runner-base-url": localOperatorBaseURL,
