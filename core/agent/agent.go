@@ -1010,7 +1010,7 @@ func (a *Agent) Run() error {
 	if a.options.parallelJobs > 1 {
 		// we fire the periodicalRunner only once.
 		go a.periodicalRunRunner(timer)
-		for range a.options.parallelJobs {
+		for i := 0; i < a.options.parallelJobs; i++ {
 			go a.run(timer)
 		}
 		select {}
