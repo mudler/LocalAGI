@@ -166,7 +166,56 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 		}
 	}(a.pool[name])
 
-	return a.startAgentWithConfig(name, agentConfig)
+	return a.startAgentWithConfig(name, agentConfig, nil)
+}
+
+func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
+	a.Lock()
+	defer a.Unlock()
+
+	oldAgent := a.agents[name]
+	var o *types.Observable
+	obs := oldAgent.Observer()
+	if obs != nil {
+		o = obs.NewObservable()
+		o.Name = "Restarting Agent"
+		o.Icon = "sync"
+		o.Creation = &types.Creation{}
+		obs.Update(*o)
+	}
+
+	stateFile, characterFile := a.stateFiles(name)
+
+	os.Remove(stateFile)
+	os.Remove(characterFile)
+
+	oldAgent.Stop()
+
+	a.pool[name] = *agentConfig
+	delete(a.agents, name)
+
+	if err := a.save(); err != nil {
+		if obs != nil {
+			o.Completion = &types.Completion{Error: err.Error()}
+			obs.Update(*o)
+		}
+		return err
+	}
+
+	if err := a.startAgentWithConfig(name, agentConfig, obs); err != nil {
+		if obs != nil {
+			o.Completion = &types.Completion{Error: err.Error()}
+			obs.Update(*o)
+		}
+		return err
+	}
+
+	if obs != nil {
+		o.Completion = &types.Completion{}
+		obs.Update(*o)
+	}
+
+	return nil
 }
 
 func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agent AgentConfig) error {
@@ -268,8 +317,13 @@ func (a *AgentPool) GetStatusHistory(name string) *Status {
 	return a.agentStatus[name]
 }
 
-func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
-	manager := sse.NewManager(5)
+func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs Observer) error {
+	var manager sse.Manager
+	if m, ok := a.managers[name]; ok {
+		manager = m
+	} else {
+		manager = sse.NewManager(5)
+	}
 	ctx := context.Background()
 	model := a.defaultModel
 	multimodalModel := a.defaultMultimodalModel
@@ -330,6 +384,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	// for _, p := range config.DynamicPrompts {
 	// 	dynamicPrompts = append(dynamicPrompts, p.ToMap())
 	// }
+
+	if obs == nil {
+		obs = NewSSEObserver(name, manager)
+	}
 
 	opts := []Option{
 		WithModel(model),
@@ -407,7 +465,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 				c.AgentResultCallback()(state)
 			}
 		}),
-		WithObserver(NewSSEObserver(name, manager)),
+		WithObserver(obs),
 	}
 
 	if config.HUD {
@@ -510,7 +568,7 @@ func (a *AgentPool) StartAll() error {
 		if a.agents[name] != nil { // Agent already started
 			continue
 		}
-		if err := a.startAgentWithConfig(name, &config); err != nil {
+		if err := a.startAgentWithConfig(name, &config, nil); err != nil {
 			xlog.Error("Failed to start agent", "name", name, "error", err)
 		}
 	}
@@ -548,7 +606,7 @@ func (a *AgentPool) Start(name string) error {
 		return nil
 	}
 	if config, ok := a.pool[name]; ok {
-		return a.startAgentWithConfig(name, &config)
+		return a.startAgentWithConfig(name, &config, nil)
 	}
 
 	return fmt.Errorf("agent %s not found", name)

@@ -36,7 +36,8 @@ func NewSSEObserver(agent string, manager sse.Manager) *SSEObserver {
 }
 
 func (s *SSEObserver) NewObservable() *types.Observable {
-	id := atomic.AddInt32(&s.maxID, 1)
+	id  := atomic.AddInt32(&s.maxID, 1)
+	
 	return &types.Observable{
 		ID:    id - 1,
 		Agent: s.agent,
