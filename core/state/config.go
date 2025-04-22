@@ -67,11 +67,12 @@ type AgentConfig struct {
 }
 
 type AgentConfigMeta struct {
-	Fields         []config.Field
-	Connectors     []config.FieldGroup
-	Actions        []config.FieldGroup
-	DynamicPrompts []config.FieldGroup
-	MCPServers     []config.Field
+	Fields          []config.Field
+	Connectors      []config.FieldGroup
+	Actions         []config.FieldGroup
+	DynamicPrompts  []config.FieldGroup
+	MCPServers      []config.Field
+	MCPSTDIOServers []config.Field
 }
 
 func NewAgentConfigMeta(
@@ -286,6 +287,28 @@ func NewAgentConfigMeta(
 				Label:    "API Key",
 				Type:     config.FieldTypeText,
 				Required: true,
+			},
+		},
+		MCPSTDIOServers: []config.Field{
+			{
+				Name:     "cmd",
+				Label:    "Command",
+				Type:     config.FieldTypeText,
+				Required: true,
+			},
+			{
+				Name:     "args",
+				Label:    "Arguments",
+				Type:     config.FieldTypeText,
+				Required: true,
+				HelpText: "Comma-separated list of arguments",
+			},
+			{
+				Name:     "env",
+				Label:    "Environment Variables",
+				Type:     config.FieldTypeText,
+				Required: true,
+				HelpText: "Comma-separated list of environment variables in KEY=VALUE format",
 			},
 		},
 		DynamicPrompts: dynamicPromptsConfig,
