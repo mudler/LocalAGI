@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -24,48 +25,60 @@ func main() {
 	// Create a client
 	client := stdio.NewClient("localhost:8080")
 
-	// Start the client
-	if err := client.Start(context.Background()); err != nil {
-		log.Fatalf("Failed to start client: %v", err)
-	}
-	defer client.Close()
+	// Create a process group
+	groupID := "test-group"
 
-	// Set up notification handler
-	client.SetNotificationHandler(func(notification stdio.JSONRPCNotification) {
-		fmt.Printf("Received notification: %+v\n", notification)
-	})
-
-	// Send a request
-	request := stdio.JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "test",
-		Params:  map[string]string{"hello": "world"},
-	}
-
-	response, err := client.SendRequest(context.Background(), request)
+	// Start a process in the group
+	process, err := client.CreateProcess(
+		context.Background(),
+		"echo",
+		[]string{"Hello, World!"},
+		[]string{"TEST=value"},
+		groupID,
+	)
 	if err != nil {
-		log.Fatalf("Failed to send request: %v", err)
+		log.Fatalf("Failed to create process: %v", err)
 	}
 
-	fmt.Printf("Received response: %+v\n", response)
-
-	// Send a notification
-	notification := stdio.JSONRPCNotification{
-		JSONRPC: "2.0",
-		Notification: struct {
-			Method string      `json:"method"`
-			Params interface{} `json:"params,omitempty"`
-		}{
-			Method: "test",
-			Params: map[string]string{"hello": "world"},
-		},
+	// Get IO streams for the process
+	reader, writer, err := client.GetProcessIO(process.ID)
+	if err != nil {
+		log.Fatalf("Failed to get process IO: %v", err)
 	}
 
-	if err := client.SendNotification(context.Background(), notification); err != nil {
-		log.Fatalf("Failed to send notification: %v", err)
+	// Write to the process
+	_, err = writer.Write([]byte("Hello from client\n"))
+	if err != nil {
+		log.Fatalf("Failed to write to process: %v", err)
 	}
 
-	// Keep the program running
-	select {}
+	// Read from the process
+	buf := make([]byte, 1024)
+	n, err := reader.Read(buf)
+	if err != nil && err != io.EOF {
+		log.Fatalf("Failed to read from process: %v", err)
+	}
+	fmt.Printf("Process output: %s", buf[:n])
+
+	// Get all processes in the group
+	processes, err := client.GetGroupProcesses(groupID)
+	if err != nil {
+		log.Printf("Failed to get group processes: %v", err)
+	} else {
+		fmt.Printf("Processes in group %s: %+v\n", groupID, processes)
+	}
+
+	// List all groups
+	groups := client.ListGroups()
+	fmt.Printf("All groups: %v\n", groups)
+
+	// Stop the process
+	if err := client.StopProcess(process.ID); err != nil {
+		log.Fatalf("Failed to stop process: %v", err)
+	}
+
+	// Close the client
+	if err := client.Close(); err != nil {
+		log.Fatalf("Failed to close client: %v", err)
+	}
 }
