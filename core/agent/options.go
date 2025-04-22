@@ -64,6 +64,7 @@ func (o *options) SeparatedMultimodalModel() bool {
 
 func defaultOptions() *options {
 	return &options{
+		parallelJobs: 1,
 		periodicRuns: 15 * time.Minute,
 		LLMAPI: llmOptions{
 			APIURL: "http://localhost:8080",

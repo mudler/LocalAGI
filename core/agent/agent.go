@@ -990,7 +990,6 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 }
 
 func (a *Agent) Run() error {
-
 	a.startNewConversationsConsumer()
 	xlog.Debug("Agent is now running", "agent", a.Character.Name)
 	// The agent run does two things:
@@ -1013,7 +1012,12 @@ func (a *Agent) Run() error {
 	var muErr sync.Mutex
 	var wg sync.WaitGroup
 
-	for i := 0; i <= a.options.parallelJobs; i++ {
+	parallelJobs := a.options.parallelJobs
+	if a.options.parallelJobs == 0 {
+		parallelJobs = 1
+	}
+
+	for i := 0; i < parallelJobs; i++ {
 		xlog.Debug("Starting agent worker", "worker", i)
 		wg.Add(1)
 		go func() {
