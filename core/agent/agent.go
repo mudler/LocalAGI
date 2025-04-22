@@ -1006,32 +1006,51 @@ func (a *Agent) Run() error {
 
 	//todoTimer := time.NewTicker(a.options.periodicRuns)
 	timer := time.NewTimer(a.options.periodicRuns)
+
+	if a.options.parallelJobs > 1 {
+		// we fire the periodicalRunner only once.
+		go a.periodicalRunRunner(timer)
+		for range a.options.parallelJobs {
+			go a.run(timer)
+		}
+		select {}
+	} else {
+		go a.periodicalRunRunner(timer)
+		return a.run(timer)
+	}
+}
+
+func (a *Agent) run(timer *time.Timer) error {
 	for {
 		xlog.Debug("Agent is now waiting for a new job", "agent", a.Character.Name)
 		select {
 		case job := <-a.jobQueue:
-			a.loop(timer, job)
+			if !timer.Stop() {
+				<-timer.C
+			}
+			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
+			a.consumeJob(job, UserRole)
+			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
 			// Agent has been canceled, return error
 			xlog.Warn("Agent has been canceled", "agent", a.Character.Name)
 			return ErrContextCanceled
-		case <-timer.C:
-			a.periodicallyRun(timer)
 		}
 	}
 }
 
-func (a *Agent) loop(timer *time.Timer, job *types.Job) {
-	// Remember always to reset the timer - if we don't the agent will stop..
-	defer timer.Reset(a.options.periodicRuns)
-	// Consume the job and generate a response
-	// TODO: Give a short-term memory to the agent
-	// stop and drain the timer
-	if !timer.Stop() {
-		<-timer.C
+func (a *Agent) periodicalRunRunner(timer *time.Timer) {
+	for {
+		xlog.Debug("Agent is now waiting for a new job", "agent", a.Character.Name)
+		select {
+		case <-a.context.Done():
+			// Agent has been canceled, return error
+			xlog.Warn("Agent has been canceled", "agent", a.Character.Name)
+			return
+		case <-timer.C:
+			a.periodicallyRun(timer)
+		}
 	}
-	xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
-	a.consumeJob(job, UserRole)
 }
 
 func (a *Agent) Observer() Observer {
