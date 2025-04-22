@@ -54,7 +54,8 @@ type options struct {
 
 	newConversationsSubscribers []func(openai.ChatCompletionMessage)
 
-	observer Observer
+	observer     Observer
+	parallelJobs int
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -134,6 +135,13 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 	return func(o *options) error {
 		o.enableKB = true
 		o.kbResults = results
+		return nil
+	}
+}
+
+func WithParallelJobs(jobs int) Option {
+	return func(o *options) error {
+		o.parallelJobs = jobs
 		return nil
 	}
 }

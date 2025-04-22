@@ -61,6 +61,7 @@ type AgentConfig struct {
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
 	LongTermMemory        bool   `json:"long_term_memory" form:"long_term_memory"`
 	SummaryLongTermMemory bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
+	ParallelJobs          int    `json:"parallel_jobs" form:"parallel_jobs"`
 }
 
 type AgentConfigMeta struct {
@@ -258,6 +259,16 @@ func NewAgentConfigMeta(
 				DefaultValue: 5,
 				Min:          1,
 				Step:         1,
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "parallel_jobs",
+				Label:        "Parallel Jobs",
+				Type:         "number",
+				DefaultValue: 5,
+				Min:          1,
+				Step:         1,
+				HelpText:     "Number of concurrent tasks that can run in parallel",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 		},

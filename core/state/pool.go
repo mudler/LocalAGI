@@ -466,6 +466,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		opts = append(opts, WithLoopDetectionSteps(config.LoopDetectionSteps))
 	}
 
+	if config.ParallelJobs > 0 {
+		opts = append(opts, WithParallelJobs(config.ParallelJobs))
+	}
+
 	xlog.Info("Starting agent", "name", name, "config", config)
 
 	agent, err := New(opts...)
