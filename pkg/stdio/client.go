@@ -58,7 +58,8 @@ func (c *Client) CreateProcess(ctx context.Context, command string, args []strin
 
 	resp, err := http.Post(url, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		return nil, fmt.Errorf("failed to start process: %w", err)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to start process: %w. body: %s", err, string(body))
 	}
 	defer resp.Body.Close()
 
@@ -68,8 +69,9 @@ func (c *Client) CreateProcess(ctx context.Context, command string, args []strin
 		ID string `json:"id"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
+
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w. body: %s", err, string(body))
 	}
 
