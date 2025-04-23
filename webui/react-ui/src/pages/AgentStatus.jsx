@@ -99,8 +99,17 @@ function AgentStatus() {
           creation: data.creation,
           progress: data.progress,
           completion: data.completion,
-          // children are always built client-side
         };
+        // Events can be received out of order
+        if (data.creation)
+          updated.creation = data.creation;
+        if (data.completion)
+          updated.completion = data.completion;
+        if (data.parent_id && !prevMap[data.parent_id])
+          prevMap[data.parent_id] = {
+            id: data.parent_id,
+            name: "unknown",
+          };
         const newMap = { ...prevMap, [data.id]: updated };
         setObservableTree(buildObservableTree(newMap));
         return newMap;

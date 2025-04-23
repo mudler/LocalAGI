@@ -77,8 +77,9 @@ func (i *IRC) Start(a *agent.Agent) {
 	}
 	i.conn.UseTLS = false
 	i.conn.AddCallback("001", func(e *irc.Event) {
-		xlog.Info("Connected to IRC server", "server", i.server)
+		xlog.Info("Connected to IRC server", "server", i.server, "arguments", e.Arguments)
 		i.conn.Join(i.channel)
+		i.nickname = e.Arguments[0]
 		xlog.Info("Joined channel", "channel", i.channel)
 	})
 
@@ -207,6 +208,13 @@ func (i *IRC) Start(a *agent.Agent) {
 
 	// Start the IRC client in a goroutine
 	go i.conn.Loop()
+	go func() {
+		select  {
+		case <-a.Context().Done():
+			i.conn.Quit()
+			return
+		}
+	}()
 }
 
 // IRCConfigMeta returns the metadata for IRC connector configuration fields

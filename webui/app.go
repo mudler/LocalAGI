@@ -176,17 +176,7 @@ func (a *App) UpdateAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error 
 			return errorJSONMessage(c, err.Error())
 		}
 
-		// Remove the agent first
-		if err := pool.Remove(agentName); err != nil {
-			return errorJSONMessage(c, "Error removing agent: "+err.Error())
-		}
-
-		// Create agent with new config
-		if err := pool.CreateAgent(agentName, &newConfig); err != nil {
-			// Try to restore the old configuration if update fails
-			if restoreErr := pool.CreateAgent(agentName, oldConfig); restoreErr != nil {
-				return errorJSONMessage(c, fmt.Sprintf("Failed to update agent and restore failed: %v, %v", err, restoreErr))
-			}
+		if err := pool.RecreateAgent(agentName, &newConfig); err != nil {
 			return errorJSONMessage(c, "Error updating agent: "+err.Error())
 		}
 
