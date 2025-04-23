@@ -180,6 +180,12 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 	}()
 
 	if j.Obs != nil {
+		if len(j.ConversationHistory) > 0 {
+			m := j.ConversationHistory[len(j.ConversationHistory)-1]
+			j.Obs.Creation = &types.Creation{ ChatCompletionMessage: &m }
+			a.observer.Update(*j.Obs)
+		}
+
 		j.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
 			j.Obs.Completion = &types.Completion{
 				Conversation: ccm,

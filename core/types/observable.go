@@ -6,6 +6,7 @@ import (
 )
 
 type Creation struct {
+	ChatCompletionMessage *openai.ChatCompletionMessage `json:"chat_completion_message,omitempty"`
 	ChatCompletionRequest *openai.ChatCompletionRequest `json:"chat_completion_request,omitempty"`
 	FunctionDefinition    *openai.FunctionDefinition    `json:"function_definition,omitempty"`
 	FunctionParams        ActionParams                  `json:"function_params,omitempty"`
