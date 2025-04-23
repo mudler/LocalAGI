@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"sync"
@@ -33,6 +34,8 @@ func NewClient(baseURL string) *Client {
 
 // CreateProcess starts a new process in a group
 func (c *Client) CreateProcess(ctx context.Context, command string, args []string, env []string, groupID string) (*Process, error) {
+	log.Printf("Creating process: command=%s, args=%v, groupID=%s", command, args, groupID)
+
 	req := struct {
 		Command string   `json:"command"`
 		Args    []string `json:"args"`
@@ -50,22 +53,27 @@ func (c *Client) CreateProcess(ctx context.Context, command string, args []strin
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	resp, err := http.Post(
-		fmt.Sprintf("%s/processes", c.baseURL),
-		"application/json",
-		bytes.NewReader(reqBody),
-	)
+	url := fmt.Sprintf("%s/processes", c.baseURL)
+	log.Printf("Sending POST request to %s", url)
+
+	resp, err := http.Post(url, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start process: %w", err)
 	}
 	defer resp.Body.Close()
 
+	log.Printf("Received response with status: %d", resp.StatusCode)
+
 	var result struct {
 		ID string `json:"id"`
 	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to decode response: %w. body: %s", err, string(body))
 	}
+
+	log.Printf("Successfully created process with ID: %s", result.ID)
 
 	process := &Process{
 		ID:        result.ID,
@@ -193,22 +201,34 @@ func (c *Client) ListGroups() []string {
 
 // GetProcessIO returns io.Reader and io.Writer for a process
 func (c *Client) GetProcessIO(id string) (io.Reader, io.Writer, error) {
+	log.Printf("Getting IO for process: %s", id)
+
 	process, err := c.GetProcess(id)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	// Parse the base URL to get the host
+	baseURL, err := url.Parse(c.baseURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse base URL: %w", err)
+	}
+
 	// Connect to WebSocket
 	u := url.URL{
 		Scheme: "ws",
-		Host:   c.baseURL,
+		Host:   baseURL.Host,
 		Path:   fmt.Sprintf("/ws/%s", process.ID),
 	}
+
+	log.Printf("Connecting to WebSocket at: %s", u.String())
 
 	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to WebSocket: %w", err)
 	}
+
+	log.Printf("Successfully connected to WebSocket for process: %s", id)
 
 	// Create reader and writer
 	reader := &websocketReader{conn: conn}
@@ -257,4 +277,47 @@ func (c *Client) Close() error {
 	}
 
 	return nil
+}
+
+// RunProcess executes a command and returns its output
+func (c *Client) RunProcess(ctx context.Context, command string, args []string, env []string) (string, error) {
+	log.Printf("Running one-time process: command=%s, args=%v", command, args)
+
+	req := struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+		Env     []string `json:"env"`
+	}{
+		Command: command,
+		Args:    args,
+		Env:     env,
+	}
+
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/run", c.baseURL)
+	log.Printf("Sending POST request to %s", url)
+
+	resp, err := http.Post(url, "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to execute process: %w", err)
+	}
+	defer resp.Body.Close()
+
+	log.Printf("Received response with status: %d", resp.StatusCode)
+
+	var result struct {
+		Output string `json:"output"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to decode response: %w. body: %s", err, string(body))
+	}
+
+	log.Printf("Successfully executed process with output length: %d", len(result.Output))
+	return result.Output, nil
 }

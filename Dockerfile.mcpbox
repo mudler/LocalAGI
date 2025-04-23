@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git
@@ -23,10 +23,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o mcpbox ./cmd/mcpbox
 FROM alpine:3.19
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata docker
 
 # Create non-root user
-RUN adduser -D -g '' appuser
+#RUN adduser -D -g '' appuser
 
 # Set working directory
 WORKDIR /app
@@ -35,7 +35,7 @@ WORKDIR /app
 COPY --from=builder /app/mcpbox .
 
 # Use non-root user
-USER appuser
+#USER appuser
 
 # Expose port
 EXPOSE 8080

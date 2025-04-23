@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -46,6 +47,8 @@ func NewServer() *Server {
 
 // StartProcess starts a new process and returns its ID
 func (s *Server) StartProcess(ctx context.Context, command string, args []string, env []string, groupID string) (string, error) {
+	log.Printf("Starting process: command=%s, args=%v, groupID=%s", command, args, groupID)
+
 	cmd := exec.CommandContext(ctx, command, args...)
 
 	if len(env) > 0 {
@@ -88,6 +91,7 @@ func (s *Server) StartProcess(ctx context.Context, command string, args []string
 	}
 	s.mu.Unlock()
 
+	log.Printf("Successfully started process with ID: %s", process.ID)
 	return process.ID, nil
 }
 
@@ -201,6 +205,22 @@ func (s *Server) ListProcesses() []*Process {
 	return processes
 }
 
+// RunProcess executes a command and returns its output
+func (s *Server) RunProcess(ctx context.Context, command string, args []string, env []string) (string, error) {
+	cmd := exec.CommandContext(ctx, command, args...)
+
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("process failed: %w", err)
+	}
+
+	return string(output), nil
+}
+
 // Start starts the HTTP server
 func (s *Server) Start(addr string) error {
 	http.HandleFunc("/processes", s.handleProcesses)
@@ -208,11 +228,14 @@ func (s *Server) Start(addr string) error {
 	http.HandleFunc("/ws/", s.handleWebSocket)
 	http.HandleFunc("/groups", s.handleGroups)
 	http.HandleFunc("/groups/", s.handleGroup)
+	http.HandleFunc("/run", s.handleRun)
 
 	return http.ListenAndServe(addr, nil)
 }
 
 func (s *Server) handleProcesses(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Handling /processes request: method=%s", r.Method)
+
 	switch r.Method {
 	case http.MethodGet:
 		processes := s.ListProcesses()
@@ -266,6 +289,8 @@ func (s *Server) handleProcess(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Path[len("/ws/"):]
+	log.Printf("Handling WebSocket connection for process: %s", id)
+
 	process, err := s.GetProcess(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -279,11 +304,14 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	log.Printf("WebSocket connection established for process: %s", id)
+
 	// Handle stdin
 	go func() {
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
+				log.Printf("WebSocket stdin read error for process %s: %v", id, err)
 				return
 			}
 			process.Stdin.Write(message)
@@ -294,9 +322,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		buf := make([]byte, 1024)
 		for {
-
 			n, err := process.Stdout.Read(buf)
 			if err != nil {
+				log.Printf("WebSocket stdout read error for process %s: %v", id, err)
 				return
 			}
 			conn.WriteMessage(websocket.TextMessage, buf[:n])
@@ -309,6 +337,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		for {
 			n, err := process.Stderr.Read(buf)
 			if err != nil {
+				log.Printf("WebSocket stderr read error for process %s: %v", id, err)
 				return
 			}
 			conn.WriteMessage(websocket.TextMessage, buf[:n])
@@ -317,6 +346,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Wait for process to exit
 	process.Cmd.Wait()
+	log.Printf("Process %s exited", id)
 }
 
 // Add new handlers for group management
@@ -350,4 +380,38 @@ func (s *Server) handleGroup(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	log.Printf("Handling /run request")
+
+	var req struct {
+		Command string   `json:"command"`
+		Args    []string `json:"args"`
+		Env     []string `json:"env"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Executing one-time process: command=%s, args=%v", req.Command, req.Args)
+
+	output, err := s.RunProcess(r.Context(), req.Command, req.Args, req.Env)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("One-time process completed with output length: %d", len(output))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"output": output,
+	})
 }
