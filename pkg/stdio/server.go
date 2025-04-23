@@ -1,6 +1,7 @@
 package stdio
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -306,47 +307,110 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("WebSocket connection established for process: %s", id)
 
+	// Create a done channel to signal process completion
+	done := make(chan struct{})
+
+	// Create buffers to capture output
+	var stdoutBuf, stderrBuf bytes.Buffer
+	stdoutTee := io.TeeReader(process.Stdout, &stdoutBuf)
+	stderrTee := io.TeeReader(process.Stderr, &stderrBuf)
+
 	// Handle stdin
 	go func() {
+		defer func() {
+			select {
+			case <-done:
+				// Process already done, this is expected
+			default:
+				log.Printf("WebSocket stdin connection closed for process %s", id)
+			}
+		}()
+
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				log.Printf("WebSocket stdin read error for process %s: %v", id, err)
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.Printf("WebSocket stdin unexpected error for process %s: %v", id, err)
+				}
 				return
 			}
-			process.Stdin.Write(message)
+			if _, err := process.Stdin.Write(message); err != nil {
+				if err != io.EOF {
+					log.Printf("WebSocket stdin write error for process %s: %v", id, err)
+				}
+				return
+			}
 		}
 	}()
 
 	// Handle stdout
 	go func() {
+		defer func() {
+			select {
+			case <-done:
+				// Process already done, this is expected
+			default:
+				log.Printf("WebSocket stdout connection closed for process %s", id)
+			}
+		}()
+
 		buf := make([]byte, 1024)
 		for {
-			n, err := process.Stdout.Read(buf)
+			n, err := stdoutTee.Read(buf)
 			if err != nil {
-				log.Printf("WebSocket stdout read error for process %s: %v", id, err)
+				if err != io.EOF {
+					log.Printf("WebSocket stdout read error for process %s: %v", id, err)
+				}
 				return
 			}
-			conn.WriteMessage(websocket.TextMessage, buf[:n])
+			if err := conn.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.Printf("WebSocket stdout write error for process %s: %v", id, err)
+				}
+				return
+			}
 		}
 	}()
 
 	// Handle stderr
 	go func() {
+		defer func() {
+			select {
+			case <-done:
+				// Process already done, this is expected
+			default:
+				log.Printf("WebSocket stderr connection closed for process %s", id)
+			}
+		}()
+
 		buf := make([]byte, 1024)
 		for {
-			n, err := process.Stderr.Read(buf)
+			n, err := stderrTee.Read(buf)
 			if err != nil {
-				log.Printf("WebSocket stderr read error for process %s: %v", id, err)
+				if err != io.EOF {
+					log.Printf("WebSocket stderr read error for process %s: %v", id, err)
+				}
 				return
 			}
-			conn.WriteMessage(websocket.TextMessage, buf[:n])
+			if err := conn.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.Printf("WebSocket stderr write error for process %s: %v", id, err)
+				}
+				return
+			}
 		}
 	}()
 
 	// Wait for process to exit
-	process.Cmd.Wait()
-	log.Printf("Process %s exited", id)
+	err = process.Cmd.Wait()
+	close(done) // Signal that the process is done
+
+	if err != nil {
+		log.Printf("Process %s exited with error: %v\nstdout: %s\nstderr: %s",
+			id, err, stdoutBuf.String(), stderrBuf.String())
+	} else {
+		log.Printf("Process %s exited successfully", id)
+	}
 }
 
 // Add new handlers for group management
