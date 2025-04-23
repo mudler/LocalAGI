@@ -1,4 +1,181 @@
 import { useState, useEffect } from 'react';
+import CollapsibleRawSections from '../components/CollapsibleRawSections';
+
+function ObservableSummary({ observable }) {
+  // --- CREATION SUMMARIES ---
+  const creation = observable?.creation || {};
+  // ChatCompletionRequest summary
+  let creationChatMsg = '';
+  // Prefer chat_completion_message if present (for jobs/top-level containers)
+  if (creation?.chat_completion_message && creation.chat_completion_message.content) {
+    creationChatMsg = creation.chat_completion_message.content;
+  } else {
+    const messages = creation?.chat_completion_request?.messages;
+    if (Array.isArray(messages) && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      creationChatMsg = lastMsg?.content || '';
+    }
+  }
+  // FunctionDefinition summary
+  let creationFunctionDef = '';
+  if (creation?.function_definition?.name) {
+    creationFunctionDef = `Function: ${creation.function_definition.name}`;
+  }
+  // FunctionParams summary
+  let creationFunctionParams = '';
+  if (creation?.function_params && Object.keys(creation.function_params).length > 0) {
+    creationFunctionParams = `Params: ${JSON.stringify(creation.function_params)}`;
+  }
+
+  // --- COMPLETION SUMMARIES ---
+  const completion = observable?.completion || {};
+  // ChatCompletionResponse summary
+  let completionChatMsg = '';
+  const chatCompletion = completion?.chat_completion_response;
+  if (
+    chatCompletion &&
+    Array.isArray(chatCompletion.choices) &&
+    chatCompletion.choices.length > 0
+  ) {
+    const lastChoice = chatCompletion.choices[chatCompletion.choices.length - 1];
+    // Prefer tool_call summary if present
+    let toolCallSummary = '';
+    const toolCalls = lastChoice?.message?.tool_calls;
+    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+      toolCallSummary = toolCalls.map(tc => {
+        let args = '';
+        // For OpenAI-style, arguments are in tc.function.arguments, function name in tc.function.name
+        if (tc.function && tc.function.arguments) {
+          try {
+            args = typeof tc.function.arguments === 'string' ? tc.function.arguments : JSON.stringify(tc.function.arguments);
+          } catch (e) {
+            args = '[Unserializable arguments]';
+          }
+        }
+        const toolName = tc.function?.name || tc.name || 'unknown';
+        return `Tool call: ${toolName}(${args})`;
+      }).join('\n');
+    }
+    completionChatMsg = lastChoice?.message?.content || '';
+    // Attach toolCallSummary to completionChatMsg for rendering
+    if (toolCallSummary) {
+      completionChatMsg = { toolCallSummary, message: completionChatMsg };
+    }
+    // Else, it's just a string
+
+  }
+  // Conversation summary
+  let completionConversation = '';
+  if (Array.isArray(completion?.conversation) && completion.conversation.length > 0) {
+    const lastConv = completion.conversation[completion.conversation.length - 1];
+    completionConversation = lastConv?.content ? `${lastConv.content}` : '';
+  }
+  // ActionResult summary
+  let completionActionResult = '';
+  if (completion?.action_result) {
+    completionActionResult = `Action Result: ${String(completion.action_result).slice(0, 100)}`;
+  }
+  // AgentState summary
+  let completionAgentState = '';
+  if (completion?.agent_state) {
+    completionAgentState = `Agent State: ${JSON.stringify(completion.agent_state)}`;
+  }
+  // Error summary
+  let completionError = '';
+  if (completion?.error) {
+    completionError = `Error: ${completion.error}`;
+  }
+
+  // Only show if any summary is present
+  if (!creationChatMsg && !creationFunctionDef && !creationFunctionParams &&
+      !completionChatMsg && !completionConversation && !completionActionResult && !completionAgentState && !completionError) {
+    return null;
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0 0 0' }}>
+      {/* CREATION */}
+      {creationChatMsg && (
+        <div title={creationChatMsg} style={{ display: 'flex', alignItems: 'center', color: '#cfc', fontSize: 14 }}>
+          <i className="fas fa-comment-dots" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{creationChatMsg}</span>
+        </div>
+      )}
+      {creationFunctionDef && (
+        <div title={creationFunctionDef} style={{ display: 'flex', alignItems: 'center', color: '#cfc', fontSize: 14 }}>
+          <i className="fas fa-code" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{creationFunctionDef}</span>
+        </div>
+      )}
+      {creationFunctionParams && (
+        <div title={creationFunctionParams} style={{ display: 'flex', alignItems: 'center', color: '#fc9', fontSize: 14 }}>
+          <i className="fas fa-sliders-h" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{creationFunctionParams}</span>
+        </div>
+      )}
+      {/* COMPLETION */}
+      {/* COMPLETION: Tool call summary if present */}
+      {completionChatMsg && typeof completionChatMsg === 'object' && completionChatMsg.toolCallSummary && (
+        <div
+          title={completionChatMsg.toolCallSummary}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            color: '#ffd966', // Distinct color for tool calls
+            fontSize: 14,
+            marginTop: 2,
+            whiteSpace: 'pre-line',
+            wordBreak: 'break-all',
+          }}
+        >
+          <i className="fas fa-tools" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ whiteSpace: 'pre-line', display: 'block' }}>{completionChatMsg.toolCallSummary}</span>
+        </div>
+      )}
+      {/* COMPLETION: Message content if present */}
+      {completionChatMsg && ((typeof completionChatMsg === 'object' && completionChatMsg.message) || typeof completionChatMsg === 'string') && (
+        <div
+          title={typeof completionChatMsg === 'object' ? completionChatMsg.message : completionChatMsg}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            color: '#8fc7ff',
+            fontSize: 14,
+            marginTop: 2,
+          }}
+        >
+          <i className="fas fa-robot" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{typeof completionChatMsg === 'object' ? completionChatMsg.message : completionChatMsg}</span>
+        </div>
+      )}
+      {completionConversation && (
+        <div title={completionConversation} style={{ display: 'flex', alignItems: 'center', color: '#b8e2ff', fontSize: 14 }}>
+          <i className="fas fa-comments" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionConversation}</span>
+        </div>
+      )}
+      {completionActionResult && (
+        <div title={completionActionResult} style={{ display: 'flex', alignItems: 'center', color: '#ffd700', fontSize: 14 }}>
+          <i className="fas fa-bolt" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionActionResult}</span>
+        </div>
+      )}
+      {completionAgentState && (
+        <div title={completionAgentState} style={{ display: 'flex', alignItems: 'center', color: '#ffb8b8', fontSize: 14 }}>
+          <i className="fas fa-brain" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionAgentState}</span>
+        </div>
+      )}
+      {completionError && (
+        <div title={completionError} style={{ display: 'flex', alignItems: 'center', color: '#f66', fontSize: 14 }}>
+          <i className="fas fa-exclamation-triangle" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionError}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 import { useParams, Link } from 'react-router-dom';
 import hljs from 'highlight.js/lib/core';
 import json from 'highlight.js/lib/languages/json';
@@ -7,7 +184,7 @@ import 'highlight.js/styles/monokai.css';
 hljs.registerLanguage('json', json);
 
 function AgentStatus() {
-  const [showStatus, setShowStatus] = useState(true);
+  const [showStatus, setShowStatus] = useState(false);
   const { name } = useParams();
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -94,17 +271,16 @@ function AgentStatus() {
       setObservableMap(prevMap => {
         const prev = prevMap[data.id] || {};
         const updated = {
-          ...prev,
           ...data,
-          creation: data.creation,
-          progress: data.progress,
-          completion: data.completion,
+          ...prev,
         };
         // Events can be received out of order
         if (data.creation)
           updated.creation = data.creation;
         if (data.completion)
           updated.completion = data.completion;
+        if ((data.progress?.length ?? 0) > (prev.progress?.length ?? 0))
+          updated.progress = data.progress;
         if (data.parent_id && !prevMap[data.parent_id])
           prevMap[data.parent_id] = {
             id: data.parent_id,
@@ -252,12 +428,17 @@ function AgentStatus() {
                           setExpandedCards(new Map(expandedCards).set(container.id, newExpanded));
                         }}
                       >
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-  <i className={`fas fa-${container.icon || 'robot'}`} style={{ verticalAlign: '-0.125em' }}></i>
-  <span>
-    <span className='stat-label'>{container.name}</span>#<span className='stat-label'>{container.id}</span>
-  </span>
-</div>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', maxWidth: '90%' }}>
+                          <i className={`fas fa-${container.icon || 'robot'}`} style={{ verticalAlign: '-0.125em' }}></i>
+                          <span style={{ width: '100%' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                              <span>
+                                <span className='stat-label'>{container.name}</span>#<span className='stat-label'>{container.id}</span>
+                              </span>
+                              <ObservableSummary observable={container} />
+                            </div>
+                          </span>
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <i
                             className={`fas fa-chevron-${expandedCards.get(container.id) ? 'up' : 'down'}`}
@@ -279,18 +460,23 @@ function AgentStatus() {
                               const isExpanded = expandedCards.get(childKey);
                               return (
                                 <div key={`${container.id}-child-${child.id}`} className='card' style={{ background: '#222', marginBottom: '0.5em' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'hand', maxWidth: '100%' }}
                                     onClick={() => {
                                       const newExpanded = !expandedCards.get(childKey);
                                       setExpandedCards(new Map(expandedCards).set(childKey, newExpanded));
                                     }}
                                   >
-                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-  <i className={`fas fa-${child.icon || 'robot'}`} style={{ verticalAlign: '-0.125em' }}></i>
-  <span>
-    <span className='stat-label'>{child.name}</span>#<span className='stat-label'>{child.id}</span>
-  </span>
-</div>
+                                    <div style={{ display: 'flex', maxWidth: '90%', gap: '10px', alignItems: 'center' }}>
+                                      <i className={`fas fa-${child.icon || 'robot'}`} style={{ verticalAlign: '-0.125em' }}></i>
+                                      <span style={{ width: '100%' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                          <span>
+                                            <span className='stat-label'>{child.name}</span>#<span className='stat-label'>{child.id}</span>
+                                          </span>
+                                          <ObservableSummary observable={child} />
+                                        </div>
+                                      </span>
+                                    </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                       <i
                                         className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}
@@ -303,60 +489,14 @@ function AgentStatus() {
                                     </div>
                                   </div>
                                   <div style={{ display: isExpanded ? 'block' : 'none' }}>
-                                    {child.creation && (
-                                      <div>
-                                        <h5>Creation:</h5>
-                                        <pre className="hljs"><code>
-                                          <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(child.creation || {}, null, 2), { language: 'json' }).value }}></div>
-                                        </code></pre>
-                                      </div>
-                                    )}
-                                    {child.progress && child.progress.length > 0 && (
-                                      <div>
-                                        <h5>Progress:</h5>
-                                        <pre className="hljs"><code>
-                                          <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(child.progress || {}, null, 2), { language: 'json' }).value }}></div>
-                                        </code></pre>
-                                      </div>
-                                    )}
-                                    {child.completion && (
-                                      <div>
-                                        <h5>Completion:</h5>
-                                        <pre className="hljs"><code>
-                                          <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(child.completion || {}, null, 2), { language: 'json' }).value }}></div>
-                                        </code></pre>
-                                      </div>
-                                    )}
+                                    <CollapsibleRawSections container={child} />
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
                         )}
-                        {container.creation && (
-                          <div>
-                            <h4>Creation:</h4>
-                            <pre className="hljs"><code>
-                              <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.creation || {}, null, 2), { language: 'json' }).value }}></div>
-                            </code></pre>
-                          </div>
-                        )}
-                        {container.progress && container.progress.length > 0 && (
-                          <div>
-                            <h4>Progress:</h4>
-                            <pre className="hljs"><code>
-                              <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.progress || {}, null, 2), { language: 'json' }).value }}></div>
-                            </code></pre>
-                          </div>
-                        )}
-                        {container.completion && (
-                          <div>
-                            <h4>Completion:</h4>
-                            <pre className="hljs"><code>
-                              <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.completion || {}, null, 2), { language: 'json' }).value }}></div>
-                            </code></pre>
-                          </div>
-                        )}
+                        <CollapsibleRawSections container={container} />
                       </div>
                     </div>
                   </div>
