@@ -157,40 +157,6 @@ const AgentForm = ({
     });
   };
 
-  // Handle adding an MCP STDIO server
-  const handleAddMCPSTDIOServer = () => {
-    setFormData({
-      ...formData,
-      mcp_stdio_servers: [
-        ...(formData.mcp_stdio_servers || []),
-        { cmd: '', args: [], env: [] }
-      ]
-    });
-  };
-
-  // Handle removing an MCP STDIO server
-  const handleRemoveMCPSTDIOServer = (index) => {
-    const updatedSTDIOServers = [...formData.mcp_stdio_servers];
-    updatedSTDIOServers.splice(index, 1);
-    setFormData({
-      ...formData,
-      mcp_stdio_servers: updatedSTDIOServers
-    });
-  };
-
-  // Handle MCP STDIO server change
-  const handleMCPSTDIOServerChange = (index, field, value) => {
-    const updatedSTDIOServers = [...formData.mcp_stdio_servers];
-    updatedSTDIOServers[index] = { 
-      ...updatedSTDIOServers[index],
-      [field]: value 
-    };
-    setFormData({
-      ...formData,
-      mcp_stdio_servers: updatedSTDIOServers
-    });
-  };
-
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
@@ -294,15 +260,7 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'mcp-section' ? 'block' : 'none' }}>
-              <MCPServersSection 
-                formData={formData} 
-                handleAddMCPServer={handleAddMCPServer} 
-                handleRemoveMCPServer={handleRemoveMCPServer} 
-                handleMCPServerChange={handleMCPServerChange}
-                handleAddMCPSTDIOServer={handleAddMCPSTDIOServer}
-                handleRemoveMCPSTDIOServer={handleRemoveMCPSTDIOServer}
-                handleMCPSTDIOServerChange={handleMCPSTDIOServerChange}
-              />
+              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange}  />
             </div>
 
             <div style={{ display: activeSection === 'memory-section' ? 'block' : 'none' }}>
@@ -353,15 +311,7 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'mcp-section' ? 'block' : 'none' }}>
-              <MCPServersSection 
-                formData={formData} 
-                handleAddMCPServer={handleAddMCPServer} 
-                handleRemoveMCPServer={handleRemoveMCPServer} 
-                handleMCPServerChange={handleMCPServerChange}
-                handleAddMCPSTDIOServer={handleAddMCPSTDIOServer}
-                handleRemoveMCPSTDIOServer={handleRemoveMCPSTDIOServer}
-                handleMCPSTDIOServerChange={handleMCPSTDIOServerChange}
-              />
+              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange}  />
             </div>
 
             <div style={{ display: activeSection === 'memory-section' ? 'block' : 'none' }}>
