@@ -46,12 +46,30 @@ services:
     image: busybox
     command: ["sh", "-c", "until wget -q -O - http://localrecall:8080 > /dev/null 2>&1; do echo 'Waiting for localrecall...'; sleep 1; done; echo 'localrecall is up!'"]
 
+  mcpbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcpbox
+    ports:
+      - "8080"
+    volumes:
+      - ./volumes/mcpbox:/app/data
+      # share docker socket if you want it to be able to run docker commands
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/processes"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   localagi:
     depends_on:
       localai:
         condition: service_healthy
       localrecall-healthcheck:
         condition: service_completed_successfully
+      mcpbox:
+        condition: service_healthy
     build:
       context: .
       dockerfile: Dockerfile.webui
@@ -68,6 +86,7 @@ services:
       - LOCALAGI_STATE_DIR=/pool
       - LOCALAGI_TIMEOUT=5m
       - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
+      - LOCALAGI_MCPBOX_URL=http://mcpbox:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

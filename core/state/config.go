@@ -2,6 +2,8 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
@@ -30,10 +32,13 @@ func (d DynamicPromptsConfig) ToMap() map[string]string {
 }
 
 type AgentConfig struct {
-	Connector      []ConnectorConfig      `json:"connectors" form:"connectors" `
-	Actions        []ActionsConfig        `json:"actions" form:"actions"`
-	DynamicPrompts []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
-	MCPServers     []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
+	Connector        []ConnectorConfig      `json:"connectors" form:"connectors" `
+	Actions          []ActionsConfig        `json:"actions" form:"actions"`
+	DynamicPrompts   []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
+	MCPServers       []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
+	MCPSTDIOServers  []agent.MCPSTDIOServer `json:"mcp_stdio_servers" form:"mcp_stdio_servers"`
+	MCPPrepareScript string                 `json:"mcp_prepare_script" form:"mcp_prepare_script"`
+	MCPBoxURL        string                 `json:"mcp_box_url" form:"mcp_box_url"`
 
 	Description string `json:"description" form:"description"`
 
@@ -271,6 +276,22 @@ func NewAgentConfigMeta(
 				HelpText:     "Number of concurrent tasks that can run in parallel",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
+			{
+				Name:         "mcp_stdio_servers",
+				Label:        "MCP STDIO Servers",
+				Type:         "textarea",
+				DefaultValue: "",
+				HelpText:     "JSON configuration for MCP STDIO servers",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "mcp_prepare_script",
+				Label:        "MCP Prepare Script",
+				Type:         "textarea",
+				DefaultValue: "",
+				HelpText:     "Script to prepare the MCP box",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
 		},
 		MCPServers: []config.Field{
 			{
@@ -296,4 +317,149 @@ type Connector interface {
 	AgentResultCallback() func(state types.ActionState)
 	AgentReasoningCallback() func(state types.ActionCurrentState) bool
 	Start(a *agent.Agent)
+}
+
+// UnmarshalJSON implements json.Unmarshaler for AgentConfig
+func (a *AgentConfig) UnmarshalJSON(data []byte) error {
+	// Create a temporary type to avoid infinite recursion
+	type Alias AgentConfig
+	aux := &struct {
+		*Alias
+		MCPSTDIOServersConfig interface{} `json:"mcp_stdio_servers"`
+	}{
+		Alias: (*Alias)(a),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Handle MCP STDIO servers configuration
+	if aux.MCPSTDIOServersConfig != nil {
+		switch v := aux.MCPSTDIOServersConfig.(type) {
+		case string:
+			// Parse string configuration
+			var mcpConfig struct {
+				MCPServers map[string]struct {
+					Command string            `json:"command"`
+					Args    []string          `json:"args"`
+					Env     map[string]string `json:"env"`
+				} `json:"mcpServers"`
+			}
+
+			if err := json.Unmarshal([]byte(v), &mcpConfig); err != nil {
+				return fmt.Errorf("failed to parse MCP STDIO servers configuration: %w", err)
+			}
+
+			a.MCPSTDIOServers = make([]agent.MCPSTDIOServer, 0, len(mcpConfig.MCPServers))
+			for _, server := range mcpConfig.MCPServers {
+				// Convert env map to slice of "KEY=VALUE" strings
+				envSlice := make([]string, 0, len(server.Env))
+				for k, v := range server.Env {
+					envSlice = append(envSlice, fmt.Sprintf("%s=%s", k, v))
+				}
+
+				a.MCPSTDIOServers = append(a.MCPSTDIOServers, agent.MCPSTDIOServer{
+					Cmd:  server.Command,
+					Args: server.Args,
+					Env:  envSlice,
+				})
+			}
+		case []interface{}:
+			// Parse array configuration
+			a.MCPSTDIOServers = make([]agent.MCPSTDIOServer, 0, len(v))
+			for _, server := range v {
+				serverMap, ok := server.(map[string]interface{})
+				if !ok {
+					return fmt.Errorf("invalid server configuration format")
+				}
+
+				cmd, _ := serverMap["cmd"].(string)
+				args := make([]string, 0)
+				if argsInterface, ok := serverMap["args"].([]interface{}); ok {
+					for _, arg := range argsInterface {
+						if argStr, ok := arg.(string); ok {
+							args = append(args, argStr)
+						}
+					}
+				}
+
+				env := make([]string, 0)
+				if envInterface, ok := serverMap["env"].([]interface{}); ok {
+					for _, e := range envInterface {
+						if envStr, ok := e.(string); ok {
+							env = append(env, envStr)
+						}
+					}
+				}
+
+				a.MCPSTDIOServers = append(a.MCPSTDIOServers, agent.MCPSTDIOServer{
+					Cmd:  cmd,
+					Args: args,
+					Env:  env,
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements json.Marshaler for AgentConfig
+func (a *AgentConfig) MarshalJSON() ([]byte, error) {
+	// Create a temporary type to avoid infinite recursion
+	type Alias AgentConfig
+	aux := &struct {
+		*Alias
+		MCPSTDIOServersConfig string `json:"mcp_stdio_servers,omitempty"`
+	}{
+		Alias: (*Alias)(a),
+	}
+
+	// Convert MCPSTDIOServers back to the expected JSON format
+	if len(a.MCPSTDIOServers) > 0 {
+		mcpConfig := struct {
+			MCPServers map[string]struct {
+				Command string            `json:"command"`
+				Args    []string          `json:"args"`
+				Env     map[string]string `json:"env"`
+			} `json:"mcpServers"`
+		}{
+			MCPServers: make(map[string]struct {
+				Command string            `json:"command"`
+				Args    []string          `json:"args"`
+				Env     map[string]string `json:"env"`
+			}),
+		}
+
+		// Convert each MCPSTDIOServer to the expected format
+		for i, server := range a.MCPSTDIOServers {
+			// Convert env slice back to map
+			envMap := make(map[string]string)
+			for _, env := range server.Env {
+				if parts := strings.SplitN(env, "=", 2); len(parts) == 2 {
+					envMap[parts[0]] = parts[1]
+				}
+			}
+
+			mcpConfig.MCPServers[fmt.Sprintf("server%d", i)] = struct {
+				Command string            `json:"command"`
+				Args    []string          `json:"args"`
+				Env     map[string]string `json:"env"`
+			}{
+				Command: server.Cmd,
+				Args:    server.Args,
+				Env:     envMap,
+			}
+		}
+
+		// Marshal the MCP config to JSON string
+		mcpConfigJSON, err := json.Marshal(mcpConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal MCP STDIO servers configuration: %w", err)
+		}
+		aux.MCPSTDIOServersConfig = string(mcpConfigJSON)
+	}
+
+	return json.Marshal(aux)
 }

@@ -33,6 +33,7 @@ type AgentPool struct {
 	managers                                     map[string]sse.Manager
 	agentStatus                                  map[string]*Status
 	apiURL, defaultModel, defaultMultimodalModel string
+	mcpBoxURL                                    string
 	imageModel, localRAGAPI, localRAGKey, apiKey string
 	availableActions                             func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                   func(*AgentConfig) []Connector
@@ -72,7 +73,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory string,
+	defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory, mcpBoxURL string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -98,6 +99,7 @@ func NewAgentPool(
 			apiURL:                 apiURL,
 			defaultModel:           defaultModel,
 			defaultMultimodalModel: defaultMultimodalModel,
+			mcpBoxURL:              mcpBoxURL,
 			imageModel:             imageModel,
 			localRAGAPI:            LocalRAGAPI,
 			apiKey:                 apiKey,
@@ -123,6 +125,7 @@ func NewAgentPool(
 		pooldir:                directory,
 		defaultModel:           defaultModel,
 		defaultMultimodalModel: defaultMultimodalModel,
+		mcpBoxURL:              mcpBoxURL,
 		imageModel:             imageModel,
 		apiKey:                 apiKey,
 		agents:                 make(map[string]*Agent),
@@ -336,6 +339,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		model = config.Model
 	}
 
+	if config.MCPBoxURL != "" {
+		a.mcpBoxURL = config.MCPBoxURL
+	}
+
 	if config.PeriodicRuns == "" {
 		config.PeriodicRuns = "10m"
 	}
@@ -396,7 +403,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		WithMCPServers(config.MCPServers...),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
+		WithMCPSTDIOServers(config.MCPSTDIOServers...),
+		WithMCPBoxURL(a.mcpBoxURL),
 		WithPrompts(promptBlocks...),
+		WithMCPPrepareScript(config.MCPPrepareScript),
 		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
 			Name: name,
