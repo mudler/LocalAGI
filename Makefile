@@ -3,14 +3,15 @@ IMAGE_NAME?=webui
 MCPBOX_IMAGE_NAME?=mcpbox
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-prepare-tests:
+prepare-tests: build-mcpbox
 	docker compose up -d --build
+	docker run -d -v /var/run/docker.sock:/var/run/docker.sock --privileged -p 9090:8080 --rm -ti $(MCPBOX_IMAGE_NAME)
 
 cleanup-tests:
 	docker compose down
 
 tests: prepare-tests
-	LOCALAGI_MODEL="gemma-3-12b-it-qat" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --fail-fast -v -r ./...
+	LOCALAGI_MCPBOX_URL="http://localhost:9090" LOCALAGI_MODEL="gemma-3-12b-it-qat" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --fail-fast -v -r ./...
 
 run-nokb:
 	$(MAKE) run KBDISABLEINDEX=true
