@@ -50,10 +50,10 @@ type options struct {
 
 	conversationsPath string
 
-	mcpServers      []MCPServer
-	mcpStdioServers []MCPSTDIOServer
-	mcpBoxURL       string
-
+	mcpServers                  []MCPServer
+	mcpStdioServers             []MCPSTDIOServer
+	mcpBoxURL                   string
+	mcpPrepareScript            string
 	newConversationsSubscribers []func(openai.ChatCompletionMessage)
 
 	observer     Observer
@@ -219,6 +219,13 @@ func WithMCPSTDIOServers(servers ...MCPSTDIOServer) Option {
 func WithMCPBoxURL(url string) Option {
 	return func(o *options) error {
 		o.mcpBoxURL = url
+		return nil
+	}
+}
+
+func WithMCPPrepareScript(script string) Option {
+	return func(o *options) error {
+		o.mcpPrepareScript = script
 		return nil
 	}
 }

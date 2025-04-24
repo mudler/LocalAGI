@@ -2,24 +2,21 @@ package stdio
 
 import (
 	"context"
-	"os"
 	"time"
 
+	mcp "github.com/metoro-io/mcp-golang"
+	"github.com/metoro-io/mcp-golang/transport/stdio"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Client", func() {
 	var (
-		client  *Client
-		baseURL string
+		client *Client
 	)
 
 	BeforeEach(func() {
-		baseURL = os.Getenv("STDIO_SERVER_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:8080"
-		}
 		client = NewClient(baseURL)
 	})
 
@@ -182,6 +179,57 @@ var _ = Describe("Client", func() {
 			// Stop the process
 			err = client.StopProcess(process.ID)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("MCP", func() {
+			ctx := context.Background()
+			process, err := client.CreateProcess(ctx,
+				"docker", []string{"run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"},
+				[]string{"GITHUB_PERSONAL_ACCESS_TOKEN=test"}, "test-group")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(process).NotTo(BeNil())
+			Expect(process.ID).NotTo(BeEmpty())
+
+			defer client.StopProcess(process.ID)
+
+			// MCP client
+
+			read, writer, err := client.GetProcessIO(process.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(read).NotTo(BeNil())
+			Expect(writer).NotTo(BeNil())
+
+			transport := stdio.NewStdioServerTransportWithIO(read, writer)
+
+			// Create a new client
+			mcpClient := mcp.NewClient(transport)
+			// Initialize the client
+			response, e := mcpClient.Initialize(ctx)
+			Expect(e).NotTo(HaveOccurred())
+			Expect(response).NotTo(BeNil())
+
+			Expect(mcpClient.Ping(ctx)).To(Succeed())
+
+			xlog.Debug("Client initialized: %v", response.Instructions)
+
+			alltools := []mcp.ToolRetType{}
+			var cursor *string
+			for {
+				tools, err := mcpClient.ListTools(ctx, cursor)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(tools).NotTo(BeNil())
+				Expect(tools.Tools).NotTo(BeEmpty())
+				alltools = append(alltools, tools.Tools...)
+
+				if tools.NextCursor == nil {
+					break // No more pages
+				}
+				cursor = tools.NextCursor
+			}
+
+			for _, tool := range alltools {
+				xlog.Debug("Tool: %v", tool)
+			}
 		})
 	})
 })

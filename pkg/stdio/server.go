@@ -1,7 +1,6 @@
 package stdio
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -41,9 +40,7 @@ func NewServer() *Server {
 	return &Server{
 		processes: make(map[string]*Process),
 		groups:    make(map[string][]string),
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
-		},
+		upgrader:  websocket.Upgrader{},
 	}
 }
 
@@ -354,7 +351,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Handle stdout and stderr using bufio.Scanner
+	// Handle stdout and stderr
 	go func() {
 		defer func() {
 			select {
@@ -365,46 +362,29 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 
-		// Create a scanner that reads from both stdout and stderr
-		scanner := bufio.NewScanner(io.MultiReader(process.Stdout, process.Stderr))
-		// Set a larger buffer size for JSON-RPC messages (10MB)
-		scanner.Buffer(make([]byte, 10*1024*1024), 10*1024*1024)
-		// Use a custom split function to handle JSON-RPC messages
-		scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-			if atEOF && len(data) == 0 {
-				return 0, nil, nil
-			}
+		// Create a buffer for reading
+		buf := make([]byte, 4096)
+		reader := io.MultiReader(process.Stdout, process.Stderr)
 
-			// Look for the end of a JSON-RPC message
-			for i := 0; i < len(data); i++ {
-				if data[i] == '\n' {
-					return i + 1, data[:i], nil
-				}
-			}
-
-			// If we're at EOF, return the remaining data
-			if atEOF {
-				return len(data), data, nil
-			}
-
-			// Request more data
-			return 0, nil, nil
-		})
-
-		for scanner.Scan() {
-			line := scanner.Text()
-			xlog.Debug("Sending message", "processID", id, "message", line)
-			if err := conn.WriteMessage(websocket.TextMessage, []byte(line)); err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-					xlog.Debug("WebSocket output write error", "processID", id, "error", err)
+		for {
+			n, err := reader.Read(buf)
+			if err != nil {
+				if err != io.EOF {
+					xlog.Debug("Read error", "processID", id, "error", err)
 				}
 				return
 			}
-			xlog.Debug("Message sent to client", "processID", id, "message", line)
-		}
 
-		if err := scanner.Err(); err != nil {
-			xlog.Debug("Scanner error", "processID", id, "error", err)
+			if n > 0 {
+				xlog.Debug("Sending message", "processID", id, "size", n)
+				if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+						xlog.Debug("WebSocket output write error", "processID", id, "error", err)
+					}
+					return
+				}
+				xlog.Debug("Message sent to client", "processID", id, "size", n)
+			}
 		}
 	}()
 

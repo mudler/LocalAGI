@@ -174,7 +174,15 @@ func (a *Agent) initMCPActions() error {
 	}
 
 	// MCP STDIO Servers
+
 	a.closeMCPSTDIOServers() // Make sure we stop all previous servers if any is active
+
+	if a.options.mcpPrepareScript != "" {
+		xlog.Debug("Preparing MCP box", "script", a.options.mcpPrepareScript)
+		client := stdio.NewClient(a.options.mcpBoxURL)
+		client.RunProcess(a.context, "/bin/bash", []string{"-c", a.options.mcpPrepareScript}, []string{})
+	}
+
 	for _, mcpStdioServer := range a.options.mcpStdioServers {
 		client := stdio.NewClient(a.options.mcpBoxURL)
 		p, err := client.CreateProcess(a.context,

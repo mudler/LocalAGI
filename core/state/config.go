@@ -32,12 +32,13 @@ func (d DynamicPromptsConfig) ToMap() map[string]string {
 }
 
 type AgentConfig struct {
-	Connector       []ConnectorConfig      `json:"connectors" form:"connectors" `
-	Actions         []ActionsConfig        `json:"actions" form:"actions"`
-	DynamicPrompts  []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
-	MCPServers      []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
-	MCPSTDIOServers []agent.MCPSTDIOServer `json:"mcp_stdio_servers" form:"mcp_stdio_servers"`
-	MCPBoxURL       string                 `json:"mcp_box_url" form:"mcp_box_url"`
+	Connector        []ConnectorConfig      `json:"connectors" form:"connectors" `
+	Actions          []ActionsConfig        `json:"actions" form:"actions"`
+	DynamicPrompts   []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
+	MCPServers       []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
+	MCPSTDIOServers  []agent.MCPSTDIOServer `json:"mcp_stdio_servers" form:"mcp_stdio_servers"`
+	MCPPrepareScript string                 `json:"mcp_prepare_script" form:"mcp_prepare_script"`
+	MCPBoxURL        string                 `json:"mcp_box_url" form:"mcp_box_url"`
 
 	Description string `json:"description" form:"description"`
 

@@ -406,6 +406,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		WithMCPSTDIOServers(config.MCPSTDIOServers...),
 		WithMCPBoxURL(a.mcpBoxURL),
 		WithPrompts(promptBlocks...),
+		WithMCPPrepareScript(config.MCPPrepareScript),
 		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
 			Name: name,

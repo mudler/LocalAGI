@@ -58,8 +58,7 @@ func (c *Client) CreateProcess(ctx context.Context, command string, args []strin
 
 	resp, err := http.Post(url, "application/json", bytes.NewReader(reqBody))
 	if err != nil {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to start process: %w. body: %s", err, string(body))
+		return nil, fmt.Errorf("failed to start process: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -259,9 +258,10 @@ type websocketWriter struct {
 }
 
 func (w *websocketWriter) Write(p []byte) (n int, err error) {
-	err = w.conn.WriteMessage(websocket.TextMessage, p)
+	// Use BinaryMessage type for better compatibility
+	err = w.conn.WriteMessage(websocket.BinaryMessage, p)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to write WebSocket message: %w", err)
 	}
 	return len(p), nil
 }
