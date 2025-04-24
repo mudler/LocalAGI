@@ -16,7 +16,7 @@ func TestSTDIOTransport(t *testing.T) {
 var baseURL string
 
 func init() {
-	baseURL = os.Getenv("STDIO_SERVER_URL")
+	baseURL = os.Getenv("LOCALAGI_MCPBOX_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
 	}
