@@ -10,6 +10,10 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
+const (
+	MetadataBrowserAgentHistory = "browser_agent_history"
+)
+
 type BrowserAgentRunner struct {
 	baseURL, customActionName string
 	client                    *api.Client
@@ -62,7 +66,7 @@ func (b *BrowserAgentRunner) Run(ctx context.Context, params types.ActionParams)
 
 	return types.ActionResult{
 		Result:   fmt.Sprintf("Browser agent completed successfully. History:\n%s", historyStr),
-		Metadata: map[string]interface{}{"browser_agent_history": stateHistory},
+		Metadata: map[string]interface{}{MetadataBrowserAgentHistory: stateHistory},
 	}, nil
 }
 
