@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/localoperator"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
@@ -167,8 +168,38 @@ func replaceUserIDsWithNamesInMessage(api *slack.Client, message string) string 
 	return message
 }
 
-func generateAttachmentsFromJobResponse(j *types.JobResult) (attachments []slack.Attachment) {
+func generateAttachmentsFromJobResponse(j *types.JobResult, api *slack.Client, channelID, ts string) (attachments []slack.Attachment) {
 	for _, state := range j.State {
+		// coming from the browser agent
+		if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
+			if historyStruct, ok := history.(*localoperator.StateHistory); ok {
+				state := historyStruct.States[len(historyStruct.States)-1]
+				// Decode base64 screenshot and upload to Slack
+				if state.Screenshot != "" {
+					screenshotData, err := base64.StdEncoding.DecodeString(state.Screenshot)
+					if err != nil {
+						xlog.Error(fmt.Sprintf("Error decoding screenshot: %v", err))
+						continue
+					}
+
+					data := string(screenshotData)
+					// Upload the file to Slack
+					_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+						Reader:          bytes.NewReader(screenshotData),
+						FileSize:        len(data),
+						ThreadTimestamp: ts,
+						Channel:         channelID,
+						Filename:        "screenshot.png",
+						InitialComment:  "Browser Agent Screenshot",
+					})
+					if err != nil {
+						xlog.Error(fmt.Sprintf("Error uploading screenshot: %v", err))
+						continue
+					}
+				}
+			}
+		}
+
 		// coming from the search action
 		if urls, exists := state.Metadata[actions.MetadataUrls]; exists {
 			for _, url := range xstrings.UniqueSlice(urls.([]string)) {
@@ -375,7 +406,7 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 				slack.MsgOptionEnableLinkUnfurl(),
 				slack.MsgOptionText(message, true),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
-				slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+				slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, "")...),
 			)
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
@@ -387,7 +418,7 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 			slack.MsgOptionEnableLinkUnfurl(),
 			slack.MsgOptionText(res.Response, true),
 			slack.MsgOptionPostMessageParameters(postMessageParams),
-			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, "")...),
 		//	slack.MsgOptionTS(ts),
 		)
 		if err != nil {
@@ -408,7 +439,7 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
 			slack.MsgOptionText(messages[0], true),
-			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, msgTs)...),
 		)
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
@@ -435,7 +466,7 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
 			slack.MsgOptionText(finalResponse, true),
-			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res)...),
+			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, msgTs)...),
 		)
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))

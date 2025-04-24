@@ -1,4 +1,4 @@
-package api
+package localoperator
 
 import (
 	"bytes"
