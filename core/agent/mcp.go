@@ -167,10 +167,11 @@ func (a *Agent) initMCPActions() error {
 		// Create a new client
 		client := mcp.NewClient(transport)
 		xlog.Debug("Adding tools for MCP server", "server", mcpServer)
-		generatedActions, err = a.addTools(client)
+		actions, err := a.addTools(client)
 		if err != nil {
 			xlog.Error("Failed to add tools for MCP server", "server", mcpServer, "error", err.Error())
 		}
+		generatedActions = append(generatedActions, actions...)
 	}
 
 	// MCP STDIO Servers
@@ -206,10 +207,11 @@ func (a *Agent) initMCPActions() error {
 		mcpClient := mcp.NewClient(transport)
 
 		xlog.Debug("Adding tools for MCP server (stdio)", "server", mcpStdioServer)
-		generatedActions, err = a.addTools(mcpClient)
+		actions, err := a.addTools(mcpClient)
 		if err != nil {
 			xlog.Error("Failed to add tools for MCP server", "server", mcpStdioServer, "error", err.Error())
 		}
+		generatedActions = append(generatedActions, actions...)
 	}
 
 	a.mcpActions = generatedActions
