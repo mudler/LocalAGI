@@ -2,7 +2,7 @@
   <img src="./webui/react-ui/public/logo_1.png" alt="LocalAGI Logo" width="220"/>
 </p>
 
-<h3 align="center"><em>Your AI. Your Hardware. Your Rules.</em></h3>
+<h3 align="center"><em>Your AI. Your Hardware. Your Rules</em></h3>
 
 <div align="center">
   
@@ -13,9 +13,9 @@
 
 </div>
 
-We empower you building AI Agents that you can run locally, without coding.
+Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
 
-**LocalAGI** is a powerful, self-hostable AI Agent platform designed for maximum privacy and flexibility. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
+**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
 
 ## 🛡️ Take Back Your Privacy
 
@@ -37,6 +37,7 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 🖼 **Multimodal Support**: Ready for vision, text, and more.
 - 🔧 **Extensible Custom Actions**: Easily script dynamic agent behaviors in Go (interpreted, no compilation!).
 - 🛠 **Fully Customizable Models**: Use your own models or integrate seamlessly with [LocalAI](https://github.com/mudler/LocalAI).
+- 📊 **Observability**: Monitor agent status and view detailed observable updates in real-time.
 
 ## 🛠️ Quickstart
 
@@ -194,6 +195,8 @@ LocalAGI is part of the powerful Local family of privacy-focused AI tools:
 ![Web UI Dashboard](https://github.com/user-attachments/assets/a40194f9-af3a-461f-8b39-5f4612fbf221)
 ![Web UI Agent Settings](https://github.com/user-attachments/assets/fb3c3e2a-cd53-4ca8-97aa-c5da51ff1f83)
 ![Web UI Create Group](https://github.com/user-attachments/assets/102189a2-0fba-4a1e-b0cb-f99268ef8062)
+![Web UI Agent Observability](https://github.com/user-attachments/assets/f7359048-9d28-4cf1-9151-1f5556ce9235)
+
 
 ### Connectors Ready-to-Go
 
