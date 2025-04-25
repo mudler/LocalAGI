@@ -30,9 +30,15 @@ func NewDiscord(config map[string]string) *Discord {
 		duration = 5 * time.Minute
 	}
 
+	token := config["token"]
+
+	if !strings.HasPrefix(token, "Bot ") {
+		token = "Bot " + token
+	}
+
 	return &Discord{
 		conversationTracker: NewConversationTracker[string](duration),
-		token:               config["token"],
+		token:               token,
 		defaultChannel:      config["defaultChannel"],
 	}
 }
