@@ -12,6 +12,11 @@ services:
       - /dev/dri/card1
       - /dev/dri/renderD129
 
+  mcpbox:
+    extends:
+      file: docker-compose.yaml
+      service: mcpbox
+
   localrecall:
     extends:
       file: docker-compose.yaml
