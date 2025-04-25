@@ -69,6 +69,11 @@ Now you can access and manage your agents at [http://localhost:8080](http://loca
 
 Still having issues? see this Youtube video: https://youtu.be/HtVwIxW3ePg
 
+## Videos
+
+[![Creating a basic agent](https://img.youtube.com/vi/HtVwIxW3ePg/mqdefault.jpg)](https://youtu.be/HtVwIxW3ePg)
+[![Agent Observability](https://img.youtube.com/vi/v82rswGJt_M/mqdefault.jpg)](https://youtu.be/v82rswGJt_M)
+
 ## 📚🆕 Local Stack Family
 
 🆕 LocalAI is now part of a comprehensive suite of AI tools designed to work together:
@@ -179,14 +184,6 @@ Good (relatively small) models that have been tested are:
 - **✓ Developer-Friendly**: Rich APIs and intuitive interfaces.
 - **✓ Effortless Setup**: Simple Docker compose setups and pre-built binaries.
 - **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, LocalAGI has it all.
-
-## 🌐 The Local Ecosystem
-
-LocalAGI is part of the powerful Local family of privacy-focused AI tools:
-
-- [**LocalAI**](https://github.com/mudler/LocalAI): Run Large Language Models locally.
-- [**LocalRecall**](https://github.com/mudler/LocalRecall): Retrieval-Augmented Generation with local storage.
-- [**LocalAGI**](https://github.com/mudler/LocalAGI): Deploy intelligent AI agents securely and privately.
 
 ## 🌟 Screenshots
 
