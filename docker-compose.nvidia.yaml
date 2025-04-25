@@ -21,6 +21,11 @@ services:
     extends:
       file: docker-compose.yaml
       service: mcpbox
+    
+  dind:
+    extends:
+      file: docker-compose.yaml
+      service: dind
 
   localrecall:
     extends:
