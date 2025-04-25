@@ -1,6 +1,7 @@
 package agent_test
 
 import (
+	"net/url"
 	"os"
 	"testing"
 
@@ -13,15 +14,19 @@ func TestAgent(t *testing.T) {
 	RunSpecs(t, "Agent test suite")
 }
 
-var testModel = os.Getenv("LOCALAGI_MODEL")
-var apiURL = os.Getenv("LOCALAI_API_URL")
-var apiKeyURL = os.Getenv("LOCALAI_API_KEY")
+var (
+	testModel      = os.Getenv("LOCALAGI_MODEL")
+	apiURL         = os.Getenv("LOCALAI_API_URL")
+	apiKey         = os.Getenv("LOCALAI_API_KEY")
+	useRealLocalAI bool
+	clientTimeout  = "10m"
+)
+
+func isValidURL(u string) bool {
+	parsed, err := url.ParseRequestURI(u)
+	return err == nil && parsed.Scheme != "" && parsed.Host != ""
+}
 
 func init() {
-	if testModel == "" {
-		testModel = "hermes-2-pro-mistral"
-	}
-	if apiURL == "" {
-		apiURL = "http://192.168.68.113:8080"
-	}
+	useRealLocalAI = isValidURL(apiURL) && apiURL != "" && testModel != ""
 }

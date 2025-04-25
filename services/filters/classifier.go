@@ -8,7 +8,6 @@ import (
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/llm"
-	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -16,7 +15,7 @@ const FilterClassifier = "classifier"
 
 type ClassifierFilter struct {
 	name         string
-	client       *openai.Client
+	client       llm.LLMClient
 	model        string
 	description  string
 	allowOnMatch bool

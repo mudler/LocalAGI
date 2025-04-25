@@ -29,7 +29,7 @@ type Agent struct {
 	sync.Mutex
 	options   *options
 	Character Character
-	client    *openai.Client
+	client    llm.LLMClient
 	jobQueue  chan *types.Job
 	context   *types.ActionContext
 
@@ -63,7 +63,12 @@ func New(opts ...Option) (*Agent, error) {
 		return nil, fmt.Errorf("failed to set options: %v", err)
 	}
 
-	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL, options.timeout)
+	var client llm.LLMClient
+	if options.llmClient != nil {
+		client = options.llmClient
+	} else {
+		client = llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL, options.timeout)
+	}
 
 	c := context.Background()
 	if options.context != nil {
@@ -123,6 +128,11 @@ func New(opts ...Option) (*Agent, error) {
 
 func (a *Agent) SharedState() *types.AgentSharedState {
 	return a.sharedState
+}
+
+// LLMClient returns the agent's LLM client (for testing)
+func (a *Agent) LLMClient() llm.LLMClient {
+	return a.client
 }
 
 func (a *Agent) startNewConversationsConsumer() {

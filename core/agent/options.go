@@ -7,6 +7,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai"
+	"github.com/mudler/LocalAGI/pkg/llm"
 )
 
 type Option func(*options) error
@@ -19,6 +20,7 @@ type llmOptions struct {
 }
 
 type options struct {
+	llmClient llm.LLMClient
 	LLMAPI                                                                                       llmOptions
 	character                                                                                    Character
 	randomIdentityGuidance                                                                       string
@@ -66,6 +68,14 @@ type options struct {
 	parallelJobs int
 
 	lastMessageDuration time.Duration
+}
+
+// WithLLMClient allows injecting a custom LLM client (e.g. for testing)
+func WithLLMClient(client llm.LLMClient) Option {
+	return func(o *options) error {
+		o.llmClient = client
+		return nil
+	}
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
