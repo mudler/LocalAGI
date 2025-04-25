@@ -17,6 +17,11 @@ services:
               count: 1
               capabilities: [gpu]
 
+  mcpbox:
+    extends:
+      file: docker-compose.yaml
+      service: mcpbox
+
   localrecall:
     extends:
       file: docker-compose.yaml
