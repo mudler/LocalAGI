@@ -19,6 +19,7 @@ const (
 	ConnectorGithubIssues = "github-issues"
 	ConnectorGithubPRs    = "github-prs"
 	ConnectorTwitter      = "twitter"
+	ConnectorMatrix       = "matrix"
 )
 
 var AvailableConnectors = []string{
@@ -29,6 +30,7 @@ var AvailableConnectors = []string{
 	ConnectorGithubIssues,
 	ConnectorGithubPRs,
 	ConnectorTwitter,
+	ConnectorMatrix,
 }
 
 func Connectors(a *state.AgentConfig) []state.Connector {
@@ -66,6 +68,8 @@ func Connectors(a *state.AgentConfig) []state.Connector {
 				continue
 			}
 			conns = append(conns, cc)
+		case ConnectorMatrix:
+			conns = append(conns, connectors.NewMatrix(config))
 		}
 	}
 	return conns
@@ -107,6 +111,11 @@ func ConnectorsConfigMeta() []config.FieldGroup {
 			Name:   "twitter",
 			Label:  "Twitter",
 			Fields: connectors.TwitterConfigMeta(),
+		},
+		{
+			Name:   "matrix",
+			Label:  "Matrix",
+			Fields: connectors.MatrixConfigMeta(),
 		},
 	}
 }
