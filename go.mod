@@ -15,6 +15,7 @@ require (
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/metoro-io/mcp-golang v0.11.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
@@ -24,7 +25,7 @@ require (
 	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64
 	github.com/tmc/langchaingo v0.1.13
 	github.com/traefik/yaegi v0.16.1
-	github.com/valyala/fasthttp v1.60.0
+	github.com/valyala/fasthttp v1.61.0
 	golang.org/x/crypto v0.37.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
 	mvdan.cc/xurls/v2 v2.6.0
@@ -57,7 +58,6 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.12.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
@@ -86,7 +86,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.starlark.net v0.0.0-20230302034142-4b1e35fe2254 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/tools v0.31.0 // indirect
