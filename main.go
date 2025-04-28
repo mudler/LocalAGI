@@ -66,6 +66,7 @@ func main() {
 		localRAG,
 		services.Actions(map[string]string{
 			"browser-agent-runner-base-url": localOperatorBaseURL,
+			"deep-research-runner-base-url": localOperatorBaseURL,
 		}),
 		services.Connectors,
 		services.DynamicPrompts,
