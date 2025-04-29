@@ -25,7 +25,18 @@ func NewBrowserAgentRunner(config map[string]string, defaultURL string) *Browser
 		config["baseURL"] = defaultURL
 	}
 
-	client := api.NewClient(config["baseURL"], 15*time.Minute)
+	timeout := "15m"
+	if config["timeout"] != "" {
+		timeout = config["timeout"]
+	}
+
+	duration, err := time.ParseDuration(timeout)
+	if err != nil {
+		// If parsing fails, use default 15 minutes
+		duration = 15 * time.Minute
+	}
+
+	client := api.NewClient(config["baseURL"], duration)
 
 	return &BrowserAgentRunner{
 		client:           client,
@@ -117,6 +128,13 @@ func BrowserAgentRunnerConfigMeta() []config.Field {
 			Label:    "Custom Action Name",
 			Type:     config.FieldTypeText,
 			HelpText: "Custom name for this action",
+		},
+		{
+			Name:     "timeout",
+			Label:    "Client Timeout",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Client timeout duration (e.g. '15m', '1h'). Defaults to '15m' if not specified.",
 		},
 	}
 }
