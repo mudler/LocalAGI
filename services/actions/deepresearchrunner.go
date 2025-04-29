@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -24,7 +25,7 @@ func NewDeepResearchRunner(config map[string]string, defaultURL string) *DeepRes
 		config["baseURL"] = defaultURL
 	}
 
-	client := api.NewClient(config["baseURL"])
+	client := api.NewClient(config["baseURL"], 15*time.Minute)
 
 	return &DeepResearchRunner{
 		client:           client,
