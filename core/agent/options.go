@@ -24,6 +24,7 @@ type options struct {
 	randomIdentityGuidance                                                                       string
 	randomIdentity                                                                               bool
 	userActions                                                                                  types.Actions
+	jobFilters                                                                                   types.JobFilters
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
 	stripThinkingTags                                                                            bool
 
@@ -369,6 +370,13 @@ func WithRandomIdentity(guidance ...string) Option {
 func WithActions(actions ...types.Action) Option {
 	return func(o *options) error {
 		o.userActions = actions
+		return nil
+	}
+}
+
+func WithJobFilters(filters ...types.JobFilter) Option {
+	return func(o *options) error {
+		o.jobFilters = filters
 		return nil
 	}
 }

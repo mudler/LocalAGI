@@ -31,6 +31,11 @@ func (d DynamicPromptsConfig) ToMap() map[string]string {
 	return config
 }
 
+type FiltersConfig struct {
+	Type   string `json:"type"`
+	Config string `json:"config"`
+}
+
 type AgentConfig struct {
 	Connector        []ConnectorConfig      `json:"connectors" form:"connectors" `
 	Actions          []ActionsConfig        `json:"actions" form:"actions"`
@@ -39,6 +44,7 @@ type AgentConfig struct {
 	MCPSTDIOServers  []agent.MCPSTDIOServer `json:"mcp_stdio_servers" form:"mcp_stdio_servers"`
 	MCPPrepareScript string                 `json:"mcp_prepare_script" form:"mcp_prepare_script"`
 	MCPBoxURL        string                 `json:"mcp_box_url" form:"mcp_box_url"`
+	Filters          []FiltersConfig        `json:"filters" form:"filters"`
 
 	Description string `json:"description" form:"description"`
 
@@ -71,6 +77,7 @@ type AgentConfig struct {
 }
 
 type AgentConfigMeta struct {
+	Filters        []config.FieldGroup
 	Fields         []config.Field
 	Connectors     []config.FieldGroup
 	Actions        []config.FieldGroup
@@ -82,6 +89,7 @@ func NewAgentConfigMeta(
 	actionsConfig []config.FieldGroup,
 	connectorsConfig []config.FieldGroup,
 	dynamicPromptsConfig []config.FieldGroup,
+	filtersConfig []config.FieldGroup,
 ) AgentConfigMeta {
 	return AgentConfigMeta{
 		Fields: []config.Field{
@@ -319,6 +327,7 @@ func NewAgentConfigMeta(
 		DynamicPrompts: dynamicPromptsConfig,
 		Connectors:     connectorsConfig,
 		Actions:        actionsConfig,
+		Filters:        filtersConfig,
 	}
 }
 

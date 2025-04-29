@@ -70,6 +70,7 @@ func main() {
 		}),
 		services.Connectors,
 		services.DynamicPrompts,
+		services.Filters,
 		timeout,
 		withLogs,
 	)

@@ -86,9 +86,22 @@ function ObservableSummary({ observable }) {
     completionError = `Error: ${completion.error}`;
   }
 
+  let completionFilter = '';
+  if (completion?.filter_result) {
+    if (completion.filter_result?.has_triggers && !completion.filter_result?.triggered_by) {
+      completionFilter = 'Failed to match any triggers';
+    } else if (completion.filter_result?.triggered_by) {
+      completionFilter = `Triggered by ${completion.filter_result.triggered_by}`;
+    }
+
+    if (completion?.filter_result?.failed_by)
+      completionFilter = `${completionFilter ? completionFilter + ', ' : ''}Failed by ${completion.filter_result.failed_by}`;
+  }
+
   // Only show if any summary is present
   if (!creationChatMsg && !creationFunctionDef && !creationFunctionParams &&
-      !completionChatMsg && !completionConversation && !completionActionResult && !completionAgentState && !completionError) {
+      !completionChatMsg && !completionConversation && !completionActionResult && 
+      !completionAgentState && !completionError && !completionFilter) {
     return null;
   }
 
@@ -170,6 +183,12 @@ function ObservableSummary({ observable }) {
         <div title={completionError} style={{ display: 'flex', alignItems: 'center', color: '#f66', fontSize: 14 }}>
           <i className="fas fa-exclamation-triangle" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionError}</span>
+        </div>
+      )}
+      {completionFilter && (
+        <div title={completionFilter} style={{ display: 'flex', alignItems: 'center', color: '#ffd7', fontSize: 14 }}>
+          <i className="fas fa-shield-alt" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionFilter}</span>
         </div>
       )}
     </div>

@@ -38,6 +38,7 @@ type AgentPool struct {
 	availableActions                             func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                   func(*AgentConfig) []Connector
 	dynamicPrompt                                func(*AgentConfig) []DynamicPrompt
+	filters                                      func(*AgentConfig) types.JobFilters
 	timeout                                      string
 	conversationLogs                             string
 }
@@ -78,6 +79,7 @@ func NewAgentPool(
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) []DynamicPrompt,
+	filters func(*AgentConfig) types.JobFilters,
 	timeout string,
 	withLogs bool,
 ) (*AgentPool, error) {
@@ -110,6 +112,7 @@ func NewAgentPool(
 			connectors:             connectors,
 			availableActions:       availableActions,
 			dynamicPrompt:          promptBlocks,
+			filters:                filters,
 			timeout:                timeout,
 			conversationLogs:       conversationPath,
 		}, nil
@@ -135,6 +138,7 @@ func NewAgentPool(
 		connectors:             connectors,
 		localRAGAPI:            LocalRAGAPI,
 		dynamicPrompt:          promptBlocks,
+		filters:                filters,
 		availableActions:       availableActions,
 		timeout:                timeout,
 		conversationLogs:       conversationPath,
@@ -337,6 +341,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 
 	if config.Model != "" {
 		model = config.Model
+	} else {
+		config.Model = model
 	}
 
 	if config.MCPBoxURL != "" {
@@ -347,12 +353,17 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		config.PeriodicRuns = "10m"
 	}
 
+	// XXX: Why do we update the pool config from an Agent's config?
 	if config.APIURL != "" {
 		a.apiURL = config.APIURL
+	} else {
+		config.APIURL = a.apiURL
 	}
 
 	if config.APIKey != "" {
 		a.apiKey = config.APIKey
+	} else {
+		config.APIKey = a.apiKey
 	}
 
 	if config.LocalRAGURL != "" {
@@ -366,6 +377,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)
 	actions := a.availableActions(config)(ctx, a)
+	filters := a.filters(config)
 	stateFile, characterFile := a.stateFiles(name)
 
 	actionsLog := []string{}
@@ -378,6 +390,11 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		connectorLog = append(connectorLog, fmt.Sprintf("%+v", connector))
 	}
 
+	filtersLog := []string{}
+	for _, filter := range filters {
+		filtersLog = append(filtersLog, filter.Name())
+	}
+
 	xlog.Info(
 		"Creating agent",
 		"name", name,
@@ -385,6 +402,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		"api_url", a.apiURL,
 		"actions", actionsLog,
 		"connectors", connectorLog,
+		"filters", filtersLog,
 	)
 
 	// dynamicPrompts := []map[string]string{}
@@ -406,6 +424,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		WithMCPSTDIOServers(config.MCPSTDIOServers...),
 		WithMCPBoxURL(a.mcpBoxURL),
 		WithPrompts(promptBlocks...),
+		WithJobFilters(filters...),
 		WithMCPPrepareScript(config.MCPPrepareScript),
 		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
