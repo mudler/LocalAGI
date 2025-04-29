@@ -120,7 +120,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose -f docker-compose.nvidia.yaml up`
 - Default models:
-  - Text: `gemma-3-12b-it-qat`
+  - Text: `qwen3-8b`
   - Multimodal: `minicpm-v-2_6`
   - Image: `sd-1.5-ggml`
 - Environment variables:
@@ -136,7 +136,7 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose -f docker-compose.intel.yaml up`
 - Default models:
-  - Text: `gemma-3-12b-it-qat`
+  - Text: `qwen3-8b`
   - Multimodal: `minicpm-v-2_6`
   - Image: `sd-1.5-ggml`
 - Environment variables:
@@ -167,7 +167,7 @@ docker compose -f docker-compose.intel.yaml up
 ```
 
 If no models are specified, it will use the defaults:
-- Text model: `gemma-3-12b-it-qat`
+- Text model: `qwen3-8b`
 - Multimodal model: `minicpm-v-2_6`
 - Image model: `sd-1.5-ggml`
 
