@@ -19,6 +19,7 @@ const (
 	ActionSearch                         = "search"
 	ActionCustom                         = "custom"
 	ActionBrowserAgentRunner             = "browser-agent-runner"
+	ActionDeepResearchRunner             = "deep-research-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
 	ActionGithubIssueOpener              = "github-issue-opener"
 	ActionGithubIssueCloser              = "github-issue-closer"
@@ -54,6 +55,7 @@ var AvailableActions = []string{
 	ActionGithubRepositoryGet,
 	ActionGithubGetAllContent,
 	ActionBrowserAgentRunner,
+	ActionDeepResearchRunner,
 	ActionGithubRepositoryCreateOrUpdate,
 	ActionGithubIssueReader,
 	ActionGithubIssueCommenter,
@@ -121,6 +123,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubIssueSearch(config)
 	case ActionBrowserAgentRunner:
 		a = actions.NewBrowserAgentRunner(config, actionsConfigs["browser-agent-runner-base-url"])
+	case ActionDeepResearchRunner:
+		a = actions.NewDeepResearchRunner(config, actionsConfigs["deep-research-runner-base-url"])
 	case ActionGithubIssueReader:
 		a = actions.NewGithubIssueReader(config)
 	case ActionGithubPRReader:
@@ -180,6 +184,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "browser-agent-runner",
 			Label:  "Browser Agent Runner",
 			Fields: actions.BrowserAgentRunnerConfigMeta(),
+		},
+		{
+			Name:   "deep-research-runner",
+			Label:  "Deep Research Runner",
+			Fields: actions.DeepResearchRunnerConfigMeta(),
 		},
 		{
 			Name:   "generate_image",
