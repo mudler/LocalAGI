@@ -19,6 +19,7 @@ type Job struct {
 	ConversationHistory []openai.ChatCompletionMessage
 	UUID                string
 	Metadata            map[string]interface{}
+	DoneFilter          bool
 
 	pastActions         []*ActionRequest
 	nextAction          *Action

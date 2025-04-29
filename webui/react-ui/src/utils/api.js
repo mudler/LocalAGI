@@ -121,6 +121,7 @@ export const agentApi = {
         groupedMetadata.actions = metadata.Actions;
       }
       groupedMetadata.dynamicPrompts = metadata.DynamicPrompts;
+      groupedMetadata.filters = metadata.Filters;
 
       return groupedMetadata;
     }

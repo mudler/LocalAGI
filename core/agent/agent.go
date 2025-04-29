@@ -492,6 +492,73 @@ func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Me
 	return conv
 }
 
+func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
+	hasTriggers := false
+	triggeredBy := ""
+	failedBy := ""
+
+	if job.DoneFilter {
+		return true, nil
+	}
+	job.DoneFilter = true
+
+	if len(a.options.jobFilters) < 1 {
+		xlog.Debug("No filters")
+		return true, nil
+	}
+
+	for _, filter := range a.options.jobFilters {
+		name := filter.Name()
+		if triggeredBy != "" && filter.IsTrigger() {
+			continue
+		}
+
+		ok, err = filter.Apply(job)
+		if err != nil {
+			xlog.Error("Error in job filter", "filter", name, "error", err)
+			failedBy = name
+			break
+		}
+
+		if filter.IsTrigger() {
+			hasTriggers = true
+			if ok {
+				triggeredBy = name
+				xlog.Info("Job triggered by filter", "filter", name)
+			} 
+		} else if !ok {
+			failedBy = name
+			xlog.Info("Job failed filter", "filter", name)
+			break
+		} else {
+			xlog.Debug("Job passed filter", "filter", name)
+		}
+	}
+
+	if a.Observer() != nil {
+		obs := a.Observer().NewObservable()
+		obs.Name = "filter"
+		obs.Icon = "shield"
+		obs.ParentID = job.Obs.ID
+		if err == nil {
+			obs.Completion = &types.Completion{
+				FilterResult: &types.FilterResult{
+					HasTriggers: hasTriggers,
+					TriggeredBy: triggeredBy,
+					FailedBy:    failedBy,
+				},
+			}
+		} else {
+			obs.Completion = &types.Completion{
+				Error: err.Error(),
+			}
+		}
+		a.Observer().Update(*obs)
+	}
+
+	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
+}
+
 func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 
 	if err := job.GetContext().Err(); err != nil {
@@ -533,6 +600,14 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	}
 
 	conv = a.processPrompts(conv)
+	if ok, err := a.filterJob(job); !ok || err != nil {
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("Error in job filter: %w", err))
+		} else {
+			job.Result.Finish(nil)
+		}
+		return
+	}
 	conv = a.processUserInputs(job, role, conv)
 
 	// RAG

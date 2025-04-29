@@ -13,6 +13,7 @@ import FormFieldDefinition from './common/FormFieldDefinition';
  * @param {String} props.itemType - Type of items being configured ('action', 'connector', etc.)
  * @param {String} props.typeField - The field name that determines the item's type (e.g., 'name' for actions, 'type' for connectors)
  * @param {String} props.addButtonText - Text for the add button
+ * @param {String} props.saveAllFieldsAsString - Whether to save all fields as string or the appropriate JSON type
  */
 const ConfigForm = ({ 
   items = [], 
@@ -22,7 +23,8 @@ const ConfigForm = ({
   onAdd,
   itemType = 'item',
   typeField = 'type',
-  addButtonText = 'Add Item'
+  addButtonText = 'Add Item',
+  saveAllFieldsAsString = true,
 }) => {
   // Generate options from fieldGroups
   const typeOptions = [
@@ -62,8 +64,10 @@ const ConfigForm = ({
     const item = items[index];
     const config = parseConfig(item);
     
-    if (type === 'checkbox')
-      config[key] = checked ? 'true' : 'false';
+    if (type === 'number' && !saveAllFieldsAsString)
+      config[key] = Number(value);
+    else if (type === 'checkbox')
+      config[key] = saveAllFieldsAsString ? (checked ? 'true' : 'false') : checked;
     else
       config[key] = value;
     
