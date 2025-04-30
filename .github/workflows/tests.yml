@@ -30,16 +30,24 @@ jobs:
           $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
           sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
         sudo apt-get update
-        sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin make
         docker version
 
         docker run --rm hello-world
     - uses: actions/setup-go@v5
       with:
         go-version: '>=1.17.0'
+    - name: Free up disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo apt-get clean
+        docker system prune -af || true
+        df -h
+
     - name: Run tests
       run: |
-        sudo apt-get update && sudo apt-get install -y make
         make tests
     #sudo mv coverage/coverage.txt coverage.txt
     #sudo chmod 777 coverage.txt
