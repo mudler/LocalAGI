@@ -69,6 +69,7 @@ func defaultOptions() *options {
 	return &options{
 		parallelJobs: 1,
 		periodicRuns: 15 * time.Minute,
+		loopDetectionSteps: 10,
 		LLMAPI: llmOptions{
 			APIURL: "http://localhost:8080",
 			Model:  "gpt-4",

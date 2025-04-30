@@ -492,10 +492,15 @@ func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Me
 	return conv
 }
 
-func (a *Agent) consumeJob(job *types.Job, role string) {
+func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
+		return
+	}
+
+	if retries < 1 {
+		job.Result.Finish(fmt.Errorf("Exceeded recursive retries"))
 		return
 	}
 
@@ -561,7 +566,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				xlog.Error("Error generating parameters, trying again", "error", err)
 				// try again
 				job.SetNextAction(&chosenAction, nil, reasoning)
-				a.consumeJob(job, role)
+				a.consumeJob(job, role, retries - 1)
 				return
 			}
 			actionParams = p.actionParams
@@ -575,24 +580,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		if err != nil {
 			xlog.Error("Error picking action", "error", err)
 			job.Result.Finish(err)
-			return
-		}
-	}
-
-	// check if the agent is looping over the same action
-	// if so, we need to stop it
-	if a.options.loopDetectionSteps > 0 && len(job.GetPastActions()) > 0 {
-		count := map[string]int{}
-		for i := len(job.GetPastActions()) - 1; i >= 0; i-- {
-			pastAction := job.GetPastActions()[i]
-			if pastAction.Action.Definition().Name == chosenAction.Definition().Name &&
-				pastAction.Params.String() == actionParams.String() {
-				count[chosenAction.Definition().Name.String()]++
-			}
-		}
-		if count[chosenAction.Definition().Name.String()] > a.options.loopDetectionSteps {
-			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
-			a.reply(job, role, conv, actionParams, chosenAction, reasoning)
 			return
 		}
 	}
@@ -650,7 +637,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			xlog.Error("Error generating parameters, trying again", "error", err)
 			// try again
 			job.SetNextAction(&chosenAction, nil, reasoning)
-			a.consumeJob(job, role)
+			a.consumeJob(job, role, retries - 1)
 			return
 		}
 		actionParams = params.actionParams
@@ -668,6 +655,22 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		job.Result.Finish(fmt.Errorf("no parameters"))
 		xlog.Error("No parameters", "agent", a.Character.Name)
 		return
+	}
+
+	if a.options.loopDetectionSteps > 0 && len(job.GetPastActions()) > 0 {
+		count := 0
+		for _, pastAction := range job.GetPastActions() {
+			if pastAction.Action.Definition().Name == chosenAction.Definition().Name &&
+				pastAction.Params.String() == actionParams.String() {
+				count++
+			}
+		}
+		if count > a.options.loopDetectionSteps {
+			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
+			a.reply(job, role, conv, actionParams, chosenAction, reasoning)
+			return
+		}
+		xlog.Debug("Checked for loops", "action", chosenAction.Definition().Name, "count", count)
 	}
 
 	job.AddPastAction(chosenAction, &actionParams)
@@ -783,7 +786,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		// The agent decided to do another action
 		// call ourselves again
 		job.SetNextAction(&followingAction, &followingParams, reasoning)
-		a.consumeJob(job, role)
+		a.consumeJob(job, role, retries)
 		return
 	}
 
@@ -988,7 +991,7 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 		types.WithReasoningCallback(a.options.reasoningCallback),
 		types.WithResultCallback(a.options.resultCallback),
 	)
-	a.consumeJob(whatNext, SystemRole)
+	a.consumeJob(whatNext, SystemRole, a.options.loopDetectionSteps)
 
 	xlog.Info("STOP -- Periodically run is done", "agent", a.Character.Name)
 
@@ -1072,7 +1075,7 @@ func (a *Agent) run(timer *time.Timer) error {
 				<-timer.C
 			}
 			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
-			a.consumeJob(job, UserRole)
+			a.consumeJob(job, UserRole, a.options.loopDetectionSteps)
 			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
 			// Agent has been canceled, return error

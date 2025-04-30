@@ -480,13 +480,18 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		}, c...)
 	}
 
+	reasoningAction := action.NewReasoning()
 	thought, err := a.decision(job,
 		c,
-		types.Actions{action.NewReasoning()}.ToTools(),
-		action.NewReasoning().Definition().Name.String(), maxRetries)
+		types.Actions{reasoningAction}.ToTools(),
+		reasoningAction.Definition().Name.String(), maxRetries)
 	if err != nil {
 		return nil, nil, "", err
 	}
+	if thought.actioName != "" && thought.actioName != reasoningAction.Definition().Name.String() {
+		return nil, nil, "", fmt.Errorf("Expected reasoning action not: %s", thought.actioName)
+	}
+
 	originalReasoning := ""
 	response := &action.ReasoningResponse{}
 	if thought.actionParams != nil {
