@@ -566,7 +566,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 				xlog.Error("Error generating parameters, trying again", "error", err)
 				// try again
 				job.SetNextAction(&chosenAction, nil, reasoning)
-				a.consumeJob(job, role, retries - 1)
+				a.consumeJob(job, role, retries-1)
 				return
 			}
 			actionParams = p.actionParams
@@ -595,7 +595,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		if reasoning != "" {
 			conv = append(conv, openai.ChatCompletionMessage{
 				Role:    "assistant",
-				Content: reasoning,
+				Content: a.cleanupLLMResponse(reasoning),
 			})
 		} else {
 			xlog.Info("No reasoning, just reply", "agent", a.Character.Name)
@@ -604,6 +604,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 				job.Result.Finish(fmt.Errorf("error asking LLM for a reply: %w", err))
 				return
 			}
+			msg.Content = a.cleanupLLMResponse(msg.Content)
 			conv = append(conv, msg)
 			reasoning = msg.Content
 		}
@@ -637,7 +638,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 			xlog.Error("Error generating parameters, trying again", "error", err)
 			// try again
 			job.SetNextAction(&chosenAction, nil, reasoning)
-			a.consumeJob(job, role, retries - 1)
+			a.consumeJob(job, role, retries-1)
 			return
 		}
 		actionParams = params.actionParams
@@ -803,7 +804,7 @@ func stripThinkingTags(content string) string {
 	return content
 }
 
-func (a *Agent) processPrompt(content string) string {
+func (a *Agent) cleanupLLMResponse(content string) string {
 	if a.options.stripThinkingTags {
 		content = stripThinkingTags(content)
 	}
@@ -877,7 +878,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 
 		msg := openai.ChatCompletionMessage{
 			Role:    "assistant",
-			Content: a.processPrompt(replyResponse.Message),
+			Content: a.cleanupLLMResponse(replyResponse.Message),
 		}
 
 		conv = append(conv, msg)
@@ -906,10 +907,10 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 
 		msg = openai.ChatCompletionMessage{
 			Role:    "assistant",
-			Content: a.processPrompt(replyResponse.Message),
+			Content: a.cleanupLLMResponse(replyResponse.Message),
 		}
 	} else {
-		msg.Content = a.processPrompt(msg.Content)
+		msg.Content = a.cleanupLLMResponse(msg.Content)
 	}
 
 	conv = append(conv, msg)
