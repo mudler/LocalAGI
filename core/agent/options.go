@@ -25,6 +25,7 @@ type options struct {
 	randomIdentity                                                                               bool
 	userActions                                                                                  types.Actions
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
+	stripThinkingTags                                                                            bool
 
 	canStopItself         bool
 	initiateConversations bool
@@ -376,4 +377,9 @@ func WithObserver(observer Observer) Option {
 		o.observer = observer
 		return nil
 	}
+}
+
+var EnableStripThinkingTags = func(o *options) error {
+	o.stripThinkingTags = true
+	return nil
 }

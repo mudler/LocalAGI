@@ -526,6 +526,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		opts = append(opts, EnableForceReasoning)
 	}
 
+	if config.StripThinkingTags {
+		opts = append(opts, EnableStripThinkingTags)
+	}
+
 	if config.KnowledgeBaseResults > 0 {
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}

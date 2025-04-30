@@ -67,6 +67,7 @@ type AgentConfig struct {
 	LongTermMemory        bool   `json:"long_term_memory" form:"long_term_memory"`
 	SummaryLongTermMemory bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
 	ParallelJobs          int    `json:"parallel_jobs" form:"parallel_jobs"`
+	StripThinkingTags     bool   `json:"strip_thinking_tags" form:"strip_thinking_tags"`
 }
 
 type AgentConfigMeta struct {
@@ -291,6 +292,14 @@ func NewAgentConfigMeta(
 				DefaultValue: "",
 				HelpText:     "Script to prepare the MCP box",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "strip_thinking_tags",
+				Label:        "Strip Thinking Tags",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Remove content between <thinking></thinking> and <think></think> tags from agent responses",
+				Tags:         config.Tags{Section: "ModelSettings"},
 			},
 		},
 		MCPServers: []config.Field{

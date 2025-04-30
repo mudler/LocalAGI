@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -182,7 +184,7 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 	if j.Obs != nil {
 		if len(j.ConversationHistory) > 0 {
 			m := j.ConversationHistory[len(j.ConversationHistory)-1]
-			j.Obs.Creation = &types.Creation{ ChatCompletionMessage: &m }
+			j.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
 			a.observer.Update(*j.Obs)
 		}
 
@@ -788,6 +790,24 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	a.reply(job, role, conv, actionParams, chosenAction, reasoning)
 }
 
+func stripThinkingTags(content string) string {
+	// Remove content between <thinking> and </thinking>
+	content = regexp.MustCompile(`<thinking>.*?</thinking>`).ReplaceAllString(content, "")
+	// Remove content between <think> and </think>
+	content = regexp.MustCompile(`<think>.*?</think>`).ReplaceAllString(content, "")
+	// Clean up any extra whitespace
+	content = strings.TrimSpace(content)
+	return content
+}
+
+func (a *Agent) processPrompt(content string) string {
+	if a.options.stripThinkingTags {
+		content = stripThinkingTags(content)
+	}
+	// Future post-processing options can be added here
+	return content
+}
+
 func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams types.ActionParams, chosenAction types.Action, reasoning string) {
 	job.Result.Conversation = conv
 
@@ -854,7 +874,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 
 		msg := openai.ChatCompletionMessage{
 			Role:    "assistant",
-			Content: replyResponse.Message,
+			Content: a.processPrompt(replyResponse.Message),
 		}
 
 		conv = append(conv, msg)
@@ -883,8 +903,10 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 
 		msg = openai.ChatCompletionMessage{
 			Role:    "assistant",
-			Content: replyResponse.Message,
+			Content: a.processPrompt(replyResponse.Message),
 		}
+	} else {
+		msg.Content = a.processPrompt(msg.Content)
 	}
 
 	conv = append(conv, msg)
