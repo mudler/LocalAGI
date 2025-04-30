@@ -791,10 +791,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 }
 
 func stripThinkingTags(content string) string {
-	// Remove content between <thinking> and </thinking>
-	content = regexp.MustCompile(`<thinking>.*?</thinking>`).ReplaceAllString(content, "")
-	// Remove content between <think> and </think>
-	content = regexp.MustCompile(`<think>.*?</think>`).ReplaceAllString(content, "")
+	// Remove content between <thinking> and </thinking> (including multi-line)
+	content = regexp.MustCompile(`(?s)<thinking>.*?</thinking>`).ReplaceAllString(content, "")
+	// Remove content between <think> and </think> (including multi-line)
+	content = regexp.MustCompile(`(?s)<think>.*?</think>`).ReplaceAllString(content, "")
 	// Clean up any extra whitespace
 	content = strings.TrimSpace(content)
 	return content
