@@ -13,9 +13,9 @@ import (
 
 const (
 	// forkCreationRetries is the number of times to retry checking if a fork is ready
-	forkCreationRetries = 10
+	forkCreationRetries = 30
 	// forkCreationRetryDelay is the duration to wait between fork creation checks
-	forkCreationRetryDelay = 2 * time.Second
+	forkCreationRetryDelay = 5 * time.Second
 )
 
 type GithubPRCreator struct {
