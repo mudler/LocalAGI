@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAGI/core/types"
@@ -10,8 +11,16 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
+const (
+	// forkCreationRetries is the number of times to retry checking if a fork is ready
+	forkCreationRetries = 10
+	// forkCreationRetryDelay is the duration to wait between fork creation checks
+	forkCreationRetryDelay = 2 * time.Second
+)
+
 type GithubPRCreator struct {
 	token, repository, owner, customActionName, defaultBranch string
+	useFork                                                   bool
 	client                                                    *github.Client
 }
 
@@ -23,6 +32,8 @@ func NewGithubPRCreator(config map[string]string) *GithubPRCreator {
 		defaultBranch = "main" // Default to "main" if not specified
 	}
 
+	useFork := config["useFork"] == "true"
+
 	return &GithubPRCreator{
 		client:           client,
 		token:            config["token"],
@@ -30,7 +41,43 @@ func NewGithubPRCreator(config map[string]string) *GithubPRCreator {
 		owner:            config["owner"],
 		customActionName: config["customActionName"],
 		defaultBranch:    defaultBranch,
+		useFork:          useFork,
 	}
+}
+
+// ensureFork ensures that a fork exists for the given repository
+func (g *GithubPRCreator) ensureFork(ctx context.Context, owner, repo string) (string, error) {
+	// First check if we already have a fork
+	user, _, err := g.client.Users.Get(ctx, "")
+	if err != nil {
+		return "", fmt.Errorf("failed to get current user: %w", err)
+	}
+	forkOwner := user.GetLogin()
+
+	// Check if fork already exists
+	_, _, err = g.client.Repositories.Get(ctx, forkOwner, repo)
+	if err == nil {
+		// Fork already exists
+		return forkOwner, nil
+	}
+
+	// Create fork
+	_, _, err = g.client.Repositories.CreateFork(ctx, owner, repo, &github.RepositoryCreateForkOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create fork: %w", err)
+	}
+
+	// Wait for fork to be ready
+	for i := 0; i < forkCreationRetries; i++ {
+		_, _, err = g.client.Repositories.Get(ctx, forkOwner, repo)
+		if err == nil {
+			return forkOwner, nil
+		}
+		// Sleep for a bit before retrying
+		time.Sleep(forkCreationRetryDelay)
+	}
+
+	return "", fmt.Errorf("fork creation timed out")
 }
 
 func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName string, owner string, repository string) error {
@@ -128,15 +175,29 @@ func (g *GithubPRCreator) Run(ctx context.Context, params types.ActionParams) (t
 		result.BaseBranch = g.defaultBranch
 	}
 
+	var targetOwner, targetRepo string
+	if g.useFork {
+		// Ensure we have a fork and get the fork owner
+		forkOwner, err := g.ensureFork(ctx, result.Owner, result.Repository)
+		if err != nil {
+			return types.ActionResult{}, fmt.Errorf("failed to ensure fork: %w", err)
+		}
+		targetOwner = forkOwner
+		targetRepo = result.Repository
+	} else {
+		targetOwner = result.Owner
+		targetRepo = result.Repository
+	}
+
 	// Create or update branch
-	err = g.createOrUpdateBranch(ctx, result.Branch, result.Owner, result.Repository)
+	err = g.createOrUpdateBranch(ctx, result.Branch, targetOwner, targetRepo)
 	if err != nil {
 		return types.ActionResult{}, fmt.Errorf("failed to create/update branch: %w", err)
 	}
 
 	// Create or update files
 	for _, file := range result.Files {
-		err = g.createOrUpdateFile(ctx, result.Branch, file.Path, file.Content, fmt.Sprintf("Update %s", file.Path), result.Owner, result.Repository)
+		err = g.createOrUpdateFile(ctx, result.Branch, file.Path, file.Content, fmt.Sprintf("Update %s", file.Path), targetOwner, targetRepo)
 		if err != nil {
 			return types.ActionResult{}, fmt.Errorf("failed to update file %s: %w", file.Path, err)
 		}
@@ -145,7 +206,7 @@ func (g *GithubPRCreator) Run(ctx context.Context, params types.ActionParams) (t
 	// Check if PR already exists for this branch
 	prs, _, err := g.client.PullRequests.List(ctx, result.Owner, result.Repository, &github.PullRequestListOptions{
 		State: "open",
-		Head:  fmt.Sprintf("%s:%s", result.Owner, result.Branch),
+		Head:  fmt.Sprintf("%s:%s", targetOwner, result.Branch),
 	})
 	if err != nil {
 		return types.ActionResult{}, fmt.Errorf("failed to list pull requests: %w", err)
@@ -173,6 +234,12 @@ func (g *GithubPRCreator) Run(ctx context.Context, params types.ActionParams) (t
 		Body:  &result.Body,
 		Head:  &result.Branch,
 		Base:  &result.BaseBranch,
+	}
+
+	// If using a fork, we need to specify the full head reference
+	if g.useFork {
+		head := fmt.Sprintf("%s:%s", targetOwner, result.Branch)
+		newPR.Head = &head
 	}
 
 	createdPR, _, err := g.client.PullRequests.Create(ctx, result.Owner, result.Repository, newPR)
@@ -321,6 +388,13 @@ func GithubPRCreatorConfigMeta() []config.Field {
 			Type:     config.FieldTypeText,
 			Required: false,
 			HelpText: "Default branch to create PRs against (defaults to main)",
+		},
+		{
+			Name:     "useFork",
+			Label:    "Use Fork",
+			Type:     config.FieldTypeCheckbox,
+			Required: false,
+			HelpText: "Whether to create PRs from a fork (useful when you don't have write access to the repository). Set to 'true' to enable.",
 		},
 	}
 }
