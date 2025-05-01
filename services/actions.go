@@ -22,6 +22,7 @@ const (
 	ActionDeepResearchRunner             = "deep-research-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
 	ActionGithubIssueOpener              = "github-issue-opener"
+	ActionGithubIssueEditor              = "github-issue-editor"
 	ActionGithubIssueCloser              = "github-issue-closer"
 	ActionGithubIssueSearcher            = "github-issue-searcher"
 	ActionGithubRepositoryGet            = "github-repository-get-content"
@@ -50,6 +51,7 @@ var AvailableActions = []string{
 	ActionCustom,
 	ActionGithubIssueLabeler,
 	ActionGithubIssueOpener,
+	ActionGithubIssueEditor,
 	ActionGithubIssueCloser,
 	ActionGithubIssueSearcher,
 	ActionGithubRepositoryGet,
@@ -117,6 +119,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubIssueLabeler(config)
 	case ActionGithubIssueOpener:
 		a = actions.NewGithubIssueOpener(config)
+	case ActionGithubIssueEditor:
+		a = actions.NewGithubIssueEditor(config)
 	case ActionGithubIssueCloser:
 		a = actions.NewGithubIssueCloser(config)
 	case ActionGithubIssueSearcher:
@@ -204,6 +208,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "github-issue-opener",
 			Label:  "GitHub Issue Opener",
 			Fields: actions.GithubIssueOpenerConfigMeta(),
+		},
+		{
+			Name:   "github-issue-editor",
+			Label:  "GitHub Issue Editor",
+			Fields: actions.GithubIssueEditorConfigMeta(),
 		},
 		{
 			Name:   "github-issue-closer",
