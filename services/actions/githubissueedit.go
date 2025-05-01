@@ -56,7 +56,7 @@ func (g *GithubIssueEditor) Run(ctx context.Context, params types.ActionParams) 
 }
 
 func (g *GithubIssueEditor) Definition() types.ActionDefinition {
-	actionName := "edit_github_issue_description"
+	actionName := "edit_github_issue"
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
@@ -121,14 +121,14 @@ func GithubIssueEditorConfigMeta() []config.Field {
 			Name:     "repository",
 			Label:    "Repository",
 			Type:     config.FieldTypeText,
-			Required: true,
+			Required: false,
 			HelpText: "GitHub repository name",
 		},
 		{
 			Name:     "owner",
 			Label:    "Owner",
 			Type:     config.FieldTypeText,
-			Required: true,
+			Required: false,
 			HelpText: "GitHub repository owner",
 		},
 		{
