@@ -119,9 +119,7 @@ func (m *Matrix) cancelActiveJobForRoom(roomID string) {
 }
 
 func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
-	if m.roomID == "" ||
-		m.roomID != "" && !m.roomMode ||
-		m.roomID != evt.RoomID.String() { // If we have a roomID and it's not the same as the event room
+	if m.roomID != evt.RoomID.String() && m.roomMode { // If we have a roomID and it's not the same as the event room
 		// Skip messages from other rooms
 		xlog.Info("Skipping reply to room", evt.RoomID, m.roomID)
 		return
@@ -129,6 +127,22 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 
 	if evt.Sender == id.UserID(m.userID) {
 		// Skip messages from ourselves
+		return
+	}
+
+	// Skip if message does not mention the bot
+	mentioned := false
+	if evt.Content.AsMessage().Mentions != nil {
+		for _, mention := range evt.Content.AsMessage().Mentions.UserIDs {
+			if mention == m.client.UserID {
+				mentioned = true
+				break
+			}
+		}
+	}
+
+	if !mentioned && !m.roomMode {
+		xlog.Info("Skipping reply because it does not mention the bot", evt.RoomID, m.roomID)
 		return
 	}
 
@@ -217,18 +231,38 @@ func (m *Matrix) Start(a *agent.Agent) {
 		xlog.Error(fmt.Sprintf("Error creating Matrix client: %v", err))
 		return
 	}
+	xlog.Info("Matrix client created")
 	m.client = client
 
 	// Set up event handler
 	syncer := client.Syncer.(*mautrix.DefaultSyncer)
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
+		xlog.Info("Received message", evt.Content.AsMessage().Body)
 		m.handleRoomMessage(a, evt)
+	})
+
+	syncer.OnEventType(event.StateMember, func(ctx context.Context, evt *event.Event) {
+		if evt.GetStateKey() == client.UserID.String() && evt.Content.AsMember().Membership == event.MembershipInvite {
+			_, err := client.JoinRoomByID(ctx, evt.RoomID)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error joining room: %v", err))
+			}
+			xlog.Info(fmt.Sprintf("Joined room: %s (%s)", evt.RoomID.String(), evt.RoomID.URI()))
+		}
+	})
+
+	syncer.OnEventType(event.EventEncrypted, func(ctx context.Context, evt *event.Event) {
+		xlog.Info("Received encrypted message, this does not work yet", evt.RoomID.String())
+		//m.handleRoomMessage(a, evt)
 	})
 
 	// Start syncing
 	go func() {
 		for {
-			if err := client.Sync(); err != nil {
+			err := client.SyncWithContext(a.Context())
+
+			xlog.Info("Syncing")
+			if err != nil {
 				xlog.Error(fmt.Sprintf("Error syncing: %v", err))
 				time.Sleep(5 * time.Second)
 			}
