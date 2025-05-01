@@ -1,22 +1,3 @@
-<p align="center">
-  <img src="./webui/react-ui/public/logo_1.png" alt="LocalAGI Logo" width="220"/>
-</p>
-
-<h3 align="center"><em>Your AI. Your Hardware. Your Rules</em></h3>
-
-<div align="center">
-  
-[![Go Report Card](https://goreportcard.com/badge/github.com/mudler/LocalAGI)](https://goreportcard.com/report/github.com/mudler/LocalAGI)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub stars](https://img.shields.io/github/stars/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/issues)
-
-</div>
-
-Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
-
-**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
-
 ## 🛡️ Take Back Your Privacy
 
 Are you tired of AI wrappers calling out to cloud APIs, risking your privacy? So were we.
@@ -59,9 +40,9 @@ docker compose -f docker-compose.intel.yaml up
 MODEL_NAME=gemma-3-12b-it docker compose up
 
 # NVIDIA GPU setup with custom multimodal and image models
-MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
-IMAGE_MODEL=flux.1-dev-ggml \
+MODEL_NAME=gemma-3-12b-it 
+MULTIMODAL_MODEL=minicpm-v-2_6 
+IMAGE_MODEL=flux.1-dev-ggml
 docker compose -f docker-compose.nvidia.yaml up
 ```
 
@@ -154,15 +135,15 @@ You can customize the models used by LocalAGI by setting environment variables w
 MODEL_NAME=gemma-3-12b-it docker compose up
 
 # NVIDIA GPU with custom models
-MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
-IMAGE_MODEL=flux.1-dev-ggml \
+MODEL_NAME=gemma-3-12b-it 
+MULTIMODAL_MODEL=minicpm-v-2_6 
+IMAGE_MODEL=flux.1-dev-ggml
 docker compose -f docker-compose.nvidia.yaml up
 
 # Intel GPU with custom models
-MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
-IMAGE_MODEL=sd-1.5-ggml \
+MODEL_NAME=gemma-3-12b-it 
+MULTIMODAL_MODEL=minicpm-v-2_6 
+IMAGE_MODEL=sd-1.5-ggml
 docker compose -f docker-compose.intel.yaml up
 ```
 
@@ -244,16 +225,16 @@ Requirements:
 
 ```bash
 # Clone repo
-git clone https://github.com/mudler/LocalAGI.git
-cd LocalAGI
+ git clone https://github.com/mudler/LocalAGI.git
+ cd LocalAGI
 
 # Build it
-cd webui/react-ui && bun i && bun run build
-cd ../..
-go build -o localagi
+ cd webui/react-ui &amp;&amp; bun i &amp;&amp; bun run build
+ cd ../..
+ go build -o localagi
 
 # Run it
-./localagi
+ ./localagi
 ```
 
 ### Development
@@ -262,21 +243,21 @@ The development workflow is similar to the source build, but with additional ste
 
 ```bash
 # Clone repo
-git clone https://github.com/mudler/LocalAGI.git
-cd LocalAGI
+ git clone https://github.com/mudler/LocalAGI.git
+ cd LocalAGI
 
 # Install dependencies and start frontend development server
-cd webui/react-ui && bun i && bun run dev
+ cd webui/react-ui &amp;&amp; bun i &amp;&amp; bun run dev
 ```
 
 Then in separate terminal:
 
 ```bash
 # Start development server
-cd ../.. && go run main.go
+ cd ../.. &amp;&amp; go run main.go
 ```
 
-> Note: see webui/react-ui/.vite.config.js for env vars that can be used to configure the backend URL
+&gt; Note: see webui/react-ui/.vite.config.js for env vars that can be used to configure the backend URL
 
 ## CONNECTORS
 
@@ -303,8 +284,8 @@ After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/dis
   "defaultChannel": "OPTIONAL_CHANNEL_ID"
 }
 ```
-> Don't forget to enable "Message Content Intent" in Bot(tab) settings!
-> Enable " Message Content Intent " in the Bot tab!
+&gt; Don't forget to enable "Message Content Intent" in Bot(tab) settings!
+&gt; Enable " Message Content Intent " in the Bot tab!
 
 ### Slack
 
@@ -317,8 +298,8 @@ Use the included `slack.yaml` manifest to create your app, then configure:
 }
 ```
 
-- Create Oauth token bot token from "OAuth & Permissions" -> "OAuth Tokens for Your Workspace"
-- Create App level token (from "Basic Information" -> "App-Level Tokens" ( scope connections:writeRoute authorizations:read ))
+- Create Oauth token bot token from "OAuth &amp; Permissions" -&gt; "OAuth Tokens for Your Workspace"
+- Create App level token (from "Basic Information" -&gt; "App-Level Tokens" ( scope connections:writeRoute authorizations:read ))
 
 
 ### Telegram
@@ -376,95 +357,95 @@ Connect to IRC networks:
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
-| `/api/chat/:name` | POST | Send message & get response | [Example](#send-message) |
+| `/api/chat/:name` | POST | Send message &amp; get response | [Example](#send-message) |
 | `/api/notify/:name` | POST | Send notification to agent | [Example](#notify-agent) |
 | `/api/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
-| `/v1/responses` | POST | Send message & get response | [OpenAI's Responses](https://platform.openai.com/docs/api-reference/responses/create) |
+| `/v1/responses` | POST | Send message &amp; get response | [OpenAI's Responses](https://platform.openai.com/docs/api-reference/responses/create) |
 
 <details>
 <summary><strong>Curl Examples</strong></summary>
 
 #### Get All Agents
 ```bash
-curl -X GET "http://localhost:3000/api/agents"
+ curl -X GET "http://localhost:3000/api/agents"
 ```
 
 #### Get Agent Status
 ```bash
-curl -X GET "http://localhost:3000/api/agent/my-agent/status"
+ curl -X GET "http://localhost:3000/api/agent/my-agent/status"
 ```
 
 #### Create Agent
 ```bash
-curl -X POST "http://localhost:3000/api/agent/create" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "my-agent",
-    "model": "gpt-4",
-    "system_prompt": "You are an AI assistant.",
-    "enable_kb": true,
-    "enable_reasoning": true
-  }'
+ curl -X POST "http://localhost:3000/api/agent/create" \
+   -H "Content-Type: application/json" \
+   -d '{
+     "name": "my-agent",
+     "model": "gpt-4",
+     "system_prompt": "You are an AI assistant.",
+     "enable_kb": true,
+     "enable_reasoning": true
+   }'
 ```
 
 #### Delete Agent
 ```bash
-curl -X DELETE "http://localhost:3000/api/agent/my-agent"
+ curl -X DELETE "http://localhost:3000/api/agent/my-agent"
 ```
 
 #### Pause Agent
 ```bash
-curl -X PUT "http://localhost:3000/api/agent/my-agent/pause"
+ curl -X PUT "http://localhost:3000/api/agent/my-agent/pause"
 ```
 
 #### Start Agent
 ```bash
-curl -X PUT "http://localhost:3000/api/agent/my-agent/start"
+ curl -X PUT "http://localhost:3000/api/agent/my-agent/start"
 ```
 
 #### Get Agent Configuration
 ```bash
-curl -X GET "http://localhost:3000/api/agent/my-agent/config"
+ curl -X GET "http://localhost:3000/api/agent/my-agent/config"
 ```
 
 #### Update Agent Configuration
 ```bash
-curl -X PUT "http://localhost:3000/api/agent/my-agent/config" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4",
-    "system_prompt": "You are an AI assistant."
-  }'
+ curl -X PUT "http://localhost:3000/api/agent/my-agent/config" \
+   -H "Content-Type: application/json" \
+   -d '{
+     "model": "gpt-4",
+     "system_prompt": "You are an AI assistant."
+   }'
 ```
 
 #### Export Agent
 ```bash
-curl -X GET "http://localhost:3000/settings/export/my-agent" --output my-agent.json
+ curl -X GET "http://localhost:3000/settings/export/my-agent" --output my-agent.json
 ```
 
 #### Import Agent
 ```bash
-curl -X POST "http://localhost:3000/settings/import" \
-  -F "file=@/path/to/my-agent.json"
+ curl -X POST "http://localhost:3000/settings/import" \
+   -F "file=@/path/to/my-agent.json"
 ```
 
 #### Send Message
 ```bash
-curl -X POST "http://localhost:3000/api/chat/my-agent" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello, how are you today?"}'
+ curl -X POST "http://localhost:3000/api/chat/my-agent" \
+   -H "Content-Type: application/json" \
+   -d '{"message": "Hello, how are you today?"}'
 ```
 
 #### Notify Agent
 ```bash
-curl -X POST "http://localhost:3000/api/notify/my-agent" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Important notification"}'
+ curl -X POST "http://localhost:3000/api/notify/my-agent" \
+   -H "Content-Type: application/json" \
+   -d '{"message": "Important notification"}'
 ```
 
 #### Agent SSE Stream
 ```bash
-curl -N -X GET "http://localhost:3000/api/sse/my-agent"
+ curl -N -X GET "http://localhost:3000/api/sse/my-agent"
 ```
 Note: For proper SSE handling, you should use a client that supports SSE natively.
 
