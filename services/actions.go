@@ -108,6 +108,10 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	var a types.Action
 	var err error
 
+	if config == nil {
+		config = map[string]string{}
+	}
+
 	switch name {
 	case ActionCustom:
 		a, err = action.NewCustom(config, "")
