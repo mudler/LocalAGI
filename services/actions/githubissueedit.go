@@ -32,6 +32,7 @@ func (g *GithubIssueEditor) Run(ctx context.Context, params types.ActionParams) 
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
 		Description string `json:"description"`
+		Title       string `json:"title"`
 		IssueNumber int    `json:"issue_number"`
 	}{}
 	err := params.Unmarshal(&result)
@@ -46,11 +47,12 @@ func (g *GithubIssueEditor) Run(ctx context.Context, params types.ActionParams) 
 
 	_, _, err = g.client.Issues.Edit(ctx, result.Owner, result.Repository, result.IssueNumber,
 		&github.IssueRequest{
-			Body: &result.Description,
+			Body:  &result.Description,
+			Title: &result.Title,
 		})
-	resultString := fmt.Sprintf("Updated description for issue %d in repository %s/%s", result.IssueNumber, result.Owner, result.Repository)
+	resultString := fmt.Sprintf("Updated issue %d in repository %s/%s", result.IssueNumber, result.Owner, result.Repository)
 	if err != nil {
-		resultString = fmt.Sprintf("Error updating description for issue %d in repository %s/%s: %v", result.IssueNumber, result.Owner, result.Repository, err)
+		resultString = fmt.Sprintf("Error updating issue %d in repository %s/%s: %v", result.IssueNumber, result.Owner, result.Repository, err)
 	}
 	return types.ActionResult{Result: resultString}, err
 }
@@ -60,7 +62,7 @@ func (g *GithubIssueEditor) Definition() types.ActionDefinition {
 	if g.customActionName != "" {
 		actionName = g.customActionName
 	}
-	description := "Edit the description of a Github issue in a repository."
+	description := "Edit the title and description of a Github issue in a repository. Use this action after reading the issue"
 	if g.repository != "" && g.owner != "" {
 		return types.ActionDefinition{
 			Name:        types.ActionDefinitionName(actionName),
@@ -70,12 +72,16 @@ func (g *GithubIssueEditor) Definition() types.ActionDefinition {
 					Type:        jsonschema.Number,
 					Description: "The number of the issue to edit.",
 				},
+				"title": {
+					Type:        jsonschema.String,
+					Description: "The new title for the issue.",
+				},
 				"description": {
 					Type:        jsonschema.String,
 					Description: "The new description for the issue.",
 				},
 			},
-			Required: []string{"issue_number", "description"},
+			Required: []string{"issue_number", "title", "description"},
 		}
 	}
 	return types.ActionDefinition{
@@ -94,12 +100,16 @@ func (g *GithubIssueEditor) Definition() types.ActionDefinition {
 				Type:        jsonschema.String,
 				Description: "The owner of the repository.",
 			},
+			"title": {
+				Type:        jsonschema.String,
+				Description: "The new title for the issue.",
+			},
 			"description": {
 				Type:        jsonschema.String,
 				Description: "The new description for the issue.",
 			},
 		},
-		Required: []string{"issue_number", "repository", "owner", "description"},
+		Required: []string{"issue_number", "repository", "owner", "title", "description"},
 	}
 }
 
