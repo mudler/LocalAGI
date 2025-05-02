@@ -35,6 +35,8 @@ const (
 	ActionGithubPRCreator                = "github-pr-creator"
 	ActionGithubGetAllContent            = "github-get-all-repository-content"
 	ActionGithubREADME                   = "github-readme"
+	ActionGithubRepositorySearchFiles    = "github-repository-search-files"
+	ActionGithubRepositoryListFiles      = "github-repository-list-files"
 	ActionScraper                        = "scraper"
 	ActionWikipedia                      = "wikipedia"
 	ActionBrowse                         = "browse"
@@ -56,6 +58,8 @@ var AvailableActions = []string{
 	ActionGithubIssueSearcher,
 	ActionGithubRepositoryGet,
 	ActionGithubGetAllContent,
+	ActionGithubRepositorySearchFiles,
+	ActionGithubRepositoryListFiles,
 	ActionBrowserAgentRunner,
 	ActionDeepResearchRunner,
 	ActionGithubRepositoryCreateOrUpdate,
@@ -145,6 +149,10 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubPRCreator(config)
 	case ActionGithubGetAllContent:
 		a = actions.NewGithubRepositoryGetAllContent(config)
+	case ActionGithubRepositorySearchFiles:
+		a = actions.NewGithubRepositorySearchFiles(config)
+	case ActionGithubRepositoryListFiles:
+		a = actions.NewGithubRepositoryListFiles(config)
 	case ActionGithubIssueCommenter:
 		a = actions.NewGithubIssueCommenter(config)
 	case ActionGithubRepositoryGet:
@@ -247,6 +255,16 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "github-get-all-repository-content",
 			Label:  "GitHub Get All Repository Content",
 			Fields: actions.GithubRepositoryGetAllContentConfigMeta(),
+		},
+		{
+			Name:   "github-repository-search-files",
+			Label:  "GitHub Repository Search Files",
+			Fields: actions.GithubRepositorySearchFilesConfigMeta(),
+		},
+		{
+			Name:   "github-repository-list-files",
+			Label:  "GitHub Repository List Files",
+			Fields: actions.GithubRepositoryListFilesConfigMeta(),
 		},
 		{
 			Name:   "github-repository-create-or-update-content",
