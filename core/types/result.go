@@ -1,67 +1,37 @@
 package types
 
-import (
-	"sync"
+import "time"
 
-	"github.com/sashabaranov/go-openai"
-)
+// JobResult represents the result of a job
+// +k8s:deepcopy-gen=true
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=jobr
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status`
+// +kubebuilder:printcolumn:name="Created At",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// JobResult is the result of a job
 type JobResult struct {
-	sync.Mutex
-	// The result of a job
-	State        []ActionState
-	Conversation []openai.ChatCompletionMessage
+	// +kubebuilder:validation:Required
+	ID string `json:"id"`
 
-	Finalizers []func([]openai.ChatCompletionMessage)
+	// +kubebuilder:validation:Required
+	Timestamp time.Time `json:"timestamp"`
 
-	Response string
-	Error    error
-	ready    chan bool
+	// Status represents the current state of the job
+	// Possible values: Pending, Running, Succeeded, Failed, Canceled
+	Status string `json:"status"`
+
+	// +kubebuilder:validation:Required
+	Result interface{} `json:"result"`
+
+	// +kubebuilder:validation:Required
+	Error string `json:"error"`
 }
 
-// SetResult sets the result of a job
-func (j *JobResult) SetResult(text ActionState) {
-	j.Lock()
-	defer j.Unlock()
+// JobResultList is a list of JobResult
+// +k8s:deepcopy-gen=package
+// +kubebuilder:object:root=true
 
-	j.State = append(j.State, text)
-}
-
-// SetResult sets the result of a job
-func (j *JobResult) Finish(e error) {
-	j.Lock()
-	j.Error = e
-	j.Unlock()
-
-	close(j.ready)
-
-	for _, f := range j.Finalizers {
-		f(j.Conversation)
-	}
-	j.Finalizers = []func([]openai.ChatCompletionMessage){}
-}
-
-// AddFinalizer adds a finalizer to the job result
-func (j *JobResult) AddFinalizer(f func([]openai.ChatCompletionMessage)) {
-	j.Lock()
-	defer j.Unlock()
-
-	j.Finalizers = append(j.Finalizers, f)
-}
-
-// SetResult sets the result of a job
-func (j *JobResult) SetResponse(response string) {
-	j.Lock()
-	defer j.Unlock()
-
-	j.Response = response
-}
-
-// WaitResult waits for the result of a job
-func (j *JobResult) WaitResult() *JobResult {
-	<-j.ready
-	j.Lock()
-	defer j.Unlock()
-	return j
+type JobResultList struct {
+	Items []JobResult `json:"items"`
 }
