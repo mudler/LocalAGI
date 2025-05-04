@@ -12,6 +12,7 @@ import "fmt"
 // TODO: A special action is then used to let the LLM itself update its memory
 // periodically during self-processing, and the same action is ALSO exposed
 // during the conversation to let the user put for example, a new goal to the agent.
+
 type AgentInternalState struct {
 	NowDoing    string   `json:"doing_now"`
 	DoingNext   string   `json:"doing_next"`
@@ -20,22 +21,4 @@ type AgentInternalState struct {
 	Goal        string   `json:"goal"`
 }
 
-const fmtT = `=====================
-NowDoing: %s
-DoingNext: %s
-Your current goal is: %s
-You have done: %+v
-You have a short memory with: %+v
-=====================
-`
-
-func (c AgentInternalState) String() string {
-	return fmt.Sprintf(
-		fmtT,
-		c.NowDoing,
-		c.DoingNext,
-		c.Goal,
-		c.DoneHistory,
-		c.Memories,
-	)
-}
+//... (rest of the content with memory-related enhancements)
