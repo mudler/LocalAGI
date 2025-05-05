@@ -818,29 +818,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	// At this point can only be a reply action
 	xlog.Info("Computing reply", "agent", a.Character.Name)
 
-	// decode the response
-	replyResponse := action.ReplyResponse{}
-
-	if err := actionParams.Unmarshal(&replyResponse); err != nil {
-		job.Result.Conversation = conv
-		job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
-		return
-	}
-
-	// If we have already a reply from the action, just return it.
-	// Otherwise generate a full conversation to get a proper message response
-	// if chosenAction.Definition().Name.Is(action.ReplyActionName) {
-	// 	replyResponse := action.ReplyResponse{}
-	// 	if err := params.actionParams.Unmarshal(&replyResponse); err != nil {
-	// 		job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
-	// 		return
-	// 	}
-	// 	if replyResponse.Message != "" {
-	// 		job.Result.SetResponse(replyResponse.Message)
-	// 		job.Result.Finish(nil)
-	// 		return
-	// 	}
-	// }
+	forceResponsePrompt := "Reply to the user without using any tools or function calls. Just reply with the message."
 
 	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {
@@ -856,39 +834,19 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 					Role:    "system",
 					Content: prompt,
 				},
+				{
+					Role:    "system",
+					Content: forceResponsePrompt,
+				},
 			}, conv...)
 		}
-	}
-
-	// Generate a human-readable response
-	// resp, err := a.client.CreateChatCompletion(ctx,
-	// 	openai.ChatCompletionRequest{
-	// 		Model: a.options.LLMAPI.Model,
-	// 		Messages: append(conv,
-	// 			openai.ChatCompletionMessage{
-	// 				Role:    "system",
-	// 				Content: "Assistant thought: " + replyResponse.Message,
-	// 			},
-	// 		),
-	// 	},
-	// )
-
-	if replyResponse.Message != "" {
-		xlog.Info("Return reply message", "reply", replyResponse.Message, "agent", a.Character.Name)
-
-		msg := openai.ChatCompletionMessage{
-			Role:    "assistant",
-			Content: a.cleanupLLMResponse(replyResponse.Message),
-		}
-
-		conv = append(conv, msg)
-		job.Result.Conversation = conv
-		job.Result.SetResponse(msg.Content)
-		job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
-			a.saveCurrentConversation(conv)
-		})
-		job.Result.Finish(nil)
-		return
+	} else {
+		conv = append([]openai.ChatCompletionMessage{
+			{
+				Role:    "system",
+				Content: forceResponsePrompt,
+			},
+		}, conv...)
 	}
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
@@ -901,16 +859,22 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 		return
 	}
 
-	// If we didn't got any message, we can use the response from the action
-	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" {
-		xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
+	msg.Content = a.cleanupLLMResponse(msg.Content)
 
-		msg = openai.ChatCompletionMessage{
-			Role:    "assistant",
-			Content: a.cleanupLLMResponse(replyResponse.Message),
+	if msg.Content == "" {
+		// If we didn't got any message, we can use the response from the action (it should be a reply)
+
+		replyResponse := action.ReplyResponse{}
+		if err := actionParams.Unmarshal(&replyResponse); err != nil {
+			job.Result.Conversation = conv
+			job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
+			return
 		}
-	} else {
-		msg.Content = a.cleanupLLMResponse(msg.Content)
+
+		if chosenAction.Definition().Name.Is(action.ReplyActionName) && replyResponse.Message != "" {
+			xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
+			msg.Content = a.cleanupLLMResponse(replyResponse.Message)
+		}
 	}
 
 	conv = append(conv, msg)
