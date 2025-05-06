@@ -1,7 +1,9 @@
 package connectors
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +19,7 @@ import (
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/localoperator"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
@@ -114,6 +117,75 @@ func (t *Telegram) cancelActiveJobForChat(chatID int64) {
 		delete(t.activeJobs, chatID)
 		t.activeJobsMutex.Unlock()
 	}
+}
+
+// handleMultimediaContent processes and sends multimedia content from the agent's response
+func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, res *types.JobResult) ([]string, error) {
+	var urls []string
+
+	for _, state := range res.State {
+		// Collect URLs from search action
+		if urlList, exists := state.Metadata[actions.MetadataUrls]; exists {
+			urls = append(urls, xstrings.UniqueSlice(urlList.([]string))...)
+		}
+
+		// Handle images from gen image actions
+		if imagesUrls, exists := state.Metadata[actions.MetadataImages]; exists {
+			for _, url := range xstrings.UniqueSlice(imagesUrls.([]string)) {
+				xlog.Debug("Sending photo", "url", url)
+
+				resp, err := http.Get(url)
+				if err != nil {
+					xlog.Error("Error downloading image", "error", err.Error())
+					continue
+				}
+				defer resp.Body.Close()
+
+				// Send image with caption
+				_, err = t.bot.SendPhoto(ctx, &bot.SendPhotoParams{
+					ChatID: chatID,
+					Photo: &models.InputFileUpload{
+						Filename: "image.jpg",
+						Data:     resp.Body,
+					},
+					Caption: "Generated image",
+				})
+				if err != nil {
+					xlog.Error("Error sending photo", "error", err.Error())
+				}
+			}
+		}
+
+		// Handle browser agent screenshots
+		if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
+			if historyStruct, ok := history.(*localoperator.StateHistory); ok {
+				state := historyStruct.States[len(historyStruct.States)-1]
+				if state.Screenshot != "" {
+					// Decode base64 screenshot
+					screenshotData, err := base64.StdEncoding.DecodeString(state.Screenshot)
+					if err != nil {
+						xlog.Error("Error decoding screenshot", "error", err)
+						continue
+					}
+
+					// Send screenshot with caption
+					_, err = t.bot.SendPhoto(ctx, &bot.SendPhotoParams{
+						ChatID: chatID,
+						Photo: &models.InputFileUpload{
+							Filename: "screenshot.png",
+							Data:     bytes.NewReader(screenshotData),
+						},
+						Caption: "Browser Agent Screenshot",
+					})
+					if err != nil {
+						xlog.Error("Error sending screenshot", "error", err)
+					}
+				}
+			}
+		}
+	}
+
+	return urls, nil
 }
 
 func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent, update *models.Update) {
@@ -227,40 +299,29 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		},
 	)
 
+	// Handle any multimedia content in the response and collect URLs
+	urls, err := t.handleMultimediaContent(ctx, update.Message.Chat.ID, res)
+	if err != nil {
+		xlog.Error("Error handling multimedia content", "error", err)
+	}
+
+	// Prepare the final response with URLs if any
+	finalResponse := res.Response
+	if len(urls) > 0 {
+		finalResponse += "\n\nReferences:\n"
+		for i, url := range urls {
+			finalResponse += fmt.Sprintf("🔗 %d. %s\n", i+1, url)
+		}
+	}
+
 	// Update the message with the final response
 	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:    update.Message.Chat.ID,
 		MessageID: msg.ID,
-		Text:      res.Response,
+		Text:      finalResponse,
 	})
 	if err != nil {
 		xlog.Error("Error updating final message", "error", err)
-	}
-
-	// Handle any images or URLs in the response
-	for _, res := range res.State {
-		if imagesUrls, exists := res.Metadata[actions.MetadataImages]; exists {
-			for _, url := range xstrings.UniqueSlice(imagesUrls.([]string)) {
-				xlog.Debug("Sending photo", "url", url)
-
-				resp, err := http.Get(url)
-				if err != nil {
-					xlog.Error("Error downloading image", "error", err.Error())
-					continue
-				}
-				defer resp.Body.Close()
-				_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
-					ChatID: update.Message.Chat.ID,
-					Photo: &models.InputFileUpload{
-						Filename: "image.jpg",
-						Data:     resp.Body,
-					},
-				})
-				if err != nil {
-					xlog.Error("Error sending photo", "error", err.Error())
-				}
-			}
-		}
 	}
 }
 
