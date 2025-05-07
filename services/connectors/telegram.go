@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -139,14 +140,21 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 					xlog.Error("Error downloading image", "error", err.Error())
 					continue
 				}
-				defer resp.Body.Close()
+
+				// Read the entire body into memory
+				bodyBytes, err := io.ReadAll(resp.Body)
+				resp.Body.Close() // Close the response body immediately
+				if err != nil {
+					xlog.Error("Error reading image body", "error", err.Error())
+					continue
+				}
 
 				// Send image with caption
 				_, err = t.bot.SendPhoto(ctx, &bot.SendPhotoParams{
 					ChatID: chatID,
 					Photo: &models.InputFileUpload{
 						Filename: "image.jpg",
-						Data:     resp.Body,
+						Data:     bytes.NewReader(bodyBytes),
 					},
 					Caption: "Generated image",
 				})
