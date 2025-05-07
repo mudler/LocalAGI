@@ -118,7 +118,7 @@ function ActionsPlayground() {
       if (fieldType === 'checkbox') {
         value = e.target.checked;
       } else if (fieldType === 'number') {
-        value = e.target.value === '' ? '' : Number(e.target.value);
+        value = e.target.value === '' ? '' : String(e.target.value);
       } else {
         value = e.target.value;
       }
