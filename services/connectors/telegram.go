@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -119,6 +120,36 @@ func (t *Telegram) cancelActiveJobForChat(chatID int64) {
 	}
 }
 
+// sendImageToTelegram downloads and sends an image to Telegram
+func sendImageToTelegram(ctx context.Context, b *bot.Bot, chatID int64, url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("error downloading image: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the entire body into memory
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading image body: %w", err)
+	}
+
+	// Send image with caption
+	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
+		ChatID: chatID,
+		Photo: &models.InputFileUpload{
+			Filename: "image.jpg",
+			Data:     bytes.NewReader(bodyBytes),
+		},
+		Caption: "Generated image",
+	})
+	if err != nil {
+		return fmt.Errorf("error sending photo: %w", err)
+	}
+
+	return nil
+}
+
 // handleMultimediaContent processes and sends multimedia content from the agent's response
 func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, res *types.JobResult) ([]string, error) {
 	var urls []string
@@ -133,25 +164,8 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 		if imagesUrls, exists := state.Metadata[actions.MetadataImages]; exists {
 			for _, url := range xstrings.UniqueSlice(imagesUrls.([]string)) {
 				xlog.Debug("Sending photo", "url", url)
-
-				resp, err := http.Get(url)
-				if err != nil {
-					xlog.Error("Error downloading image", "error", err.Error())
-					continue
-				}
-				defer resp.Body.Close()
-
-				// Send image with caption
-				_, err = t.bot.SendPhoto(ctx, &bot.SendPhotoParams{
-					ChatID: chatID,
-					Photo: &models.InputFileUpload{
-						Filename: "image.jpg",
-						Data:     resp.Body,
-					},
-					Caption: "Generated image",
-				})
-				if err != nil {
-					xlog.Error("Error sending photo", "error", err.Error())
+				if err := sendImageToTelegram(ctx, t.bot, chatID, url); err != nil {
+					xlog.Error("Error handling image", "error", err)
 				}
 			}
 		}
@@ -188,6 +202,19 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 	return urls, nil
 }
 
+// formatResponseWithURLs formats the response text and creates message entities for URLs
+func formatResponseWithURLs(response string, urls []string) string {
+	finalResponse := response
+	if len(urls) > 0 {
+		finalResponse += "\n\nReferences:\n"
+		for i, url := range urls {
+			finalResponse += fmt.Sprintf("🔗 %d. %s\n", i+1, url)
+		}
+	}
+
+	return bot.EscapeMarkdown(finalResponse)
+}
+
 func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent, update *models.Update) {
 	username := update.Message.From.Username
 
@@ -222,8 +249,9 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 
 	// Send initial placeholder message
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   telegramThinkingMessage,
+		ChatID:    update.Message.Chat.ID,
+		Text:      bot.EscapeMarkdown(telegramThinkingMessage),
+		ParseMode: models.ParseModeMarkdown,
 	})
 	if err != nil {
 		xlog.Error("Error sending initial message", "error", err)
@@ -305,23 +333,20 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		xlog.Error("Error handling multimedia content", "error", err)
 	}
 
-	// Prepare the final response with URLs if any
-	finalResponse := res.Response
-	if len(urls) > 0 {
-		finalResponse += "\n\nReferences:\n"
-		for i, url := range urls {
-			finalResponse += fmt.Sprintf("🔗 %d. %s\n", i+1, url)
-		}
-	}
-
 	// Update the message with the final response
 	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:    update.Message.Chat.ID,
 		MessageID: msg.ID,
-		Text:      finalResponse,
+		Text:      formatResponseWithURLs(res.Response, urls),
+		ParseMode: models.ParseModeMarkdown,
 	})
 	if err != nil {
 		xlog.Error("Error updating final message", "error", err)
+		b.EditMessageText(ctx, &bot.EditMessageTextParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: msg.ID,
+			Text:      "there was an internal error. try again!",
+		})
 	}
 }
 
