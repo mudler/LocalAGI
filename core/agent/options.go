@@ -42,6 +42,10 @@ type options struct {
 	kbResults             int
 	ragdb                 RAGDB
 
+	// Evaluation settings
+	maxEvaluationLoops int
+	enableEvaluation   bool
+
 	prompts []DynamicPrompt
 
 	systemPrompt string
@@ -68,9 +72,11 @@ func (o *options) SeparatedMultimodalModel() bool {
 
 func defaultOptions() *options {
 	return &options{
-		parallelJobs: 1,
-		periodicRuns: 15 * time.Minute,
+		parallelJobs:       1,
+		periodicRuns:       15 * time.Minute,
 		loopDetectionSteps: 10,
+		maxEvaluationLoops: 2,
+		enableEvaluation:   false,
 		LLMAPI: llmOptions{
 			APIURL: "http://localhost:8080",
 			Model:  "gpt-4",
@@ -391,4 +397,18 @@ func WithObserver(observer Observer) Option {
 var EnableStripThinkingTags = func(o *options) error {
 	o.stripThinkingTags = true
 	return nil
+}
+
+func WithMaxEvaluationLoops(loops int) Option {
+	return func(o *options) error {
+		o.maxEvaluationLoops = loops
+		return nil
+	}
+}
+
+func EnableEvaluation() Option {
+	return func(o *options) error {
+		o.enableEvaluation = true
+		return nil
+	}
 }

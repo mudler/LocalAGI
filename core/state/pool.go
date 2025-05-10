@@ -561,6 +561,13 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		opts = append(opts, WithParallelJobs(config.ParallelJobs))
 	}
 
+	if config.EnableEvaluation {
+		opts = append(opts, EnableEvaluation())
+		if config.MaxEvaluationLoops > 0 {
+			opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
+		}
+	}
+
 	xlog.Info("Starting agent", "name", name, "config", config)
 
 	agent, err := New(opts...)
