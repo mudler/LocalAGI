@@ -339,7 +339,7 @@ func ActionsConfigMeta() []config.FieldGroup {
 		{
 			Name:   "call_agents",
 			Label:  "Call Agents",
-			Fields: []config.Field{},
+			Fields: actions.CallAgentConfigMeta(),
 		},
 	}
 }
