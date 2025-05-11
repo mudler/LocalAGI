@@ -28,7 +28,7 @@ type ShellAction struct {
 	customDescription string
 }
 
-func (a *ShellAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *ShellAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Command string `json:"command"`
 		Host    string `json:"host"`

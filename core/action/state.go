@@ -15,7 +15,7 @@ func NewState() *StateAction {
 
 type StateAction struct{}
 
-func (a *StateAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+func (a *StateAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	return types.ActionResult{Result: "internal state has been updated"}, nil
 }
 

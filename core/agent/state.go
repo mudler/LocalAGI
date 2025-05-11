@@ -14,10 +14,10 @@ import (
 // all information that should be displayed to the LLM
 // in the prompts
 type PromptHUD struct {
-	Character     Character                 `json:"character"`
+	Character     Character                `json:"character"`
 	CurrentState  types.AgentInternalState `json:"current_state"`
-	PermanentGoal string                    `json:"permanent_goal"`
-	ShowCharacter bool                      `json:"show_character"`
+	PermanentGoal string                   `json:"permanent_goal"`
+	ShowCharacter bool                     `json:"show_character"`
 }
 
 type Character struct {

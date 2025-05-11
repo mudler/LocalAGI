@@ -38,7 +38,7 @@ func (a *mcpAction) Plannable() bool {
 	return true
 }
 
-func (m *mcpAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (m *mcpAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	resp, err := m.mcpClient.CallTool(ctx, m.toolName, params)
 	if err != nil {
 		xlog.Error("Failed to call tool", "error", err.Error())

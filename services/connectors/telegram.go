@@ -13,7 +13,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -35,13 +34,7 @@ type Telegram struct {
 	bot   *bot.Bot
 	agent *agent.Agent
 
-	currentconversation map[int64][]openai.ChatCompletionMessage
-	lastMessageTime     map[int64]time.Time
-	lastMessageDuration time.Duration
-
 	admins []string
-
-	conversationTracker *ConversationTracker[int64]
 
 	// To track placeholder messages
 	placeholders     map[string]int // map[jobUUID]messageID
@@ -50,6 +43,8 @@ type Telegram struct {
 	// Track active jobs for cancellation
 	activeJobs      map[int64][]*types.Job // map[chatID]bool to track if a chat has active processing
 	activeJobsMutex sync.RWMutex
+
+	channelID string
 }
 
 // Send any text message to the bot after the bot has been started
@@ -219,6 +214,8 @@ func formatResponseWithURLs(response string, urls []string) string {
 func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent, update *models.Update) {
 	username := update.Message.From.Username
 
+	xlog.Debug("Received message from user", "username", username, "chatID", update.Message.Chat.ID, "message", update.Message.Text)
+
 	internalError := func(err error, msg *models.Message) {
 		xlog.Error("Error updating final message", "error", err)
 		b.EditMessageText(ctx, &bot.EditMessageTextParams{
@@ -242,14 +239,14 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 	// Cancel any active job for this chat before starting a new one
 	t.cancelActiveJobForChat(update.Message.Chat.ID)
 
-	currentConv := t.conversationTracker.GetConversation(update.Message.From.ID)
+	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("telegram:%d", update.Message.From.ID))
 	currentConv = append(currentConv, openai.ChatCompletionMessage{
 		Content: update.Message.Text,
 		Role:    "user",
 	})
 
-	t.conversationTracker.AddMessage(
-		update.Message.From.ID,
+	a.SharedState().ConversationTracker.AddMessage(
+		fmt.Sprintf("telegram:%d", update.Message.From.ID),
 		openai.ChatCompletionMessage{
 			Content: update.Message.Text,
 			Role:    "user",
@@ -328,8 +325,8 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		return
 	}
 
-	t.conversationTracker.AddMessage(
-		update.Message.From.ID,
+	a.SharedState().ConversationTracker.AddMessage(
+		fmt.Sprintf("telegram:%d", update.Message.From.ID),
 		openai.ChatCompletionMessage{
 			Content: res.Response,
 			Role:    "assistant",
@@ -408,10 +405,33 @@ func (t *Telegram) Start(a *agent.Agent) {
 	t.agent = a
 
 	// go func() {
-	// 	for m := range a.ConversationChannel() {
+	// 	forc m := range a.ConversationChannel() {
 	// 		t.handleNewMessage(ctx, b, m)
 	// 	}
 	// }()
+
+	if t.channelID != "" {
+		// handle new conversations
+		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+			xlog.Debug("Subscriber(telegram)", "message", ccm.Content)
+			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: t.channelID,
+				Text:   ccm.Content,
+			})
+			if err != nil {
+				xlog.Error("Error sending message", "error", err)
+				return
+			}
+
+			t.agent.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("telegram:%s", t.channelID),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
+		})
+	}
 
 	b.Start(ctx)
 }
@@ -422,11 +442,6 @@ func NewTelegramConnector(config map[string]string) (*Telegram, error) {
 		return nil, errors.New("token is required")
 	}
 
-	duration, err := time.ParseDuration(config["lastMessageDuration"])
-	if err != nil {
-		duration = 5 * time.Minute
-	}
-
 	admins := []string{}
 
 	if _, ok := config["admins"]; ok {
@@ -434,14 +449,11 @@ func NewTelegramConnector(config map[string]string) (*Telegram, error) {
 	}
 
 	return &Telegram{
-		Token:               token,
-		lastMessageDuration: duration,
-		admins:              admins,
-		currentconversation: map[int64][]openai.ChatCompletionMessage{},
-		lastMessageTime:     map[int64]time.Time{},
-		conversationTracker: NewConversationTracker[int64](duration),
-		placeholders:        make(map[string]int),
-		activeJobs:          make(map[int64][]*types.Job),
+		Token:        token,
+		admins:       admins,
+		placeholders: make(map[string]int),
+		activeJobs:   make(map[int64][]*types.Job),
+		channelID:    config["channel_id"],
 	}, nil
 }
 
@@ -461,10 +473,10 @@ func TelegramConfigMeta() []config.Field {
 			HelpText: "Comma-separated list of Telegram usernames that are allowed to interact with the bot",
 		},
 		{
-			Name:         "lastMessageDuration",
-			Label:        "Last Message Duration",
-			Type:         config.FieldTypeText,
-			DefaultValue: "5m",
+			Name:     "channel_id",
+			Label:    "Channel ID",
+			Type:     config.FieldTypeText,
+			HelpText: "Telegram channel ID to send messages to if the agent needs to initiate a conversation",
 		},
 	}
 }

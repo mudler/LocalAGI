@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/localoperator"
@@ -42,27 +41,19 @@ type Slack struct {
 	// Track active jobs for cancellation
 	activeJobs      map[string][]*types.Job // map[channelID]bool to track if a channel has active processing
 	activeJobsMutex sync.RWMutex
-
-	conversationTracker *ConversationTracker[string]
 }
 
 const thinkingMessage = ":hourglass: thinking..."
 
 func NewSlack(config map[string]string) *Slack {
 
-	duration, err := time.ParseDuration(config["lastMessageDuration"])
-	if err != nil {
-		duration = 5 * time.Minute
-	}
-
 	return &Slack{
-		appToken:            config["appToken"],
-		botToken:            config["botToken"],
-		channelID:           config["channelID"],
-		channelMode:         config["channelMode"] == "true",
-		conversationTracker: NewConversationTracker[string](duration),
-		placeholders:        make(map[string]string),
-		activeJobs:          make(map[string][]*types.Job),
+		appToken:     config["appToken"],
+		botToken:     config["botToken"],
+		channelID:    config["channelID"],
+		channelMode:  config["channelMode"] == "true",
+		placeholders: make(map[string]string),
+		activeJobs:   make(map[string][]*types.Job),
 	}
 }
 
@@ -138,16 +129,6 @@ func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) strin
 	cleaned = strings.ReplaceAll(cleaned, "<@"+b.BotID+">", "")
 	cleaned = strings.TrimSpace(cleaned)
 	return cleaned
-}
-
-func extractUserIDsFromMessage(message string) []string {
-	var userIDs []string
-	for _, part := range strings.Split(message, " ") {
-		if strings.HasPrefix(part, "<@") && strings.HasSuffix(part, ">") {
-			userIDs = append(userIDs, strings.TrimPrefix(strings.TrimSuffix(part, ">"), "<@"))
-		}
-	}
-	return userIDs
 }
 
 func replaceUserIDsWithNamesInMessage(api *slack.Client, message string) string {
@@ -279,7 +260,7 @@ func (t *Slack) handleChannelMessage(
 	// Cancel any active job for this channel before starting a new one
 	t.cancelActiveJobForChannel(ev.Channel)
 
-	currentConv := t.conversationTracker.GetConversation(t.channelID)
+	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("slack:%s", t.channelID))
 
 	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
 
@@ -323,8 +304,8 @@ func (t *Slack) handleChannelMessage(
 			})
 		}
 
-		t.conversationTracker.AddMessage(
-			t.channelID, currentConv[len(currentConv)-1],
+		a.SharedState().ConversationTracker.AddMessage(
+			fmt.Sprintf("slack:%s", t.channelID), currentConv[len(currentConv)-1],
 		)
 
 		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
@@ -370,14 +351,14 @@ func (t *Slack) handleChannelMessage(
 			return
 		}
 
-		t.conversationTracker.AddMessage(
-			t.channelID, openai.ChatCompletionMessage{
+		a.SharedState().ConversationTracker.AddMessage(
+			fmt.Sprintf("slack:%s", t.channelID), openai.ChatCompletionMessage{
 				Role:    "assistant",
 				Content: res.Response,
 			},
 		)
 
-		xlog.Debug("After adding message to conversation tracker", "conversation", t.conversationTracker.GetConversation(t.channelID))
+		xlog.Debug("After adding message to conversation tracker", "conversation", a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("slack:%s", t.channelID)))
 
 		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
 
@@ -752,6 +733,13 @@ func (t *Slack) Start(a *agent.Agent) {
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 			}
+			a.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("slack:%s", t.channelID),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
 		})
 	}
 
@@ -834,12 +822,6 @@ func SlackConfigMeta() []config.Field {
 			Name:  "alwaysReply",
 			Label: "Always Reply",
 			Type:  config.FieldTypeCheckbox,
-		},
-		{
-			Name:         "lastMessageDuration",
-			Label:        "Last Message Duration",
-			Type:         config.FieldTypeText,
-			DefaultValue: "5m",
 		},
 	}
 }

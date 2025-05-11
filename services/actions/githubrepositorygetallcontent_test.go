@@ -45,7 +45,7 @@ var _ = Describe("GithubRepositoryGetAllContent", func() {
 				"path": ".",
 			}
 
-			result, err := action.Run(ctx, params)
+			result, err := action.Run(ctx, nil, params)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Result).NotTo(BeEmpty())
 
@@ -64,7 +64,7 @@ var _ = Describe("GithubRepositoryGetAllContent", func() {
 				"path": "non-existent-path",
 			}
 
-			_, err := action.Run(ctx, params)
+			_, err := action.Run(ctx, nil, params)
 			Expect(err).To(HaveOccurred())
 		})
 	})

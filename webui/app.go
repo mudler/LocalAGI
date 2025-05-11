@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mudler/LocalAGI/core/conversations"
 	coreTypes "github.com/mudler/LocalAGI/core/types"
+	internalTypes "github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/llm"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services"
-	"github.com/mudler/LocalAGI/services/connectors"
 	"github.com/mudler/LocalAGI/webui/types"
+
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 
@@ -33,6 +35,7 @@ type (
 		htmx   *htmx.HTMX
 		config *Config
 		*fiber.App
+		sharedState *internalTypes.AgentSharedState
 	}
 )
 
@@ -47,9 +50,10 @@ func NewApp(opts ...Option) *App {
 	})
 
 	a := &App{
-		htmx:   htmx.New(),
-		config: config,
-		App:    webapp,
+		htmx:        htmx.New(),
+		config:      config,
+		App:         webapp,
+		sharedState: internalTypes.NewAgentSharedState(5 * time.Minute),
 	}
 
 	a.registerRoutes(config.Pool, webapp)
@@ -443,7 +447,7 @@ func (a *App) GetActionDefinition(pool *state.AgentPool) func(c *fiber.Ctx) erro
 	}
 }
 
-func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (app *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		payload := struct {
 			Config map[string]string      `json:"config"`
@@ -467,7 +471,7 @@ func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(c.Context(), 200*time.Second)
 		defer cancel()
 
-		res, err := a.Run(ctx, payload.Params)
+		res, err := a.Run(ctx, app.sharedState, payload.Params)
 		if err != nil {
 			xlog.Error("Error running action", "error", err)
 			return errorJSONMessage(c, err.Error())
@@ -484,7 +488,7 @@ func (a *App) ListActions() func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Responses(pool *state.AgentPool, tracker *connectors.ConversationTracker[string]) func(c *fiber.Ctx) error {
+func (a *App) Responses(pool *state.AgentPool, tracker *conversations.ConversationTracker[string]) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		var request types.RequestBody
 		if err := c.BodyParser(&request); err != nil {

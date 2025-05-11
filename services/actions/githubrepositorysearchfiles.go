@@ -71,7 +71,7 @@ func (g *GithubRepositorySearchFiles) searchFilesRecursively(ctx context.Context
 	return result.String(), nil
 }
 
-func (g *GithubRepositorySearchFiles) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubRepositorySearchFiles) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository    string `json:"repository"`
 		Owner         string `json:"owner"`

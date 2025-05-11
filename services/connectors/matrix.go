@@ -31,27 +31,20 @@ type Matrix struct {
 	// Track active jobs for cancellation
 	activeJobs      map[string][]*types.Job // map[roomID]bool to track if a room has active processing
 	activeJobsMutex sync.RWMutex
-
-	conversationTracker *ConversationTracker[string]
 }
 
 const matrixThinkingMessage = "🤔 thinking..."
 
 func NewMatrix(config map[string]string) *Matrix {
-	duration, err := time.ParseDuration(config["lastMessageDuration"])
-	if err != nil {
-		duration = 5 * time.Minute
-	}
 
 	return &Matrix{
-		homeserverURL:       config["homeserverURL"],
-		userID:              config["userID"],
-		accessToken:         config["accessToken"],
-		roomID:              config["roomID"],
-		roomMode:            config["roomMode"] == "true",
-		conversationTracker: NewConversationTracker[string](duration),
-		placeholders:        make(map[string]string),
-		activeJobs:          make(map[string][]*types.Job),
+		homeserverURL: config["homeserverURL"],
+		userID:        config["userID"],
+		accessToken:   config["accessToken"],
+		roomID:        config["roomID"],
+		roomMode:      config["roomMode"] == "true",
+		placeholders:  make(map[string]string),
+		activeJobs:    make(map[string][]*types.Job),
 	}
 }
 
@@ -149,7 +142,7 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 	// Cancel any active job for this room before starting a new one
 	m.cancelActiveJobForRoom(evt.RoomID.String())
 
-	currentConv := m.conversationTracker.GetConversation(evt.RoomID.String())
+	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("matrix:%s", evt.RoomID.String()))
 
 	message := evt.Content.AsMessage().Body
 
@@ -163,8 +156,8 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 			Content: message,
 		})
 
-		m.conversationTracker.AddMessage(
-			evt.RoomID.String(), currentConv[len(currentConv)-1],
+		a.SharedState().ConversationTracker.AddMessage(
+			fmt.Sprintf("matrix:%s", evt.RoomID.String()), currentConv[len(currentConv)-1],
 		)
 
 		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
@@ -209,8 +202,8 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 			return
 		}
 
-		m.conversationTracker.AddMessage(
-			evt.RoomID.String(), openai.ChatCompletionMessage{
+		a.SharedState().ConversationTracker.AddMessage(
+			fmt.Sprintf("matrix:%s", evt.RoomID.String()), openai.ChatCompletionMessage{
 				Role:    "assistant",
 				Content: res.Response,
 			},
@@ -306,12 +299,6 @@ func MatrixConfigMeta() []config.Field {
 			Name:  "roomMode",
 			Label: "Room Mode",
 			Type:  config.FieldTypeCheckbox,
-		},
-		{
-			Name:         "lastMessageDuration",
-			Label:        "Last Message Duration",
-			Type:         config.FieldTypeText,
-			DefaultValue: "5m",
 		},
 	}
 }

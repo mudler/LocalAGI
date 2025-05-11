@@ -64,6 +64,8 @@ type options struct {
 
 	observer     Observer
 	parallelJobs int
+
+	lastMessageDuration time.Duration
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -147,6 +149,17 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 	return func(o *options) error {
 		o.enableKB = true
 		o.kbResults = results
+		return nil
+	}
+}
+
+func WithLastMessageDuration(duration string) Option {
+	return func(o *options) error {
+		d, err := time.ParseDuration(duration)
+		if err != nil {
+			d = types.DefaultLastMessageDuration
+		}
+		o.lastMessageDuration = d
 		return nil
 	}
 }
