@@ -74,6 +74,8 @@ type AgentConfig struct {
 	SummaryLongTermMemory bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
 	ParallelJobs          int    `json:"parallel_jobs" form:"parallel_jobs"`
 	StripThinkingTags     bool   `json:"strip_thinking_tags" form:"strip_thinking_tags"`
+	EnableEvaluation      bool   `json:"enable_evaluation" form:"enable_evaluation"`
+	MaxEvaluationLoops    int    `json:"max_evaluation_loops" form:"max_evaluation_loops"`
 }
 
 type AgentConfigMeta struct {
@@ -308,6 +310,24 @@ func NewAgentConfigMeta(
 				DefaultValue: false,
 				HelpText:     "Remove content between <thinking></thinking> and <think></think> tags from agent responses",
 				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "enable_evaluation",
+				Label:        "Enable Evaluation",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Enable automatic evaluation of agent responses to ensure they meet user requirements",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "max_evaluation_loops",
+				Label:        "Max Evaluation Loops",
+				Type:         "number",
+				DefaultValue: 2,
+				Min:          1,
+				Step:         1,
+				HelpText:     "Maximum number of evaluation loops to perform when addressing gaps in responses",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 		},
 		MCPServers: []config.Field{

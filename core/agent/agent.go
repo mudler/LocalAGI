@@ -525,7 +525,7 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 			if ok {
 				triggeredBy = name
 				xlog.Info("Job triggered by filter", "filter", name)
-			} 
+			}
 		} else if !ok {
 			failedBy = name
 			xlog.Info("Job failed filter", "filter", name)
@@ -560,7 +560,6 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 }
 
 func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
-
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
 		return
@@ -659,12 +658,9 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		}
 	}
 
-	//xlog.Debug("Picked action", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "reasoning", reasoning)
 	if chosenAction == nil {
 		// If no action was picked up, the reasoning is the message returned by the assistant
 		// so we can consume it as if it was a reply.
-		//job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
-		//job.Result.Finish(fmt.Errorf("no action to do"))\
 		xlog.Info("No action to do, just reply", "agent", a.Character.Name, "reasoning", reasoning)
 
 		if reasoning != "" {
@@ -682,6 +678,23 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 			msg.Content = a.cleanupLLMResponse(msg.Content)
 			conv = append(conv, msg)
 			reasoning = msg.Content
+		}
+
+		var satisfied bool
+		var err error
+		// Evaluate the response
+		satisfied, conv, err = a.handleEvaluation(job, conv, job.GetEvaluationLoop())
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("error evaluating response: %w", err))
+			return
+		}
+
+		if !satisfied {
+			// If not satisfied, continue with the conversation
+			job.ConversationHistory = conv
+			job.IncrementEvaluationLoop()
+			a.consumeJob(job, role, retries)
+			return
 		}
 
 		xlog.Debug("Finish job with reasoning", "reasoning", reasoning, "agent", a.Character.Name, "conversation", fmt.Sprintf("%+v", conv))
@@ -773,8 +786,6 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)
 	if err != nil {
 		xlog.Error("error handling planning", "error", err)
-		//job.Result.Conversation = conv
-		//job.Result.SetResponse(msg.Content)
 		a.reply(job, role, append(conv, openai.ChatCompletionMessage{
 			Role:    "assistant",
 			Content: fmt.Sprintf("Error handling planning: %v", err),
@@ -821,9 +832,6 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
 		result, err := a.runAction(job, chosenAction, actionParams)
 		if err != nil {
-			//job.Result.Finish(fmt.Errorf("error running action: %w", err))
-			//return
-			// make the LLM aware of the error of running the action instead of stopping the job here
 			result.Result = fmt.Sprintf("Error running tool: %v", err)
 		}
 
@@ -862,6 +870,22 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		// The agent decided to do another action
 		// call ourselves again
 		job.SetNextAction(&followingAction, &followingParams, reasoning)
+		a.consumeJob(job, role, retries)
+		return
+	}
+
+	// Evaluate the final response
+	var satisfied bool
+	satisfied, conv, err = a.handleEvaluation(job, conv, job.GetEvaluationLoop())
+	if err != nil {
+		job.Result.Finish(fmt.Errorf("error evaluating response: %w", err))
+		return
+	}
+
+	if !satisfied {
+		// If not satisfied, continue with the conversation
+		job.ConversationHistory = conv
+		job.IncrementEvaluationLoop()
 		a.consumeJob(job, role, retries)
 		return
 	}

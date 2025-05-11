@@ -247,7 +247,7 @@ func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agen
 		ImagePrompt string `json:"image_prompt"`
 	}
 
-	err := llm.GenerateTypedJSON(
+	err := llm.GenerateTypedJSONWithGuidance(
 		context.Background(),
 		llm.NewClient(APIKey, APIURL, "10m"),
 		"Generate a prompt that I can use to create a random avatar for the bot '"+agent.Name+"', the description of the bot is: "+agent.Description,
@@ -559,6 +559,13 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 
 	if config.ParallelJobs > 0 {
 		opts = append(opts, WithParallelJobs(config.ParallelJobs))
+	}
+
+	if config.EnableEvaluation {
+		opts = append(opts, EnableEvaluation())
+		if config.MaxEvaluationLoops > 0 {
+			opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
+		}
 	}
 
 	xlog.Info("Starting agent", "name", name, "config", config)

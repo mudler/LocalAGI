@@ -78,7 +78,7 @@ func (f *ClassifierFilter) Apply(job *types.Job) (bool, error) {
 	var result struct {
 		Asserted bool `json:"answer"`
 	}
-	err := llm.GenerateTypedJSON(job.GetContext(), f.client, guidance, f.model, jsonschema.Definition{
+	err := llm.GenerateTypedJSONWithGuidance(job.GetContext(), f.client, guidance, f.model, jsonschema.Definition{
 		Type: jsonschema.Object,
 		Properties: map[string]jsonschema.Definition{
 			"answer": {

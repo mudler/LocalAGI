@@ -576,7 +576,7 @@ func (a *App) GenerateGroupProfiles(pool *state.AgentPool) func(c *fiber.Ctx) er
 
 		xlog.Debug("Generating group", "description", request.Descript)
 		client := llm.NewClient(a.config.LLMAPIKey, a.config.LLMAPIURL, "10m")
-		err := llm.GenerateTypedJSON(c.Context(), client, request.Descript, a.config.LLMModel, jsonschema.Definition{
+		err := llm.GenerateTypedJSONWithGuidance(c.Context(), client, request.Descript, a.config.LLMModel, jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
 				"agents": {

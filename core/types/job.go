@@ -162,23 +162,23 @@ func newUUID() string {
 // To wait for a Job result, use JobResult.WaitResult()
 func NewJob(opts ...JobOption) *Job {
 	j := &Job{
-		Result: NewJobResult(),
-		UUID:   newUUID(),
-	}
-	for _, o := range opts {
-		o(j)
-	}
-
-	var ctx context.Context
-	if j.context == nil {
-		ctx = context.Background()
-	} else {
-		ctx = j.context
+		Result:              NewJobResult(),
+		UUID:                uuid.New().String(),
+		Metadata:            make(map[string]interface{}),
+		context:             context.Background(),
+		ConversationHistory: []openai.ChatCompletionMessage{},
 	}
 
-	context, cancel := context.WithCancel(ctx)
-	j.context = context
+	for _, opt := range opts {
+		opt(j)
+	}
+
+	// Store the original request if it exists in the conversation history
+
+	ctx, cancel := context.WithCancel(j.context)
+	j.context = ctx
 	j.cancel = cancel
+
 	return j
 }
 
@@ -206,4 +206,24 @@ func WithObservable(obs *Observable) JobOption {
 	return func(j *Job) {
 		j.Obs = obs
 	}
+}
+
+// GetEvaluationLoop returns the current evaluation loop count
+func (j *Job) GetEvaluationLoop() int {
+	if j.Metadata == nil {
+		j.Metadata = make(map[string]interface{})
+	}
+	if loop, ok := j.Metadata["evaluation_loop"].(int); ok {
+		return loop
+	}
+	return 0
+}
+
+// IncrementEvaluationLoop increments the evaluation loop count
+func (j *Job) IncrementEvaluationLoop() {
+	if j.Metadata == nil {
+		j.Metadata = make(map[string]interface{})
+	}
+	currentLoop := j.GetEvaluationLoop()
+	j.Metadata["evaluation_loop"] = currentLoop + 1
 }
