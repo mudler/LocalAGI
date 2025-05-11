@@ -46,6 +46,7 @@ const (
 	ActionCounter                        = "counter"
 	ActionCallAgents                     = "call_agents"
 	ActionShellcommand                   = "shell-command"
+	ActionSendTelegramMessage            = "send-telegram-message"
 )
 
 var AvailableActions = []string{
@@ -79,6 +80,7 @@ var AvailableActions = []string{
 	ActionCounter,
 	ActionCallAgents,
 	ActionShellcommand,
+	ActionSendTelegramMessage,
 }
 
 func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
@@ -177,6 +179,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewCallAgent(config, agentName, pool.InternalAPI())
 	case ActionShellcommand:
 		a = actions.NewShell(config)
+	case ActionSendTelegramMessage:
+		a = actions.NewSendTelegramMessageRunner(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -340,6 +344,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "call_agents",
 			Label:  "Call Agents",
 			Fields: actions.CallAgentConfigMeta(),
+		},
+		{
+			Name:   "send-telegram-message",
+			Label:  "Send Telegram Message",
+			Fields: actions.SendTelegramMessageConfigMeta(),
 		},
 	}
 }
