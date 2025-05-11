@@ -131,16 +131,6 @@ func cleanUpUsernameFromMessage(message string, b *slack.AuthTestResponse) strin
 	return cleaned
 }
 
-func extractUserIDsFromMessage(message string) []string {
-	var userIDs []string
-	for _, part := range strings.Split(message, " ") {
-		if strings.HasPrefix(part, "<@") && strings.HasSuffix(part, ">") {
-			userIDs = append(userIDs, strings.TrimPrefix(strings.TrimSuffix(part, ">"), "<@"))
-		}
-	}
-	return userIDs
-}
-
 func replaceUserIDsWithNamesInMessage(api *slack.Client, message string) string {
 	for _, part := range strings.Split(message, " ") {
 		if strings.HasPrefix(part, "<@") && strings.HasSuffix(part, ">") {
