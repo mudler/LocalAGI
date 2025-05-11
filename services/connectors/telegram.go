@@ -28,6 +28,7 @@ import (
 )
 
 const telegramThinkingMessage = "🤔 thinking..."
+const telegramMaxMessageLength = 3000
 
 type Telegram struct {
 	Token string
@@ -218,6 +219,14 @@ func formatResponseWithURLs(response string, urls []string) string {
 func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent, update *models.Update) {
 	username := update.Message.From.Username
 
+	internalError := func(err error, msg *models.Message) {
+		xlog.Error("Error updating final message", "error", err)
+		b.EditMessageText(ctx, &bot.EditMessageTextParams{
+			ChatID:    update.Message.Chat.ID,
+			MessageID: msg.ID,
+			Text:      "there was an internal error. try again!",
+		})
+	}
 	if len(t.admins) > 0 && !slices.Contains(t.admins, username) {
 		xlog.Info("Unauthorized user", "username", username)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
@@ -334,19 +343,38 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 	}
 
 	// Update the message with the final response
+	formattedResponse := formatResponseWithURLs(res.Response, urls)
+
+	// Split the message if it's too long
+	messages := xstrings.SplitParagraph(formattedResponse, telegramMaxMessageLength)
+
+	if len(messages) == 0 {
+		internalError(errors.New("empty response from agent"), msg)
+		return
+	}
+
+	// Update the first message
 	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:    update.Message.Chat.ID,
 		MessageID: msg.ID,
-		Text:      formatResponseWithURLs(res.Response, urls),
+		Text:      messages[0],
 		ParseMode: models.ParseModeMarkdown,
 	})
 	if err != nil {
-		xlog.Error("Error updating final message", "error", err)
-		b.EditMessageText(ctx, &bot.EditMessageTextParams{
+		internalError(fmt.Errorf("internal error: %w", err), msg)
+		return
+	}
+
+	// Send additional chunks as new messages
+	for i := 1; i < len(messages); i++ {
+		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID:    update.Message.Chat.ID,
-			MessageID: msg.ID,
-			Text:      "there was an internal error. try again!",
+			Text:      messages[i],
+			ParseMode: models.ParseModeMarkdown,
 		})
+		if err != nil {
+			internalError(fmt.Errorf("internal error: %w", err), msg)
+		}
 	}
 }
 
