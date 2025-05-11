@@ -261,6 +261,145 @@ go build -o localagi
 ./localagi
 ```
 
+### Using as a Library
+
+LocalAGI can be used as a Go library to programmatically create and manage AI agents. Let's start with a simple example of creating a single agent:
+
+```go
+import (
+    "github.com/mudler/LocalAGI/core/agent"
+    "github.com/mudler/LocalAGI/core/types"
+)
+
+// Create a new agent with basic configuration
+agent, err := agent.New(
+    agent.WithModel("gpt-4"),
+    agent.WithLLMAPIURL("http://localhost:8080"),
+    agent.WithLLMAPIKey("your-api-key"),
+    agent.WithSystemPrompt("You are a helpful assistant."),
+    agent.WithCharacter(agent.Character{
+        Name: "my-agent",
+    }),
+    agent.WithActions(
+        // Add your custom actions here
+    ),
+    agent.WithStateFile("./state/my-agent.state.json"),
+    agent.WithCharacterFile("./state/my-agent.character.json"),
+    agent.WithTimeout("10m"),
+    agent.EnableKnowledgeBase(),
+    agent.EnableReasoning(),
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+// Start the agent
+go func() {
+    if err := agent.Run(); err != nil {
+        log.Printf("Agent stopped: %v", err)
+    }
+}()
+
+// Stop the agent when done
+agent.Stop()
+```
+
+This basic example shows how to:
+- Create a single agent with essential configuration
+- Set up the agent's model and API connection
+- Configure basic features like knowledge base and reasoning
+- Start and stop the agent
+
+#### Advanced Usage with Agent Pools
+
+For managing multiple agents, you can use the AgentPool system:
+
+```go
+import (
+    "github.com/mudler/LocalAGI/core/state"
+    "github.com/mudler/LocalAGI/core/types"
+)
+
+// Create a new agent pool
+pool, err := state.NewAgentPool(
+    "default-model",           // default model name
+    "default-multimodal-model", // default multimodal model
+    "image-model",            // image generation model
+    "http://localhost:8080",  // API URL
+    "your-api-key",          // API key
+    "./state",               // state directory
+    "",                      // MCP box URL (optional)
+    "http://localhost:8081", // LocalRAG API URL
+    func(config *AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action {
+        // Define available actions for agents
+        return func(ctx context.Context, pool *AgentPool) []types.Action {
+            return []types.Action{
+                // Add your custom actions here
+            }
+        }
+    },
+    func(config *AgentConfig) []Connector {
+        // Define connectors for agents
+        return []Connector{
+            // Add your custom connectors here
+        }
+    },
+    func(config *AgentConfig) []DynamicPrompt {
+        // Define dynamic prompts for agents
+        return []DynamicPrompt{
+            // Add your custom prompts here
+        }
+    },
+    func(config *AgentConfig) types.JobFilters {
+        // Define job filters for agents
+        return types.JobFilters{
+            // Add your custom filters here
+        }
+    },
+    "10m", // timeout
+    true,  // enable conversation logs
+)
+
+// Create a new agent in the pool
+agentConfig := &AgentConfig{
+    Name: "my-agent",
+    Model: "gpt-4",
+    SystemPrompt: "You are a helpful assistant.",
+    EnableKnowledgeBase: true,
+    EnableReasoning: true,
+    // Add more configuration options as needed
+}
+
+err = pool.CreateAgent("my-agent", agentConfig)
+
+// Start all agents
+err = pool.StartAll()
+
+// Get agent status
+status := pool.GetStatusHistory("my-agent")
+
+// Stop an agent
+pool.Stop("my-agent")
+
+// Remove an agent
+err = pool.Remove("my-agent")
+```
+
+Key features available through the library:
+
+- **Single Agent Management**: Create and manage individual agents with basic configuration
+- **Agent Pool Management**: Create, start, stop, and remove multiple agents
+- **Configuration**: Customize agent behavior through AgentConfig
+- **Actions**: Define custom actions for agents to perform
+- **Connectors**: Add custom connectors for external services
+- **Dynamic Prompts**: Create dynamic prompt templates
+- **Job Filters**: Implement custom job filtering logic
+- **Status Tracking**: Monitor agent status and history
+- **State Persistence**: Automatic state saving and loading
+
+For more details about available configuration options and features, refer to the [Agent Configuration Reference](#agent-configuration-reference) section.
+
 ### Development
 
 The development workflow is similar to the source build, but with additional steps for hot reloading of the frontend:
