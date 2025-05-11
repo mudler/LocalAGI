@@ -439,7 +439,8 @@ cd ../.. && go run main.go
 
 Link your agents to the services you already use. Configuration examples below.
 
-### GitHub Issues
+<details>
+<summary><strong>GitHub Issues</strong></summary>
 
 ```json
 {
@@ -449,8 +450,10 @@ Link your agents to the services you already use. Configuration examples below.
   "botUserName": "bot-username"
 }
 ```
+</details>
 
-### Discord
+<details>
+<summary><strong>Discord</strong></summary>
 
 After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/discord.html):
 
@@ -462,8 +465,10 @@ After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/dis
 ```
 > Don't forget to enable "Message Content Intent" in Bot(tab) settings!
 > Enable " Message Content Intent " in the Bot tab!
+</details>
 
-### Slack
+<details>
+<summary><strong>Slack</strong></summary>
 
 Use the included `slack.yaml` manifest to create your app, then configure:
 
@@ -476,9 +481,10 @@ Use the included `slack.yaml` manifest to create your app, then configure:
 
 - Create Oauth token bot token from "OAuth & Permissions" -> "OAuth Tokens for Your Workspace"
 - Create App level token (from "Basic Information" -> "App-Level Tokens" ( scope connections:writeRoute authorizations:read ))
+</details>
 
-
-### Telegram
+<details>
+<summary><strong>Telegram</strong></summary>
 
 Get a token from @botfather, then:
 
@@ -487,8 +493,10 @@ Get a token from @botfather, then:
   "token": "your-bot-father-token" 
 }
 ```
+</details>
 
-### IRC
+<details>
+<summary><strong>IRC</strong></summary>
 
 Connect to IRC networks:
 
@@ -501,10 +509,12 @@ Connect to IRC networks:
   "alwaysReply": "false"
 }
 ```
+</details>
 
 ## REST API
 
-### Agent Management
+<details>
+<summary><strong>Agent Management</strong></summary>
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
@@ -519,8 +529,10 @@ Connect to IRC networks:
 | `/api/meta/agent/config` | GET | Get agent configuration metadata | |
 | `/settings/export/:name` | GET | Export agent config | [Example](#export-agent) |
 | `/settings/import` | POST | Import agent config | [Example](#import-agent) |
+</details>
 
-### Actions and Groups
+<details>
+<summary><strong>Actions and Groups</strong></summary>
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
@@ -528,8 +540,10 @@ Connect to IRC networks:
 | `/api/action/:name/run` | POST | Execute an action | |
 | `/api/agent/group/generateProfiles` | POST | Generate group profiles | |
 | `/api/agent/group/create` | POST | Create a new agent group | |
+</details>
 
-### Chat Interactions
+<details>
+<summary><strong>Chat Interactions</strong></summary>
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
@@ -537,6 +551,7 @@ Connect to IRC networks:
 | `/api/notify/:name` | POST | Send notification to agent | [Example](#notify-agent) |
 | `/api/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
 | `/v1/responses` | POST | Send message & get response | [OpenAI's Responses](https://platform.openai.com/docs/api-reference/responses/create) |
+</details>
 
 <details>
 <summary><strong>Curl Examples</strong></summary>
@@ -624,10 +639,12 @@ curl -X POST "http://localhost:3000/api/notify/my-agent" \
 curl -N -X GET "http://localhost:3000/api/sse/my-agent"
 ```
 Note: For proper SSE handling, you should use a client that supports SSE natively.
-
 </details>
 
 ### Agent Configuration Reference
+
+<details>
+<summary><strong>Configuration Structure</strong></summary>
 
 The agent configuration defines how an agent behaves and what capabilities it has. You can view the available configuration options and their descriptions by using the metadata endpoint:
 
@@ -661,6 +678,25 @@ Here's an example of the agent configuration structure:
   "summary_long_term_memory": false
 }
 ```
+</details>
+
+<details>
+<summary><strong>Environment Configuration</strong></summary>
+
+LocalAGI supports environment configurations. Note that these environment variables needs to be specified in the localagi container in the docker-compose file to have effect.
+
+| Variable | What It Does |
+|----------|--------------|
+| `LOCALAGI_MODEL` | Your go-to model |
+| `LOCALAGI_MULTIMODAL_MODEL` | Optional model for multimodal capabilities |
+| `LOCALAGI_LLM_API_URL` | OpenAI-compatible API server URL |
+| `LOCALAGI_LLM_API_KEY` | API authentication |
+| `LOCALAGI_TIMEOUT` | Request timeout settings |
+| `LOCALAGI_STATE_DIR` | Where state gets stored |
+| `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
+| `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
+| `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
+</details>
 
 ## LICENSE
 
