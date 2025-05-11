@@ -265,6 +265,9 @@ go build -o localagi
 
 LocalAGI can be used as a Go library to programmatically create and manage AI agents. Let's start with a simple example of creating a single agent:
 
+<details>
+<summary><strong>Basic Usage: Single Agent</strong></summary>
+
 ```go
 import (
     "github.com/mudler/LocalAGI/core/agent"
@@ -311,7 +314,10 @@ This basic example shows how to:
 - Configure basic features like knowledge base and reasoning
 - Start and stop the agent
 
-#### Advanced Usage with Agent Pools
+</details>
+
+<details>
+<summary><strong>Advanced Usage: Agent Pools</strong></summary>
 
 For managing multiple agents, you can use the AgentPool system:
 
@@ -386,6 +392,11 @@ pool.Stop("my-agent")
 err = pool.Remove("my-agent")
 ```
 
+</details>
+
+<details>
+<summary><strong>Available Features</strong></summary>
+
 Key features available through the library:
 
 - **Single Agent Management**: Create and manage individual agents with basic configuration
@@ -399,6 +410,8 @@ Key features available through the library:
 - **State Persistence**: Automatic state saving and loading
 
 For more details about available configuration options and features, refer to the [Agent Configuration Reference](#agent-configuration-reference) section.
+
+</details>
 
 ### Development
 
