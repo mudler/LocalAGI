@@ -733,6 +733,13 @@ func (t *Slack) Start(a *agent.Agent) {
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 			}
+			a.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("slack:%s", t.channelID),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
 		})
 	}
 

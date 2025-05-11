@@ -43,6 +43,8 @@ type Telegram struct {
 	// Track active jobs for cancellation
 	activeJobs      map[int64][]*types.Job // map[chatID]bool to track if a chat has active processing
 	activeJobsMutex sync.RWMutex
+
+	channelID string
 }
 
 // Send any text message to the bot after the bot has been started
@@ -403,10 +405,33 @@ func (t *Telegram) Start(a *agent.Agent) {
 	t.agent = a
 
 	// go func() {
-	// 	for m := range a.ConversationChannel() {
+	// 	forc m := range a.ConversationChannel() {
 	// 		t.handleNewMessage(ctx, b, m)
 	// 	}
 	// }()
+
+	if t.channelID != "" {
+		// handle new conversations
+		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+			xlog.Debug("Subscriber(telegram)", "message", ccm.Content)
+			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: t.channelID,
+				Text:   ccm.Content,
+			})
+			if err != nil {
+				xlog.Error("Error sending message", "error", err)
+				return
+			}
+
+			t.agent.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("telegram:%s", t.channelID),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
+		})
+	}
 
 	b.Start(ctx)
 }
@@ -428,6 +453,7 @@ func NewTelegramConnector(config map[string]string) (*Telegram, error) {
 		admins:       admins,
 		placeholders: make(map[string]int),
 		activeJobs:   make(map[int64][]*types.Job),
+		channelID:    config["channel_id"],
 	}, nil
 }
 
@@ -445,6 +471,12 @@ func TelegramConfigMeta() []config.Field {
 			Label:    "Admins",
 			Type:     config.FieldTypeText,
 			HelpText: "Comma-separated list of Telegram usernames that are allowed to interact with the bot",
+		},
+		{
+			Name:     "channel_id",
+			Label:    "Channel ID",
+			Type:     config.FieldTypeText,
+			HelpText: "Telegram channel ID to send messages to if the agent needs to initiate a conversation",
 		},
 	}
 }
