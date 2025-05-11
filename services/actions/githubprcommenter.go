@@ -3,8 +3,6 @@ package actions
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strconv"
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAGI/core/types"
@@ -15,96 +13,6 @@ import (
 type GithubPRCommenter struct {
 	token, repository, owner, customActionName string
 	client                                     *github.Client
-}
-
-var (
-	patchRegex = regexp.MustCompile(`^@@.*\d [\+\-](\d+),?(\d+)?.+?@@`)
-)
-
-type commitFileInfo struct {
-	FileName  string
-	hunkInfos []*hunkInfo
-	sha       string
-}
-
-type hunkInfo struct {
-	hunkStart int
-	hunkEnd   int
-}
-
-func (hi hunkInfo) isLineInHunk(line int) bool {
-	return line >= hi.hunkStart && line <= hi.hunkEnd
-}
-
-func (cfi *commitFileInfo) getHunkInfo(line int) *hunkInfo {
-	for _, hunkInfo := range cfi.hunkInfos {
-		if hunkInfo.isLineInHunk(line) {
-			return hunkInfo
-		}
-	}
-	return nil
-}
-
-func (cfi *commitFileInfo) isLineInChange(line int) bool {
-	return cfi.getHunkInfo(line) != nil
-}
-
-func (cfi commitFileInfo) calculatePosition(line int) *int {
-	hi := cfi.getHunkInfo(line)
-	if hi == nil {
-		return nil
-	}
-	position := line - hi.hunkStart
-	return &position
-}
-
-func parseHunkPositions(patch, filename string) ([]*hunkInfo, error) {
-	hunkInfos := make([]*hunkInfo, 0)
-	if patch != "" {
-		groups := patchRegex.FindAllStringSubmatch(patch, -1)
-		if len(groups) < 1 {
-			return hunkInfos, fmt.Errorf("the patch details for [%s] could not be resolved", filename)
-		}
-		for _, patchGroup := range groups {
-			endPos := 2
-			if len(patchGroup) > 2 && patchGroup[2] == "" {
-				endPos = 1
-			}
-
-			hunkStart, err := strconv.Atoi(patchGroup[1])
-			if err != nil {
-				hunkStart = -1
-			}
-			hunkEnd, err := strconv.Atoi(patchGroup[endPos])
-			if err != nil {
-				hunkEnd = -1
-			}
-			hunkInfos = append(hunkInfos, &hunkInfo{
-				hunkStart: hunkStart,
-				hunkEnd:   hunkEnd,
-			})
-		}
-	}
-	return hunkInfos, nil
-}
-
-func getCommitInfo(file *github.CommitFile) (*commitFileInfo, error) {
-	patch := file.GetPatch()
-	hunkInfos, err := parseHunkPositions(patch, *file.Filename)
-	if err != nil {
-		return nil, err
-	}
-
-	sha := file.GetSHA()
-	if sha == "" {
-		return nil, fmt.Errorf("the sha details for [%s] could not be resolved", *file.Filename)
-	}
-
-	return &commitFileInfo{
-		FileName:  *file.Filename,
-		hunkInfos: hunkInfos,
-		sha:       sha,
-	}, nil
 }
 
 func NewGithubPRCommenter(config map[string]string) *GithubPRCommenter {
@@ -119,7 +27,7 @@ func NewGithubPRCommenter(config map[string]string) *GithubPRCommenter {
 	}
 }
 
-func (g *GithubPRCommenter) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubPRCommenter) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`

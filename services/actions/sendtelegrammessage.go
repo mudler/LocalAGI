@@ -10,6 +10,7 @@ import (
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
+	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -19,9 +20,11 @@ const (
 )
 
 type SendTelegramMessageRunner struct {
-	token  string
-	chatID int64
-	bot    *bot.Bot
+	token             string
+	chatID            int64
+	bot               *bot.Bot
+	customName        string
+	customDescription string
 }
 
 func NewSendTelegramMessageRunner(config map[string]string) *SendTelegramMessageRunner {
@@ -46,9 +49,11 @@ func NewSendTelegramMessageRunner(config map[string]string) *SendTelegramMessage
 	}
 
 	return &SendTelegramMessageRunner{
-		token:  token,
-		chatID: chatID,
-		bot:    b,
+		token:             token,
+		chatID:            chatID,
+		bot:               b,
+		customName:        config["custom_name"],
+		customDescription: config["custom_description"],
 	}
 }
 
@@ -57,7 +62,7 @@ type TelegramMessageParams struct {
 	Message string `json:"message"`
 }
 
-func (s *SendTelegramMessageRunner) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (s *SendTelegramMessageRunner) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	var messageParams TelegramMessageParams
 	err := params.Unmarshal(&messageParams)
 	if err != nil {
@@ -95,6 +100,11 @@ func (s *SendTelegramMessageRunner) Run(ctx context.Context, params types.Action
 		}
 	}
 
+	sharedState.ConversationTracker.AddMessage(fmt.Sprintf("telegram:%d", messageParams.ChatID), openai.ChatCompletionMessage{
+		Content: messageParams.Message,
+		Role:    "assistant",
+	})
+
 	return types.ActionResult{
 		Result: fmt.Sprintf("Message sent successfully to chat ID %d in %d parts", messageParams.ChatID, len(messages)),
 		Metadata: map[string]interface{}{
@@ -104,10 +114,21 @@ func (s *SendTelegramMessageRunner) Run(ctx context.Context, params types.Action
 }
 
 func (s *SendTelegramMessageRunner) Definition() types.ActionDefinition {
+
+	customName := "send_telegram_message"
+	if s.customName != "" {
+		customName = s.customName
+	}
+
+	customDescription := "Send a message to a Telegram user or group"
+	if s.customDescription != "" {
+		customDescription = s.customDescription
+	}
+
 	if s.chatID != 0 {
 		return types.ActionDefinition{
-			Name:        "send_telegram_message",
-			Description: "Send a message to a Telegram user or group",
+			Name:        types.ActionDefinitionName(customName),
+			Description: customDescription,
 			Properties: map[string]jsonschema.Definition{
 				"message": {
 					Type:        jsonschema.String,
@@ -119,8 +140,8 @@ func (s *SendTelegramMessageRunner) Definition() types.ActionDefinition {
 	}
 
 	return types.ActionDefinition{
-		Name:        "send_telegram_message",
-		Description: "Send a message to a Telegram user or group",
+		Name:        types.ActionDefinitionName(customName),
+		Description: customDescription,
 		Properties: map[string]jsonschema.Definition{
 			"chat_id": {
 				Type:        jsonschema.Number,
@@ -155,6 +176,20 @@ func SendTelegramMessageConfigMeta() []config.Field {
 			Type:     config.FieldTypeText,
 			Required: false,
 			HelpText: "Default Telegram chat ID to send messages to (can be overridden in parameters)",
+		},
+		{
+			Name:     "custom_name",
+			Label:    "Custom Name",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Custom name for the action (optional, defaults to 'send_telegram_message')",
+		},
+		{
+			Name:     "custom_description",
+			Label:    "Custom Description",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Custom description for the action (optional, defaults to 'Send a message to a Telegram user or group')",
 		},
 	}
 }

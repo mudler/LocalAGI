@@ -462,6 +462,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		}),
 		WithSystemPrompt(config.SystemPrompt),
 		WithMultimodalModel(multimodalModel),
+		WithLastMessageDuration(config.LastMessageDuration),
 		WithAgentResultCallback(func(state types.ActionState) {
 			a.Lock()
 			if _, ok := a.agentStatus[name]; !ok {

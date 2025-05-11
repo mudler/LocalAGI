@@ -45,7 +45,7 @@ func NewBrowserAgentRunner(config map[string]string, defaultURL string) *Browser
 	}
 }
 
-func (b *BrowserAgentRunner) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (b *BrowserAgentRunner) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := api.AgentRequest{}
 	err := params.Unmarshal(&result)
 	if err != nil {

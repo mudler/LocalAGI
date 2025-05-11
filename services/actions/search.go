@@ -35,7 +35,7 @@ func NewSearch(config map[string]string) *SearchAction {
 
 type SearchAction struct{ results int }
 
-func (a *SearchAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *SearchAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Query string `json:"query"`
 	}{}

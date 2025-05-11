@@ -88,7 +88,7 @@ func (a ActionDefinition) ToFunctionDefinition() *openai.FunctionDefinition {
 
 // Actions is something the agent can do
 type Action interface {
-	Run(ctx context.Context, action ActionParams) (ActionResult, error)
+	Run(ctx context.Context, sharedState *AgentSharedState, action ActionParams) (ActionResult, error)
 	Definition() ActionDefinition
 	Plannable() bool
 }

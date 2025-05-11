@@ -22,7 +22,7 @@ type ReplyResponse struct {
 	Message string `json:"message"`
 }
 
-func (a *ReplyAction) Run(context.Context, types.ActionParams) (string, error) {
+func (a *ReplyAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (string, error) {
 	return "no-op", nil
 }
 

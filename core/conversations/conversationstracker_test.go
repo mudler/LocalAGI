@@ -1,9 +1,9 @@
-package connectors_test
+package conversations_test
 
 import (
 	"time"
 
-	"github.com/mudler/LocalAGI/services/connectors"
+	"github.com/mudler/LocalAGI/core/conversations"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sashabaranov/go-openai"
@@ -11,13 +11,13 @@ import (
 
 var _ = Describe("ConversationTracker", func() {
 	var (
-		tracker  *connectors.ConversationTracker[string]
+		tracker  *conversations.ConversationTracker[string]
 		duration time.Duration
 	)
 
 	BeforeEach(func() {
 		duration = 1 * time.Second
-		tracker = connectors.NewConversationTracker[string](duration)
+		tracker = conversations.NewConversationTracker[string](duration)
 	})
 
 	It("should initialize with empty conversations", func() {
@@ -81,8 +81,8 @@ var _ = Describe("ConversationTracker", func() {
 	})
 
 	It("should handle different key types", func() {
-		trackerInt := connectors.NewConversationTracker[int](duration)
-		trackerInt64 := connectors.NewConversationTracker[int64](duration)
+		trackerInt := conversations.NewConversationTracker[int](duration)
+		trackerInt64 := conversations.NewConversationTracker[int64](duration)
 
 		message := openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,

@@ -28,7 +28,7 @@ type SendMailAction struct {
 	smtpPort string
 }
 
-func (a *SendMailAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *SendMailAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Message string `json:"message"`
 		To      string `json:"to"`

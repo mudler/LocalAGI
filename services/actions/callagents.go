@@ -52,7 +52,7 @@ type CallAgentAction struct {
 	blacklist []string
 }
 
-func (a *CallAgentAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *CallAgentAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		AgentName string `json:"agent_name"`
 		Message   string `json:"message"`

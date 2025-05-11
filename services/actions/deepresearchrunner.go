@@ -45,7 +45,7 @@ func NewDeepResearchRunner(config map[string]string, defaultURL string) *DeepRes
 	}
 }
 
-func (d *DeepResearchRunner) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (d *DeepResearchRunner) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := api.DeepResearchRequest{}
 	err := params.Unmarshal(&result)
 	if err != nil {

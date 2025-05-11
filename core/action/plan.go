@@ -30,7 +30,7 @@ type PlanSubtask struct {
 	Reasoning string `json:"reasoning"`
 }
 
-func (a *PlanAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+func (a *PlanAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	return types.ActionResult{}, nil
 }
 

@@ -15,7 +15,7 @@ func NewWikipedia(config map[string]string) *WikipediaAction {
 
 type WikipediaAction struct{}
 
-func (a *WikipediaAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *WikipediaAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Query string `json:"query"`
 	}{}

@@ -76,7 +76,7 @@ return []string{"foo"}
 				Description: "A test action",
 			}))
 
-			runResult, err := customAction.Run(context.Background(), types.ActionParams{
+			runResult, err := customAction.Run(context.Background(), nil, types.ActionParams{
 				"Foo": "bar",
 			})
 			Expect(err).ToNot(HaveOccurred())

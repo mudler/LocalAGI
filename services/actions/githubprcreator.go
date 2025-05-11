@@ -148,7 +148,7 @@ func (g *GithubPRCreator) createOrUpdateFile(ctx context.Context, branch string,
 	return nil
 }
 
-func (g *GithubPRCreator) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubPRCreator) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`

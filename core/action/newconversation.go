@@ -19,7 +19,7 @@ type ConversationActionResponse struct {
 	Message string `json:"message"`
 }
 
-func (a *ConversationAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+func (a *ConversationAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	return types.ActionResult{}, nil
 }
 

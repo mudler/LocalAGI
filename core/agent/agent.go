@@ -46,6 +46,8 @@ type Agent struct {
 	newMessagesSubscribers []func(openai.ChatCompletionMessage)
 
 	observer Observer
+
+	sharedState *types.AgentSharedState
 }
 
 type RAGDB interface {
@@ -78,6 +80,7 @@ func New(opts ...Option) (*Agent, error) {
 		context:                types.NewActionContext(ctx, cancel),
 		newConversations:       make(chan openai.ChatCompletionMessage),
 		newMessagesSubscribers: options.newConversationsSubscribers,
+		sharedState:            types.NewAgentSharedState(options.lastMessageDuration),
 	}
 
 	// Initialize observer if provided
@@ -116,6 +119,10 @@ func New(opts ...Option) (*Agent, error) {
 	)
 
 	return a, nil
+}
+
+func (a *Agent) SharedState() *types.AgentSharedState {
+	return a.sharedState
 }
 
 func (a *Agent) startNewConversationsConsumer() {
@@ -294,7 +301,7 @@ func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params type
 
 	for _, act := range a.availableActions() {
 		if act.Definition().Name == chosenAction.Definition().Name {
-			res, err := act.Run(job.GetContext(), params)
+			res, err := act.Run(job.GetContext(), a.sharedState, params)
 			if err != nil {
 				if obs != nil {
 					obs.Completion = &types.Completion{

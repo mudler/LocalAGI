@@ -25,7 +25,7 @@ func NewGithubRepositoryREADME(config map[string]string) *GithubRepositoryREADME
 	}
 }
 
-func (g *GithubRepositoryREADME) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubRepositoryREADME) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`

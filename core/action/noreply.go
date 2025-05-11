@@ -16,7 +16,7 @@ func NewStop() *StopAction {
 
 type StopAction struct{}
 
-func (a *StopAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+func (a *StopAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	return types.ActionResult{}, nil
 }
 

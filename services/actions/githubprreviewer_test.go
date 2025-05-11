@@ -58,7 +58,7 @@ var _ = Describe("GithubPRReviewer", func() {
 				},
 			}
 
-			result, err := reviewer.Run(ctx, params)
+			result, err := reviewer.Run(ctx, nil, params)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Result).To(ContainSubstring("reviewed successfully"))
 		})
@@ -70,7 +70,7 @@ var _ = Describe("GithubPRReviewer", func() {
 				"review_action":  "COMMENT",
 			}
 
-			result, err := reviewer.Run(ctx, params)
+			result, err := reviewer.Run(ctx, nil, params)
 			Expect(err).To(HaveOccurred())
 			Expect(result.Result).To(ContainSubstring("not found"))
 		})
@@ -85,7 +85,7 @@ var _ = Describe("GithubPRReviewer", func() {
 				"review_action":  "INVALID_ACTION",
 			}
 
-			_, err := reviewer.Run(ctx, params)
+			_, err := reviewer.Run(ctx, nil, params)
 			Expect(err).To(HaveOccurred())
 		})
 	})

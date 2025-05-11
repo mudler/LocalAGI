@@ -48,12 +48,13 @@ type AgentConfig struct {
 
 	Description string `json:"description" form:"description"`
 
-	Model           string `json:"model" form:"model"`
-	MultimodalModel string `json:"multimodal_model" form:"multimodal_model"`
-	APIURL          string `json:"api_url" form:"api_url"`
-	APIKey          string `json:"api_key" form:"api_key"`
-	LocalRAGURL     string `json:"local_rag_url" form:"local_rag_url"`
-	LocalRAGAPIKey  string `json:"local_rag_api_key" form:"local_rag_api_key"`
+	Model               string `json:"model" form:"model"`
+	MultimodalModel     string `json:"multimodal_model" form:"multimodal_model"`
+	APIURL              string `json:"api_url" form:"api_url"`
+	APIKey              string `json:"api_key" form:"api_key"`
+	LocalRAGURL         string `json:"local_rag_url" form:"local_rag_url"`
+	LocalRAGAPIKey      string `json:"local_rag_api_key" form:"local_rag_api_key"`
+	LastMessageDuration string `json:"last_message_duration" form:"last_message_duration"`
 
 	Name                  string `json:"name" form:"name"`
 	HUD                   bool   `json:"hud" form:"hud"`
@@ -327,6 +328,14 @@ func NewAgentConfigMeta(
 				Min:          1,
 				Step:         1,
 				HelpText:     "Maximum number of evaluation loops to perform when addressing gaps in responses",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "last_message_duration",
+				Label:        "Last Message Duration",
+				Type:         "text",
+				DefaultValue: "5m",
+				HelpText:     "Duration for the last message to be considered in the conversation",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 		},

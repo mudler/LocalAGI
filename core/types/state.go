@@ -1,6 +1,11 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+
+	"github.com/mudler/LocalAGI/core/conversations"
+)
 
 // State is the structure
 // that is used to keep track of the current state
@@ -18,6 +23,23 @@ type AgentInternalState struct {
 	DoneHistory []string `json:"done_history"`
 	Memories    []string `json:"memories"`
 	Goal        string   `json:"goal"`
+}
+
+const (
+	DefaultLastMessageDuration = 5 * time.Minute
+)
+
+type AgentSharedState struct {
+	ConversationTracker *conversations.ConversationTracker[string] `json:"conversation_tracker"`
+}
+
+func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
+	if lastMessageDuration == 0 {
+		lastMessageDuration = DefaultLastMessageDuration
+	}
+	return &AgentSharedState{
+		ConversationTracker: conversations.NewConversationTracker[string](lastMessageDuration),
+	}
 }
 
 const fmtT = `=====================

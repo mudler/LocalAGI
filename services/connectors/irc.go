@@ -15,28 +15,22 @@ import (
 )
 
 type IRC struct {
-	server              string
-	port                string
-	nickname            string
-	channel             string
-	conn                *irc.Connection
-	alwaysReply         bool
-	conversationTracker *ConversationTracker[string]
+	server      string
+	port        string
+	nickname    string
+	channel     string
+	conn        *irc.Connection
+	alwaysReply bool
 }
 
 func NewIRC(config map[string]string) *IRC {
 
-	duration, err := time.ParseDuration(config["lastMessageDuration"])
-	if err != nil {
-		duration = 5 * time.Minute
-	}
 	return &IRC{
-		server:              config["server"],
-		port:                config["port"],
-		nickname:            config["nickname"],
-		channel:             config["channel"],
-		alwaysReply:         config["alwaysReply"] == "true",
-		conversationTracker: NewConversationTracker[string](duration),
+		server:      config["server"],
+		port:        config["port"],
+		nickname:    config["nickname"],
+		channel:     config["channel"],
+		alwaysReply: config["alwaysReply"] == "true",
 	}
 }
 
@@ -115,7 +109,7 @@ func (i *IRC) Start(a *agent.Agent) {
 		cleanedMessage := cleanUpMessage(message, i.nickname)
 
 		go func() {
-			conv := i.conversationTracker.GetConversation(channel)
+			conv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("irc:%s", channel))
 
 			conv = append(conv,
 				openai.ChatCompletionMessage{
@@ -125,7 +119,7 @@ func (i *IRC) Start(a *agent.Agent) {
 			)
 
 			// Update the conversation history
-			i.conversationTracker.AddMessage(channel, openai.ChatCompletionMessage{
+			a.SharedState().ConversationTracker.AddMessage(fmt.Sprintf("irc:%s", channel), openai.ChatCompletionMessage{
 				Content: cleanedMessage,
 				Role:    "user",
 			})
@@ -140,7 +134,7 @@ func (i *IRC) Start(a *agent.Agent) {
 			}
 
 			// Update the conversation history
-			i.conversationTracker.AddMessage(channel, openai.ChatCompletionMessage{
+			a.SharedState().ConversationTracker.AddMessage(fmt.Sprintf("irc:%s", channel), openai.ChatCompletionMessage{
 				Content: res.Response,
 				Role:    "assistant",
 			})
@@ -209,7 +203,7 @@ func (i *IRC) Start(a *agent.Agent) {
 	// Start the IRC client in a goroutine
 	go i.conn.Loop()
 	go func() {
-		select  {
+		select {
 		case <-a.Context().Done():
 			i.conn.Quit()
 			return
@@ -248,12 +242,6 @@ func IRCConfigMeta() []config.Field {
 			Name:  "alwaysReply",
 			Label: "Always Reply",
 			Type:  config.FieldTypeCheckbox,
-		},
-		{
-			Name:         "lastMessageDuration",
-			Label:        "Last Message Duration",
-			Type:         config.FieldTypeText,
-			DefaultValue: "5m",
 		},
 	}
 }

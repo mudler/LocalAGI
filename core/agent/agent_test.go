@@ -44,7 +44,7 @@ func (a *TestAction) Plannable() bool {
 	return true
 }
 
-func (a *TestAction) Run(c context.Context, p types.ActionParams) (types.ActionResult, error) {
+func (a *TestAction) Run(c context.Context, sharedState *types.AgentSharedState, p types.ActionParams) (types.ActionResult, error) {
 	for k, r := range a.response {
 		if strings.Contains(strings.ToLower(p.String()), strings.ToLower(k)) {
 			return types.ActionResult{Result: r}, nil

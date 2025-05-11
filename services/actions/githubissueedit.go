@@ -27,7 +27,7 @@ func NewGithubIssueEditor(config map[string]string) *GithubIssueEditor {
 	}
 }
 
-func (g *GithubIssueEditor) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubIssueEditor) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`

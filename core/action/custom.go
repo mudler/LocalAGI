@@ -81,7 +81,7 @@ func (a *CustomAction) Plannable() bool {
 	return true
 }
 
-func (a *CustomAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *CustomAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	v, err := a.i.Eval(fmt.Sprintf("%s.Run", a.config["name"]))
 	if err != nil {
 		return types.ActionResult{}, err
