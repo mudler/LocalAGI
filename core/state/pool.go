@@ -247,7 +247,7 @@ func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agen
 		ImagePrompt string `json:"image_prompt"`
 	}
 
-	err := llm.GenerateTypedJSON(
+	err := llm.GenerateTypedJSONWithGuidance(
 		context.Background(),
 		llm.NewClient(APIKey, APIURL, "10m"),
 		"Generate a prompt that I can use to create a random avatar for the bot '"+agent.Name+"', the description of the bot is: "+agent.Description,

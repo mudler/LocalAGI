@@ -52,7 +52,15 @@ Consider the entire conversation history to understand the complete context and 
 Focus on identifying the primary objective and any specific requirements or limitations mentioned.`
 
 	var result GoalExtraction
-	err := llm.GenerateTypedJSON(job.GetContext(), a.client, prompt, a.options.LLMAPI.Model, schema, &result)
+	err := llm.GenerateTypedJSONWithConversation(job.GetContext(), a.client,
+		append(
+			[]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: prompt,
+				},
+			},
+			conv...), a.options.LLMAPI.Model, schema, &result)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting goal: %w", err)
 	}
@@ -106,7 +114,16 @@ Provide a detailed evaluation with specific gaps if any are found.`,
 		goal.Context)
 
 	var result EvaluationResult
-	err = llm.GenerateTypedJSON(job.GetContext(), a.client, prompt, a.options.LLMAPI.Model, schema, &result)
+	err = llm.GenerateTypedJSONWithConversation(job.GetContext(), a.client,
+		append(
+			[]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: prompt,
+				},
+			},
+			conv...),
+		a.options.LLMAPI.Model, schema, &result)
 	if err != nil {
 		return nil, fmt.Errorf("error generating evaluation: %w", err)
 	}
