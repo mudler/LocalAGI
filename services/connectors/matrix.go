@@ -3,6 +3,7 @@ package connectors
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -114,7 +115,7 @@ func (m *Matrix) cancelActiveJobForRoom(roomID string) {
 func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 	if m.roomID != evt.RoomID.String() && m.roomMode { // If we have a roomID and it's not the same as the event room
 		// Skip messages from other rooms
-		xlog.Info("Skipping reply to room", evt.RoomID, m.roomID)
+		xlog.Info("Skipping reply to room", "event room", evt.RoomID, "config room", m.roomID)
 		return
 	}
 
@@ -126,16 +127,11 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 	// Skip if message does not mention the bot
 	mentioned := false
 	if evt.Content.AsMessage().Mentions != nil {
-		for _, mention := range evt.Content.AsMessage().Mentions.UserIDs {
-			if mention == m.client.UserID {
-				mentioned = true
-				break
-			}
-		}
+		mentioned = slices.Contains(evt.Content.AsMessage().Mentions.UserIDs, m.client.UserID)
 	}
 
 	if !mentioned && !m.roomMode {
-		xlog.Info("Skipping reply because it does not mention the bot", evt.RoomID, m.roomID)
+		xlog.Info("Skipping reply because it does not mention the bot", "mentions", evt.Content.AsMessage().Mentions.UserIDs)
 		return
 	}
 
@@ -181,7 +177,7 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 			job.Cancel()
 			for i, j := range m.activeJobs[evt.RoomID.String()] {
 				if j.UUID == job.UUID {
-					m.activeJobs[evt.RoomID.String()] = append(m.activeJobs[evt.RoomID.String()][:i], m.activeJobs[evt.RoomID.String()][i+1:]...)
+					m.activeJobs[evt.RoomID.String()] = slices.Delete(m.activeJobs[evt.RoomID.String()], i, i+1)
 					break
 				}
 			}
@@ -252,20 +248,20 @@ func (m *Matrix) Start(a *agent.Agent) {
 	// Start syncing
 	go func() {
 		for {
-			err := client.SyncWithContext(a.Context())
+			select {
+			case <-a.Context().Done():
+				xlog.Info("Context cancelled, stopping sync loop")
+				return
+			default:
+				err := client.SyncWithContext(a.Context())
 
-			xlog.Info("Syncing")
-			if err != nil {
-				xlog.Error(fmt.Sprintf("Error syncing: %v", err))
-				time.Sleep(5 * time.Second)
+				xlog.Info("Syncing")
+				if err != nil {
+					xlog.Error(fmt.Sprintf("Error syncing: %v", err))
+					time.Sleep(5 * time.Second)
+				}
 			}
 		}
-	}()
-
-	// Handle shutdown
-	go func() {
-		<-a.Context().Done()
-		client.StopSync()
 	}()
 }
 
