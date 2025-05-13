@@ -1,13 +1,15 @@
 package connectors
 
 import (
-	//"fmt"
-	//"strings"
+	"fmt"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/xlog"
+	sasl "github.com/emersion/go-sasl"
+	smtp "github.com/emersion/go-smtp"
 )
 
 type Email struct {
@@ -105,8 +107,42 @@ func (e *Email) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 	}
 }
 
-func (e *Email) Start(a *agent.Agent) {
+func (e *Email) sendMail(toAddr, subject, content string, secure bool) {
+	auth := sasl.NewPlainClient("", e.username, e.password)
 
+	to := []string{toAddr}
+	if secure {
+		msg := strings.NewReader(
+			fmt.Sprintf("To: %s\r\n", toAddr) +
+			fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
+			fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
+			fmt.Sprintf("%s\r\n", content),
+		)
+		err := smtp.SendMail(e.smtpUri, auth, e.email, to, msg)
+		if err != nil { xlog.Info(fmt.Sprintf("Email send err: %v", err)) }
+	} else {
+		c, err := smtp.Dial(e.smtpUri)
+		if err != nil { xlog.Info(fmt.Sprintf("Email connection err: %v", err)) }
+		defer c.Close()
+
+		err = c.Hello("hello")
+		if err != nil { xlog.Info(fmt.Sprintf("Email hello err: %v", err)) }
+
+		err = c.Auth(auth)
+		if err != nil { xlog.Info(fmt.Sprintf("Email auth err: %v", err)) }
+
+		msg := strings.NewReader(
+			fmt.Sprintf("To: %s\r\n", toAddr) +
+			fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
+			fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
+			fmt.Sprintf("%s\r\n", content),
+		)
+		err = c.SendMail(e.email, to, msg)
+		if err != nil { xlog.Info(fmt.Sprintf("Email send err: %v", err)) }
+	}
+}
+
+func (e *Email) Start(a *agent.Agent) {
 	go func() {
 		xlog.Info("Email connector is now running.  Press CTRL-C to exit.")
 		
