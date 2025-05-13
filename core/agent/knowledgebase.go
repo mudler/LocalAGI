@@ -10,11 +10,11 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-func (a *Agent) knowledgeBaseLookup(conv Messages) {
+func (a *Agent) knowledgeBaseLookup(conv Messages) Messages {
 	if (!a.options.enableKB && !a.options.enableLongTermMemory && !a.options.enableSummaryMemory) ||
 		len(conv) <= 0 {
 		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
-		return
+		return conv
 	}
 
 	// Walk conversation from bottom to top, and find the first message of the user
@@ -25,7 +25,7 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) {
 
 	if userMessage == "" {
 		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)
-		return
+		return conv
 	}
 
 	results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
@@ -35,7 +35,7 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) {
 
 	if len(results) == 0 {
 		xlog.Info("[Knowledge Base Lookup] No similar strings found in KB", "agent", a.Character.Name)
-		return
+		return conv
 	}
 
 	formatResults := ""
@@ -55,6 +55,8 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) {
 			Role:    "system",
 			Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
 		}}, conv...)
+
+	return conv
 }
 
 func (a *Agent) saveConversation(m Messages, prefix string) error {
