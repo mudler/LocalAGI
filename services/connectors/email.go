@@ -19,6 +19,9 @@ import (
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai"
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
 )
 
 type Email struct {
@@ -116,7 +119,7 @@ func (e *Email) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 	}
 }
 
-func (e *Email) sendMail(toHeader, subject, content, replyTo, references string, sendTo []string) {
+func (e *Email) sendMail(toHeader, subject, content, replyTo, references string, sendTo []string, html bool) {
 	auth := sasl.NewPlainClient("", e.username, e.password)
 
 	replyHeaders := ""
@@ -126,10 +129,14 @@ func (e *Email) sendMail(toHeader, subject, content, replyTo, references string,
 		strings.ReplaceAll(references + " " + replyTo, "\n", ""))
 	}
 
+	contentTypeHeaders := "MIME-Version: 1.0\r\nContent-Type: text/plain;\r\n"
+	if (html) { contentTypeHeaders = "MIME-Version: 1.0\r\nContent-Type: text/html;\r\n" }
+
 	msg := strings.NewReader(
 		fmt.Sprintf("To: %s\r\n", toHeader) +
 		fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
 		replyHeaders + 
+		contentTypeHeaders +
 		fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
 		fmt.Sprintf("%s\r\n", content),
 	)
@@ -174,6 +181,21 @@ func filterEmailRecipients(input string, emailToRemove string) string {
 	return ""
 }
 
+func mdToHTML(mds string) string {
+	md := []byte(mds)
+
+	// create markdown parser with extensions
+	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
+	p := parser.NewWithExtensions(extensions)
+	doc := p.Parse(md)
+
+	// create HTML renderer with extensions
+	htmlFlags := html.CommonFlags | html.HrefTargetBlank | html.CompletePage
+	opts := html.RendererOptions{Flags: htmlFlags}
+	renderer := html.NewRenderer(opts)
+
+	return string(markdown.Render(doc, renderer))
+}
 
 func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, startIndex uint32) {
 
@@ -213,25 +235,42 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 					xlog.Info(fmt.Sprintf("From: %s", message.Header.Get("From")))
 					xlog.Info(fmt.Sprintf("To: %s", message.Header.Get("To")))
 					xlog.Info(fmt.Sprintf("Subject: %s", message.Header.Get("Subject")))
-					xlog.Info(fmt.Sprintf("Message-ID: %s", message.Header.Get("Message-ID")))
-					xlog.Info(fmt.Sprintf("Envelope From: %s", msg.Envelope.From))
-					xlog.Info(fmt.Sprintf("Envelope To: %s", msg.Envelope.To))
-					xlog.Info(fmt.Sprintf("Envelope Subject: %s", msg.Envelope.Subject))
-		
-					// Print the body content
+
+					// In the event that an email account has multiple email addresses, only respond to the one configured
+					if !strings.Contains(message.Header.Get("To"), e.email) { 
+						xlog.Info(fmt.Sprintf("Email was sent to %s, but appeared in my inbox (%s). Ignoring!", message.Header.Get("To"), e.email));
+						return
+					}
+
 					buf := new(bytes.Buffer)
 					buf.ReadFrom(message.Body)
 				
-					// TODO: for some reason, it outputs &gt; when it comes to these >quotes
-					markdown, err := htmltomarkdown.ConvertString(buf.String())
-					if err != nil { xlog.Info(fmt.Sprintf("Email html => md err: %v", err)) }
-					xlog.Info(fmt.Sprintf("Markdown:\n\n%s", markdown))
+					content := buf.String()
+					contentIsHTML := false
+
+					// Convert email to markdown only if it's in HTML
+					prefixes := []string{"<html", "<body", "<div", "<head"}
+					for _, prefix := range prefixes {
+						if strings.HasPrefix(strings.ToLower(content), prefix) {
+							content, err = htmltomarkdown.ConvertString(buf.String())
+							contentIsHTML = true
+							if err != nil { 
+								xlog.Error(fmt.Sprintf("Email html => md err: %v", err))
+								contentIsHTML = false
+								content = buf.String()
+							}
+						}
+					}
 					
-					prompt := fmt.Sprintf("From: %s\nTime: %s\nSubject: %s\n=====\n%s",
+					xlog.Info(fmt.Sprintf("Markdown:\n\n%s", content))
+					
+					prompt := fmt.Sprintf("%s %s:\n\nFrom: %s\nTime: %s\nSubject: %s\n=====\n%s",
+					    "This email thread was sent to you. You are",
+						e.email,
 						message.Header.Get("From"),
 						msg.Envelope.Date.Format(time.RFC3339),
 						msg.Envelope.Subject,
-						markdown,
+						content,
 					)
 					conv := []openai.ChatCompletionMessage{}
 					conv = append(conv, openai.ChatCompletionMessage{
@@ -263,22 +302,23 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 					replyContent := jobResult.Response
 					if jobResult.Response == "" { replyContent = 
 						"System: I'm sorry, but it looks like the agent did not respond. This could be in error, or maybe it had nothing to say." }
-					quoteHeader := fmt.Sprintf("\n\nOn %s, %s wrote:\n", 
+					quoteHeader := fmt.Sprintf("\r\n\r\nOn %s, %s wrote:\n", 
 						msg.Envelope.Date.Format("Monday, Jan 2, 2006 at 15:04"),
 						fmt.Sprintf("%s <%s@%s>", msg.Envelope.From[0].Name, msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host),
 					)
-					quotedContent := strings.ReplaceAll(markdown, "\r\n", "\n")
-					quotedLines := strings.Split(quotedContent, "\n")
+					quotedLines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
 					for i, line := range quotedLines {
 						quotedLines[i] = "> " + line
 					}
-					replyContent = replyContent + quoteHeader + strings.Join(quotedLines, "\n")
+					replyContent = replyContent + quoteHeader + strings.Join(quotedLines, "\r\n")
+					if contentIsHTML { replyContent = mdToHTML(replyContent) }
 					e.sendMail(newTos, 
 						fmt.Sprintf("Re: %s", message.Header.Get("Subject")),
 						replyContent,
 						message.Header.Get("Message-ID"),
 						message.Header.Get("References"),
 						emails,
+						contentIsHTML,
 					)
 				}(e, a, c, msg)
 			}
