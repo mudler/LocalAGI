@@ -5,7 +5,7 @@ services:
     # Available images with CUDA, ROCm, SYCL, Vulkan
     # Image list (quay.io): https://quay.io/repository/go-skynet/local-ai?tab=tags
     # Image list (dockerhub): https://hub.docker.com/r/localai/localai
-    image: localai/localai:master-ffmpeg-core
+    image: localai/localai:master
     command: 
     - ${MODEL_NAME:-gemma-3-12b-it-qat}
     - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
