@@ -6,15 +6,25 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai"
 )
 
-func (a *Agent) knowledgeBaseLookup(conv Messages) Messages {
+func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 	if (!a.options.enableKB && !a.options.enableLongTermMemory && !a.options.enableSummaryMemory) ||
 		len(conv) <= 0 {
 		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
 		return conv
+	}
+	
+	var obs *types.Observable
+	if job != nil && job.Obs != nil && a.observer != nil {
+		obs = a.observer.NewObservable()
+		obs.Name = "Recall"
+		obs.Icon = "database"
+		obs.ParentID = job.Obs.ID
+		a.observer.Update(*obs)
 	}
 
 	// Walk conversation from bottom to top, and find the first message of the user
@@ -25,16 +35,34 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) Messages {
 
 	if userMessage == "" {
 		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)
+		if obs != nil {
+			obs.Completion = &types.Completion{
+				Error: "No user message found in conversation",
+			}
+			a.observer.Update(*obs)
+		}
 		return conv
 	}
 
 	results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
 	if err != nil {
 		xlog.Info("Error finding similar strings inside KB:", "error", err)
+		if obs != nil {
+			obs.AddProgress(types.Progress{
+				Error: fmt.Sprintf("Error searching knowledge base: %v", err),
+			})
+			a.observer.Update(*obs)
+		}
 	}
 
 	if len(results) == 0 {
 		xlog.Info("[Knowledge Base Lookup] No similar strings found in KB", "agent", a.Character.Name)
+		if obs != nil {
+			obs.Completion = &types.Completion{
+				ActionResult: "No similar strings found in knowledge base",
+			}
+			a.observer.Update(*obs)
+		}
 		return conv
 	}
 
@@ -44,17 +72,28 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) Messages {
 	}
 	xlog.Info("[Knowledge Base Lookup] Found similar strings in KB", "agent", a.Character.Name, "results", formatResults)
 
-	// conv = append(conv,
-	// 	openai.ChatCompletionMessage{
-	// 		Role:    "system",
-	// 		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-	// 	},
-	// )
-	conv = append([]openai.ChatCompletionMessage{
-		{
-			Role:    "system",
-			Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
-		}}, conv...)
+	if obs != nil {
+		obs.AddProgress(types.Progress{
+			ActionResult: fmt.Sprintf("Found %d results in knowledge base", len(results)),
+		})
+		a.observer.Update(*obs)
+	}
+
+	// Create the message to add to conversation
+	systemMessage := openai.ChatCompletionMessage{
+		Role:    "system",
+		Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
+	}
+
+	// Add the message to the conversation
+	conv = append([]openai.ChatCompletionMessage{systemMessage}, conv...)
+
+	if obs != nil {
+		obs.Completion = &types.Completion{
+				Conversation: []openai.ChatCompletionMessage{systemMessage},
+		}
+		a.observer.Update(*obs)
+	}
 
 	return conv
 }

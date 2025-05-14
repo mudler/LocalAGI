@@ -617,7 +617,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	conv = a.processUserInputs(job, role, conv)
 
 	// RAG
-	conv = a.knowledgeBaseLookup(conv)
+	conv = a.knowledgeBaseLookup(job, conv)
 
 	var pickTemplate string
 	var reEvaluationTemplate string
