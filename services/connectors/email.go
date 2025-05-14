@@ -115,24 +115,26 @@ func (e *Email) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 	}
 }
 
-func (e *Email) sendMail(toAddr, subject, content string, replyTo string) {
+func (e *Email) sendMail(toHeader, subject, content, replyTo string, sendTo []string) {
 	auth := sasl.NewPlainClient("", e.username, e.password)
 
 	replyToHeader := ""
 	if replyTo != "" { replyToHeader = fmt.Sprintf("In-Reply-To: %s\r\nReferences: %s\r\n", replyTo, replyTo)}
 
-	to := []string{toAddr}
+	msg := strings.NewReader(
+		fmt.Sprintf("To: %s\r\n", toHeader) +
+		fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
+		replyToHeader + 
+		fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
+		fmt.Sprintf("%s\r\n", content),
+	)
 	if !e.smtpIns {
-		msg := strings.NewReader(
-			fmt.Sprintf("To: %s\r\n", toAddr) +
-			fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
-			replyToHeader + 
-			fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
-			fmt.Sprintf("%s\r\n", content),
-		)
-		err := smtp.SendMail(e.smtpUri, auth, e.email, to, msg)
+
+		err := smtp.SendMail(e.smtpUri, auth, e.email, sendTo, msg)
 		if err != nil { xlog.Info(fmt.Sprintf("Email send err: %v", err)) }
+
 	} else {
+
 		c, err := smtp.Dial(e.smtpUri)
 		if err != nil { xlog.Info(fmt.Sprintf("Email connection err: %v", err)) }
 		defer c.Close()
@@ -143,18 +145,32 @@ func (e *Email) sendMail(toAddr, subject, content string, replyTo string) {
 		err = c.Auth(auth)
 		if err != nil { xlog.Info(fmt.Sprintf("Email auth err: %v", err)) }
 
-		msg := strings.NewReader(
-			fmt.Sprintf("To: %s\r\n", toAddr) +
-			fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
-			fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
-			fmt.Sprintf("%s\r\n", content),
-		)
-		err = c.SendMail(e.email, to, msg)
+		err = c.SendMail(e.email, sendTo, msg)
 		if err != nil { xlog.Info(fmt.Sprintf("Email send err: %v", err)) }
+
 	}
 }
 
-func imapWorker(done chan bool, c *imapclient.Client, startIndex uint32) {
+func filterEmailRecipients(input string, emailToRemove string) string {
+
+	addresses := strings.Split(strings.TrimPrefix(input, "To: "), ",")
+
+	var filtered []string
+	for _, address := range addresses {
+		address = strings.TrimSpace(address)
+		if !strings.Contains(address, emailToRemove) {
+			filtered = append(filtered, address)
+		}
+	}
+
+	if len(filtered) > 0 {
+		return strings.Join(filtered, ", ")
+	}
+	return ""
+}
+
+
+func imapWorker(done chan bool, e *Email, c *imapclient.Client, startIndex uint32) {
 
 	currentIndex := startIndex
 
@@ -204,8 +220,31 @@ func imapWorker(done chan bool, c *imapclient.Client, startIndex uint32) {
 				markdown, err := htmltomarkdown.ConvertString(buf.String())
 				if err != nil { xlog.Info(fmt.Sprintf("Email html => md err: %v", err)) }
 				xlog.Info(fmt.Sprintf("Markdown:\n\n%s", markdown))
-	
-				xlog.Info(fmt.Sprintf("Processing email with sequence number: %v", 1))
+
+				xlog.Info("Sending reply...")
+
+				emails := []string{}
+				emails = append(emails, fmt.Sprintf("%s@%s", 
+					msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host))
+
+				for _, addr := range msg.Envelope.To {
+					if addr.Mailbox != "" && addr.Host != "" {
+						email := fmt.Sprintf("%s@%s", addr.Mailbox, addr.Host)
+						if email != e.email { emails = append(emails, email) }
+					}
+				}
+
+				newTos := 
+					message.Header.Get("From") +
+					", " + filterEmailRecipients(message.Header.Get("To"), e.email)
+
+				// TODO: Quote email that is being responded to
+				e.sendMail(newTos, 
+					fmt.Sprintf("Re: %s", message.Header.Get("Subject")),
+				    "This is an automated reply! It does not yet contain generated or quoted content!\r\n\r\n",
+					message.Header.Get("Message-ID"),
+					emails,
+				)
 			}
 
             time.Sleep(5 * time.Second)
@@ -244,7 +283,7 @@ func (e *Email) Start(a *agent.Agent) {
 		xlog.Info(fmt.Sprintf("Email IMAP mailbox contains %v messages", selectedMbox.NumMessages))
 
 		imapWorkerHandle := make(chan bool)
-		go imapWorker(imapWorkerHandle, c, selectedMbox.NumMessages)
+		go imapWorker(imapWorkerHandle, e, c, selectedMbox.NumMessages)
 
 		<-a.Context().Done()
 		imapWorkerHandle <- true
