@@ -116,16 +116,20 @@ func (e *Email) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 	}
 }
 
-func (e *Email) sendMail(toHeader, subject, content, replyTo string, sendTo []string) {
+func (e *Email) sendMail(toHeader, subject, content, replyTo, references string, sendTo []string) {
 	auth := sasl.NewPlainClient("", e.username, e.password)
 
-	replyToHeader := ""
-	if replyTo != "" { replyToHeader = fmt.Sprintf("In-Reply-To: %s\r\nReferences: %s\r\n", replyTo, replyTo)}
+	replyHeaders := ""
+	if replyTo != "" { replyHeaders = fmt.Sprintf(
+		"In-Reply-To: %s\r\nReferences: %s\r\n",
+		replyTo,
+		strings.ReplaceAll(references + " " + replyTo, "\n", ""))
+	}
 
 	msg := strings.NewReader(
 		fmt.Sprintf("To: %s\r\n", toHeader) +
 		fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
-		replyToHeader + 
+		replyHeaders + 
 		fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
 		fmt.Sprintf("%s\r\n", content),
 	)
@@ -188,6 +192,7 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 
 			for currentIndex < selectedMbox.NumMessages {
 				currentIndex++
+
 				seqSet := imap.SeqSetNum(currentIndex)
 				bodySection := &imap.FetchItemBodySection{}
 				fetchOptions := &imap.FetchOptions{
@@ -199,68 +204,84 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 				if err != nil { xlog.Info(fmt.Sprintf("Email IMAP fetch err: %v", err)) }
 	
 				msg := messages[0]
-	
-				r := bytes.NewReader(msg.FindBodySection(bodySection))
-				message, err := message.Read(r)
-				if err != nil { xlog.Info(fmt.Sprintf("Email reader err: %v", err)) }
-	
-				xlog.Info(fmt.Sprintf("From: %s", message.Header.Get("From")))
-				xlog.Info(fmt.Sprintf("To: %s", message.Header.Get("To")))
-				xlog.Info(fmt.Sprintf("Subject: %s", message.Header.Get("Subject")))
-				xlog.Info(fmt.Sprintf("Message-ID: %s", message.Header.Get("Message-ID")))
-				xlog.Info(fmt.Sprintf("Envelope From: %s", msg.Envelope.From))
-				xlog.Info(fmt.Sprintf("Envelope To: %s", msg.Envelope.To))
-				xlog.Info(fmt.Sprintf("Envelope Subject: %s", msg.Envelope.Subject))
-	
-				// Print the body content
-				buf := new(bytes.Buffer)
-				buf.ReadFrom(message.Body)
-			
-				markdown, err := htmltomarkdown.ConvertString(buf.String())
-				if err != nil { xlog.Info(fmt.Sprintf("Email html => md err: %v", err)) }
-				xlog.Info(fmt.Sprintf("Markdown:\n\n%s", markdown))
+
+				go func(e *Email, a *agent.Agent, c *imapclient.Client, msg *imapclient.FetchMessageBuffer){
+					r := bytes.NewReader(msg.FindBodySection(bodySection))
+					message, err := message.Read(r)
+					if err != nil { xlog.Info(fmt.Sprintf("Email reader err: %v", err)) }
+		
+					xlog.Info(fmt.Sprintf("From: %s", message.Header.Get("From")))
+					xlog.Info(fmt.Sprintf("To: %s", message.Header.Get("To")))
+					xlog.Info(fmt.Sprintf("Subject: %s", message.Header.Get("Subject")))
+					xlog.Info(fmt.Sprintf("Message-ID: %s", message.Header.Get("Message-ID")))
+					xlog.Info(fmt.Sprintf("Envelope From: %s", msg.Envelope.From))
+					xlog.Info(fmt.Sprintf("Envelope To: %s", msg.Envelope.To))
+					xlog.Info(fmt.Sprintf("Envelope Subject: %s", msg.Envelope.Subject))
+		
+					// Print the body content
+					buf := new(bytes.Buffer)
+					buf.ReadFrom(message.Body)
 				
-				prompt := fmt.Sprintf("Time: %s\nSubject: %s\n=====\n%s",
-					msg.Envelope.Date.Format(time.RFC3339),
-					msg.Envelope.Subject,
-					markdown,
-				)
-				conv := []openai.ChatCompletionMessage{}
-				conv = append(conv, openai.ChatCompletionMessage{
-					Role:    "user",
-					Content: prompt,
-				})
+					// TODO: for some reason, it outputs &gt; when it comes to these >quotes
+					markdown, err := htmltomarkdown.ConvertString(buf.String())
+					if err != nil { xlog.Info(fmt.Sprintf("Email html => md err: %v", err)) }
+					xlog.Info(fmt.Sprintf("Markdown:\n\n%s", markdown))
+					
+					prompt := fmt.Sprintf("From: %s\nTime: %s\nSubject: %s\n=====\n%s",
+						message.Header.Get("From"),
+						msg.Envelope.Date.Format(time.RFC3339),
+						msg.Envelope.Subject,
+						markdown,
+					)
+					conv := []openai.ChatCompletionMessage{}
+					conv = append(conv, openai.ChatCompletionMessage{
+						Role:    "user",
+						Content: prompt,
+					})
 
-				xlog.Info(fmt.Sprintf("Starting conversation:\n\n%v", conv))
+					xlog.Info(fmt.Sprintf("Starting conversation:\n\n%v", conv))
 
-				jobResult := a.Ask( types.WithConversationHistory(conv), )
-				if jobResult.Error != nil { xlog.Info(fmt.Sprintf("Error asking agent: %v", jobResult.Error)) }
+					jobResult := a.Ask( types.WithConversationHistory(conv), )
+					if jobResult.Error != nil { xlog.Info(fmt.Sprintf("Error asking agent: %v", jobResult.Error)) }
 
-				xlog.Info("Sending reply email")
-				emails := []string{}
-				emails = append(emails, fmt.Sprintf("%s@%s", 
-					msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host))
+					xlog.Info("Sending reply email")
+					emails := []string{}
+					emails = append(emails, fmt.Sprintf("%s@%s", 
+						msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host))
 
-				for _, addr := range msg.Envelope.To {
-					if addr.Mailbox != "" && addr.Host != "" {
-						email := fmt.Sprintf("%s@%s", addr.Mailbox, addr.Host)
-						if email != e.email { emails = append(emails, email) }
+					for _, addr := range msg.Envelope.To {
+						if addr.Mailbox != "" && addr.Host != "" {
+							email := fmt.Sprintf("%s@%s", addr.Mailbox, addr.Host)
+							if email != e.email { emails = append(emails, email) }
+						}
 					}
-				}
 
-				newTos := 
-					message.Header.Get("From") +
-					", " + filterEmailRecipients(message.Header.Get("To"), e.email)
+					newTos := 
+						message.Header.Get("From") +
+						", " + filterEmailRecipients(message.Header.Get("To"), e.email)
 
-				// TODO: Quote email that is being responded to
-				e.sendMail(newTos, 
-					fmt.Sprintf("Re: %s", message.Header.Get("Subject")),
-				    jobResult.Response,
-					message.Header.Get("Message-ID"),
-					emails,
-				)
+					replyContent := jobResult.Response
+					if jobResult.Response == "" { replyContent = 
+						"System: I'm sorry, but it looks like the agent did not respond. This could be in error, or maybe it had nothing to say." }
+					quoteHeader := fmt.Sprintf("\n\nOn %s, %s wrote:\n", 
+						msg.Envelope.Date.Format("Monday, Jan 2, 2006 at 15:04"),
+						fmt.Sprintf("%s <%s@%s>", msg.Envelope.From[0].Name, msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host),
+					)
+					quotedContent := strings.ReplaceAll(markdown, "\r\n", "\n")
+					quotedLines := strings.Split(quotedContent, "\n")
+					for i, line := range quotedLines {
+						quotedLines[i] = "> " + line
+					}
+					replyContent = replyContent + quoteHeader + strings.Join(quotedLines, "\n")
+					e.sendMail(newTos, 
+						fmt.Sprintf("Re: %s", message.Header.Get("Subject")),
+						replyContent,
+						message.Header.Get("Message-ID"),
+						message.Header.Get("References"),
+						emails,
+					)
+				}(e, a, c, msg)
 			}
-
             time.Sleep(5 * time.Second)
         }
     }
@@ -269,9 +290,6 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 func (e *Email) Start(a *agent.Agent) {
 	go func() {
 		xlog.Info("Email connector is now running.  Press CTRL-C to exit.")
-
-		searchSinceTime := time.Now().Add(-100 * time.Hour)
-		xlog.Info(fmt.Sprintf("%v", searchSinceTime))
 
 		options := &imapclient.Options{
 			WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader},
