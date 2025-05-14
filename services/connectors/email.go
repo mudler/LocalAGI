@@ -3,6 +3,8 @@ package connectors
 import (
 	"fmt"
 	"strings"
+	"mime"
+	"time"
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
@@ -10,6 +12,10 @@ import (
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	sasl "github.com/emersion/go-sasl"
 	smtp "github.com/emersion/go-smtp"
+	imap "github.com/emersion/go-imap/v2"
+    "github.com/emersion/go-imap/v2/imapclient"
+	"github.com/emersion/go-message/charset"
+	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 )
 
 type Email struct {
@@ -107,11 +113,11 @@ func (e *Email) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 	}
 }
 
-func (e *Email) sendMail(toAddr, subject, content string, secure bool) {
+func (e *Email) sendMail(toAddr, subject, content string) {
 	auth := sasl.NewPlainClient("", e.username, e.password)
 
 	to := []string{toAddr}
-	if secure {
+	if !e.smtpIns {
 		msg := strings.NewReader(
 			fmt.Sprintf("To: %s\r\n", toAddr) +
 			fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
@@ -145,6 +151,79 @@ func (e *Email) sendMail(toAddr, subject, content string, secure bool) {
 func (e *Email) Start(a *agent.Agent) {
 	go func() {
 		xlog.Info("Email connector is now running.  Press CTRL-C to exit.")
+
+		searchSinceTime := time.Now().Add(-100 * time.Hour)
+		xlog.Info(fmt.Sprintf("%v", searchSinceTime))
+
+		options := &imapclient.Options{
+			WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader},
+		}
+		c, err := imapclient.DialInsecure(e.imapUri, options)
+		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP dial err: %v", err)) }
+		defer c.Close()
+
+		err = c.Login(e.username, e.password).Wait()
+		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP login err: %v", err)) }
+
+		mailboxes, err := c.List("", "%", nil).Collect()
+		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
+
+		xlog.Info(fmt.Sprintf("Email IMAP mailbox count: %v", len(mailboxes)))
+		for _, mbox := range mailboxes {
+			xlog.Info(fmt.Sprintf(" - %v", mbox.Mailbox))
+		}
+
+		selectedMbox, err := c.Select("INBOX", nil).Wait()
+		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
+		xlog.Info(fmt.Sprintf("Email IMAP mailbox contains %v messages", selectedMbox.NumMessages))
+
+		// data, err := c.UIDSearch(&imap.SearchCriteria{
+		// 	NotFlag: []imap.Flag{imap.FlagSeen},
+		// 	//Since: searchSinceTime,
+		// }, nil).Wait()
+		// if err != nil { xlog.Info(fmt.Sprintf("Email IMAP search err: %v", err)) }
+		// xlog.Info(fmt.Sprintf("Email search UUID: %v", data.AllUIDs()))
+		// xlog.Info(fmt.Sprintf("Email search AllSeqNums: %v", data.AllSeqNums()))
+		// xlog.Info(fmt.Sprintf("Email search AllString: %v", data.All.String()))
+
+		if true {
+			// Do something with each seqNum
+			seqSet := imap.SeqSetNum(1)
+			bodySection := &imap.FetchItemBodySection{}
+			fetchOptions := &imap.FetchOptions{
+				Flags:       true,
+				Envelope:    true,
+				BodySection: []*imap.FetchItemBodySection{bodySection},
+			}
+			messages, err := c.Fetch(seqSet, fetchOptions).Collect()
+			if err != nil { xlog.Info(fmt.Sprintf("Email IMAP fetch err: %v", err)) }
+
+			msg := messages[0]
+			header, body, _ := strings.Cut(string(msg.FindBodySection(bodySection)), "\r\n\r\n")
+			markdown, err := htmltomarkdown.ConvertString(body)
+	        if err != nil { xlog.Info(fmt.Sprintf("Email html => md err: %v", err)) }
+
+			xlog.Info(fmt.Sprintf("Flags: %v", msg.Flags))
+			xlog.Info(fmt.Sprintf("Subject: %v", msg.Envelope.Subject))
+			xlog.Info(fmt.Sprintf("Header:\n%v", header))
+			xlog.Info(fmt.Sprintf("Body:\n%s", markdown))
+
+			xlog.Info(fmt.Sprintf("Processing email with sequence number: %v", 1))
+		}
+		
+		
+		// if selectedMbox.NumMessages > 0 {
+		// 	seqSet := imap.SeqSetNum(1)
+		// 	fetchOptions := &imap.FetchOptions{Envelope: true}
+		// 	messages, err := c.Fetch(seqSet, fetchOptions).Collect()
+		// 	if err != nil {
+		// 		log.Fatalf("failed to fetch first message in INBOX: %v", err)
+		// 	}
+		// 	log.Printf("subject of first message in INBOX: %v", messages[0].Envelope.Subject)
+		// }
+
+		err = c.Logout().Wait()
+		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP logout fail: %v", err)) }
 		
 		<-a.Context().Done()
 		xlog.Info("Email connector is now stopped.")
