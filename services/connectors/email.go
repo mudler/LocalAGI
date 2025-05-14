@@ -9,43 +9,45 @@ import (
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 	imap "github.com/emersion/go-imap/v2"
+	sasl "github.com/emersion/go-sasl"
+	smtp "github.com/emersion/go-smtp"
+
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-message"
 	"github.com/emersion/go-message/charset"
-	sasl "github.com/emersion/go-sasl"
-	smtp "github.com/emersion/go-smtp"
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
+
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai"
-	"github.com/gomarkdown/markdown"
-	"github.com/gomarkdown/markdown/html"
-	"github.com/gomarkdown/markdown/parser"
 )
 
 type Email struct {
-	username string
-	name     string
-	password string
-	email    string
-	smtpUri  string
-	smtpIns  bool
-	imapUri string
-	imapIns  bool
+	username     string
+	name         string
+	password     string
+	email        string
+	smtpUri      string
+	smtpInsecure bool
+	imapUri      string
+	imapInsecure bool
 }
 
 func NewEmail(config map[string]string) *Email {
 
 	return &Email{
-		username: config["username"],
-		name:     config["name"],
-		password: config["password"],
-		email:    config["email"],
-		smtpUri:  config["smtpUri"],
-		smtpIns:  config["smtpIns"] == "true",
-		imapUri:  config["imapUri"],
-		imapIns:  config["imapIns"] == "true",
+		username:     config["username"],
+		name:         config["name"],
+		password:     config["password"],
+		email:        config["email"],
+		smtpUri:      config["smtpUri"],
+		smtpInsecure: config["smtpInsecure"] == "true",
+		imapUri:      config["imapUri"],
+		imapInsecure: config["imapInsecure"] == "true",
 	}
 }
 
@@ -59,7 +61,7 @@ func EmailConfigMeta() []config.Field {
 			HelpText: "SMTP server host:port (e.g., smtp.gmail.com:587)",
 		},
 		{
-			Name:  "smtpIns",
+			Name:  "smtpInsecure",
 			Label: "Insecure SMTP",
 			Type:  config.FieldTypeCheckbox,
 		},
@@ -71,7 +73,7 @@ func EmailConfigMeta() []config.Field {
 			HelpText: "IMAP server host:port (e.g., imap.gmail.com:993)",
 		},
 		{
-			Name:  "imapIns",
+			Name:  "imapInsecure",
 			Label: "Insecure IMAP",
 			Type:  config.FieldTypeCheckbox,
 		},
@@ -119,50 +121,6 @@ func (e *Email) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 	}
 }
 
-func (e *Email) sendMail(toHeader, subject, content, replyTo, references string, sendTo []string, html bool) {
-	auth := sasl.NewPlainClient("", e.username, e.password)
-
-	replyHeaders := ""
-	if replyTo != "" { replyHeaders = fmt.Sprintf(
-		"In-Reply-To: %s\r\nReferences: %s\r\n",
-		replyTo,
-		strings.ReplaceAll(references + " " + replyTo, "\n", ""))
-	}
-
-	contentTypeHeaders := "MIME-Version: 1.0\r\nContent-Type: text/plain;\r\n"
-	if (html) { contentTypeHeaders = "MIME-Version: 1.0\r\nContent-Type: text/html;\r\n" }
-
-	msg := strings.NewReader(
-		fmt.Sprintf("To: %s\r\n", toHeader) +
-		fmt.Sprintf("From: %s <%s>\r\n", e.name, e.email) +
-		replyHeaders + 
-		contentTypeHeaders +
-		fmt.Sprintf("Subject: %s\r\n\r\n", subject) +
-		fmt.Sprintf("%s\r\n", content),
-	)
-	if !e.smtpIns {
-
-		err := smtp.SendMail(e.smtpUri, auth, e.email, sendTo, msg)
-		if err != nil { xlog.Info(fmt.Sprintf("Email send err: %v", err)) }
-
-	} else {
-
-		c, err := smtp.Dial(e.smtpUri)
-		if err != nil { xlog.Info(fmt.Sprintf("Email connection err: %v", err)) }
-		defer c.Close()
-
-		err = c.Hello("hello")
-		if err != nil { xlog.Info(fmt.Sprintf("Email hello err: %v", err)) }
-
-		err = c.Auth(auth)
-		if err != nil { xlog.Info(fmt.Sprintf("Email auth err: %v", err)) }
-
-		err = c.SendMail(e.email, sendTo, msg)
-		if err != nil { xlog.Info(fmt.Sprintf("Email send err: %v", err)) }
-
-	}
-}
-
 func filterEmailRecipients(input string, emailToRemove string) string {
 
 	addresses := strings.Split(strings.TrimPrefix(input, "To: "), ",")
@@ -181,40 +139,76 @@ func filterEmailRecipients(input string, emailToRemove string) string {
 	return ""
 }
 
-func mdToHTML(mds string) string {
-	md := []byte(mds)
+func (e *Email) sendMail(to, subject, content, replyToID, references string, emails []string, html bool) {
 
-	// create markdown parser with extensions
-	extensions := parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock
-	p := parser.NewWithExtensions(extensions)
-	doc := p.Parse(md)
+	auth := sasl.NewPlainClient("", e.username, e.password)
 
-	// create HTML renderer with extensions
-	htmlFlags := html.CommonFlags | html.HrefTargetBlank | html.CompletePage
-	opts := html.RendererOptions{Flags: htmlFlags}
-	renderer := html.NewRenderer(opts)
+	contentType := "text/plain"
+	if html { contentType = "text/html" }
 
-	return string(markdown.Render(doc, renderer))
+	var replyHeaders string
+	if replyToID != "" {
+		referenceLine := strings.ReplaceAll(references+" "+replyToID, "\n", "")
+		replyHeaders = fmt.Sprintf("In-Reply-To: %s\r\nReferences: %s\r\n", replyToID, referenceLine)
+	}
+
+	// Build full message content
+	var builder strings.Builder
+	fmt.Fprintf(&builder, "To: %s\r\n", to)
+	fmt.Fprintf(&builder, "From: %s <%s>\r\n", e.name, e.email)
+	builder.WriteString(replyHeaders)
+	fmt.Fprintf(&builder, "MIME-Version: 1.0\r\nContent-Type: %s;\r\n", contentType)
+	fmt.Fprintf(&builder, "Subject: %s\r\n\r\n", subject)
+	fmt.Fprintf(&builder, "%s\r\n", content)
+	msg := strings.NewReader(builder.String())
+
+	if !e.smtpInsecure {
+
+		err := smtp.SendMail(e.smtpUri, auth, e.email, emails, msg)
+		if err != nil { xlog.Error(fmt.Sprintf("Email send err: %v", err)) }
+
+	} else {
+
+		c, err := smtp.Dial(e.smtpUri)
+		if err != nil { xlog.Error(fmt.Sprintf("Email connection err: %v", err)) }
+		defer c.Close()
+
+		err = c.Hello("client")
+		if err != nil { xlog.Error(fmt.Sprintf("Email hello err: %v", err)) }
+
+		err = c.Auth(auth)
+		if err != nil { xlog.Error(fmt.Sprintf("Email auth err: %v", err)) }
+
+		err = c.SendMail(e.email, emails, msg)
+		if err != nil { xlog.Error(fmt.Sprintf("Email send err: %v", err)) }
+
+	}
 }
 
 func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, startIndex uint32) {
 
 	currentIndex := startIndex
 
-    for {
-        select {
-        case <-done:
-            xlog.Info("Stopping imapWorker")
-			err := c.Logout().Wait()
-			if err != nil { xlog.Info(fmt.Sprintf("Email IMAP logout fail: %v", err)) }
-            return
-        default:
-			selectedMbox, err := c.Select("INBOX", nil).Wait()
-			if err != nil { xlog.Info(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
+	for {
+		select {
+		case <-done:
 
+			xlog.Info("Stopping imapWorker")
+			err := c.Logout().Wait()
+			if err != nil { xlog.Error(fmt.Sprintf("Email IMAP logout fail: %v", err)) }
+			return
+
+		default:
+
+			selectedMbox, err := c.Select("INBOX", nil).Wait()
+			if err != nil { xlog.Error(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
+
+			// Loop over any new messages recieved in selected mailbox
 			for currentIndex < selectedMbox.NumMessages {
+
 				currentIndex++
 
+				// Download email info
 				seqSet := imap.SeqSetNum(currentIndex)
 				bodySection := &imap.FetchItemBodySection{}
 				fetchOptions := &imap.FetchOptions{
@@ -222,29 +216,30 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 					Envelope:    true,
 					BodySection: []*imap.FetchItemBodySection{bodySection},
 				}
-				messages, err := c.Fetch(seqSet, fetchOptions).Collect()
-				if err != nil { xlog.Info(fmt.Sprintf("Email IMAP fetch err: %v", err)) }
-	
-				msg := messages[0]
+				messageBuffers, err := c.Fetch(seqSet, fetchOptions).Collect()
+				if err != nil { xlog.Error(fmt.Sprintf("Email IMAP fetch err: %v", err)) }
 
-				go func(e *Email, a *agent.Agent, c *imapclient.Client, msg *imapclient.FetchMessageBuffer){
-					r := bytes.NewReader(msg.FindBodySection(bodySection))
-					message, err := message.Read(r)
-					if err != nil { xlog.Info(fmt.Sprintf("Email reader err: %v", err)) }
-		
-					xlog.Info(fmt.Sprintf("From: %s", message.Header.Get("From")))
-					xlog.Info(fmt.Sprintf("To: %s", message.Header.Get("To")))
-					xlog.Info(fmt.Sprintf("Subject: %s", message.Header.Get("Subject")))
+				// Start conversation goroutine
+				go func(e *Email, a *agent.Agent, c *imapclient.Client, fmb *imapclient.FetchMessageBuffer) {
+
+					// Download Email contents
+					r := bytes.NewReader(fmb.FindBodySection(bodySection))
+					msg, err := message.Read(r)
+					if err != nil { xlog.Error(fmt.Sprintf("Email reader err: %v", err)) }
+					buf := new(bytes.Buffer)
+					buf.ReadFrom(msg.Body)
+					
+					xlog.Debug("New email!")
+					xlog.Debug(fmt.Sprintf("From: %s", msg.Header.Get("From")))
+					xlog.Debug(fmt.Sprintf("To: %s", msg.Header.Get("To")))
+					xlog.Debug(fmt.Sprintf("Subject: %s", msg.Header.Get("Subject")))
 
 					// In the event that an email account has multiple email addresses, only respond to the one configured
-					if !strings.Contains(message.Header.Get("To"), e.email) { 
-						xlog.Info(fmt.Sprintf("Email was sent to %s, but appeared in my inbox (%s). Ignoring!", message.Header.Get("To"), e.email));
+					if !strings.Contains(msg.Header.Get("To"), e.email) {
+						xlog.Info(fmt.Sprintf("Email was sent to %s, but appeared in my inbox (%s). Ignoring!", msg.Header.Get("To"), e.email))
 						return
 					}
 
-					buf := new(bytes.Buffer)
-					buf.ReadFrom(message.Body)
-				
 					content := buf.String()
 					contentIsHTML := false
 
@@ -254,111 +249,143 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 						if strings.HasPrefix(strings.ToLower(content), prefix) {
 							content, err = htmltomarkdown.ConvertString(buf.String())
 							contentIsHTML = true
-							if err != nil { 
+							if err != nil {
 								xlog.Error(fmt.Sprintf("Email html => md err: %v", err))
 								contentIsHTML = false
 								content = buf.String()
 							}
 						}
 					}
-					
-					xlog.Info(fmt.Sprintf("Markdown:\n\n%s", content))
-					
+
+					xlog.Debug(fmt.Sprintf("Markdown:\n\n%s", content))
+
+					// Construct prompt
 					prompt := fmt.Sprintf("%s %s:\n\nFrom: %s\nTime: %s\nSubject: %s\n=====\n%s",
-					    "This email thread was sent to you. You are",
+						"This email thread was sent to you. You are",
 						e.email,
-						message.Header.Get("From"),
-						msg.Envelope.Date.Format(time.RFC3339),
-						msg.Envelope.Subject,
+						msg.Header.Get("From"),
+						fmb.Envelope.Date.Format(time.RFC3339),
+						fmb.Envelope.Subject,
 						content,
 					)
 					conv := []openai.ChatCompletionMessage{}
-					conv = append(conv, openai.ChatCompletionMessage{
-						Role:    "user",
-						Content: prompt,
-					})
+					conv = append(conv, openai.ChatCompletionMessage{ Role: "user", Content: prompt, })
 
-					xlog.Info(fmt.Sprintf("Starting conversation:\n\n%v", conv))
+					// Send prompt to agent and wait for result
+					xlog.Debug(fmt.Sprintf("Starting conversation:\n\n%v", conv))
+					jobResult := a.Ask(types.WithConversationHistory(conv))
+					if jobResult.Error != nil { xlog.Error(fmt.Sprintf("Error asking agent: %v", jobResult.Error)) }
 
-					jobResult := a.Ask( types.WithConversationHistory(conv), )
-					if jobResult.Error != nil { xlog.Info(fmt.Sprintf("Error asking agent: %v", jobResult.Error)) }
+					// Send agent response to user, replying to original email.
+					xlog.Debug("Agent finished responding. Sending reply email to user")
 
-					xlog.Info("Sending reply email")
+					// Get a list of emails to respond to ("Reply All" logic)
+					// This could be done through regex, but it's probably safer to rebuild explicitly
+					fromEmail := fmt.Sprintf("%s@%s", fmb.Envelope.From[0].Mailbox, fmb.Envelope.From[0].Host)
 					emails := []string{}
-					emails = append(emails, fmt.Sprintf("%s@%s", 
-						msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host))
+					emails = append(emails, fromEmail)
 
-					for _, addr := range msg.Envelope.To {
+					for _, addr := range fmb.Envelope.To {
 						if addr.Mailbox != "" && addr.Host != "" {
 							email := fmt.Sprintf("%s@%s", addr.Mailbox, addr.Host)
-							if email != e.email { emails = append(emails, email) }
+							if email != e.email {
+								emails = append(emails, email)
+							}
 						}
 					}
 
-					newTos := 
-						message.Header.Get("From") +
-						", " + filterEmailRecipients(message.Header.Get("To"), e.email)
+					// Keep the original header, in case sender had contact names as part of the header
+					newToHeader := msg.Header.Get("From") + ", " + filterEmailRecipients(msg.Header.Get("To"), e.email)
 
+					// Create the body of the email
 					replyContent := jobResult.Response
-					if jobResult.Response == "" { replyContent = 
-						"System: I'm sorry, but it looks like the agent did not respond. This could be in error, or maybe it had nothing to say." }
-					quoteHeader := fmt.Sprintf("\r\n\r\nOn %s, %s wrote:\n", 
-						msg.Envelope.Date.Format("Monday, Jan 2, 2006 at 15:04"),
-						fmt.Sprintf("%s <%s@%s>", msg.Envelope.From[0].Name, msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host),
+					if jobResult.Response == "" {
+						replyContent =
+							"System: I'm sorry, but it looks like the agent did not respond. " +
+							"This could be in error, or maybe it had nothing to say."
+					}
+
+					// Quote the original message. This lets the agent see conversation history and is an email standard.
+					quoteHeader := fmt.Sprintf("\r\n\r\nOn %s, %s wrote:\n",
+						fmb.Envelope.Date.Format("Monday, Jan 2, 2006 at 15:04"),
+						fmt.Sprintf("%s <%s>", fmb.Envelope.From[0].Name, fromEmail),
 					)
 					quotedLines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
 					for i, line := range quotedLines {
 						quotedLines[i] = "> " + line
 					}
 					replyContent = replyContent + quoteHeader + strings.Join(quotedLines, "\r\n")
-					if contentIsHTML { replyContent = mdToHTML(replyContent) }
-					e.sendMail(newTos, 
-						fmt.Sprintf("Re: %s", message.Header.Get("Subject")),
+
+					// If the original email was sent in HTML, reply with HTML
+					if contentIsHTML {
+						p := parser.NewWithExtensions(parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock)
+						doc := p.Parse([]byte(replyContent))
+
+						opts := html.RendererOptions{Flags: html.CommonFlags | html.HrefTargetBlank | html.CompletePage}
+						renderer := html.NewRenderer(opts)
+
+						replyContent = string(markdown.Render(doc, renderer))
+					}
+
+					// Send the email
+					e.sendMail(newToHeader,
+						fmt.Sprintf("Re: %s", msg.Header.Get("Subject")),
 						replyContent,
-						message.Header.Get("Message-ID"),
-						message.Header.Get("References"),
+						msg.Header.Get("Message-ID"),
+						msg.Header.Get("References"),
 						emails,
 						contentIsHTML,
 					)
-				}(e, a, c, msg)
+				}(e, a, c, messageBuffers[0])
 			}
-            time.Sleep(5 * time.Second)
-        }
-    }
+			time.Sleep(5 * time.Second) // Refresh inbox every n seconds
+		}
+	}
 }
 
 func (e *Email) Start(a *agent.Agent) {
 	go func() {
+
 		xlog.Info("Email connector is now running.  Press CTRL-C to exit.")
 
-		options := &imapclient.Options{
-			WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader},
-		}
-		c, err := imapclient.DialInsecure(e.imapUri, options)
-		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP dial err: %v", err)) }
+		imapWorking := true
+
+		// IMAP dial
+		imapOpts := &imapclient.Options{ WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader}, }
+		var c *imapclient.Client
+		var err error
+		if e.imapInsecure { c, err = imapclient.DialInsecure(e.imapUri, imapOpts)
+		} else { c, err = imapclient.DialStartTLS(e.imapUri, imapOpts) }
+
+
+		if err != nil { xlog.Error(fmt.Sprintf("Email IMAP dial err: %v", err)); imapWorking = false; }
 		defer c.Close()
 
+		// IMAP login
 		err = c.Login(e.username, e.password).Wait()
-		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP login err: %v", err)) }
+		if err != nil { xlog.Error(fmt.Sprintf("Email IMAP login err: %v", err)); imapWorking = false; }
 
+		// IMAP mailbox
 		mailboxes, err := c.List("", "%", nil).Collect()
-		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
+		if err != nil { xlog.Error(fmt.Sprintf("Email IMAP mailbox err: %v", err)); imapWorking = false; }
 
-		xlog.Info(fmt.Sprintf("Email IMAP mailbox count: %v", len(mailboxes)))
+		xlog.Debug(fmt.Sprintf("Email IMAP mailbox count: %v", len(mailboxes)))
 		for _, mbox := range mailboxes {
-			xlog.Info(fmt.Sprintf(" - %v", mbox.Mailbox))
+			xlog.Debug(fmt.Sprintf(" - %v", mbox.Mailbox))
 		}
 
+		// Select INBOX
 		selectedMbox, err := c.Select("INBOX", nil).Wait()
-		if err != nil { xlog.Info(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
+		if err != nil { xlog.Error(fmt.Sprintf("Cannot select INBOX mailbox! %v", err)); imapWorking = false; }
+		xlog.Debug(fmt.Sprintf("INBOX contains %v messages", selectedMbox.NumMessages))
 
-		xlog.Info(fmt.Sprintf("Email IMAP mailbox contains %v messages", selectedMbox.NumMessages))
-
+		// Start checking INBOX for new mail
 		imapWorkerHandle := make(chan bool)
-		go imapWorker(imapWorkerHandle, e, a, c, selectedMbox.NumMessages)
+		if imapWorking { go imapWorker(imapWorkerHandle, e, a, c, selectedMbox.NumMessages) }
 
 		<-a.Context().Done()
 		imapWorkerHandle <- true
 		xlog.Info("Email connector is now stopped.")
+
 	}()
 }
