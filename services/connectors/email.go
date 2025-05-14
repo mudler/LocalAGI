@@ -31,9 +31,9 @@ type Email struct {
 	name         string
 	password     string
 	email        string
-	smtpUri      string
+	smtpServer   string
 	smtpInsecure bool
-	imapUri      string
+	imapServer   string
 	imapInsecure bool
 }
 
@@ -44,9 +44,9 @@ func NewEmail(config map[string]string) *Email {
 		name:         config["name"],
 		password:     config["password"],
 		email:        config["email"],
-		smtpUri:      config["smtpUri"],
+		smtpServer:   config["smtpServer"],
 		smtpInsecure: config["smtpInsecure"] == "true",
-		imapUri:      config["imapUri"],
+		imapServer:   config["imapServer"],
 		imapInsecure: config["imapInsecure"] == "true",
 	}
 }
@@ -54,7 +54,7 @@ func NewEmail(config map[string]string) *Email {
 func EmailConfigMeta() []config.Field {
 	return []config.Field{
 		{
-			Name:     "smtpUri",
+			Name:     "smtpServer",
 			Label:    "SMTP Host:port",
 			Type:     config.FieldTypeText,
 			Required: true,
@@ -66,7 +66,7 @@ func EmailConfigMeta() []config.Field {
 			Type:  config.FieldTypeCheckbox,
 		},
 		{
-			Name:     "imapUri",
+			Name:     "imapServer",
 			Label:    "IMAP Host:port",
 			Type:     config.FieldTypeText,
 			Required: true,
@@ -93,17 +93,17 @@ func EmailConfigMeta() []config.Field {
 		},
 		{
 			Name:     "password",
-			Label:    "SMTP Password",
+			Label:    "Password",
 			Type:     config.FieldTypeText,
 			Required: true,
-			HelpText: "SMTP password or app password",
+			HelpText: "SMTP/IMAP password or app password",
 		},
 		{
 			Name:     "email",
 			Label:    "From Email",
 			Type:     config.FieldTypeText,
 			Required: true,
-			HelpText: "Sender email address",
+			HelpText: "Agent email address",
 		},
 	}
 }
@@ -144,7 +144,9 @@ func (e *Email) sendMail(to, subject, content, replyToID, references string, ema
 	auth := sasl.NewPlainClient("", e.username, e.password)
 
 	contentType := "text/plain"
-	if html { contentType = "text/html" }
+	if html {
+		contentType = "text/html"
+	}
 
 	var replyHeaders string
 	if replyToID != "" {
@@ -164,23 +166,33 @@ func (e *Email) sendMail(to, subject, content, replyToID, references string, ema
 
 	if !e.smtpInsecure {
 
-		err := smtp.SendMail(e.smtpUri, auth, e.email, emails, msg)
-		if err != nil { xlog.Error(fmt.Sprintf("Email send err: %v", err)) }
+		err := smtp.SendMail(e.smtpServer, auth, e.email, emails, msg)
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email send err: %v", err))
+		}
 
 	} else {
 
-		c, err := smtp.Dial(e.smtpUri)
-		if err != nil { xlog.Error(fmt.Sprintf("Email connection err: %v", err)) }
+		c, err := smtp.Dial(e.smtpServer)
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email connection err: %v", err))
+		}
 		defer c.Close()
 
 		err = c.Hello("client")
-		if err != nil { xlog.Error(fmt.Sprintf("Email hello err: %v", err)) }
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email hello err: %v", err))
+		}
 
 		err = c.Auth(auth)
-		if err != nil { xlog.Error(fmt.Sprintf("Email auth err: %v", err)) }
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email auth err: %v", err))
+		}
 
 		err = c.SendMail(e.email, emails, msg)
-		if err != nil { xlog.Error(fmt.Sprintf("Email send err: %v", err)) }
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email send err: %v", err))
+		}
 
 	}
 }
@@ -195,13 +207,17 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 
 			xlog.Info("Stopping imapWorker")
 			err := c.Logout().Wait()
-			if err != nil { xlog.Error(fmt.Sprintf("Email IMAP logout fail: %v", err)) }
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Email IMAP logout fail: %v", err))
+			}
 			return
 
 		default:
 
 			selectedMbox, err := c.Select("INBOX", nil).Wait()
-			if err != nil { xlog.Error(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Email IMAP mailbox err: %v", err))
+			}
 
 			// Loop over any new messages recieved in selected mailbox
 			for currentIndex < selectedMbox.NumMessages {
@@ -217,7 +233,9 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 					BodySection: []*imap.FetchItemBodySection{bodySection},
 				}
 				messageBuffers, err := c.Fetch(seqSet, fetchOptions).Collect()
-				if err != nil { xlog.Error(fmt.Sprintf("Email IMAP fetch err: %v", err)) }
+				if err != nil {
+					xlog.Error(fmt.Sprintf("Email IMAP fetch err: %v", err))
+				}
 
 				// Start conversation goroutine
 				go func(e *Email, a *agent.Agent, c *imapclient.Client, fmb *imapclient.FetchMessageBuffer) {
@@ -225,10 +243,12 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 					// Download Email contents
 					r := bytes.NewReader(fmb.FindBodySection(bodySection))
 					msg, err := message.Read(r)
-					if err != nil { xlog.Error(fmt.Sprintf("Email reader err: %v", err)) }
+					if err != nil {
+						xlog.Error(fmt.Sprintf("Email reader err: %v", err))
+					}
 					buf := new(bytes.Buffer)
 					buf.ReadFrom(msg.Body)
-					
+
 					xlog.Debug("New email!")
 					xlog.Debug(fmt.Sprintf("From: %s", msg.Header.Get("From")))
 					xlog.Debug(fmt.Sprintf("To: %s", msg.Header.Get("To")))
@@ -269,12 +289,14 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 						content,
 					)
 					conv := []openai.ChatCompletionMessage{}
-					conv = append(conv, openai.ChatCompletionMessage{ Role: "user", Content: prompt, })
+					conv = append(conv, openai.ChatCompletionMessage{Role: "user", Content: prompt})
 
 					// Send prompt to agent and wait for result
 					xlog.Debug(fmt.Sprintf("Starting conversation:\n\n%v", conv))
 					jobResult := a.Ask(types.WithConversationHistory(conv))
-					if jobResult.Error != nil { xlog.Error(fmt.Sprintf("Error asking agent: %v", jobResult.Error)) }
+					if jobResult.Error != nil {
+						xlog.Error(fmt.Sprintf("Error asking agent: %v", jobResult.Error))
+					}
 
 					// Send agent response to user, replying to original email.
 					xlog.Debug("Agent finished responding. Sending reply email to user")
@@ -302,7 +324,7 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 					if jobResult.Response == "" {
 						replyContent =
 							"System: I'm sorry, but it looks like the agent did not respond. " +
-							"This could be in error, or maybe it had nothing to say."
+								"This could be in error, or maybe it had nothing to say."
 					}
 
 					// Quote the original message. This lets the agent see conversation history and is an email standard.
@@ -351,23 +373,34 @@ func (e *Email) Start(a *agent.Agent) {
 		imapWorking := true
 
 		// IMAP dial
-		imapOpts := &imapclient.Options{ WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader}, }
+		imapOpts := &imapclient.Options{WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader}}
 		var c *imapclient.Client
 		var err error
-		if e.imapInsecure { c, err = imapclient.DialInsecure(e.imapUri, imapOpts)
-		} else { c, err = imapclient.DialStartTLS(e.imapUri, imapOpts) }
+		if e.imapInsecure {
+			c, err = imapclient.DialInsecure(e.imapServer, imapOpts)
+		} else {
+			c, err = imapclient.DialStartTLS(e.imapServer, imapOpts)
+		}
 
-
-		if err != nil { xlog.Error(fmt.Sprintf("Email IMAP dial err: %v", err)); imapWorking = false; }
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email IMAP dial err: %v", err))
+			imapWorking = false
+		}
 		defer c.Close()
 
 		// IMAP login
 		err = c.Login(e.username, e.password).Wait()
-		if err != nil { xlog.Error(fmt.Sprintf("Email IMAP login err: %v", err)); imapWorking = false; }
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email IMAP login err: %v", err))
+			imapWorking = false
+		}
 
 		// IMAP mailbox
 		mailboxes, err := c.List("", "%", nil).Collect()
-		if err != nil { xlog.Error(fmt.Sprintf("Email IMAP mailbox err: %v", err)); imapWorking = false; }
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Email IMAP mailbox err: %v", err))
+			imapWorking = false
+		}
 
 		xlog.Debug(fmt.Sprintf("Email IMAP mailbox count: %v", len(mailboxes)))
 		for _, mbox := range mailboxes {
@@ -376,12 +409,17 @@ func (e *Email) Start(a *agent.Agent) {
 
 		// Select INBOX
 		selectedMbox, err := c.Select("INBOX", nil).Wait()
-		if err != nil { xlog.Error(fmt.Sprintf("Cannot select INBOX mailbox! %v", err)); imapWorking = false; }
+		if err != nil {
+			xlog.Error(fmt.Sprintf("Cannot select INBOX mailbox! %v", err))
+			imapWorking = false
+		}
 		xlog.Debug(fmt.Sprintf("INBOX contains %v messages", selectedMbox.NumMessages))
 
 		// Start checking INBOX for new mail
 		imapWorkerHandle := make(chan bool)
-		if imapWorking { go imapWorker(imapWorkerHandle, e, a, c, selectedMbox.NumMessages) }
+		if imapWorking {
+			go imapWorker(imapWorkerHandle, e, a, c, selectedMbox.NumMessages)
+		}
 
 		<-a.Context().Done()
 		imapWorkerHandle <- true
