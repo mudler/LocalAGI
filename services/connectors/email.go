@@ -18,6 +18,7 @@ import (
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/sashabaranov/go-openai"
 )
 
 type Email struct {
@@ -170,7 +171,7 @@ func filterEmailRecipients(input string, emailToRemove string) string {
 }
 
 
-func imapWorker(done chan bool, e *Email, c *imapclient.Client, startIndex uint32) {
+func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, startIndex uint32) {
 
 	currentIndex := startIndex
 
@@ -184,8 +185,6 @@ func imapWorker(done chan bool, e *Email, c *imapclient.Client, startIndex uint3
         default:
 			selectedMbox, err := c.Select("INBOX", nil).Wait()
 			if err != nil { xlog.Info(fmt.Sprintf("Email IMAP mailbox err: %v", err)) }
-
-			//xlog.Info(fmt.Sprintf("Email IMAP mailbox contains %v messages", selectedMbox.NumMessages))
 
 			for currentIndex < selectedMbox.NumMessages {
 				currentIndex++
@@ -220,9 +219,24 @@ func imapWorker(done chan bool, e *Email, c *imapclient.Client, startIndex uint3
 				markdown, err := htmltomarkdown.ConvertString(buf.String())
 				if err != nil { xlog.Info(fmt.Sprintf("Email html => md err: %v", err)) }
 				xlog.Info(fmt.Sprintf("Markdown:\n\n%s", markdown))
+				
+				prompt := fmt.Sprintf("Time: %s\nSubject: %s\n=====\n%s",
+					msg.Envelope.Date.Format(time.RFC3339),
+					msg.Envelope.Subject,
+					markdown,
+				)
+				conv := []openai.ChatCompletionMessage{}
+				conv = append(conv, openai.ChatCompletionMessage{
+					Role:    "user",
+					Content: prompt,
+				})
 
-				xlog.Info("Sending reply...")
+				xlog.Info(fmt.Sprintf("Starting conversation:\n\n%v", conv))
 
+				jobResult := a.Ask( types.WithConversationHistory(conv), )
+				if jobResult.Error != nil { xlog.Info(fmt.Sprintf("Error asking agent: %v", jobResult.Error)) }
+
+				xlog.Info("Sending reply email")
 				emails := []string{}
 				emails = append(emails, fmt.Sprintf("%s@%s", 
 					msg.Envelope.From[0].Mailbox, msg.Envelope.From[0].Host))
@@ -241,7 +255,7 @@ func imapWorker(done chan bool, e *Email, c *imapclient.Client, startIndex uint3
 				// TODO: Quote email that is being responded to
 				e.sendMail(newTos, 
 					fmt.Sprintf("Re: %s", message.Header.Get("Subject")),
-				    "This is an automated reply! It does not yet contain generated or quoted content!\r\n\r\n",
+				    jobResult.Response,
 					message.Header.Get("Message-ID"),
 					emails,
 				)
@@ -283,7 +297,7 @@ func (e *Email) Start(a *agent.Agent) {
 		xlog.Info(fmt.Sprintf("Email IMAP mailbox contains %v messages", selectedMbox.NumMessages))
 
 		imapWorkerHandle := make(chan bool)
-		go imapWorker(imapWorkerHandle, e, c, selectedMbox.NumMessages)
+		go imapWorker(imapWorkerHandle, e, a, c, selectedMbox.NumMessages)
 
 		<-a.Context().Done()
 		imapWorkerHandle <- true
