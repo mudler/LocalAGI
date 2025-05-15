@@ -76,7 +76,8 @@ Still having issues? see this Youtube video: https://youtu.be/HtVwIxW3ePg
 
 [![Creating a basic agent](https://img.youtube.com/vi/HtVwIxW3ePg/mqdefault.jpg)](https://youtu.be/HtVwIxW3ePg)
 [![Agent Observability](https://img.youtube.com/vi/v82rswGJt_M/mqdefault.jpg)](https://youtu.be/v82rswGJt_M)
-[![Filters and Triggers](https://youtu.be/d_we-AYksSw/mqdefault.jpg)](https://youtu.be/d_we-AYksSw)
+[![Filters and Triggers](https://img.youtube.com/vi/d_we-AYksSw/mqdefault.jpg)](https://youtu.be/d_we-AYksSw)
+[![RAG and Matrix](https://img.youtube.com/vi/2Xvx78i5oBs/mqdefault.jpg)](https://youtu.be/2Xvx78i5oBs)
 
 
 ## 📚🆕 Local Stack Family
