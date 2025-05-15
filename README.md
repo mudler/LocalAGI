@@ -511,6 +511,23 @@ Connect to IRC networks:
 ```
 </details>
 
+<details>
+<summary><strong>Email</strong></summary>
+
+```json
+{
+  "smtpServer": "smtp.gmail.com:587",
+  "imapServer": "imap.gmail.com:993",
+  "smtpInsecure": "false",
+  "imapInsecure": "false",
+  "username": "user@gmail.com",
+  "email": "user@gmail.com",
+  "password": "correct-horse-battery-staple",
+  "name": "LogalAGI Agent"
+}
+```
+</details>
+
 ## REST API
 
 <details>
