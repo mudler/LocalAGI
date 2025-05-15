@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -165,12 +166,15 @@ func sshCommand(privateKey, command, user, host string) (string, error) {
 	defer session.Close()
 
 	// Run a command
-	output, err := session.CombinedOutput(command)
-	if err != nil {
-		return "", fmt.Errorf("failed to run: %v", err)
+	cmdOut, err := session.CombinedOutput(command)
+	result := string(cmdOut)
+	if strings.TrimSpace(result) == "" {
+		result += "\nCommand has exited with no output"
 	}
-
-	return string(output), nil
+	if err != nil {
+		result += "\nError: " + err.Error()
+	}
+	return result, nil
 }
 
 func (a *ShellAction) Plannable() bool {
