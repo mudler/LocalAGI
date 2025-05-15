@@ -369,9 +369,6 @@ func (e *Email) Start(a *agent.Agent) {
 	go func() {
 
 		xlog.Info("Email connector is now running.  Press CTRL-C to exit.")
-
-		imapWorking := true
-
 		// IMAP dial
 		imapOpts := &imapclient.Options{WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader}}
 		var c *imapclient.Client
@@ -379,12 +376,12 @@ func (e *Email) Start(a *agent.Agent) {
 		if e.imapInsecure {
 			c, err = imapclient.DialInsecure(e.imapServer, imapOpts)
 		} else {
-			c, err = imapclient.DialStartTLS(e.imapServer, imapOpts)
+			c, err = imapclient.DialTLS(e.imapServer, imapOpts)
 		}
 
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Email IMAP dial err: %v", err))
-			imapWorking = false
+			return
 		}
 		defer c.Close()
 
@@ -392,14 +389,14 @@ func (e *Email) Start(a *agent.Agent) {
 		err = c.Login(e.username, e.password).Wait()
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Email IMAP login err: %v", err))
-			imapWorking = false
+			return
 		}
 
 		// IMAP mailbox
 		mailboxes, err := c.List("", "%", nil).Collect()
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Email IMAP mailbox err: %v", err))
-			imapWorking = false
+			return
 		}
 
 		xlog.Debug(fmt.Sprintf("Email IMAP mailbox count: %v", len(mailboxes)))
@@ -411,15 +408,13 @@ func (e *Email) Start(a *agent.Agent) {
 		selectedMbox, err := c.Select("INBOX", nil).Wait()
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Cannot select INBOX mailbox! %v", err))
-			imapWorking = false
+			return
 		}
 		xlog.Debug(fmt.Sprintf("INBOX contains %v messages", selectedMbox.NumMessages))
 
 		// Start checking INBOX for new mail
 		imapWorkerHandle := make(chan bool)
-		if imapWorking {
-			go imapWorker(imapWorkerHandle, e, a, c, selectedMbox.NumMessages)
-		}
+		go imapWorker(imapWorkerHandle, e, a, c, selectedMbox.NumMessages)
 
 		<-a.Context().Done()
 		imapWorkerHandle <- true
