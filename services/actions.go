@@ -83,6 +83,12 @@ var AvailableActions = []string{
 	ActionSendTelegramMessage,
 }
 
+const (
+	ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
+	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
+	ActionConfigSSHBoxURL          = "sshbox-url"
+)
+
 func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 		return func(ctx context.Context, pool *state.AgentPool) []types.Action {
@@ -136,9 +142,9 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	case ActionGithubIssueSearcher:
 		a = actions.NewGithubIssueSearch(config)
 	case ActionBrowserAgentRunner:
-		a = actions.NewBrowserAgentRunner(config, actionsConfigs["browser-agent-runner-base-url"])
+		a = actions.NewBrowserAgentRunner(config, actionsConfigs[ActionConfigBrowserAgentRunner])
 	case ActionDeepResearchRunner:
-		a = actions.NewDeepResearchRunner(config, actionsConfigs["deep-research-runner-base-url"])
+		a = actions.NewDeepResearchRunner(config, actionsConfigs[ActionConfigDeepResearchRunner])
 	case ActionGithubIssueReader:
 		a = actions.NewGithubIssueReader(config)
 	case ActionGithubPRReader:
@@ -178,7 +184,7 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	case ActionCallAgents:
 		a = actions.NewCallAgent(config, agentName, pool.InternalAPI())
 	case ActionShellcommand:
-		a = actions.NewShell(config)
+		a = actions.NewShell(config, actionsConfigs[ActionConfigSSHBoxURL])
 	case ActionSendTelegramMessage:
 		a = actions.NewSendTelegramMessageRunner(config)
 	default:
