@@ -712,6 +712,8 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
 | `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
+| `LOCALAGI_SSHBOX_URL` | LocalAGI SSHBox URL, e.g. user:pass@ip:port |
+| `LOCALAGI_MCPBOX_URL` | LocalAGI MCPBox URL, e.g. http://mcpbox:8080 |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 </details>

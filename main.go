@@ -24,6 +24,7 @@ var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
 var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
 var localOperatorBaseURL = os.Getenv("LOCALOPERATOR_BASE_URL")
 var mcpboxURL = os.Getenv("LOCALAGI_MCPBOX_URL")
+var sshBoxURL = os.Getenv("LOCALAGI_SSHBOX_URL")
 
 func init() {
 	if baseModel == "" {
@@ -65,8 +66,9 @@ func main() {
 		mcpboxURL,
 		localRAG,
 		services.Actions(map[string]string{
-			"browser-agent-runner-base-url": localOperatorBaseURL,
-			"deep-research-runner-base-url": localOperatorBaseURL,
+			services.ActionConfigBrowserAgentRunner: localOperatorBaseURL,
+			services.ActionConfigDeepResearchRunner: localOperatorBaseURL,
+			services.ActionConfigSSHBoxURL:          sshBoxURL,
 		}),
 		services.Connectors,
 		services.DynamicPrompts,

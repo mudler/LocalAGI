@@ -46,6 +46,20 @@ services:
     image: busybox
     command: ["sh", "-c", "until wget -q -O - http://localrecall:8080 > /dev/null 2>&1; do echo 'Waiting for localrecall...'; sleep 1; done; echo 'localrecall is up!'"]
 
+  sshbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.sshbox
+    ports:
+      - "22"
+    environment:
+      - SSH_USER=root
+      - SSH_PASSWORD=root
+      - DOCKER_HOST=tcp://dind:2375
+    depends_on:
+      dind:
+        condition: service_healthy
+
   mcpbox:
     build:
       context: .
@@ -101,6 +115,7 @@ services:
       - LOCALAGI_TIMEOUT=5m
       - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
       - LOCALAGI_MCPBOX_URL=http://mcpbox:8080
+      - LOCALAGI_SSHBOX_URL=root:root@sshbox:22
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
