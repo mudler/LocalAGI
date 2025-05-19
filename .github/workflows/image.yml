@@ -78,8 +78,7 @@ jobs:
             VERSION=${{ steps.prep.outputs.binary_version }}
           context: ./
           file: ./Dockerfile.webui
-          #platforms: linux/amd64,linux/arm64
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           #tags: ${{ steps.prep.outputs.tags }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -152,8 +151,7 @@ jobs:
             VERSION=${{ steps.prep.outputs.binary_version }}
           context: ./
           file: ./Dockerfile.mcpbox
-          #platforms: linux/amd64,linux/arm64
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           #tags: ${{ steps.prep.outputs.tags }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -226,8 +224,7 @@ jobs:
             VERSION=${{ steps.prep.outputs.binary_version }}
           context: ./
           file: ./Dockerfile.sshbox
-          #platforms: linux/amd64,linux/arm64
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           #tags: ${{ steps.prep.outputs.tags }}
           tags: ${{ steps.meta.outputs.tags }}
