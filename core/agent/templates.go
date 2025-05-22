@@ -144,3 +144,42 @@ Available Tools:
 {{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}`
 
 const reEvalTemplate = pickActionTemplate
+
+const reminderTemplate = `You are processing a reminder that was set earlier. This reminder could be either:
+1. A specific task or goal that the user asked you to remember
+2. A follow-up action that you decided to do later
+3. A recurring task that needs periodic attention
+
+Current Reminder: {{.Message}}
+
+Guidelines for handling reminders:
+1. If this is a user-requested task:
+   - Review the original context and requirements
+   - Take immediate action if possible
+   - Update the user on progress or completion
+   - Consider if any follow-up actions are needed
+
+2. If this is a self-initiated follow-up:
+   - Review why you set this reminder
+   - Evaluate if the conditions for the action are still relevant
+   - Execute the planned action or adjust if circumstances have changed
+   - Update your state and goals accordingly
+
+3. If this is a recurring task:
+   - Check if any new information or context is available
+   - Perform the routine task
+   - Consider if the recurring schedule needs adjustment
+   - Document any changes or progress
+
+Remember to:
+- Be proactive in addressing the reminder
+- Consider both immediate actions and long-term implications
+- Update your state and goals as needed
+- Keep the user informed if the reminder was user-requested
+
+Available Tools:
+{{range .Actions -}}
+- {{.Name}}: {{.Description }}
+{{ end }}
+
+{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}` + hudTemplate

@@ -15,6 +15,7 @@ import (
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/llm"
+	"github.com/robfig/cron/v3"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -1026,25 +1027,57 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 
 	xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 
-	// TODO: Would be nice if we have a special action to
-	// contact the user. This would actually make sure that
-	// if the agent wants to initiate a conversation, it can do so.
-	// This would be a special action that would be picked up by the agent
-	// and would be used to contact the user.
+	// Check for reminders that need to be triggered
+	now := time.Now()
+	var triggeredReminders []types.ReminderActionResponse
+	var remainingReminders []types.ReminderActionResponse
 
-	// if len(conv()) != 0 {
-	// 	// Here the LLM could decide to store some part of the conversation too in the memory
-	// 	evaluateMemory := NewJob(
-	// 		WithText(
-	// 			`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
-	// 		),
-	// 		WithReasoningCallback(a.options.reasoningCallback),
-	// 		WithResultCallback(a.options.resultCallback),
-	// 	)
-	// 	a.consumeJob(evaluateMemory, SystemRole)
+	for _, reminder := range a.sharedState.Reminders {
+		if now.After(reminder.NextRun) {
+			triggeredReminders = append(triggeredReminders, reminder)
 
-	// 	a.ResetConversation()
-	// }
+			// Calculate next run time for recurring reminders
+			if reminder.IsRecurring {
+				parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+				schedule, err := parser.Parse(reminder.CronExpr)
+				if err == nil {
+					nextRun := schedule.Next(now)
+					reminder.LastRun = now
+					reminder.NextRun = nextRun
+					remainingReminders = append(remainingReminders, reminder)
+				}
+			}
+		} else {
+			remainingReminders = append(remainingReminders, reminder)
+		}
+	}
+
+	// Update the reminders list
+	a.sharedState.Reminders = remainingReminders
+
+	// Handle triggered reminders
+	for _, reminder := range triggeredReminders {
+		xlog.Info("Processing triggered reminder", "agent", a.Character.Name, "message", reminder.Message)
+
+		prompt, err := renderTemplate(reminderTemplate, a.prepareHUD(), a.availableActions(), reminder.Message)
+		if err != nil {
+			xlog.Error("Error rendering reminder template", "error", err)
+			continue
+		}
+		// Create a job to handle the reminder with the specific template
+		reminderJob := types.NewJob(
+			types.WithText(prompt),
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)
+
+		// Add the reminder message to the job's metadata
+		reminderJob.Metadata = map[string]interface{}{
+			"message": reminder.Message,
+		}
+
+		a.consumeJob(reminderJob, SystemRole, a.options.loopDetectionSteps)
+	}
 
 	if !a.options.standaloneJob {
 		return
@@ -1056,7 +1089,6 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// - evaluating the result
 	// - asking the agent to do something else based on the result
 
-	//	whatNext := NewJob(WithText("Decide what to do based on the state"))
 	whatNext := types.NewJob(
 		types.WithText(innerMonologueTemplate),
 		types.WithReasoningCallback(a.options.reasoningCallback),
@@ -1065,31 +1097,6 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	a.consumeJob(whatNext, SystemRole, a.options.loopDetectionSteps)
 
 	xlog.Info("STOP -- Periodically run is done", "agent", a.Character.Name)
-
-	// Save results from state
-
-	// a.ResetConversation()
-
-	// doWork := NewJob(WithText("Select the tool to use based on your goal and the current state."))
-	// a.consumeJob(doWork, SystemRole)
-
-	// results := []string{}
-	// for _, v := range doWork.Result.State {
-	// 	results = append(results, v.Result)
-	// }
-
-	// a.ResetConversation()
-
-	// // Here the LLM could decide to do something based on the result of our automatic action
-	// evaluateAction := NewJob(
-	// 	WithText(
-	// 		`Evaluate the current situation and decide if we need to execute other tools (for instance to store results into permanent, or short memory).
-	// 		We have done the following actions:
-	// 		` + strings.Join(results, "\n"),
-	// 	))
-	// a.consumeJob(evaluateAction, SystemRole)
-
-	// a.ResetConversation()
 }
 
 func (a *Agent) Run() error {

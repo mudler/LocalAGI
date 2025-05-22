@@ -47,6 +47,9 @@ const (
 	ActionCallAgents                     = "call_agents"
 	ActionShellcommand                   = "shell-command"
 	ActionSendTelegramMessage            = "send-telegram-message"
+	ActionSetReminder                    = "set_reminder"
+	ActionListReminders                  = "list_reminders"
+	ActionRemoveReminder                 = "remove_reminder"
 )
 
 var AvailableActions = []string{
@@ -81,6 +84,9 @@ var AvailableActions = []string{
 	ActionCallAgents,
 	ActionShellcommand,
 	ActionSendTelegramMessage,
+	ActionSetReminder,
+	ActionListReminders,
+	ActionRemoveReminder,
 }
 
 const (
@@ -95,6 +101,9 @@ func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(c
 			allActions := []types.Action{}
 
 			agentName := a.Name
+
+			// Add the reminder action
+			allActions = append(allActions, action.NewReminder())
 
 			for _, a := range a.Actions {
 				var config map[string]string
@@ -187,6 +196,12 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewShell(config, actionsConfigs[ActionConfigSSHBoxURL])
 	case ActionSendTelegramMessage:
 		a = actions.NewSendTelegramMessageRunner(config)
+	case ActionSetReminder:
+		a = action.NewReminder()
+	case ActionListReminders:
+		a = action.NewListReminders()
+	case ActionRemoveReminder:
+		a = action.NewRemoveReminder()
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
