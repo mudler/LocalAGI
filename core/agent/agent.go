@@ -1077,6 +1077,42 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 		}
 
 		a.consumeJob(reminderJob, SystemRole, a.options.loopDetectionSteps)
+
+		// After the reminder job is complete, create a summary for the user
+		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
+			// Create a summary prompt
+			summaryPrompt := fmt.Sprintf(`Please summarize what was done to handle the following reminder: "%s". 
+			Review the conversation history and provide a concise summary of the actions taken and their outcomes.
+			Focus on what was accomplished and any important updates or changes.`, reminder.Message)
+
+			// Add the conversation history to the prompt
+			summaryMessages := append([]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: summaryPrompt,
+				},
+			}, reminderJob.Result.Conversation...)
+
+			// Generate the summary using askLLM
+			summary, err := a.askLLM(a.context.Context, summaryMessages, maxRetries)
+			if err != nil {
+				xlog.Error("Error generating reminder summary", "error", err)
+				continue
+			}
+
+			if summary.Content != "" {
+				// Send the summary as a new conversation to the user
+				msg := openai.ChatCompletionMessage{
+					Role:    "assistant",
+					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, summary.Content),
+				}
+
+				go func(agent *Agent) {
+					xlog.Info("Sending reminder summary to user", "agent", agent.Character.Name, "message", msg.Content)
+					agent.newConversations <- msg
+				}(a)
+			}
+		}
 	}
 
 	if !a.options.standaloneJob {
