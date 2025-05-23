@@ -83,6 +83,27 @@ func (d *Discord) Start(a *agent.Agent) {
 
 	dg.StateEnabled = true
 
+	if d.defaultChannel != "" {
+		// handle new conversations
+		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+			xlog.Debug("Subscriber(discord)", "message", ccm.Content)
+
+			// Send the message to the default channel
+			_, err := dg.ChannelMessageSend(d.defaultChannel, ccm.Content)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error sending message: %v", err))
+			}
+
+			a.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("discord:%s", d.defaultChannel),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
+		})
+	}
+
 	// Register the messageCreate func as a callback for MessageCreate events.
 	dg.AddHandler(d.messageCreate(a))
 

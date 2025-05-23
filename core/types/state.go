@@ -29,8 +29,17 @@ const (
 	DefaultLastMessageDuration = 5 * time.Minute
 )
 
+type ReminderActionResponse struct {
+	Message     string    `json:"message"`
+	CronExpr    string    `json:"cron_expr"`    // Cron expression for scheduling
+	LastRun     time.Time `json:"last_run"`     // Last time this reminder was triggered
+	NextRun     time.Time `json:"next_run"`     // Next scheduled run time
+	IsRecurring bool      `json:"is_recurring"` // Whether this is a recurring reminder
+}
+
 type AgentSharedState struct {
 	ConversationTracker *conversations.ConversationTracker[string] `json:"conversation_tracker"`
+	Reminders           []ReminderActionResponse                   `json:"reminders"`
 }
 
 func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
@@ -39,6 +48,7 @@ func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
 	}
 	return &AgentSharedState{
 		ConversationTracker: conversations.NewConversationTracker[string](lastMessageDuration),
+		Reminders:           make([]ReminderActionResponse, 0),
 	}
 }
 

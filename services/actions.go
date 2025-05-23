@@ -47,6 +47,9 @@ const (
 	ActionCallAgents                     = "call_agents"
 	ActionShellcommand                   = "shell-command"
 	ActionSendTelegramMessage            = "send-telegram-message"
+	ActionSetReminder                    = "set_reminder"
+	ActionListReminders                  = "list_reminders"
+	ActionRemoveReminder                 = "remove_reminder"
 )
 
 var AvailableActions = []string{
@@ -81,6 +84,9 @@ var AvailableActions = []string{
 	ActionCallAgents,
 	ActionShellcommand,
 	ActionSendTelegramMessage,
+	ActionSetReminder,
+	ActionListReminders,
+	ActionRemoveReminder,
 }
 
 const (
@@ -187,6 +193,12 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewShell(config, actionsConfigs[ActionConfigSSHBoxURL])
 	case ActionSendTelegramMessage:
 		a = actions.NewSendTelegramMessageRunner(config)
+	case ActionSetReminder:
+		a = action.NewReminder()
+	case ActionListReminders:
+		a = action.NewListReminders()
+	case ActionRemoveReminder:
+		a = action.NewRemoveReminder()
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -355,6 +367,21 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "send-telegram-message",
 			Label:  "Send Telegram Message",
 			Fields: actions.SendTelegramMessageConfigMeta(),
+		},
+		{
+			Name:   "set_reminder",
+			Label:  "Set Reminder",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "list_reminders",
+			Label:  "List Reminders",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "remove_reminder",
+			Label:  "Remove Reminder",
+			Fields: []config.Field{},
 		},
 	}
 }

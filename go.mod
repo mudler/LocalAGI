@@ -32,7 +32,10 @@ require (
 	mvdan.cc/xurls/v2 v2.6.0
 )
 
-require github.com/JohannesKaufmann/dom v0.2.0 // indirect
+require (
+	github.com/JohannesKaufmann/dom v0.2.0 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
+)
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.2
