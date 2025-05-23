@@ -225,7 +225,7 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		})
 	}
 	if len(t.admins) > 0 && !slices.Contains(t.admins, username) {
-		xlog.Info("Unauthorized user", "username", username)
+		xlog.Info("Unauthorized user", "username", username, "admins", t.admins)
 		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
 			Text:   "you are not authorized to use this bot!",
@@ -444,7 +444,7 @@ func NewTelegramConnector(config map[string]string) (*Telegram, error) {
 
 	admins := []string{}
 
-	if _, ok := config["admins"]; ok {
+	if _, ok := config["admins"]; ok && strings.Contains(config["admins"], ",") {
 		admins = append(admins, strings.Split(config["admins"], ",")...)
 	}
 
