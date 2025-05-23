@@ -368,5 +368,20 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Label:  "Send Telegram Message",
 			Fields: actions.SendTelegramMessageConfigMeta(),
 		},
+		{
+			Name:   "set_reminder",
+			Label:  "Set Reminder",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "list_reminders",
+			Label:  "List Reminders",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "remove_reminder",
+			Label:  "Remove Reminder",
+			Fields: []config.Field{},
+		},
 	}
 }
