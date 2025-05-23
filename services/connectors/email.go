@@ -35,6 +35,7 @@ type Email struct {
 	smtpInsecure bool
 	imapServer   string
 	imapInsecure bool
+	defaultEmail string
 }
 
 func NewEmail(config map[string]string) *Email {
@@ -48,6 +49,7 @@ func NewEmail(config map[string]string) *Email {
 		smtpInsecure: config["smtpInsecure"] == "true",
 		imapServer:   config["imapServer"],
 		imapInsecure: config["imapInsecure"] == "true",
+		defaultEmail: config["defaultEmail"],
 	}
 }
 
@@ -104,6 +106,12 @@ func EmailConfigMeta() []config.Field {
 			Type:     config.FieldTypeText,
 			Required: true,
 			HelpText: "Agent email address",
+		},
+		{
+			Name:     "defaultEmail",
+			Label:    "Default Recipient",
+			Type:     config.FieldTypeText,
+			HelpText: "Default email address to send messages to when the agent wants to initiate a conversation",
 		},
 	}
 }
@@ -367,6 +375,31 @@ func imapWorker(done chan bool, e *Email, a *agent.Agent, c *imapclient.Client, 
 
 func (e *Email) Start(a *agent.Agent) {
 	go func() {
+		if e.defaultEmail != "" {
+			// handle new conversations
+			a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+				xlog.Debug("Subscriber(email)", "message", ccm.Content)
+
+				// Send the message to the default email
+				e.sendMail(
+					e.defaultEmail,
+					"Message from LocalAGI",
+					ccm.Content,
+					"",
+					"",
+					[]string{e.defaultEmail},
+					false,
+				)
+
+				a.SharedState().ConversationTracker.AddMessage(
+					fmt.Sprintf("email:%s", e.defaultEmail),
+					openai.ChatCompletionMessage{
+						Content: ccm.Content,
+						Role:    "assistant",
+					},
+				)
+			})
+		}
 
 		xlog.Info("Email connector is now running.  Press CTRL-C to exit.")
 		// IMAP dial

@@ -223,6 +223,24 @@ func (m *Matrix) Start(a *agent.Agent) {
 	xlog.Info("Matrix client created")
 	m.client = client
 
+	if m.roomID != "" {
+		// handle new conversations
+		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+			xlog.Debug("Subscriber(matrix)", "message", ccm.Content)
+			_, err := m.client.SendText(context.Background(), id.RoomID(m.roomID), ccm.Content)
+			if err != nil {
+				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
+			}
+			a.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("matrix:%s", m.roomID),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
+		})
+	}
+
 	syncer := client.Syncer.(*mautrix.DefaultSyncer)
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
 		xlog.Info("Received message", evt.Content.AsMessage().Body)
