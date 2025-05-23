@@ -102,9 +102,6 @@ func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(c
 
 			agentName := a.Name
 
-			// Add the reminder action
-			allActions = append(allActions, action.NewReminder())
-
 			for _, a := range a.Actions {
 				var config map[string]string
 				if err := json.Unmarshal([]byte(a.Config), &config); err != nil {

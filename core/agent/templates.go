@@ -150,7 +150,7 @@ const reminderTemplate = `You are processing a reminder that was set earlier. Th
 2. A follow-up action that you decided to do later
 3. A recurring task that needs periodic attention
 
-Current Reminder: {{.Message}}
+Current Reminder: {{.Reasoning}}
 
 Guidelines for handling reminders:
 1. If this is a user-requested task:
