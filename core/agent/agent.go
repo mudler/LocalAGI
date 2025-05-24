@@ -1063,60 +1063,42 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	for _, reminder := range triggeredReminders {
 		xlog.Info("Processing triggered reminder", "agent", a.Character.Name, "message", reminder.Message)
 
-		prompt, err := renderTemplate(reminderTemplate, a.prepareHUD(), a.availableActions(), reminder.Message)
-		if err != nil {
-			xlog.Error("Error rendering reminder template", "error", err)
-			continue
-		}
-		// Create a job to handle the reminder with the specific template
+		// Create a more natural conversation flow for the reminder
 		reminderJob := types.NewJob(
-			types.WithText(prompt),
+			types.WithText(fmt.Sprintf("I have a reminder for you: %s", reminder.Message)),
 			types.WithReasoningCallback(a.options.reasoningCallback),
 			types.WithResultCallback(a.options.resultCallback),
 		)
 
 		// Add the reminder message to the job's metadata
 		reminderJob.Metadata = map[string]interface{}{
-			"message": reminder.Message,
+			"message":     reminder.Message,
+			"is_reminder": true,
 		}
 
-		a.consumeJob(reminderJob, SystemRole, a.options.loopDetectionSteps)
+		// Process the reminder as a normal conversation
+		a.consumeJob(reminderJob, UserRole, a.options.loopDetectionSteps)
 
-		// After the reminder job is complete, create a summary for the user
+		// After the reminder job is complete, ensure the user is notified
 		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
-			// Create a summary prompt
-			summaryPrompt := fmt.Sprintf(`Please summarize what was done to handle the following reminder: "%s". 
-			Review the conversation history and provide a concise summary of the actions taken and their outcomes.
-			Focus on what was accomplished and any important updates or changes.`, reminder.Message)
-
-			// Add the conversation history to the prompt
-			summaryMessages := append([]openai.ChatCompletionMessage{
-				{
-					Role:    "system",
-					Content: summaryPrompt,
-				},
-			}, reminderJob.Result.Conversation...)
-
-			// Generate the summary using askLLM
-			summary, err := a.askLLM(a.context.Context, summaryMessages, maxRetries)
-			if err != nil {
-				xlog.Error("Error generating reminder summary", "error", err)
-				continue
+			// Get the last assistant message from the conversation
+			var lastAssistantMsg *openai.ChatCompletionMessage
+			for i := len(reminderJob.Result.Conversation) - 1; i >= 0; i-- {
+				if reminderJob.Result.Conversation[i].Role == AssistantRole {
+					lastAssistantMsg = &reminderJob.Result.Conversation[i]
+					break
+				}
 			}
 
-			if a.options.stripThinkingTags {
-				summary.Content = stripThinkingTags(summary.Content)
-			}
-
-			if summary.Content != "" {
-				// Send the summary as a new conversation to the user
+			if lastAssistantMsg != nil && lastAssistantMsg.Content != "" {
+				// Send the reminder response to the user
 				msg := openai.ChatCompletionMessage{
 					Role:    "assistant",
-					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, summary.Content),
+					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, lastAssistantMsg.Content),
 				}
 
 				go func(agent *Agent) {
-					xlog.Info("Sending reminder summary to user", "agent", agent.Character.Name, "message", msg.Content)
+					xlog.Info("Sending reminder response to user", "agent", agent.Character.Name, "message", msg.Content)
 					agent.newConversations <- msg
 				}(a)
 			}
