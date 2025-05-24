@@ -70,6 +70,52 @@ func (i *IRC) Start(a *agent.Agent) {
 		return
 	}
 	i.conn.UseTLS = false
+
+	if i.channel != "" {
+		// handle new conversations
+		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+			xlog.Debug("Subscriber(irc)", "message", ccm.Content)
+
+			// Split the response into multiple messages if it's too long
+			maxLength := 400 // Safe limit for most IRC servers
+			response := ccm.Content
+
+			// Handle multiline responses
+			lines := strings.Split(response, "\n")
+			for _, line := range lines {
+				if line == "" {
+					continue
+				}
+
+				// Split long lines
+				for len(line) > 0 {
+					var chunk string
+					if len(line) > maxLength {
+						chunk = line[:maxLength]
+						line = line[maxLength:]
+					} else {
+						chunk = line
+						line = ""
+					}
+
+					// Send the message to the channel
+					i.conn.Privmsg(i.channel, chunk)
+
+					// Small delay to prevent flooding
+					time.Sleep(500 * time.Millisecond)
+				}
+			}
+
+			a.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("irc:%s", i.channel),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
+		})
+	}
+
 	i.conn.AddCallback("001", func(e *irc.Event) {
 		xlog.Info("Connected to IRC server", "server", i.server, "arguments", e.Arguments)
 		i.conn.Join(i.channel)
