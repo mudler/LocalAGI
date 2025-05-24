@@ -223,6 +223,14 @@ func (m Messages) IsLastMessageFromRole(role string) bool {
 }
 
 func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act types.Action, c []openai.ChatCompletionMessage, reasoning string, maxAttempts int) (*decisionResult, error) {
+
+	if len(act.Definition().Properties) > 0 {
+		xlog.Debug("Action has properties", "action", act.Definition().Name, "properties", act.Definition().Properties)
+	} else {
+		xlog.Debug("Action has no properties", "action", act.Definition().Name)
+		return &decisionResult{actionParams: types.ActionParams{}}, nil
+	}
+
 	stateHUD, err := renderTemplate(pickTemplate, a.prepareHUD(), a.availableActions(), reasoning)
 	if err != nil {
 		return nil, err

@@ -1033,21 +1033,25 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	var remainingReminders []types.ReminderActionResponse
 
 	for _, reminder := range a.sharedState.Reminders {
+		xlog.Debug("Checking reminder", "reminder", reminder)
 		if now.After(reminder.NextRun) {
 			triggeredReminders = append(triggeredReminders, reminder)
-
+			xlog.Debug("Reminder triggered", "reminder", reminder)
 			// Calculate next run time for recurring reminders
 			if reminder.IsRecurring {
+				xlog.Debug("Reminder is recurring", "reminder", reminder)
 				parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 				schedule, err := parser.Parse(reminder.CronExpr)
 				if err == nil {
 					nextRun := schedule.Next(now)
+					xlog.Debug("Next run time", "reminder", reminder, "nextRun", nextRun)
 					reminder.LastRun = now
 					reminder.NextRun = nextRun
 					remainingReminders = append(remainingReminders, reminder)
 				}
 			}
 		} else {
+			xlog.Debug("Reminder not triggered", "reminder", reminder)
 			remainingReminders = append(remainingReminders, reminder)
 		}
 	}
@@ -1098,6 +1102,10 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 			if err != nil {
 				xlog.Error("Error generating reminder summary", "error", err)
 				continue
+			}
+
+			if a.options.stripThinkingTags {
+				summary.Content = stripThinkingTags(summary.Content)
 			}
 
 			if summary.Content != "" {
