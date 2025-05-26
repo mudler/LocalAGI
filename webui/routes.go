@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dave-gray101/v2keyauth"
@@ -31,6 +33,9 @@ var embeddedFiles embed.FS
 
 //go:embed react-ui/dist/*
 var reactUI embed.FS
+
+var rawKey = os.Getenv("PRIVY_PUBLIC_KEY_PEM")
+var pubKey = strings.ReplaceAll(rawKey, `\n`, "\n")
 
 func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
@@ -67,6 +72,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Get("/", func(c *fiber.Ctx) error {
 		return c.Redirect("/app")
 	})
+
 	webapp.Use("/app", filesystem.New(filesystem.Config{
 		Root:       http.FS(reactUI),
 		PathPrefix: "react-ui/dist",
@@ -129,15 +135,15 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
-	webapp.Get("/api/notify/:name", app.Notify(pool))
-	webapp.Post("/old/chat/:name", app.OldChat(pool))
+	webapp.Get("/api/notify/:name", app.RequireUser(pubKey), app.Notify(pool))
+	webapp.Post("/old/chat/:name", app.RequireUser(pubKey), app.OldChat(pool))
 
-	webapp.Post("/api/agent/create", app.Create(pool))
-	webapp.Delete("/api/agent/:name", app.Delete(pool))
-	webapp.Put("/api/agent/:name/pause", app.Pause(pool))
-	webapp.Put("/api/agent/:name/start", app.Start(pool))
+	webapp.Post("/api/agent/create", app.RequireUser(pubKey), app.Create("pools"))
+	webapp.Delete("/api/agent/:name", app.RequireUser(pubKey), app.Delete(pool))
+	webapp.Put("/api/agent/:name/pause", app.RequireUser(pubKey), app.Pause(pool))
+	webapp.Put("/api/agent/:name/start", app.RequireUser(pubKey), app.Start(pool))
 
-	webapp.Post("/api/chat/:name", app.Chat(pool))
+	webapp.Post("/api/chat/:name", app.RequireUser(pubKey), app.Chat(pool))
 
 	conversationTracker := connectors.NewConversationTracker[string](time.Minute)
 
@@ -180,23 +186,23 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// New API endpoints for getting and updating agent configuration
-	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
-	webapp.Put("/api/agent/:name/config", app.UpdateAgentConfig(pool))
+	webapp.Get("/api/agent/:name/config", app.RequireUser(pubKey), app.GetAgentConfig(pool))
+	webapp.Put("/api/agent/:name/config", app.RequireUser(pubKey), app.UpdateAgentConfig(pool))
 
 	// Metadata endpoint for agent configuration fields
-	webapp.Get("/api/agent/config/metadata", app.GetAgentConfigMeta())
+	webapp.Get("/api/agent/config/metadata", app.RequireUser(pubKey), app.GetAgentConfigMeta())
 
 	// Add endpoint for getting agent config metadata
-	webapp.Get("/api/meta/agent/config", app.GetAgentConfigMeta())
+	webapp.Get("/api/meta/agent/config", app.RequireUser(pubKey), app.GetAgentConfigMeta())
 
-	webapp.Post("/api/action/:name/run", app.ExecuteAction(pool))
+	webapp.Post("/api/action/:name/run", app.RequireUser(pubKey), app.ExecuteAction(pool))
 	webapp.Get("/api/actions", app.ListActions())
 
-	webapp.Post("/api/agent/group/generateProfiles", app.GenerateGroupProfiles(pool))
-	webapp.Post("/api/agent/group/create", app.CreateGroup(pool))
+	webapp.Post("/api/agent/group/generateProfiles", app.RequireUser(pubKey), app.GenerateGroupProfiles(pool))
+	webapp.Post("/api/agent/group/create", app.RequireUser(pubKey), app.CreateGroup(pool))
 
 	// Dashboard API endpoint for React UI
-	webapp.Get("/api/agents", func(c *fiber.Ctx) error {
+	webapp.Get("/api/agents", app.RequireUser(pubKey), func(c *fiber.Ctx) error {
 		statuses := map[string]bool{}
 		agents := pool.List()
 		for _, a := range agents {
@@ -218,7 +224,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// API endpoint for getting a specific agent's details
-	webapp.Get("/api/agent/:name", func(c *fiber.Ctx) error {
+	webapp.Get("/api/agent/:name", app.RequireUser(pubKey), func(c *fiber.Ctx) error {
 		name := c.Params("name")
 		agent := pool.GetAgent(name)
 		if agent == nil {
@@ -234,7 +240,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// API endpoint for agent status history
-	webapp.Get("/api/agent/:name/status", func(c *fiber.Ctx) error {
+	webapp.Get("/api/agent/:name/status", app.RequireUser(pubKey), func(c *fiber.Ctx) error {
 		history := pool.GetStatusHistory(c.Params("name"))
 		if history == nil {
 			history = &state.Status{ActionResults: []types.ActionState{}}
@@ -243,10 +249,10 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		entries := []string{}
 		for _, h := range Reverse(history.Results()) {
 			entries = append(entries, fmt.Sprintf(
-				"Result: %v Action: %v Params: %v Reasoning: %v", 
+				"Result: %v Action: %v Params: %v Reasoning: %v",
 				h.Result,
-				h.Action.Definition().Name, 
-				h.Params, 
+				h.Action.Definition().Name,
+				h.Params,
 				h.Reasoning,
 			))
 		}
@@ -257,10 +263,10 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
-	webapp.Post("/settings/import", app.ImportAgent(pool))
-	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
+	webapp.Post("/settings/import", app.RequireUser(pubKey), app.ImportAgent(pool))
+	webapp.Get("/settings/export/:name", app.RequireUser(pubKey), app.ExportAgent(pool))
 
-	webapp.Post("/api/openrouter/chat", app.ProxyOpenRouterChat())
+	webapp.Post("/api/openrouter/chat", app.RequireUser(pubKey), app.ProxyOpenRouterChat())
 
 }
 

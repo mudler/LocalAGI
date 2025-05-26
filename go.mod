@@ -1,8 +1,8 @@
 module github.com/mudler/LocalAGI
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.22.2
+toolchain go1.24.3
 
 require (
 	github.com/bwmarrin/discordgo v0.28.1
@@ -25,7 +25,7 @@ require (
 	github.com/tmc/langchaingo v0.1.8
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.52.0
-	golang.org/x/crypto v0.30.0
+	golang.org/x/crypto v0.38.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
 	mvdan.cc/xurls/v2 v2.6.0
 )
@@ -52,6 +52,8 @@ require (
 	github.com/gocolly/colly v1.2.0 // indirect
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/utils v1.1.0 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
@@ -59,6 +61,10 @@ require (
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.12.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/pgx v3.6.2+incompatible
+	github.com/jackc/pgx/v5 v5.7.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
@@ -87,8 +93,8 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.starlark.net v0.0.0-20230302034142-4b1e35fe2254 // indirect
 	golang.org/x/net v0.32.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/tools v0.28.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect

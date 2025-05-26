@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
 import "./App.css";
+import { PrivyProvider } from "@privy-io/react-auth";
 
 // Add the Google Fonts for the cyberpunk styling
 const fontLink = document.createElement("link");
@@ -20,6 +21,16 @@ document.head.appendChild(fontAwesomeLink);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <PrivyProvider
+      appId={import.meta.env.VITE_PRIVY_APP_ID}
+      config={{
+        loginMethods: ["wallet", "email"],
+        appearance: {
+          theme: "light",
+        },
+      }}
+    >
+      <RouterProvider router={router} />
+    </PrivyProvider>
   </StrictMode>
 );

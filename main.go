@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAGI/core/state"
+	"github.com/mudler/LocalAGI/db"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/LocalAGI/webui"
 )
@@ -22,6 +23,7 @@ var withLogs = os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
 var apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
 var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
 var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
+var dbUrl = os.Getenv("LOCALAGI_DB_URL")
 
 func init() {
 	if baseModel == "" {
@@ -47,6 +49,8 @@ func main() {
 	// make sure state dir exists
 	os.MkdirAll(stateDir, 0755)
 
+	db.ConnectDB(dbUrl)
+
 	apiKeys := []string{}
 	if apiKeysEnv != "" {
 		apiKeys = strings.Split(apiKeysEnv, ",")
@@ -54,6 +58,7 @@ func main() {
 
 	// Create the agent pool
 	pool, err := state.NewAgentPool(
+		"1",
 		baseModel,
 		multimodalModel,
 		imageModel,

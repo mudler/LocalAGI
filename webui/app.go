@@ -2,7 +2,9 @@ package webui
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,10 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	coreTypes "github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/db"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/llm"
+	"github.com/mudler/LocalAGI/pkg/utils"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/LocalAGI/services/connectors"
@@ -24,20 +29,25 @@ import (
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/state"
 
+	"bytes"
+	"io"
+
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
-	"bytes"
-	"io"
 )
 
 type (
 	App struct {
-		htmx   *htmx.HTMX
-		config *Config
+		UserPools map[string]*state.AgentPool
+		htmx      *htmx.HTMX
+		config    *Config
 		*fiber.App
 	}
 )
+
+var privyAppId = os.Getenv("PRIVY_APP_ID")
+var privyApiKey = os.Getenv("PRIVY_APP_SECRET")
 
 func NewApp(opts ...Option) *App {
 	config := NewConfig(opts...)
@@ -50,9 +60,10 @@ func NewApp(opts ...Option) *App {
 	})
 
 	a := &App{
-		htmx:   htmx.New(),
-		config: config,
-		App:    webapp,
+		UserPools: make(map[string]*state.AgentPool),
+		htmx:      htmx.New(),
+		config:    config,
+		App:       webapp,
 	}
 
 	a.registerRoutes(config.Pool, webapp)
@@ -130,18 +141,54 @@ func (a *App) Start(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Create(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Create(poolRoot string) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		config := state.AgentConfig{}
+		// 1. Get user ID
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		// 2. Parse request body
+		var config state.AgentConfig
 		if err := c.BodyParser(&config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
-
-		xlog.Info("Agent configuration\n", "config", config)
-
 		if config.Name == "" {
 			return errorJSONMessage(c, "Name is required")
 		}
+
+		// 3. Use cached pool or create new one
+		var pool *state.AgentPool
+		if p, ok := a.UserPools[userID]; ok {
+			pool = p
+		} else {
+			userDir := filepath.Join(poolRoot, userID)
+			os.MkdirAll(userDir, 0755)
+
+			var err error
+			pool, err = state.NewAgentPool(
+				userID,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				userDir,
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
+			}
+			a.UserPools[userID] = pool
+		}
+
+		// 4. Create the agent
 		if err := pool.CreateAgent(config.Name, &config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
@@ -697,26 +744,28 @@ func getOpenRouterModels() []map[string]interface{} {
 		resp.Body.Close()
 	}()
 
-	var result struct { Data []map[string]interface{} `json:"data"` }
+	var result struct {
+		Data []map[string]interface{} `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil
 	}
 	// Only allow latest OpenAI, Anthropic, and Alibaba models
 	allowed := map[string]bool{
-		"openai/gpt-4o": true,
-		"openai/gpt-4-turbo": true,
-		"openai/gpt-4.1": true,
-		"openai/o4-mini": true,
-		"openai/o4-mini-high": true,
-		"openai/o3": true,
-		"anthropic/claude-3.5-sonnet": true,
-		"anthropic/claude-3.7-sonnet": true,
-		"qwen/qwen-2.5-7b-instruct": true,
-		"qwen/qwq-32b": true,
-		"qwen/qwen-2.5-72b-instruct": true,
+		"openai/gpt-4o":                        true,
+		"openai/gpt-4-turbo":                   true,
+		"openai/gpt-4.1":                       true,
+		"openai/o4-mini":                       true,
+		"openai/o4-mini-high":                  true,
+		"openai/o3":                            true,
+		"anthropic/claude-3.5-sonnet":          true,
+		"anthropic/claude-3.7-sonnet":          true,
+		"qwen/qwen-2.5-7b-instruct":            true,
+		"qwen/qwq-32b":                         true,
+		"qwen/qwen-2.5-72b-instruct":           true,
 		"google/gemini-2.5-pro-exp-03-25:free": true,
-		"deepseek/deepseek-chat-v3-0324:free": true,
-		"qwen/qwq-32b:free": true,
+		"deepseek/deepseek-chat-v3-0324:free":  true,
+		"qwen/qwq-32b:free":                    true,
 	}
 	models := []map[string]interface{}{}
 	for _, m := range result.Data {
@@ -779,5 +828,116 @@ func (a *App) ProxyOpenRouterChat() func(c *fiber.Ctx) error {
 		c.Set("Content-Type", resp.Header.Get("Content-Type"))
 		c.Send(respBody)
 		return nil
+	}
+}
+
+// PrivyClaims holds the JWT fields
+type PrivyClaims struct {
+	AppId      string `json:"aud,omitempty"`
+	Expiration uint64 `json:"exp,omitempty"`
+	Issuer     string `json:"iss,omitempty"`
+	UserId     string `json:"sub,omitempty"`
+	Email      string `json:"email,omitempty"`
+}
+
+func (c *PrivyClaims) Valid() error {
+	if c.AppId != privyAppId {
+		return errors.New("aud claim must match your Privy App ID")
+	}
+	if c.Issuer != "privy.io" {
+		return errors.New("iss claim must be 'privy.io'")
+	}
+	if c.Expiration < uint64(time.Now().Unix()) {
+		return errors.New("token is expired")
+	}
+	return nil
+}
+
+func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		// Get token from cookies
+		tokenStr := c.Cookies("privy-token")
+		if tokenStr == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"error":   "Missing Privy token",
+			})
+		}
+
+		// Parse public key
+		pubKey, err := jwt.ParseECPublicKeyFromPEM([]byte(verificationKey))
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Could not parse public key",
+			})
+		}
+
+		// Parse and validate JWT
+		claims := &PrivyClaims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+			if token.Method.Alg() != jwt.SigningMethodES256.Alg() {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return pubKey, nil
+		})
+
+		if err != nil || !token.Valid {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"error":   "Invalid or expired token",
+			})
+		}
+
+		if err := claims.Valid(); err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"error":   "JWT validation failed: " + err.Error(),
+			})
+		}
+
+		// Attempt to fetch user ID directly
+		var id string
+		err = db.Conn.QueryRow(context.Background(),
+			"SELECT id FROM users WHERE privyId = $1", claims.UserId).Scan(&id)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// User doesn't exist — create them
+				user, err := utils.GetPrivyUserByDID(claims.UserId, privyAppId, privyApiKey)
+				if err != nil {
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"success": false,
+						"error":   "Failed to fetch user from Privy",
+					})
+				}
+
+				email := user.GetEmail()
+
+				err = db.Conn.QueryRow(context.Background(),
+					"INSERT INTO users (email, privyId) VALUES ($1, $2) RETURNING id", email, claims.UserId,
+				).Scan(&id)
+				if err != nil {
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"success": false,
+						"error":   "Failed to insert new user",
+					})
+				}
+
+				c.Locals("email", email)
+			} else {
+				// Unknown DB error
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"success": false,
+					"error":   "Database error while fetching user",
+				})
+			}
+		}
+
+		// Store user info in context
+		c.Locals("id", id)
+		c.Locals("privyId", claims.UserId)
+
+		return c.Next()
 	}
 }

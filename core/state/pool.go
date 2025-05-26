@@ -26,6 +26,7 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
+	userId                                       string
 	file                                         string
 	pooldir                                      string
 	pool                                         AgentPoolData
@@ -72,7 +73,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory string,
+	userId, defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -93,6 +94,7 @@ func NewAgentPool(
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
+			userId:                 userId,
 			file:                   poolfile,
 			pooldir:                directory,
 			apiURL:                 apiURL,

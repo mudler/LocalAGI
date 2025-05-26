@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import "./App.css";
+import { usePrivy } from "@privy-io/react-auth";
 
 function App() {
   const [toast, setToast] = useState({
@@ -40,6 +41,24 @@ function App() {
     return location.pathname === path;
   };
 
+  const { ready, authenticated } = usePrivy();
+
+  const isAuthLoading = !ready;
+
+  const isAuthenticated = ready && authenticated;
+
+  if (isAuthLoading) {
+    return <div></div>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <main className="main-content">
+        <Outlet context={{ showToast }} />
+      </main>
+    );
+  }
+
   return (
     <div className="app-container">
       {/* Navigation Menu */}
@@ -62,35 +81,41 @@ function App() {
               <img src="/app/nav/house.svg" alt="House" className="nav-icon" />
               Home
             </Link>
-            <Link
-              to="/agents"
-              className={`nav-link ${isActive("/agents") ? "active" : ""}`}
-            >
-              <img src="/app/nav/robot.svg" alt="Robot" className="nav-icon" />{" "}
-              Agent List
-            </Link>
-            <Link
-              to="/actions-playground"
-              className={`nav-link ${
-                isActive("/actions-playground") ? "active" : ""
-              }`}
-            >
-              <img src="/app/nav/bolt.svg" alt="Bolt" className="nav-icon" />
-              Action Playground
-            </Link>
-            <Link
-              to="/group-create"
-              className={`nav-link ${
-                isActive("/group-create") ? "active" : ""
-              }`}
-            >
-              <img
-                src="/app/nav/user-group.svg"
-                alt="User Group"
-                className="nav-icon"
-              />
-              Create Group Agent
-            </Link>
+            <>
+              <Link
+                to="/agents"
+                className={`nav-link ${isActive("/agents") ? "active" : ""}`}
+              >
+                <img
+                  src="/app/nav/robot.svg"
+                  alt="Robot"
+                  className="nav-icon"
+                />{" "}
+                Agent List
+              </Link>
+              <Link
+                to="/actions-playground"
+                className={`nav-link ${
+                  isActive("/actions-playground") ? "active" : ""
+                }`}
+              >
+                <img src="/app/nav/bolt.svg" alt="Bolt" className="nav-icon" />
+                Action Playground
+              </Link>
+              <Link
+                to="/group-create"
+                className={`nav-link ${
+                  isActive("/group-create") ? "active" : ""
+                }`}
+              >
+                <img
+                  src="/app/nav/user-group.svg"
+                  alt="User Group"
+                  className="nav-icon"
+                />
+                Create Group Agent
+              </Link>
+            </>
           </div>
 
           <div className="status-text">
@@ -122,44 +147,50 @@ function App() {
                 Home
               </Link>
             </li>
-            <li>
-              <Link
-                to="/agents"
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <img
-                  src="/app/nav/robot.svg"
-                  alt="Robot"
-                  className="nav-icon"
-                />{" "}
-                Agent List
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/actions-playground"
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <img src="/app/nav/bolt.svg" alt="Bolt" className="nav-icon" />{" "}
-                Action Playground
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/group-create"
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <img
-                  src="/app/nav/user-group.svg"
-                  alt="User Group"
-                  className="nav-icon"
-                />{" "}
-                Create Group Agent
-              </Link>
-            </li>
+            <>
+              <li>
+                <Link
+                  to="/agents"
+                  className="mobile-nav-link"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <img
+                    src="/app/nav/robot.svg"
+                    alt="Robot"
+                    className="nav-icon"
+                  />{" "}
+                  Agent List
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/actions-playground"
+                  className="mobile-nav-link"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <img
+                    src="/app/nav/bolt.svg"
+                    alt="Bolt"
+                    className="nav-icon"
+                  />{" "}
+                  Action Playground
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/group-create"
+                  className="mobile-nav-link"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <img
+                    src="/app/nav/user-group.svg"
+                    alt="User Group"
+                    className="nav-icon"
+                  />{" "}
+                  Create Group Agent
+                </Link>
+              </li>
+            </>
           </ul>
         </div>
       )}

@@ -1232,3 +1232,38 @@ a:hover {
     margin-bottom: 8px;
   }
 }
+
+.unauth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 97px);
+}
+
+.login-button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: #2563eb; 
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-button:hover:not(:disabled) {
+  background-color: #1e40af; 
+}
+
+.login-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.5);
+}
+
+.login-button:disabled {
+  background-color: #d1d5db; 
+  cursor: not-allowed;
+  box-shadow: none;
+}
