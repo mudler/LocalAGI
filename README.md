@@ -491,9 +491,26 @@ Get a token from @botfather, then:
 
 ```json
 { 
-  "token": "your-bot-father-token" 
+  "token": "your-bot-father-token",
+  "group_mode": "true",
+  "mention_only": "true",
+  "admins": "username1,username2"
 }
 ```
+
+Configuration options:
+- `token`: Your bot token from BotFather
+- `group_mode`: Enable/disable group chat functionality
+- `mention_only`: When enabled, bot only responds when mentioned in groups
+- `admins`: Comma-separated list of Telegram usernames allowed to use the bot in private chats
+- `channel_id`: Optional channel ID for the bot to send messages to
+
+> **Important**: For group functionality to work properly:
+> 1. Go to @BotFather
+> 2. Select your bot
+> 3. Go to "Bot Settings" > "Group Privacy"
+> 4. Select "Turn off" to allow the bot to read all messages in groups
+> 5. Restart your bot after changing this setting
 </details>
 
 <details>
