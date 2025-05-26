@@ -138,7 +138,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Get("/api/notify/:name", app.RequireUser(pubKey), app.Notify(pool))
 	webapp.Post("/old/chat/:name", app.RequireUser(pubKey), app.OldChat(pool))
 
-	webapp.Post("/api/agent/create", app.RequireUser(pubKey), app.Create("pools"))
+	webapp.Post("/api/agent/create", app.RequireUser(pubKey), app.Create())
 	webapp.Delete("/api/agent/:name", app.RequireUser(pubKey), app.Delete(pool))
 	webapp.Put("/api/agent/:name/pause", app.RequireUser(pubKey), app.Pause(pool))
 	webapp.Put("/api/agent/:name/start", app.RequireUser(pubKey), app.Start(pool))
@@ -186,7 +186,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// New API endpoints for getting and updating agent configuration
-	webapp.Get("/api/agent/:name/config", app.RequireUser(pubKey), app.GetAgentConfig(pool))
+	webapp.Get("/api/agent/:name/config", app.RequireUser(pubKey), app.GetAgentConfig())
+
 	webapp.Put("/api/agent/:name/config", app.RequireUser(pubKey), app.UpdateAgentConfig(pool))
 
 	// Metadata endpoint for agent configuration fields
@@ -203,20 +204,57 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	// Dashboard API endpoint for React UI
 	webapp.Get("/api/agents", app.RequireUser(pubKey), func(c *fiber.Ctx) error {
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		// Get or create user's AgentPool
+		var pool *state.AgentPool
+		if existing, ok := app.UserPools[userID]; ok {
+			pool = existing
+		} else {
+			userDir := filepath.Join("pools", userID)
+			os.MkdirAll(userDir, 0755)
+
+			var err error
+			pool, err = state.NewAgentPool(
+				userID,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				userDir,
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to load agent pool: "+err.Error())
+			}
+			app.UserPools[userID] = pool
+		}
+
+		// List user's agents
+		agentNames := pool.List()
 		statuses := map[string]bool{}
-		agents := pool.List()
-		for _, a := range agents {
-			agent := pool.GetAgent(a)
+
+		for _, name := range agentNames {
+			agent := pool.GetAgent(name)
 			if agent == nil {
-				xlog.Error("Agent not found", "name", a)
+				xlog.Error("Agent not found", "name", name)
 				continue
 			}
-			statuses[a] = !agent.Paused()
+			statuses[name] = !agent.Paused()
 		}
 
 		return c.JSON(fiber.Map{
-			"agents":     agents,
-			"agentCount": len(agents),
+			"agents":     agentNames,
+			"agentCount": len(agentNames),
 			"actions":    len(services.AvailableActions),
 			"connectors": len(services.AvailableConnectors),
 			"statuses":   statuses,
@@ -224,20 +262,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// API endpoint for getting a specific agent's details
-	webapp.Get("/api/agent/:name", app.RequireUser(pubKey), func(c *fiber.Ctx) error {
-		name := c.Params("name")
-		agent := pool.GetAgent(name)
-		if agent == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Agent not found",
-			})
-		}
-
-		// Add the active status to the configuration
-		return c.JSON(fiber.Map{
-			"active": !agent.Paused(),
-		})
-	})
+	webapp.Get("/api/agent/:name", app.RequireUser(pubKey), app.GetAgentDetails())
 
 	// API endpoint for agent status history
 	webapp.Get("/api/agent/:name/status", app.RequireUser(pubKey), func(c *fiber.Ctx) error {

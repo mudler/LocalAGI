@@ -48,6 +48,7 @@ type (
 
 var privyAppId = os.Getenv("PRIVY_APP_ID")
 var privyApiKey = os.Getenv("PRIVY_APP_SECRET")
+var poolRoot = "pools"
 
 func NewApp(opts ...Option) *App {
 	config := NewConfig(opts...)
@@ -141,7 +142,7 @@ func (a *App) Start(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Create(poolRoot string) func(c *fiber.Ctx) error {
+func (a *App) Create() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// 1. Get user ID
 		userID, ok := c.Locals("id").(string)
@@ -198,12 +199,65 @@ func (a *App) Create(poolRoot string) func(c *fiber.Ctx) error {
 }
 
 // NEW FUNCTION: Get agent configuration
-func (a *App) GetAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		config := pool.GetConfig(c.Params("name"))
-		if config == nil {
-			return errorJSONMessage(c, "Agent not found")
+		// 1. Get user ID
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return errorJSONMessage(c, "User ID missing")
 		}
+
+		// 2. Check if user's AgentPool is cached
+		pool, ok := a.UserPools[userID]
+		if !ok {
+			// Try loading from disk if not cached
+			userDir := filepath.Join(poolRoot, userID)
+			poolFile := filepath.Join(userDir, "pool.json")
+
+			if _, err := os.Stat(poolFile); os.IsNotExist(err) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error":   "Agent pool not found",
+					"success": false,
+				})
+			}
+
+			// Try loading the pool (but don't auto-create anything)
+			loaded, err := state.NewAgentPool(
+				userID,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				userDir,
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error":   "Failed to load agent pool",
+					"success": false,
+				})
+			}
+
+			pool = loaded
+			a.UserPools[userID] = pool
+		}
+
+		// 3. Fetch agent config
+		agentName := c.Params("name")
+		config := pool.GetConfig(agentName)
+		if config == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error":   "Agent not found",
+				"success": false,
+			})
+		}
+
 		return c.JSON(config)
 	}
 }
@@ -683,11 +737,20 @@ func (a *App) ListModels(pool *state.AgentPool) func(c *fiber.Ctx) error {
 // GetAgentConfigMeta returns the metadata for agent configuration fields, including available models
 func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		// 1. Get user ID
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return errorJSONMessage(c, "User ID missing from session")
+		}
+
+		// 2. Prepare config metadata for form rendering
 		configMeta := state.NewAgentConfigMeta(
 			services.ActionsConfigMeta(),
 			services.ConnectorsConfigMeta(),
 			services.DynamicPromptsConfigMeta(),
 		)
+
+		// 3. Add available models (could be filtered per-user later)
 		models := getAvailableModels()
 		for i, field := range configMeta.Fields {
 			if field.Name == "model" {
@@ -705,6 +768,10 @@ func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
 				configMeta.Fields[i].Options = options
 			}
 		}
+
+		// 4. (Optional) Add user-specific flags/limits here if needed
+		_ = userID // Placeholder if needed later
+
 		return c.JSON(configMeta)
 	}
 }
@@ -896,14 +963,24 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 			})
 		}
 
-		// Attempt to fetch user ID directly
+		// Acquire connection from pool
+		conn, err := db.Conn.Acquire(context.Background())
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Failed to acquire DB connection",
+			})
+		}
+		defer conn.Release()
+
+		// Query for existing user
 		var id string
-		err = db.Conn.QueryRow(context.Background(),
+		err = conn.QueryRow(context.Background(),
 			"SELECT id FROM users WHERE privyId = $1", claims.UserId).Scan(&id)
 
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				// User doesn't exist — create them
+				// User doesn't exist — create new user
 				user, err := utils.GetPrivyUserByDID(claims.UserId, privyAppId, privyApiKey)
 				if err != nil {
 					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -914,8 +991,9 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 
 				email := user.GetEmail()
 
-				err = db.Conn.QueryRow(context.Background(),
-					"INSERT INTO users (email, privyId) VALUES ($1, $2) RETURNING id", email, claims.UserId,
+				err = conn.QueryRow(context.Background(),
+					"INSERT INTO users (email, privyId) VALUES ($1, $2) RETURNING id",
+					email, claims.UserId,
 				).Scan(&id)
 				if err != nil {
 					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -926,7 +1004,6 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 
 				c.Locals("email", email)
 			} else {
-				// Unknown DB error
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"success": false,
 					"error":   "Database error while fetching user",
@@ -939,5 +1016,66 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 		c.Locals("privyId", claims.UserId)
 
 		return c.Next()
+	}
+}
+
+func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "User ID missing",
+			})
+		}
+
+		agentName := c.Params("name")
+		userDir := filepath.Join("pools", userID)
+		poolFile := filepath.Join(userDir, "pool.json")
+
+		if _, err := os.Stat(poolFile); os.IsNotExist(err) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent pool not found",
+			})
+		}
+
+		pool, err := state.NewAgentPool(
+			userID,
+			os.Getenv("LOCALAGI_MODEL"),
+			os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+			os.Getenv("LOCALAGI_IMAGE_MODEL"),
+			os.Getenv("LOCALAGI_LLM_API_URL"),
+			os.Getenv("LOCALAGI_LLM_API_KEY"),
+			userDir,
+			os.Getenv("LOCALAGI_LOCALRAG_URL"),
+			services.Actions,
+			services.Connectors,
+			services.DynamicPrompts,
+			os.Getenv("LOCALAGI_TIMEOUT"),
+			os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to load agent pool",
+			})
+		}
+
+		// Get config (from pool.json)
+		config := pool.GetConfig(agentName)
+		if config == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent not found",
+			})
+		}
+
+		// Get agent (running instance)
+		agent := pool.GetAgent(agentName)
+		active := false
+		if agent != nil {
+			active = !agent.Paused()
+		}
+
+		return c.JSON(fiber.Map{
+			"active": active,
+		})
 	}
 }

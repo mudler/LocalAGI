@@ -39,7 +39,7 @@ function AgentSettings() {
       }
     };
     fetchMetadata();
-  }, [showToast]);
+  }, []);
 
   useEffect(() => {
     if (agent) {
