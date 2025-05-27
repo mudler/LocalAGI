@@ -2,7 +2,6 @@ package webui
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,8 +13,10 @@ import (
 
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	coreTypes "github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/db"
+	models "github.com/mudler/LocalAGI/dbmodels"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/llm"
 	"github.com/mudler/LocalAGI/pkg/utils"
@@ -35,7 +36,24 @@ import (
 	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
+	"gorm.io/gorm"
 )
+
+var (
+	verificationKey      string
+	privyAppId 			 string
+	privyApiKey			 string
+)
+
+
+
+func init() {
+	_ = godotenv.Load()
+	var rawKey = os.Getenv("PRIVY_PUBLIC_KEY_PEM")
+	verificationKey = strings.ReplaceAll(rawKey, `\n`, "\n")
+	privyAppId = os.Getenv("PRIVY_APP_ID")
+	privyApiKey = os.Getenv("PRIVY_APP_SECRET")
+}
 
 type (
 	App struct {
@@ -46,8 +64,6 @@ type (
 	}
 )
 
-var privyAppId = os.Getenv("PRIVY_APP_ID")
-var privyApiKey = os.Getenv("PRIVY_APP_SECRET")
 var poolRoot = "pools"
 
 func NewApp(opts ...Option) *App {
@@ -904,7 +920,6 @@ type PrivyClaims struct {
 	Expiration uint64 `json:"exp,omitempty"`
 	Issuer     string `json:"iss,omitempty"`
 	UserId     string `json:"sub,omitempty"`
-	Email      string `json:"email,omitempty"`
 }
 
 func (c *PrivyClaims) Valid() error {
@@ -920,9 +935,9 @@ func (c *PrivyClaims) Valid() error {
 	return nil
 }
 
-func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
+func (a *App) RequireUser() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// Get token from cookies
+		// 1. Get token from cookies
 		tokenStr := c.Cookies("privy-token")
 		if tokenStr == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -931,7 +946,7 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 			})
 		}
 
-		// Parse public key
+		// 2. Parse public key
 		pubKey, err := jwt.ParseECPublicKeyFromPEM([]byte(verificationKey))
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -940,7 +955,7 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 			})
 		}
 
-		// Parse and validate JWT
+		// 3. Parse JWT
 		claims := &PrivyClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			if token.Method.Alg() != jwt.SigningMethodES256.Alg() {
@@ -956,6 +971,7 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 			})
 		}
 
+		// 4. Validate claims
 		if err := claims.Valid(); err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"success": false,
@@ -963,25 +979,14 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 			})
 		}
 
-		// Acquire connection from pool
-		conn, err := db.Conn.Acquire(context.Background())
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"success": false,
-				"error":   "Failed to acquire DB connection",
-			})
-		}
-		defer conn.Release()
+		// 5. Find or create user
+		var user models.User
+		result := db.DB.First(&user, "privyID = ?", claims.UserId)
 
-		// Query for existing user
-		var id string
-		err = conn.QueryRow(context.Background(),
-			"SELECT id FROM users WHERE privyId = $1", claims.UserId).Scan(&id)
-
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				// User doesn't exist — create new user
-				user, err := utils.GetPrivyUserByDID(claims.UserId, privyAppId, privyApiKey)
+		if result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				// Fetch user info from Privy
+				privyUser, err := utils.GetPrivyUserByDID(claims.UserId, privyAppId, privyApiKey)
 				if err != nil {
 					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 						"success": false,
@@ -989,35 +994,36 @@ func (a *App) RequireUser(verificationKey string) func(c *fiber.Ctx) error {
 					})
 				}
 
-				email := user.GetEmail()
+				user = models.User{
+					Email:   privyUser.GetEmail(),
+					PrivyID: claims.UserId,
+				}
 
-				err = conn.QueryRow(context.Background(),
-					"INSERT INTO users (email, privyId) VALUES ($1, $2) RETURNING id",
-					email, claims.UserId,
-				).Scan(&id)
-				if err != nil {
+				if err := db.DB.Create(&user).Error; err != nil {
 					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 						"success": false,
-						"error":   "Failed to insert new user",
+						"error":   "Failed to create user",
 					})
 				}
 
-				c.Locals("email", email)
+				c.Locals("email", user.Email)
 			} else {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"success": false,
-					"error":   "Database error while fetching user",
+					"error":   "DB error while fetching user",
 				})
 			}
 		}
 
-		// Store user info in context
-		c.Locals("id", id)
-		c.Locals("privyId", claims.UserId)
+		// 6. Set user context
+		c.Locals("id", user.ID.String())
+		c.Locals("privyId", user.PrivyID)
 
 		return c.Next()
 	}
 }
+
+
 
 func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {

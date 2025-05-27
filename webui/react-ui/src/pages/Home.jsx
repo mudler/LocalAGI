@@ -46,7 +46,7 @@ function Home() {
     };
 
     fetchData();
-  }, [showToast]);
+  }, []);
 
   if (loading) {
     return <div className="loading">Loading dashboard data...</div>;

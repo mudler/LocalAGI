@@ -6,26 +6,42 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/db"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/LocalAGI/webui"
 )
 
-var baseModel = os.Getenv("LOCALAGI_MODEL")
-var multimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
-var apiURL = os.Getenv("LOCALAGI_LLM_API_URL")
-var apiKey = os.Getenv("LOCALAGI_LLM_API_KEY")
-var timeout = os.Getenv("LOCALAGI_TIMEOUT")
-var stateDir = os.Getenv("LOCALAGI_STATE_DIR")
-var localRAG = os.Getenv("LOCALAGI_LOCALRAG_URL")
-var withLogs = os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
-var apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
-var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
-var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
-var dbUrl = os.Getenv("LOCALAGI_DB_URL")
+var (
+	baseModel            string
+	multimodalModel      string
+	apiURL               string
+	apiKey               string
+	timeout              string
+	stateDir             string
+	localRAG             string
+	withLogs             bool
+	apiKeysEnv           string
+	imageModel           string
+	conversationDuration string
+)
 
 func init() {
+	_ = godotenv.Load()
+
+	baseModel = os.Getenv("LOCALAGI_MODEL")
+	multimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
+	apiURL = os.Getenv("LOCALAGI_LLM_API_URL")
+	apiKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+	timeout = os.Getenv("LOCALAGI_TIMEOUT")
+	stateDir = os.Getenv("LOCALAGI_STATE_DIR")
+	localRAG = os.Getenv("LOCALAGI_LOCALRAG_URL")
+	withLogs = os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
+	apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
+	imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
+	conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
+
 	if baseModel == "" {
 		panic("LOCALAGI_MODEL not set")
 	}
@@ -40,16 +56,16 @@ func init() {
 		if err != nil {
 			panic(err)
 		}
-
 		stateDir = filepath.Join(cwd, "pool")
 	}
 }
+
 
 func main() {
 	// make sure state dir exists
 	os.MkdirAll(stateDir, 0755)
 
-	db.ConnectDB(dbUrl)
+	db.ConnectDB()
 
 	apiKeys := []string{}
 	if apiKeysEnv != "" {
