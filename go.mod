@@ -16,7 +16,7 @@ require (
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/metoro-io/mcp-golang v0.12.0
+	github.com/metoro-io/mcp-golang v0.13.0
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/philippgille/chromem-go v0.7.0
