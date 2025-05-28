@@ -11,7 +11,7 @@ require (
 	github.com/donseba/go-htmx v1.12.0
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
 	github.com/go-telegram/bot v1.15.0
-	github.com/gofiber/fiber/v2 v2.52.6
+	github.com/gofiber/fiber/v2 v2.52.8
 	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
@@ -20,6 +20,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/philippgille/chromem-go v0.7.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/sashabaranov/go-openai v1.39.1
 	github.com/slack-go/slack v0.16.0
 	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64
@@ -32,10 +33,7 @@ require (
 	mvdan.cc/xurls/v2 v2.6.0
 )
 
-require (
-	github.com/JohannesKaufmann/dom v0.2.0 // indirect
-	github.com/robfig/cron/v3 v3.0.1 // indirect
-)
+require github.com/JohannesKaufmann/dom v0.2.0 // indirect
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.2
@@ -51,10 +49,10 @@ require (
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/emersion/go-imap/v2 v2.0.0-beta.5 // indirect
-	github.com/emersion/go-message v0.18.2 // indirect
-	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
-	github.com/emersion/go-smtp v0.22.0 // indirect
+	github.com/emersion/go-imap/v2 v2.0.0-beta.5
+	github.com/emersion/go-message v0.18.2
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
+	github.com/emersion/go-smtp v0.22.0
 	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/gin-gonic/gin v1.10.0 // indirect
