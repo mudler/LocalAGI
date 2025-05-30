@@ -241,22 +241,8 @@ a:hover {
   color: var(--success);
 }
 
-.status-active::before {
-  content: "•";
-  display: inline-block;
-  margin-right: 5px;
-  color: var(--success);
-}
-
 .status-paused {
   background-color: rgba(245, 158, 11, 0.1);
-  color: var(--warning);
-}
-
-.status-paused::before {
-  content: "•";
-  display: inline-block;
-  margin-right: 5px;
   color: var(--warning);
 }
 
@@ -671,6 +657,7 @@ a:hover {
 .agent-header h3 {
   font-size: 1.25rem;
   font-weight: 600;
+  margin-bottom: 0;
 }
 
 .agent-actions {
@@ -1245,7 +1232,7 @@ a:hover {
   font-size: 16px;
   font-weight: 500;
   color: #ffffff;
-  background-color: #2563eb; 
+  background-color: #2563eb;
   border: none;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -1254,7 +1241,7 @@ a:hover {
 }
 
 .login-button:hover:not(:disabled) {
-  background-color: #1e40af; 
+  background-color: #1e40af;
 }
 
 .login-button:focus {
@@ -1263,7 +1250,7 @@ a:hover {
 }
 
 .login-button:disabled {
-  background-color: #d1d5db; 
+  background-color: #d1d5db;
   cursor: not-allowed;
   box-shadow: none;
 }

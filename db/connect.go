@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 
-	"github.com/mudler/LocalAGI/dbmodels"
+	models "github.com/mudler/LocalAGI/dbmodels"
 )
 
 var DB *gorm.DB
@@ -33,7 +33,7 @@ func ConnectDB() {
 		log.Fatal("Failed to connect to MySQL:", err)
 	}
 
-	if err := DB.AutoMigrate(&models.User{}); err != nil {
+	if err := DB.AutoMigrate(&models.User{}, &models.Agent{}); err != nil {
 		log.Fatal("Migration failed:", err)
 	}
 }

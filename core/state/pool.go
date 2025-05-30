@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,11 +14,11 @@ import (
 	. "github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/llm"
+	"github.com/mudler/LocalAGI/db"
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/pkg/utils"
-	"github.com/sashabaranov/go-openai"
-	"github.com/sashabaranov/go-openai/jsonschema"
+
+	models "github.com/mudler/LocalAGI/dbmodels"
 
 	"github.com/mudler/LocalAGI/pkg/xlog"
 )
@@ -61,19 +60,19 @@ func (s *Status) Results() []types.ActionState {
 
 type AgentPoolData map[string]AgentConfig
 
-func loadPoolFromFile(path string) (*AgentPoolData, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
+// func loadPoolFromFile(path string) (*AgentPoolData, error) {
+// 	data, err := os.ReadFile(path)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	poolData := &AgentPoolData{}
-	err = json.Unmarshal(data, poolData)
-	return poolData, err
-}
+// 	poolData := &AgentPoolData{}
+// 	err = json.Unmarshal(data, poolData)
+// 	return poolData, err
+// }
 
 func NewAgentPool(
-	userId, defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory string,
+	userId, defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -81,64 +80,52 @@ func NewAgentPool(
 	timeout string,
 	withLogs bool,
 ) (*AgentPool, error) {
-	// if file exists, try to load an existing pool.
-	// if file does not exist, create a new pool.
+	// 1. Load all agent configs from the DB
+	var agents []models.Agent
+	if err := db.DB.Where("UserId = ?", userId).Find(&agents).Error; err != nil {
+		return nil, fmt.Errorf("failed to load agents from DB: %w", err)
+	}
 
-	poolfile := filepath.Join(directory, "pool.json")
+	// 2. Build in-memory config pool
+	poolMap := make(map[string]AgentConfig)
+	for _, a := range agents {
+		var cfg AgentConfig
+		if err := json.Unmarshal(a.Config, &cfg); err != nil {
+			// Optionally log bad config, skip silently
+			continue
+		}
+		poolMap[a.ID.String()] = cfg
+	}
 
-	conversationPath := ""
+	// 3. Optional conversation log path (e.g., if you're still using file-based logging)
+	var conversationPath string
 	if withLogs {
-		conversationPath = filepath.Join(directory, "conversations")
+		// Replace this with a DB/S3 backend later if desired
+		conversationPath = fmt.Sprintf("/tmp/%s/conversations", userId)
+		_ = os.MkdirAll(conversationPath, 0755)
 	}
 
-	if _, err := os.Stat(poolfile); err != nil {
-		// file does not exist, create a new pool
-		return &AgentPool{
-			userId:                 userId,
-			file:                   poolfile,
-			pooldir:                directory,
-			apiURL:                 apiURL,
-			defaultModel:           defaultModel,
-			defaultMultimodalModel: defaultMultimodalModel,
-			imageModel:             imageModel,
-			localRAGAPI:            LocalRAGAPI,
-			apiKey:                 apiKey,
-			agents:                 make(map[string]*Agent),
-			pool:                   make(map[string]AgentConfig),
-			agentStatus:            make(map[string]*Status),
-			managers:               make(map[string]sse.Manager),
-			connectors:             connectors,
-			availableActions:       availableActions,
-			dynamicPrompt:          promptBlocks,
-			timeout:                timeout,
-			conversationLogs:       conversationPath,
-		}, nil
-	}
-
-	poolData, err := loadPoolFromFile(poolfile)
-	if err != nil {
-		return nil, err
-	}
+	// 4. Return fully initialized pool
 	return &AgentPool{
-		file:                   poolfile,
+		userId:                 userId,
 		apiURL:                 apiURL,
-		pooldir:                directory,
 		defaultModel:           defaultModel,
 		defaultMultimodalModel: defaultMultimodalModel,
 		imageModel:             imageModel,
+		localRAGAPI:            LocalRAGAPI,
 		apiKey:                 apiKey,
 		agents:                 make(map[string]*Agent),
+		pool:                   poolMap,
+		agentStatus:            make(map[string]*Status),
 		managers:               make(map[string]sse.Manager),
-		agentStatus:            map[string]*Status{},
-		pool:                   *poolData,
 		connectors:             connectors,
-		localRAGAPI:            LocalRAGAPI,
-		dynamicPrompt:          promptBlocks,
 		availableActions:       availableActions,
+		dynamicPrompt:          promptBlocks,
 		timeout:                timeout,
 		conversationLogs:       conversationPath,
 	}, nil
 }
+
 
 func replaceInvalidChars(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
@@ -148,105 +135,20 @@ func replaceInvalidChars(s string) string {
 // CreateAgent adds a new agent to the pool
 // and starts it.
 // It also saves the state to the file.
-func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
+func (a *AgentPool) CreateAgent(id string, agentConfig *AgentConfig) error {
 	a.Lock()
 	defer a.Unlock()
-	name = replaceInvalidChars(name)
-	agentConfig.Name = name
-	if _, ok := a.pool[name]; ok {
-		return fmt.Errorf("agent %s already exists", name)
+	id = replaceInvalidChars(id)
+	agentConfig.Name = id
+	if _, ok := a.pool[id]; ok {
+		return fmt.Errorf("agent %s already exists", id)
 	}
-	a.pool[name] = *agentConfig
-	if err := a.save(); err != nil {
-		return err
-	}
+	a.pool[id] = *agentConfig
+	// if err := a.save(); err != nil {
+	// 	return err
+	// }
 
-	go func(ac AgentConfig) {
-		// Create the agent avatar
-		if err := createAgentAvatar(a.apiURL, a.apiKey, a.defaultModel, a.imageModel, a.pooldir, ac); err != nil {
-			xlog.Error("Failed to create agent avatar", "error", err)
-		}
-	}(a.pool[name])
-
-	return a.startAgentWithConfig(name, agentConfig)
-}
-
-func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agent AgentConfig) error {
-	client := llm.NewClient(APIKey, APIURL+"/v1", "10m")
-
-	if imageModel == "" {
-		return fmt.Errorf("image model not set")
-	}
-
-	if model == "" {
-		return fmt.Errorf("default model not set")
-	}
-
-	imagePath := filepath.Join(avatarDir, "avatars", fmt.Sprintf("%s.png", agent.Name))
-	if _, err := os.Stat(imagePath); err == nil {
-		// Image already exists
-		xlog.Debug("Avatar already exists", "path", imagePath)
-		return nil
-	}
-
-	var results struct {
-		ImagePrompt string `json:"image_prompt"`
-	}
-
-	err := llm.GenerateTypedJSON(
-		context.Background(),
-		llm.NewClient(APIKey, APIURL, "10m"),
-		"Generate a prompt that I can use to create a random avatar for the bot '"+agent.Name+"', the description of the bot is: "+agent.Description,
-		model,
-		jsonschema.Definition{
-			Type: jsonschema.Object,
-			Properties: map[string]jsonschema.Definition{
-				"image_prompt": {
-					Type:        jsonschema.String,
-					Description: "The prompt to generate the image",
-				},
-			},
-			Required: []string{"image_prompt"},
-		}, &results)
-	if err != nil {
-		return fmt.Errorf("failed to generate image prompt: %w", err)
-	}
-
-	if results.ImagePrompt == "" {
-		xlog.Error("Failed to generate image prompt")
-		return fmt.Errorf("failed to generate image prompt")
-	}
-
-	req := openai.ImageRequest{
-		Prompt:         results.ImagePrompt,
-		Model:          imageModel,
-		Size:           openai.CreateImageSize256x256,
-		ResponseFormat: openai.CreateImageResponseFormatB64JSON,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
-	resp, err := client.CreateImage(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to generate image: %w", err)
-	}
-
-	if len(resp.Data) == 0 {
-		return fmt.Errorf("failed to generate image")
-	}
-
-	imageJson := resp.Data[0].B64JSON
-
-	os.MkdirAll(filepath.Join(avatarDir, "avatars"), 0755)
-
-	// Save the image to the agent directory
-	imageData, err := base64.StdEncoding.DecodeString(imageJson)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(imagePath, imageData, 0644)
+	return a.startAgentWithConfig(id, agentConfig)
 }
 
 func (a *AgentPool) List() []string {
@@ -264,13 +166,13 @@ func (a *AgentPool) List() []string {
 	return agents
 }
 
-func (a *AgentPool) GetStatusHistory(name string) *Status {
+func (a *AgentPool) GetStatusHistory(id string) *Status {
 	a.Lock()
 	defer a.Unlock()
-	return a.agentStatus[name]
+	return a.agentStatus[id]
 }
 
-func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error {
+func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 	manager := sse.NewManager(5)
 	ctx := context.Background()
 	model := a.defaultModel
@@ -307,7 +209,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)
 	actions := a.availableActions(config)(ctx, a)
-	stateFile, characterFile := a.stateFiles(name)
+	stateFile, characterFile := a.stateFiles(id)
 
 	actionsLog := []string{}
 	for _, action := range actions {
@@ -321,7 +223,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 
 	xlog.Info(
 		"Creating agent",
-		"name", name,
+		"id", id,
 		"model", model,
 		"api_url", a.apiURL,
 		"actions", actionsLog,
@@ -343,7 +245,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithPrompts(promptBlocks...),
 		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
-			Name: name,
+			Name: id,
 		}),
 		WithActions(
 			actions...,
@@ -352,11 +254,11 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithCharacterFile(characterFile),
 		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
-		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)),
+		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, id)),
 		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",
-				"agent", name,
+				"agent", id,
 				"reasoning", state.Reasoning,
 				"action", state.Action.Definition().Name,
 				"params", state.Params,
@@ -379,11 +281,11 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		WithMultimodalModel(multimodalModel),
 		WithAgentResultCallback(func(state types.ActionState) {
 			a.Lock()
-			if _, ok := a.agentStatus[name]; !ok {
-				a.agentStatus[name] = &Status{}
+			if _, ok := a.agentStatus[id]; !ok {
+				a.agentStatus[id] = &Status{}
 			}
 
-			a.agentStatus[name].addResult(state)
+			a.agentStatus[id].addResult(state)
 			a.Unlock()
 			xlog.Debug(
 				"Calling agent result callback",
@@ -467,23 +369,23 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		opts = append(opts, WithLoopDetectionSteps(config.LoopDetectionSteps))
 	}
 
-	xlog.Info("Starting agent", "name", name, "config", config)
+	xlog.Info("Starting agent", "id", id, "config", config)
 
 	agent, err := New(opts...)
 	if err != nil {
 		return err
 	}
 
-	a.agents[name] = agent
-	a.managers[name] = manager
+	a.agents[id] = agent
+	a.managers[id] = manager
 
 	go func() {
 		if err := agent.Run(); err != nil {
-			xlog.Error("Agent stopped", "error", err.Error(), "name", name)
+			xlog.Error("Agent stopped", "error", err.Error(), "id", id)
 		}
 	}()
 
-	xlog.Info("Starting connectors", "name", name, "config", config)
+	xlog.Info("Starting connectors", "id", id, "config", config)
 
 	for _, c := range connectors {
 		go c.Start(agent)
@@ -498,7 +400,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 		}
 	}()
 
-	xlog.Info("Agent started", "name", name)
+	xlog.Info("Agent started", "id", id)
 
 	return nil
 }
@@ -507,12 +409,12 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig) error
 func (a *AgentPool) StartAll() error {
 	a.Lock()
 	defer a.Unlock()
-	for name, config := range a.pool {
-		if a.agents[name] != nil { // Agent already started
+	for id, config := range a.pool {
+		if a.agents[id] != nil { // Agent already started
 			continue
 		}
-		if err := a.startAgentWithConfig(name, &config); err != nil {
-			xlog.Error("Failed to start agent", "name", name, "error", err)
+		if err := a.startAgentWithConfig(id, &config); err != nil {
+			xlog.Error("Failed to start agent", "id", id, "error", err)
 		}
 	}
 	return nil
@@ -526,38 +428,38 @@ func (a *AgentPool) StopAll() {
 	}
 }
 
-func (a *AgentPool) Stop(name string) {
+func (a *AgentPool) Stop(id string) {
 	a.Lock()
 	defer a.Unlock()
-	a.stop(name)
+	a.stop(id)
 }
 
-func (a *AgentPool) stop(name string) {
-	if agent, ok := a.agents[name]; ok {
+func (a *AgentPool) stop(id string) {
+	if agent, ok := a.agents[id]; ok {
 		agent.Stop()
 	}
 }
-func (a *AgentPool) Start(name string) error {
+func (a *AgentPool) Start(id string) error {
 	a.Lock()
 	defer a.Unlock()
-	if agent, ok := a.agents[name]; ok {
+	if agent, ok := a.agents[id]; ok {
 		err := agent.Run()
 		if err != nil {
-			return fmt.Errorf("agent %s failed to start: %w", name, err)
+			return fmt.Errorf("agent %s failed to start: %w", id, err)
 		}
-		xlog.Info("Agent started", "name", name)
+		xlog.Info("Agent started", "id", id)
 		return nil
 	}
-	if config, ok := a.pool[name]; ok {
-		return a.startAgentWithConfig(name, &config)
+	if config, ok := a.pool[id]; ok {
+		return a.startAgentWithConfig(id, &config)
 	}
 
-	return fmt.Errorf("agent %s not found", name)
+	return fmt.Errorf("agent %s not found", id)
 }
 
-func (a *AgentPool) stateFiles(name string) (string, string) {
-	stateFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", name))
-	characterFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", name))
+func (a *AgentPool) stateFiles(id string) (string, string) {
+	stateFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", id))
+	characterFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", id))
 
 	return stateFile, characterFile
 }
@@ -565,24 +467,20 @@ func (a *AgentPool) stateFiles(name string) (string, string) {
 func (a *AgentPool) Remove(name string) error {
 	a.Lock()
 	defer a.Unlock()
-	// Cleanup character and state
-	stateFile, characterFile := a.stateFiles(name)
 
-	os.Remove(stateFile)
-	os.Remove(characterFile)
-
+	// Stop the running agent
 	a.stop(name)
+
+	// Remove from in-memory maps
 	delete(a.agents, name)
 	delete(a.pool, name)
+	delete(a.agentStatus, name)
+	delete(a.managers, name)
 
-	// remove avatar
-	os.Remove(filepath.Join(a.pooldir, "avatars", fmt.Sprintf("%s.png", name)))
-
-	if err := a.save(); err != nil {
-		return err
-	}
+	xlog.Info("Removed agent from memory", "name", name)
 	return nil
 }
+
 
 func (a *AgentPool) Save() error {
 	a.Lock()
@@ -598,10 +496,10 @@ func (a *AgentPool) save() error {
 	return os.WriteFile(a.file, data, 0644)
 }
 
-func (a *AgentPool) GetAgent(name string) *Agent {
+func (a *AgentPool) GetAgent(id string) *Agent {
 	a.Lock()
 	defer a.Unlock()
-	return a.agents[name]
+	return a.agents[id]
 }
 
 func (a *AgentPool) AllAgents() []string {
@@ -614,18 +512,18 @@ func (a *AgentPool) AllAgents() []string {
 	return agents
 }
 
-func (a *AgentPool) GetConfig(name string) *AgentConfig {
+func (a *AgentPool) GetConfig(id string) *AgentConfig {
 	a.Lock()
 	defer a.Unlock()
-	agent, exists := a.pool[name]
+	agent, exists := a.pool[id]
 	if !exists {
 		return nil
 	}
 	return &agent
 }
 
-func (a *AgentPool) GetManager(name string) sse.Manager {
+func (a *AgentPool) GetManager(id string) sse.Manager {
 	a.Lock()
 	defer a.Unlock()
-	return a.managers[name]
+	return a.managers[id]
 }

@@ -80,7 +80,6 @@ func main() {
 		imageModel,
 		apiURL,
 		apiKey,
-		stateDir,
 		localRAG,
 		services.Actions,
 		services.Connectors,

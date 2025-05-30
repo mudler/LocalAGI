@@ -30,11 +30,11 @@ function AgentsList() {
   };
 
   // Toggle agent status (pause/start)
-  const toggleAgentStatus = async (name, isActive) => {
+  const toggleAgentStatus = async (id, name, isActive) => {
     try {
       const endpoint = isActive
-        ? `/api/agent/${name}/pause`
-        : `/api/agent/${name}/start`;
+        ? `/api/agent/${id}/pause`
+        : `/api/agent/${id}/start`;
       const response = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -45,7 +45,7 @@ function AgentsList() {
         // Update local state
         setStatuses((prev) => ({
           ...prev,
-          [name]: !isActive,
+          [id]: !isActive,
         }));
 
         // Show success toast
@@ -67,7 +67,7 @@ function AgentsList() {
   };
 
   // Delete an agent
-  const deleteAgent = async (name) => {
+  const deleteAgent = async (id, name) => {
     if (
       !confirm(
         `Are you sure you want to delete agent "${name}"? This action cannot be undone.`
@@ -77,17 +77,17 @@ function AgentsList() {
     }
 
     try {
-      const response = await fetch(`/api/agent/${name}`, {
+      const response = await fetch(`/api/agent/${id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
 
       if (response.ok) {
         // Remove from local state
-        setAgents((prev) => prev.filter((agent) => agent !== name));
+        setAgents((prev) => prev.filter((agent) => agent.id !== id));
         setStatuses((prev) => {
           const newStatuses = { ...prev };
-          delete newStatuses[name];
+          delete newStatuses[id];
           return newStatuses;
         });
 
@@ -191,68 +191,38 @@ function AgentsList() {
 
         {agents.length > 0 ? (
           <div className="agents-grid" style={{ marginTop: 22 }}>
-            {agents.map((name) => (
+            {agents.map(({ id, name }) => (
               <div
-                key={name}
+                key={id}
                 className="agent-card"
-                data-agent={name}
-                data-active={statuses[name]}
+                data-agent={id}
+                data-active={statuses[id]}
                 style={{ marginBottom: 18 }}
               >
                 <div className="agent-content text-center">
-                  <div className="avatar-container mb-4">
-                    <img
-                      src={`/avatars/${name}.png`}
-                      alt={name}
-                      className="w-24 h-24 rounded-full"
-                      style={{
-                        border: "2px solid var(--primary)",
-                        boxShadow: "var(--neon-glow)",
-                        display: "none",
-                        margin: "0 auto",
-                      }}
-                      onLoad={(e) => {
-                        e.target.style.display = "block";
-                        e.target.nextElementSibling.style.display = "none";
-                      }}
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                        e.target.nextElementSibling.style.display = "flex";
-                      }}
-                    />
-                    <div
-                      className="avatar-placeholder"
-                      style={{ margin: "0 auto" }}
-                    >
-                      <span className="placeholder-text">
-                        <i className="fas fa-sync fa-spin"></i>
-                      </span>
-                    </div>
-                  </div>
-
                   <div className="agent-header">
                     <h2>{name}</h2>
                     <span
                       className={`status-badge ${
-                        statuses[name] ? "active" : "inactive"
+                        statuses[id] ? "active" : "inactive"
                       }`}
                     >
-                      {statuses[name] ? "Active" : "Paused"}
+                      {statuses[id] ? "Active" : "Paused"}
                     </span>
                   </div>
 
                   <div className="agent-actions">
-                    <Link to={`/talk/${name}`} className="action-btn chat-btn">
+                    <Link to={`/talk/${id}`} className="action-btn chat-btn">
                       <i className="fas fa-comment"></i> Chat
                     </Link>
                     <Link
-                      to={`/status/${name}`}
+                      to={`/status/${id}`}
                       className="action-btn status-btn"
                     >
                       <i className="fas fa-chart-line"></i> Status
                     </Link>
                     <Link
-                      to={`/settings/${name}`}
+                      to={`/settings/${id}`}
                       className="action-btn settings-btn"
                     >
                       <i className="fas fa-cog"></i> Settings
@@ -262,9 +232,9 @@ function AgentsList() {
                   <div className="agent-actions mt-2">
                     <button
                       className="action-btn toggle-btn"
-                      onClick={() => toggleAgentStatus(name, statuses[name])}
+                      onClick={() => toggleAgentStatus(id, name, statuses[id])}
                     >
-                      {statuses[name] ? (
+                      {statuses[id] ? (
                         <>
                           <i className="fas fa-pause"></i> Pause
                         </>
@@ -277,7 +247,7 @@ function AgentsList() {
 
                     <button
                       className="action-btn delete-btn"
-                      onClick={() => deleteAgent(name)}
+                      onClick={() => deleteAgent(id, name)}
                     >
                       <i className="fas fa-trash-alt"></i> Delete
                     </button>

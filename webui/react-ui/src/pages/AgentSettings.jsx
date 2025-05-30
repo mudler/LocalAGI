@@ -7,7 +7,7 @@ import Header from "../components/Header";
 import { AgentStatus, AgentActionButtons } from "../components/AgentComponents";
 
 function AgentSettings() {
-  const { name } = useParams();
+  const { id } = useParams();
   const { showToast } = useOutletContext();
   const navigate = useNavigate();
   const [metadata, setMetadata] = useState(null);
@@ -15,17 +15,17 @@ function AgentSettings() {
 
   // Update document title
   useEffect(() => {
-    if (name) {
-      document.title = `Agent Settings: ${name} - LocalAGI`;
+    if (id) {
+      document.title = `Agent Settings: ${id} - LocalAGI`;
     }
     return () => {
       document.title = "LocalAGI";
     };
-  }, [name]);
+  }, [id]);
 
   // Use our custom agent hook
   const { agent, loading, updateAgent, toggleAgentStatus, deleteAgent } =
-    useAgent(name);
+    useAgent(id);
 
   // Fetch metadata on component mount
   useEffect(() => {
@@ -70,6 +70,10 @@ function AgentSettings() {
     }
   };
 
+  if (!agent) {
+    return <div></div>;
+  }
+
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
@@ -77,7 +81,7 @@ function AgentSettings() {
           <Header
             title="Agent Settings"
             description="Configure and manage the agent's settings, connectors, and capabilities."
-            name={name}
+            name={agent.name}
           />
 
           <div className="header-right">

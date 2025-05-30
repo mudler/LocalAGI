@@ -114,15 +114,43 @@ func (a *App) Notify(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Delete(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Delete() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		if err := pool.Remove(c.Params("name")); err != nil {
-			xlog.Info("Error removing agent", err)
-			return errorJSONMessage(c, err.Error())
+		// 1. Get user ID
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
 		}
+		userUUID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
+		}
+
+		// 2. Get agent id
+		agentId := c.Params("id")
+		if agentId == "" {
+			return errorJSONMessage(c, "Agent id is required")
+		}
+
+		// 3. Delete from DB
+		if err := db.DB.
+			Where("ID = ? AND UserID = ?", agentId, userUUID).
+			Delete(&models.Agent{}).Error; err != nil {
+			return errorJSONMessage(c, "Failed to delete agent from DB: "+err.Error())
+		}
+
+		// 4. Remove from in-memory pool if exists
+		if pool, ok := a.UserPools[userIDStr]; ok {
+			if err := pool.Remove(agentId); err != nil {
+				xlog.Warn("Agent deleted from DB but failed to remove from memory", "error", err)
+			}
+		}
+
+		xlog.Info("Agent deleted", "user", userIDStr, "agent", agentId)
 		return statusJSONMessage(c, "ok")
 	}
 }
+
 
 func errorJSONMessage(c *fiber.Ctx, message string) error {
 	return c.Status(http.StatusInternalServerError).JSON(struct {
@@ -136,34 +164,123 @@ func statusJSONMessage(c *fiber.Ctx, message string) error {
 	}{Status: message})
 }
 
-func (a *App) Pause(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Pause() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		agent := pool.GetAgent(c.Params("name"))
-		if agent != nil {
-			xlog.Info("Pausing agent", "name", c.Params("name"))
-			agent.Pause()
+		// 1. Get user ID
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
 		}
+
+		// 2. Get agent id
+		agentId := c.Params("id")
+		if agentId == "" {
+			return errorJSONMessage(c, "Agent id is required")
+		}
+
+		// 3. Get or init pool
+		pool, ok := a.UserPools[userIDStr]
+		if !ok {
+			// Rehydrate pool from DB (no file fallback)
+			newPool, err := state.NewAgentPool(
+				userIDStr,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to load agent pool: "+err.Error())
+			}
+			a.UserPools[userIDStr] = newPool
+			pool = newPool
+		}
+
+		// 4. Pause agent if exists in memory
+		if agent := pool.GetAgent(agentId); agent != nil {
+			xlog.Info("Pausing agent", "Id", agentId)
+			agent.Pause()
+		} else {
+			return errorJSONMessage(c, "Agent is not active in memory")
+		}
+
 		return statusJSONMessage(c, "ok")
 	}
 }
 
-func (a *App) Start(pool *state.AgentPool) func(c *fiber.Ctx) error {
+
+func (a *App) Start() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		agent := pool.GetAgent(c.Params("name"))
-		if agent != nil {
-			xlog.Info("Starting agent", "name", c.Params("name"))
-			agent.Resume()
+		// 1. Get user ID
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
 		}
+
+		// 2. Get agent id
+		agentId := c.Params("id")
+		if agentId == "" {
+			return errorJSONMessage(c, "Agent id is required")
+		}
+
+		// 3. Load or create in-memory pool
+		pool, ok := a.UserPools[userIDStr]
+		if !ok {
+			newPool, err := state.NewAgentPool(
+				userIDStr,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to load agent pool: "+err.Error())
+			}
+			a.UserPools[userIDStr] = newPool
+			pool = newPool
+		}
+
+		// 4. Try to get the agent from memory
+		agent := pool.GetAgent(agentId)
+		
+		if agent == nil {
+			return errorJSONMessage(c, "Agent is not active in memory")
+		}
+
+		// 5. Resume agent
+		xlog.Info("Starting agent", "id", agentId)
+		agent.Resume()
+
 		return statusJSONMessage(c, "ok")
 	}
 }
+
 
 func (a *App) Create() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// 1. Get user ID
-		userID, ok := c.Locals("id").(string)
-		if !ok || userID == "" {
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
 			return errorJSONMessage(c, "User ID missing")
+		}
+
+		userID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
 		}
 
 		// 2. Parse request body
@@ -175,23 +292,36 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Name is required")
 		}
 
-		// 3. Use cached pool or create new one
+		// 3. Serialize config to JSON
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return errorJSONMessage(c, "Failed to serialize config")
+		}
+
+		// 4. Store config in MySQL
+		agent := models.Agent{
+			ID:     uuid.New(),
+			UserID: userID,
+			Name:   config.Name,
+			Config: configJSON,
+		}
+
+		if err := db.DB.Create(&agent).Error; err != nil {
+			return errorJSONMessage(c, "Failed to store agent: " + err.Error())
+		}
+
+		// 5. Create in-memory agent pool (if needed)
 		var pool *state.AgentPool
-		if p, ok := a.UserPools[userID]; ok {
+		if p, ok := a.UserPools[userIDStr]; ok {
 			pool = p
 		} else {
-			userDir := filepath.Join(poolRoot, userID)
-			os.MkdirAll(userDir, 0755)
-
-			var err error
 			pool, err = state.NewAgentPool(
-				userID,
+				userIDStr,
 				os.Getenv("LOCALAGI_MODEL"),
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
 				os.Getenv("LOCALAGI_LLM_API_KEY"),
-				userDir,
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -202,17 +332,18 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			if err != nil {
 				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
 			}
-			a.UserPools[userID] = pool
+			a.UserPools[userIDStr] = pool
 		}
 
-		// 4. Create the agent
+		// 6. Create agent in the pool
 		if err := pool.CreateAgent(config.Name, &config); err != nil {
-			return errorJSONMessage(c, err.Error())
+			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
 		}
 
 		return statusJSONMessage(c, "ok")
 	}
 }
+
 
 // NEW FUNCTION: Get agent configuration
 func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
@@ -223,95 +354,111 @@ func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "User ID missing")
 		}
 
-		// 2. Check if user's AgentPool is cached
-		pool, ok := a.UserPools[userID]
-		if !ok {
-			// Try loading from disk if not cached
-			userDir := filepath.Join(poolRoot, userID)
-			poolFile := filepath.Join(userDir, "pool.json")
-
-			if _, err := os.Stat(poolFile); os.IsNotExist(err) {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-					"error":   "Agent pool not found",
-					"success": false,
-				})
-			}
-
-			// Try loading the pool (but don't auto-create anything)
-			loaded, err := state.NewAgentPool(
-				userID,
-				os.Getenv("LOCALAGI_MODEL"),
-				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
-				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
-				userDir,
-				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
-				services.Connectors,
-				services.DynamicPrompts,
-				os.Getenv("LOCALAGI_TIMEOUT"),
-				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
-			)
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error":   "Failed to load agent pool",
-					"success": false,
-				})
-			}
-
-			pool = loaded
-			a.UserPools[userID] = pool
+		userUUID, err := uuid.Parse(userID)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
 		}
 
-		// 3. Fetch agent config
-		agentName := c.Params("name")
-		config := pool.GetConfig(agentName)
-		if config == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error":   "Agent not found",
+		// 2. Get agent id from route param
+		agentId := c.Params("id")
+		if agentId == "" {
+			return errorJSONMessage(c, "Agent id is required")
+		}
+
+		// 3. Fetch agent config from DB
+		var agent models.Agent
+		if err := db.DB.
+			Where("ID = ? AND UserId = ?", agentId, userUUID).
+			First(&agent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error":   "Agent not found",
+					"success": false,
+				})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to query agent config",
 				"success": false,
 			})
 		}
 
+		// 4. Unmarshal config JSON
+		var config state.AgentConfig
+		if err := json.Unmarshal(agent.Config, &config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to parse agent config",
+				"success": false,
+			})
+		}
+
+		// 5. Return the config
 		return c.JSON(config)
 	}
 }
 
-// UpdateAgentConfig handles updating an agent's configuration
-func (a *App) UpdateAgentConfig(pool *state.AgentPool) func(c *fiber.Ctx) error {
-	return func(c *fiber.Ctx) error {
-		agentName := strings.Clone(c.Params("name"))
 
-		// First check if agent exists
-		oldConfig := pool.GetConfig(agentName)
-		if oldConfig == nil {
-			return errorJSONMessage(c, "Agent not found")
+// UpdateAgentConfig handles updating an agent's configuration
+func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		// 1. Extract and validate user ID
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+		userUUID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
 		}
 
-		// Parse the new configuration using the same approach as Create
-		newConfig := state.AgentConfig{}
+		// 2. Extract agent id
+		agentId := c.Params("id")
+		if agentId == "" {
+			return errorJSONMessage(c, "Agent id is required")
+		}
+
+		// 3. Fetch agent from DB
+		var agent models.Agent
+		if err := db.DB.
+			Where("ID = ? AND UserId = ?", agentId, userUUID).
+			First(&agent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errorJSONMessage(c, "Agent not found")
+			}
+			return errorJSONMessage(c, "Failed to fetch agent: "+err.Error())
+		}
+
+		// 4. Parse new config
+		var newConfig state.AgentConfig
 		if err := c.BodyParser(&newConfig); err != nil {
 			xlog.Error("Error parsing agent config", "error", err)
-			return errorJSONMessage(c, err.Error())
+			return errorJSONMessage(c, "Invalid agent config: "+err.Error())
 		}
 
-		// Remove the agent first
-		if err := pool.Remove(agentName); err != nil {
-			return errorJSONMessage(c, "Error removing agent: "+err.Error())
+		newConfig.Name = agentId
+
+		// 5. Update DB
+		newConfigJSON, err := json.Marshal(newConfig)
+		if err != nil {
+			return errorJSONMessage(c, "Failed to serialize config")
+		}
+		agent.Config = newConfigJSON
+		if err := db.DB.Save(&agent).Error; err != nil {
+			return errorJSONMessage(c, "Failed to update config in DB: "+err.Error())
 		}
 
-		// Create agent with new config
-		if err := pool.CreateAgent(agentName, &newConfig); err != nil {
-			// Try to restore the old configuration if update fails
-			if restoreErr := pool.CreateAgent(agentName, oldConfig); restoreErr != nil {
-				return errorJSONMessage(c, fmt.Sprintf("Failed to update agent and restore failed: %v, %v", err, restoreErr))
+		// 6. Reload in-memory agent if active
+		pool, ok := a.UserPools[userIDStr]
+		if ok {
+			if err := pool.Remove(agentId); err != nil {
+				xlog.Warn("Failed to remove old agent from pool", "error", err)
 			}
-			return errorJSONMessage(c, "Error updating agent: "+err.Error())
+			if err := pool.CreateAgent(agentId, &newConfig); err != nil {
+				xlog.Error("Failed to recreate agent in memory", "error", err)
+				return errorJSONMessage(c, "Agent config updated in DB but failed to reload in memory")
+			}
 		}
 
-		xlog.Info("Updated agent", "name", agentName, "config", fmt.Sprintf("%+v", newConfig))
-
+		xlog.Info("Updated agent", "id", agentId)
 		return statusJSONMessage(c, "ok")
 	}
 }
@@ -1027,61 +1174,56 @@ func (a *App) RequireUser() func(c *fiber.Ctx) error {
 
 func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		userID, ok := c.Locals("id").(string)
-		if !ok || userID == "" {
+		// 1. Get user ID
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "User ID missing",
 			})
 		}
 
-		agentName := c.Params("name")
-		userDir := filepath.Join("pools", userID)
-		poolFile := filepath.Join(userDir, "pool.json")
-
-		if _, err := os.Stat(poolFile); os.IsNotExist(err) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Agent pool not found",
-			})
-		}
-
-		pool, err := state.NewAgentPool(
-			userID,
-			os.Getenv("LOCALAGI_MODEL"),
-			os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
-			os.Getenv("LOCALAGI_IMAGE_MODEL"),
-			os.Getenv("LOCALAGI_LLM_API_URL"),
-			os.Getenv("LOCALAGI_LLM_API_KEY"),
-			userDir,
-			os.Getenv("LOCALAGI_LOCALRAG_URL"),
-			services.Actions,
-			services.Connectors,
-			services.DynamicPrompts,
-			os.Getenv("LOCALAGI_TIMEOUT"),
-			os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
-		)
+		userID, err := uuid.Parse(userIDStr)
 		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid user ID",
+			})
+		}
+
+		// 2. Get agent id from URL param
+		agentId := c.Params("id")
+		if agentId == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Agent id is required",
+			})
+		}
+
+		// 3. Look up agent config in MySQL
+		var agent models.Agent
+		if err := db.DB.
+			Where("Id = ? AND UserId = ?", agentId, userID).
+			First(&agent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "Agent not found",
+				})
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to load agent pool",
+				"error": "Failed to fetch agent",
 			})
 		}
 
-		// Get config (from pool.json)
-		config := pool.GetConfig(agentName)
-		if config == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Agent not found",
-			})
-		}
-
-		// Get agent (running instance)
-		agent := pool.GetAgent(agentName)
+		// 4. Check if agent is running in memory
 		active := false
-		if agent != nil {
-			active = !agent.Paused()
+		if pool, ok := a.UserPools[userIDStr]; ok {
+			if instance := pool.GetAgent(agentId); instance != nil {
+				active = !instance.Paused()
+			}
 		}
 
+		// 5. Return status
 		return c.JSON(fiber.Map{
-			"active": active,
+			"active":   active,
 		})
 	}
 }
+

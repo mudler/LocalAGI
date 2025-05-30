@@ -31,7 +31,7 @@ export const router = createBrowserRouter(
           element: <CreateAgent />,
         },
         {
-          path: "settings/:name",
+          path: "settings/:id",
           element: <AgentSettings />,
         },
         {

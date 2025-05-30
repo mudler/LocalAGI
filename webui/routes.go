@@ -15,7 +15,10 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/keyauth"
+	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/sse"
+	"github.com/mudler/LocalAGI/db"
+	models "github.com/mudler/LocalAGI/dbmodels"
 	"github.com/mudler/LocalAGI/services/connectors"
 
 	"github.com/mudler/LocalAGI/core/state"
@@ -135,9 +138,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/old/chat/:name", app.RequireUser(), app.OldChat(pool))
 
 	webapp.Post("/api/agent/create", app.RequireUser(), app.Create())
-	webapp.Delete("/api/agent/:name", app.RequireUser(), app.Delete(pool))
-	webapp.Put("/api/agent/:name/pause", app.RequireUser(), app.Pause(pool))
-	webapp.Put("/api/agent/:name/start", app.RequireUser(), app.Start(pool))
+	webapp.Delete("/api/agent/:id", app.RequireUser(), app.Delete())
+	webapp.Put("/api/agent/:id/pause", app.RequireUser(), app.Pause())
+	webapp.Put("/api/agent/:id/start", app.RequireUser(), app.Start())
 
 	webapp.Post("/api/chat/:name", app.RequireUser(), app.Chat(pool))
 
@@ -182,9 +185,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// New API endpoints for getting and updating agent configuration
-	webapp.Get("/api/agent/:name/config", app.RequireUser(), app.GetAgentConfig())
+	webapp.Get("/api/agent/:id/config", app.RequireUser(), app.GetAgentConfig())
 
-	webapp.Put("/api/agent/:name/config", app.RequireUser(), app.UpdateAgentConfig(pool))
+	webapp.Put("/api/agent/:id/config", app.RequireUser(), app.UpdateAgentConfig())
 
 	// Metadata endpoint for agent configuration fields
 	webapp.Get("/api/agent/config/metadata", app.RequireUser(), app.GetAgentConfigMeta())
@@ -205,15 +208,25 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			return errorJSONMessage(c, "User ID missing")
 		}
 
-		// Get or create user's AgentPool
-		var pool *state.AgentPool
-		if existing, ok := app.UserPools[userID]; ok {
-			pool = existing
-		} else {
-			userDir := filepath.Join("pools", userID)
-			os.MkdirAll(userDir, 0755)
+		// 1. Parse UUID
+		userUUID, err := uuid.Parse(userID)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
+		}
 
-			var err error
+		// 2. Fetch agents directly from MySQL
+		var dbAgents []models.Agent
+		if err := db.DB.Where("UserId = ?", userUUID).Find(&dbAgents).Error; err != nil {
+			return errorJSONMessage(c, "Failed to fetch agents: "+err.Error())
+		}
+
+		// 3. Build agent list response and check in-memory status
+		agentList := make([]fiber.Map, 0, len(dbAgents))
+		statuses := make(map[string]bool)
+
+		// Use or init in-memory pool
+		pool, ok := app.UserPools[userID]
+		if !ok {
 			pool, err = state.NewAgentPool(
 				userID,
 				os.Getenv("LOCALAGI_MODEL"),
@@ -221,7 +234,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
 				os.Getenv("LOCALAGI_LLM_API_KEY"),
-				userDir,
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -235,34 +247,73 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			app.UserPools[userID] = pool
 		}
 
-		// List user's agents
-		agentNames := pool.List()
-		statuses := map[string]bool{}
+		for _, agent := range dbAgents {
+			name := agent.Name
+			agentList = append(agentList, fiber.Map{
+				"id":   agent.ID,
+				"name": name,
+			})
 
-		for _, name := range agentNames {
-			agent := pool.GetAgent(name)
-			if agent == nil {
-				xlog.Error("Agent not found", "name", name)
-				continue
+			running := false
+			if instance := pool.GetAgent(name); instance != nil {
+				running = !instance.Paused()
 			}
-			statuses[name] = !agent.Paused()
+			statuses[name] = running
 		}
 
+		// 4. Return final response
 		return c.JSON(fiber.Map{
-			"agents":     agentNames,
-			"agentCount": len(agentNames),
+			"agents":     agentList,
+			"agentCount": len(agentList),
 			"actions":    len(services.AvailableActions),
 			"connectors": len(services.AvailableConnectors),
 			"statuses":   statuses,
 		})
 	})
 
+
+
 	// API endpoint for getting a specific agent's details
-	webapp.Get("/api/agent/:name", app.RequireUser(), app.GetAgentDetails())
+	webapp.Get("/api/agent/:id", app.RequireUser(), app.GetAgentDetails())
 
 	// API endpoint for agent status history
-	webapp.Get("/api/agent/:name/status", app.RequireUser(), func(c *fiber.Ctx) error {
-		history := pool.GetStatusHistory(c.Params("name"))
+	webapp.Get("/api/agent/:id/status", app.RequireUser(), func(c *fiber.Ctx) error {
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		agentId := c.Params("id")
+		if agentId == "" {
+			return errorJSONMessage(c, "Agent id is required")
+		}
+
+		// Load or init in-memory agent pool
+		pool, ok := app.UserPools[userID]
+		if !ok {
+			newPool, err := state.NewAgentPool(
+				userID,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to load agent pool: "+err.Error())
+			}
+			app.UserPools[userID] = newPool
+			pool = newPool
+		}
+
+		// Get agent status history
+		history := pool.GetStatusHistory(agentId)
 		if history == nil {
 			history = &state.Status{ActionResults: []types.ActionState{}}
 		}
@@ -279,10 +330,11 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		}
 
 		return c.JSON(fiber.Map{
-			"Name":    c.Params("name"),
-			"History": entries,
+			"id":    agentId,
+			"history": entries,
 		})
 	})
+
 
 	webapp.Post("/settings/import", app.RequireUser(), app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.RequireUser(), app.ExportAgent(pool))
