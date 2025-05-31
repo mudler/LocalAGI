@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
@@ -12,12 +13,24 @@ import (
 	"github.com/mudler/LocalAGI/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai"
+	"github.com/sashabaranov/go-openai/jsonschema"
 )
+
+const parameterReasoningPrompt = `You are tasked with generating the optimal parameters for the action "%s". The action requires the following parameters:
+%s
+
+Your task is to:
+1. Generate the best possible values for each required parameter
+2. If the parameter requires code, provide complete, working code
+3. If the parameter requires text or documentation, provide comprehensive, well-structured content
+4. Ensure all parameters are complete and ready to be used
+
+Focus on quality and completeness. Do not explain your reasoning or analyze the action's purpose - just provide the best possible parameter values.`
 
 type decisionResult struct {
 	actionParams types.ActionParams
 	message      string
-	actioName    string
+	actionName   string
 }
 
 // decision forces the agent to take one of the available actions
@@ -131,7 +144,7 @@ func (a *Agent) decision(
 			a.observer.Update(*obs)
 		}
 
-		return &decisionResult{actionParams: params, actioName: msg.ToolCalls[0].Function.Name, message: msg.Content}, nil
+		return &decisionResult{actionParams: params, actionName: msg.ToolCalls[0].Function.Name, message: msg.Content}, nil
 	}
 
 	return nil, fmt.Errorf("failed to make a decision after %d attempts: %w", maxRetries, lastErr)
@@ -248,9 +261,32 @@ func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act type
 
 	cc := conversation
 	if a.options.forceReasoning {
+		// First, get the LLM to reason about optimal parameter usage
+		parameterReasoningPrompt := fmt.Sprintf(parameterReasoningPrompt,
+			act.Definition().Name,
+			formatProperties(act.Definition().Properties))
+
+		// Get initial reasoning about parameters using askLLM
+		paramReasoningMsg, err := a.askLLM(job.GetContext(),
+			append(conversation, openai.ChatCompletionMessage{
+				Role:    "system",
+				Content: parameterReasoningPrompt,
+			}),
+			maxAttempts,
+		)
+		if err != nil {
+			xlog.Warn("Failed to get parameter reasoning", "error", err)
+		}
+
+		// Combine original reasoning with parameter-specific reasoning
+		enhancedReasoning := reasoning
+		if paramReasoningMsg.Content != "" {
+			enhancedReasoning = fmt.Sprintf("%s\n\nParameter Analysis:\n%s", reasoning, paramReasoningMsg.Content)
+		}
+
 		cc = append(conversation, openai.ChatCompletionMessage{
 			Role:    "system",
-			Content: fmt.Sprintf("The agent decided to use the tool %s with the following reasoning: %s", act.Definition().Name, reasoning),
+			Content: fmt.Sprintf("The agent decided to use the tool %s with the following reasoning: %s", act.Definition().Name, enhancedReasoning),
 		})
 	}
 
@@ -271,6 +307,15 @@ func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act type
 	}
 
 	return nil, fmt.Errorf("failed to generate parameters after %d attempts: %w", maxAttempts, attemptErr)
+}
+
+// Helper function to format properties for the prompt
+func formatProperties(props map[string]jsonschema.Definition) string {
+	var result strings.Builder
+	for name, prop := range props {
+		result.WriteString(fmt.Sprintf("- %s: %s\n", name, prop.Description))
+	}
+	return result.String()
 }
 
 func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction types.Action, actionParams types.ActionParams, reasoning string, pickTemplate string, conv Messages) (Messages, error) {
@@ -455,12 +500,12 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 			return nil, nil, "", err
 		}
 
-		xlog.Debug(fmt.Sprintf("thought action Name: %v", thought.actioName))
+		xlog.Debug(fmt.Sprintf("thought action Name: %v", thought.actionName))
 		xlog.Debug(fmt.Sprintf("thought message: %v", thought.message))
 
 		// Find the action
-		chosenAction := a.availableActions().Find(thought.actioName)
-		if chosenAction == nil || thought.actioName == "" {
+		chosenAction := a.availableActions().Find(thought.actionName)
+		if chosenAction == nil || thought.actionName == "" {
 			xlog.Debug("no answer")
 
 			// LLM replied with an answer?
@@ -496,8 +541,8 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 	if err != nil {
 		return nil, nil, "", err
 	}
-	if thought.actioName != "" && thought.actioName != reasoningAction.Definition().Name.String() {
-		return nil, nil, "", fmt.Errorf("Expected reasoning action not: %s", thought.actioName)
+	if thought.actionName != "" && thought.actionName != reasoningAction.Definition().Name.String() {
+		return nil, nil, "", fmt.Errorf("Expected reasoning action not: %s", thought.actionName)
 	}
 
 	originalReasoning := ""
