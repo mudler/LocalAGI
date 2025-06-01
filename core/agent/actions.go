@@ -542,7 +542,7 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		return nil, nil, "", err
 	}
 	if thought.actionName != "" && thought.actionName != reasoningAction.Definition().Name.String() {
-		return nil, nil, "", fmt.Errorf("Expected reasoning action not: %s", thought.actionName)
+		return nil, nil, "", fmt.Errorf("expected reasoning action %s, got %s", reasoningAction.Definition().Name.String(), thought.actionName)
 	}
 
 	originalReasoning := ""
