@@ -500,8 +500,8 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 			return nil, nil, "", err
 		}
 
-		xlog.Debug(fmt.Sprintf("thought action Name: %v", thought.actionName))
-		xlog.Debug(fmt.Sprintf("thought message: %v", thought.message))
+		xlog.Debug("thought action Name", "actionName", thought.actionName)
+		xlog.Debug("thought message", "message", thought.message)
 
 		// Find the action
 		chosenAction := a.availableActions().Find(thought.actionName)
