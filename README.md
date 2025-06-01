@@ -63,7 +63,7 @@ MODEL_NAME=gemma-3-12b-it docker compose up
 
 # NVIDIA GPU setup with custom multimodal and image models
 MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
+MULTIMODAL_MODEL=moondream2-20250414 \
 IMAGE_MODEL=flux.1-dev-ggml \
 docker compose -f docker-compose.nvidia.yaml up
 ```
@@ -126,8 +126,8 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose -f docker-compose.nvidia.yaml up`
 - Default models:
-  - Text: `gemma-3-12b-it-qat`
-  - Multimodal: `minicpm-v-2_6`
+  - Text: `gemma-3-4b-it-qat`
+  - Multimodal: `moondream2-20250414`
   - Image: `sd-1.5-ggml`
 - Environment variables:
   - `MODEL_NAME`: Text model to use
@@ -142,8 +142,8 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose -f docker-compose.intel.yaml up`
 - Default models:
-  - Text: `gemma-3-12b-it-qat`
-  - Multimodal: `minicpm-v-2_6`
+  - Text: `gemma-3-4b-it-qat`
+  - Multimodal: `moondream2-20250414`
   - Image: `sd-1.5-ggml`
 - Environment variables:
   - `MODEL_NAME`: Text model to use
@@ -161,20 +161,20 @@ MODEL_NAME=gemma-3-12b-it docker compose up
 
 # NVIDIA GPU with custom models
 MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
+MULTIMODAL_MODEL=moondream2-20250414 \
 IMAGE_MODEL=flux.1-dev-ggml \
 docker compose -f docker-compose.nvidia.yaml up
 
 # Intel GPU with custom models
 MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
+MULTIMODAL_MODEL=moondream2-20250414 \
 IMAGE_MODEL=sd-1.5-ggml \
 docker compose -f docker-compose.intel.yaml up
 ```
 
 If no models are specified, it will use the defaults:
-- Text model: `gemma-3-12b-it-qat`
-- Multimodal model: `minicpm-v-2_6`
+- Text model: `gemma-3-4b-it-qat`
+- Multimodal model: `moondream2-20250414`
 - Image model: `sd-1.5-ggml`
 
 Good (relatively small) models that have been tested are:
