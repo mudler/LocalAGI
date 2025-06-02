@@ -516,6 +516,7 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		return chosenAction, thought.actionParams, thought.message, nil
 	}
 
+	// Force the LLM to think and we extract a "reasoning" to pick a specific action and with which parameters
 	xlog.Debug("[pickAction] forcing reasoning")
 
 	prompt, err := renderTemplate(templ, a.prepareHUD(), a.availableActions(), "")
@@ -533,33 +534,35 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		}, c...)
 	}
 
-	reasoningAction := action.NewReasoning()
-	thought, err := a.decision(job,
-		c,
-		types.Actions{reasoningAction}.ToTools(),
-		reasoningAction.Definition().Name.String(), maxRetries)
-	if err != nil {
-		return nil, nil, "", err
+	// Create a detailed prompt for reasoning that includes available actions and their properties
+	reasoningPrompt := "Analyze the current situation and determine the best course of action. Consider the following:\n\n"
+	reasoningPrompt += "Available Actions:\n"
+	for _, act := range a.availableActions() {
+		reasoningPrompt += fmt.Sprintf("- %s: %s\n", act.Definition().Name, act.Definition().Description)
+		if len(act.Definition().Properties) > 0 {
+			reasoningPrompt += "  Properties:\n"
+			for name, prop := range act.Definition().Properties {
+				reasoningPrompt += fmt.Sprintf("  - %s: %s\n", name, prop.Description)
+			}
+		}
+		reasoningPrompt += "\n"
 	}
-	if thought.actionName != "" && thought.actionName != reasoningAction.Definition().Name.String() {
-		return nil, nil, "", fmt.Errorf("expected reasoning action %s, got %s", reasoningAction.Definition().Name.String(), thought.actionName)
+	reasoningPrompt += "\nProvide a detailed reasoning about what action would be most appropriate in this situation and why. You can also just reply with a simple message by choosing the 'reply' or 'answer' action."
+
+	// Get reasoning using askLLM
+	reasoningMsg, err := a.askLLM(job.GetContext(),
+		append(c, openai.ChatCompletionMessage{
+			Role:    "system",
+			Content: reasoningPrompt,
+		}),
+		maxRetries)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("failed to get reasoning: %w", err)
 	}
 
-	originalReasoning := ""
-	response := &action.ReasoningResponse{}
-	if thought.actionParams != nil {
-		if err := thought.actionParams.Unmarshal(response); err != nil {
-			return nil, nil, "", err
-		}
-		originalReasoning = response.Reasoning
-	}
-	if thought.message != "" {
-		originalReasoning = thought.message
-	}
+	originalReasoning := reasoningMsg.Content
 
 	xlog.Debug("[pickAction] picking action", "messages", c)
-	// thought, err := a.askLLM(ctx,
-	// 	c,
 
 	actionsID := []string{"reply"}
 	for _, m := range a.availableActions() {
