@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/dave-gray101/v2keyauth"
@@ -37,13 +36,6 @@ var embeddedFiles embed.FS
 var reactUI embed.FS
 
 func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
-
-	// Static avatars in a.pooldir/avatars
-	webapp.Use("/avatars", filesystem.New(filesystem.Config{
-		Root: http.Dir(filepath.Join(app.config.StateDir, "avatars")),
-		//	PathPrefix: "avatars",
-		Browse: true,
-	}))
 
 	webapp.Use("/old/public", filesystem.New(filesystem.Config{
 		Root:       http.FS(embeddedFiles),
@@ -110,16 +102,42 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			"PromptBlocks": services.AvailableBlockPrompts,
 		})
 	})
+
 	// Define a route for the GET method on the root path '/'
-	webapp.Get("/sse/:name", func(c *fiber.Ctx) error {
-		m := pool.GetManager(c.Params("name"))
-		if m == nil {
-			return c.SendStatus(404)
+	webapp.Get("/sse/:id", app.RequireUser(), func(c *fiber.Ctx) error {
+		userID, ok := c.Locals("id").(string)
+
+		if !ok || userID == "" {
+			return c.SendStatus(fiber.StatusUnauthorized)
 		}
 
-		m.Handle(c, sse.NewClient(randStringRunes(10)))
+		pool, ok := app.UserPools[userID]
+		if !ok {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent pool not found",
+			})
+		}
+
+		agentID := c.Params("id")
+
+
+		if pool.GetConfig(agentID) == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent not found or unauthorized",
+			})
+		}
+
+		manager := pool.GetManager(agentID)
+		if manager == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "SSE stream not available for this agent",
+			})
+		}
+
+		manager.Handle(c, sse.NewClient(randStringRunes(10)))
 		return nil
 	})
+
 
 	webapp.Get("/old/status/:name", func(c *fiber.Ctx) error {
 		history := pool.GetStatusHistory(c.Params("name"))
@@ -142,7 +160,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Put("/api/agent/:id/pause", app.RequireUser(), app.Pause())
 	webapp.Put("/api/agent/:id/start", app.RequireUser(), app.Start())
 
-	webapp.Post("/api/chat/:name", app.RequireUser(), app.Chat(pool))
+	webapp.Post("/api/chat/:id", app.RequireUser(), app.Chat())
 
 	conversationTracker := connectors.NewConversationTracker[string](time.Minute)
 
@@ -248,17 +266,18 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		}
 
 		for _, agent := range dbAgents {
-			name := agent.Name
+			id := agent.ID
 			agentList = append(agentList, fiber.Map{
-				"id":   agent.ID,
-				"name": name,
+				"id":   id,
+				"name": agent.Name,
 			})
 
 			running := false
-			if instance := pool.GetAgent(name); instance != nil {
+			println()
+			if instance := pool.GetAgent(id.String()); instance != nil {
 				running = !instance.Paused()
 			}
-			statuses[name] = running
+			statuses[id.String()] = running
 		}
 
 		// 4. Return final response

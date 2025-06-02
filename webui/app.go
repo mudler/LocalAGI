@@ -283,7 +283,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Invalid user ID")
 		}
 
-		// 2. Parse request body
+		// 2. Parse request body into config
 		var config state.AgentConfig
 		if err := c.BodyParser(&config); err != nil {
 			return errorJSONMessage(c, err.Error())
@@ -292,25 +292,46 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Name is required")
 		}
 
-		// 3. Serialize config to JSON
+		// 3. Apply fallback values from env if fields are empty
+		if config.Model == "" {
+			config.Model = os.Getenv("LOCALAGI_MODEL")
+		}
+		if config.MultimodalModel == "" {
+			config.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
+		}
+		if config.APIURL == "" {
+			config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
+		}
+		if config.APIKey == "" {
+			config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+		}
+		if config.LocalRAGURL == "" {
+			config.LocalRAGURL = os.Getenv("LOCALAGI_LOCALRAG_URL")
+		}
+		if config.LocalRAGAPIKey == "" {
+			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
+		}
+
+		// 4. Serialize the enriched config to JSON
 		configJSON, err := json.Marshal(config)
 		if err != nil {
 			return errorJSONMessage(c, "Failed to serialize config")
 		}
 
-		// 4. Store config in MySQL
+		// 5. Store config in DB
+		id := uuid.New()
 		agent := models.Agent{
-			ID:     uuid.New(),
+			ID:     id,
 			UserID: userID,
 			Name:   config.Name,
 			Config: configJSON,
 		}
 
 		if err := db.DB.Create(&agent).Error; err != nil {
-			return errorJSONMessage(c, "Failed to store agent: " + err.Error())
+			return errorJSONMessage(c, "Failed to store agent: "+err.Error())
 		}
 
-		// 5. Create in-memory agent pool (if needed)
+		// 6. Ensure agent pool is initialized
 		var pool *state.AgentPool
 		if p, ok := a.UserPools[userIDStr]; ok {
 			pool = p
@@ -330,14 +351,14 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
 			if err != nil {
-				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
+				return errorJSONMessage(c, "Failed to create agent pool: " + err.Error())
 			}
 			a.UserPools[userIDStr] = pool
 		}
 
-		// 6. Create agent in the pool
-		if err := pool.CreateAgent(config.Name, &config); err != nil {
-			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
+		// 7. Register agent in the in-memory pool
+		if err := pool.CreateAgent(id.String(), &config); err != nil {
+			return errorJSONMessage(c, "Failed to initialize agent: " + err.Error())
 		}
 
 		return statusJSONMessage(c, "ok")
@@ -433,8 +454,6 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 			xlog.Error("Error parsing agent config", "error", err)
 			return errorJSONMessage(c, "Invalid agent config: "+err.Error())
 		}
-
-		newConfig.Name = agentId
 
 		// 5. Update DB
 		newConfigJSON, err := json.Marshal(newConfig)
@@ -576,125 +595,143 @@ func (a *App) OldChat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 // Chat provides a JSON-based API for chat functionality
 // This is designed to work better with the React UI
-func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) Chat() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// Parse the request body
-		payload := struct {
-			Message string `json:"message"`
-		}{}
-
-		if err := c.BodyParser(&payload); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-				"error": "Invalid request format",
-			})
+		// 1. Get user ID
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return errorJSONMessage(c, "User ID missing")
 		}
 
-		// Get agent name from URL parameter
-		agentName := c.Params("name")
+		// 2. Parse body
+		var payload struct {
+			Message string `json:"message"`
+		}
+		if err := c.BodyParser(&payload); err != nil {
+			return errorJSONMessage(c, "Invalid request")
+		}
 
-		// Validate message
 		message := strings.TrimSpace(payload.Message)
 		if message == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(map[string]interface{}{
-				"error": "Message cannot be empty",
-			})
+			return errorJSONMessage(c, "Message cannot be empty")
 		}
 
-		// Get the agent from the pool
-		agent := pool.GetAgent(agentName)
-		if agent == nil {
-			return c.Status(fiber.StatusNotFound).JSON(map[string]interface{}{
-				"error": "Agent not found",
-			})
+		agentId := c.Params("id")
+		var agentModel models.Agent
+		if err := db.DB.Where("ID = ? AND userID = ?", agentId, userID).First(&agentModel).Error; err != nil {
+			return errorJSONMessage(c, "Agent not found")
 		}
 
-		// Get the SSE manager for this agent
-		manager := pool.GetManager(agentName)
+		// 4. Parse agent config
+		var config state.AgentConfig
+		if err := json.Unmarshal(agentModel.Config, &config); err != nil {
+			return errorJSONMessage(c, "Invalid agent config")
+		}
 
-		// Create a unique message ID
+		// 5. Ensure in-memory pool exists
+		var pool *state.AgentPool
+		if p, ok := a.UserPools[userID]; ok {
+			pool = p
+		} else {
+			pool := state.NewEmptyAgentPool(
+				userID,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			a.UserPools[userID] = pool
+		}
+
+		// 6. Start agent in memory if not running
+		if pool.GetAgent(agentId) == nil {
+			if err := pool.CreateAgent(agentId, &config); err != nil {
+				return errorJSONMessage(c, "Failed to start agent: "+err.Error())
+			}
+		}
+
+		// 7. Emit user message via SSE
+		manager := pool.GetManager(agentId)
 		messageID := fmt.Sprintf("%d", time.Now().UnixNano())
 
-		// Send user message event via SSE
-		userMessageData, err := json.Marshal(map[string]interface{}{
+		send := func(event string, data map[string]interface{}) {
+			manager.Send(
+				sse.NewMessage(mustStringify(data)).WithEvent(event),
+			)
+		}
+
+		send("json_message", map[string]interface{}{
 			"id":        messageID + "-user",
 			"sender":    "user",
 			"content":   message,
 			"timestamp": time.Now().Format(time.RFC3339),
 		})
-		if err != nil {
-			xlog.Error("Error marshaling user message", "error", err)
-		} else {
-			manager.Send(
-				sse.NewMessage(string(userMessageData)).WithEvent("json_message"))
-		}
 
-		// Send processing status
-		statusData, err := json.Marshal(map[string]interface{}{
+		send("json_status", map[string]interface{}{
 			"status":    "processing",
 			"timestamp": time.Now().Format(time.RFC3339),
 		})
-		if err != nil {
-			xlog.Error("Error marshaling status message", "error", err)
-		} else {
-			manager.Send(
-				sse.NewMessage(string(statusData)).WithEvent("json_status"))
-		}
 
-		// Process the message asynchronously
+		// 8. Save user message to DB
+		_ = db.DB.Create(&models.AgentMessage{
+			ID:        uuid.New(),
+			AgentID:   agentModel.ID,
+			Sender:    "user",
+			Content:   message,
+			Timestamp: time.Now(),
+		})
+
+		// 9. Ask agent asynchronously
 		go func() {
-			// Ask the agent for a response
-			response := agent.Ask(coreTypes.WithText(message))
+			response := pool.GetAgent(agentId).Ask(coreTypes.WithText(message))
+
+			fmt.Println("BBBA", response)
 
 			if response.Error != nil {
-				// Send error message
-				xlog.Error("Error asking agent", "agent", agentName, "error", response.Error)
-				errorData, err := json.Marshal(map[string]interface{}{
+				send("json_error", map[string]interface{}{
 					"error":     response.Error.Error(),
 					"timestamp": time.Now().Format(time.RFC3339),
 				})
-				if err != nil {
-					xlog.Error("Error marshaling error message", "error", err)
-				} else {
-					manager.Send(
-						sse.NewMessage(string(errorData)).WithEvent("json_error"))
-				}
-			} else {
-				// Send agent response
-				xlog.Info("Response from agent", "agent", agentName, "response", response.Response)
-				responseData, err := json.Marshal(map[string]interface{}{
-					"id":        messageID + "-agent",
-					"sender":    "agent",
-					"content":   response.Response,
-					"timestamp": time.Now().Format(time.RFC3339),
-				})
-				if err != nil {
-					xlog.Error("Error marshaling agent response", "error", err)
-				} else {
-					manager.Send(
-						sse.NewMessage(string(responseData)).WithEvent("json_message"))
-				}
+				return
 			}
 
-			// Send completed status
-			completedData, err := json.Marshal(map[string]interface{}{
+			send("json_message", map[string]interface{}{
+				"id":        messageID + "-agent",
+				"sender":    "agent",
+				"content":   response.Response,
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+
+			// Save agent reply to DB
+			_ = db.DB.Create(&models.AgentMessage{
+				ID:        uuid.New(),
+				AgentID:   agentModel.ID,
+				Sender:    "agent",
+				Content:   response.Response,
+				Timestamp: time.Now(),
+			})
+
+			send("json_status", map[string]interface{}{
 				"status":    "completed",
 				"timestamp": time.Now().Format(time.RFC3339),
 			})
-			if err != nil {
-				xlog.Error("Error marshaling completed status", "error", err)
-			} else {
-				manager.Send(
-					sse.NewMessage(string(completedData)).WithEvent("json_status"))
-			}
 		}()
 
-		// Return immediate success response
-		return c.Status(fiber.StatusAccepted).JSON(map[string]interface{}{
+		// 10. Immediate 202 response
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 			"status":     "message_received",
 			"message_id": messageID,
 		})
 	}
 }
+
 
 func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
@@ -1227,3 +1264,7 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 	}
 }
 
+func mustStringify(v interface{}) string {
+	b, _ := json.Marshal(v)
+	return string(b)
+}

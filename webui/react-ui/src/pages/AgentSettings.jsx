@@ -48,9 +48,9 @@ function AgentSettings() {
   }, [agent]);
 
   // Header action handlers
-  const handlePauseResume = async () => {
+  const handlePauseResume = async (isActive) => {
     try {
-      await toggleAgentStatus();
+      await toggleAgentStatus(isActive);
       showToast(agent?.active ? "Agent paused" : "Agent resumed", "success");
     } catch (err) {
       console.error("Error toggling agent status:", err);
@@ -73,6 +73,8 @@ function AgentSettings() {
   if (!agent) {
     return <div></div>;
   }
+
+  console.log(metadata);
 
   return (
     <div className="dashboard-container">

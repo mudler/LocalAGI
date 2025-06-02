@@ -5,14 +5,8 @@
  */
 export const AgentStatus = ({ status, color }) => {
   return (
-    <span
-      className="status-indicator"
-      style={{ color }}
-    >
-      <span
-        className="status-dot"
-        style={{ background: color }}
-      ></span>
+    <span className="status-indicator" style={{ color }}>
+      <span className="status-dot" style={{ background: color }}></span>
       {status}
     </span>
   );
@@ -26,21 +20,19 @@ export const AgentStatus = ({ status, color }) => {
  * @param {function} onDelete - Handler for delete button click
  */
 export const AgentActionButtons = ({
-                                     agent,
-                                     loading,
-                                     onPauseResume,
-                                     onDelete
-                                   }) => {
+  agent,
+  loading,
+  onPauseResume,
+  onDelete,
+}) => {
   return (
     <div className="action-buttons">
       <button
         className="action-btn pause-resume-btn"
-        onClick={onPauseResume}
+        onClick={() => onPauseResume(agent?.active)}
         disabled={loading}
       >
-        <i
-          className={`fas ${agent?.active ? "fa-pause" : "fa-play"}`}
-        ></i>{" "}
+        <i className={`fas ${agent?.active ? "fa-pause" : "fa-play"}`}></i>{" "}
         {agent?.active ? "Pause Agent" : "Resume Agent"}
       </button>
       <button
@@ -64,17 +56,18 @@ export const AgentActionButtons = ({
  * @param {string} variant - Button style variant ("default", "pause-resume", "delete")
  */
 export const ActionButton = ({
-                               text,
-                               icon,
-                               onClick,
-                               loading = false,
-                               disabled = false,
-                               variant = "default"
-                             }) => {
+  text,
+  icon,
+  onClick,
+  loading = false,
+  disabled = false,
+  variant = "default",
+}) => {
   // Determine button class based on variant
-  const buttonClass = variant === "delete"
-    ? "action-btn delete-btn"
-    : variant === "pause-resume"
+  const buttonClass =
+    variant === "delete"
+      ? "action-btn delete-btn"
+      : variant === "pause-resume"
       ? "action-btn pause-resume-btn"
       : "action-btn";
 
@@ -86,13 +79,11 @@ export const ActionButton = ({
     >
       {loading ? (
         <>
-          <i className="fas fa-spinner fa-spin"></i>{" "}
-          Loading...
+          <i className="fas fa-spinner fa-spin"></i> Loading...
         </>
       ) : (
         <>
-          {icon && <i className={`fas ${icon}`}></i>}{" "}
-          {text}
+          {icon && <i className={`fas ${icon}`}></i>} {text}
         </>
       )}
     </button>
@@ -104,9 +95,5 @@ export const ActionButton = ({
  * @param {React.ReactNode} children - Button components to render
  */
 export const ActionButtonsContainer = ({ children }) => {
-  return (
-    <div className="action-buttons">
-      {children}
-    </div>
-  );
+  return <div className="action-buttons">{children}</div>;
 };

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { agentApi } from "../utils/api";
+import { useOutletContext } from "react-router-dom";
 
 /**
  * Custom hook for managing agent state
@@ -10,6 +11,7 @@ export function useAgent(agentId) {
   const [agent, setAgent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { showToast } = useOutletContext();
 
   // Fetch agent configuration
   const fetchAgent = useCallback(async () => {
@@ -77,8 +79,10 @@ export function useAgent(agentId) {
       try {
         if (isActive) {
           await agentApi.pauseAgent(agentId);
+          showToast(`Agent "${agent?.name}" paused successfully`, "success");
         } else {
           await agentApi.startAgent(agentId);
+          showToast(`Agent "${agent?.name}" restarted successfully`, "success");
         }
 
         // Update the agent's active status in the local state

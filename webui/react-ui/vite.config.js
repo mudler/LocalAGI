@@ -39,7 +39,6 @@ export default defineConfig(({ mode }) => {
         "/status": backendUrl,
         "/action": backendUrl,
         "/actions": backendUrl,
-        "/avatars": backendUrl,
       },
     },
   };

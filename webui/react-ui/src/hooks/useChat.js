@@ -4,11 +4,11 @@ import { useSSE } from "./useSSE";
 
 /**
  * Custom hook for chat functionality
- * @param {string} agentName - Name of the agent to chat with
+ * @param {string} agentId - Id of the agent to chat with
  * @param {Object} model - Model object (should include id)
  * @returns {Object} - Chat state and functions
  */
-export function useChat(agentName, model) {
+export function useChat(agentId, model) {
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -21,13 +21,9 @@ export function useChat(agentName, model) {
     statusUpdates,
     errorMessages,
     isConnected,
-  } = useSSE(
-    model?.id && typeof model.id === "string"
-      ? model.id.split("/")[0] === "local"
-        ? agentName
-        : null
-      : null
-  );
+  } = useSSE(model && typeof model === "string" ? agentId : null);
+
+  console.log("MODEL", model);
 
   // Process SSE messages into chat messages (local models only)
   useEffect(() => {
@@ -146,7 +142,7 @@ export function useChat(agentName, model) {
           }
         } else {
           // Use the JSON-based API endpoint for local models
-          await chatApi.sendMessage(agentName, content);
+          await chatApi.sendMessage(agentId, content);
         }
         return true;
       } catch (err) {
@@ -156,7 +152,7 @@ export function useChat(agentName, model) {
         setSending(false);
       }
     },
-    [agentName, model]
+    [agentId, model]
   );
 
   // Clear chat history

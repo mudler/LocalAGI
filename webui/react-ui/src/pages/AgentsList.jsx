@@ -204,7 +204,7 @@ function AgentsList() {
                     <h2>{name}</h2>
                     <span
                       className={`status-badge ${
-                        statuses[id] ? "active" : "inactive"
+                        statuses[id] ? "status-active" : "status-inactive"
                       }`}
                     >
                       {statuses[id] ? "Active" : "Paused"}

@@ -39,6 +39,8 @@ function Chat() {
     clearError,
   } = useChat(name, agentConfig?.model);
 
+  console.log("Connected: ", isConnected);
+
   useEffect(() => {
     if (name) {
       document.title = `Chat with ${name} - LocalAGI`;

@@ -126,6 +126,42 @@ func NewAgentPool(
 	}, nil
 }
 
+func NewEmptyAgentPool(
+	userId, defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey string,
+	localRAGAPI string,
+	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
+	connectors func(*AgentConfig) []Connector,
+	promptBlocks func(*AgentConfig) []DynamicPrompt,
+	timeout string,
+	withLogs bool,
+) *AgentPool {
+	var conversationPath string
+	if withLogs {
+		conversationPath = fmt.Sprintf("/tmp/%s/conversations", userId)
+		_ = os.MkdirAll(conversationPath, 0755)
+	}
+
+	return &AgentPool{
+		userId:                 userId,
+		apiURL:                 apiURL,
+		defaultModel:           defaultModel,
+		defaultMultimodalModel: defaultMultimodalModel,
+		imageModel:             imageModel,
+		localRAGAPI:            localRAGAPI,
+		apiKey:                 apiKey,
+		agents:                 make(map[string]*Agent),
+		pool:                   make(map[string]AgentConfig),
+		agentStatus:            make(map[string]*Status),
+		managers:               make(map[string]sse.Manager),
+		connectors:             connectors,
+		availableActions:       availableActions,
+		dynamicPrompt:          promptBlocks,
+		timeout:                timeout,
+		conversationLogs:       conversationPath,
+	}
+}
+
+
 
 func replaceInvalidChars(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
@@ -464,20 +500,20 @@ func (a *AgentPool) stateFiles(id string) (string, string) {
 	return stateFile, characterFile
 }
 
-func (a *AgentPool) Remove(name string) error {
+func (a *AgentPool) Remove(id string) error {
 	a.Lock()
 	defer a.Unlock()
 
 	// Stop the running agent
-	a.stop(name)
+	a.stop(id)
 
 	// Remove from in-memory maps
-	delete(a.agents, name)
-	delete(a.pool, name)
-	delete(a.agentStatus, name)
-	delete(a.managers, name)
+	delete(a.agents, id)
+	delete(a.pool, id)
+	delete(a.agentStatus, id)
+	delete(a.managers, id)
 
-	xlog.Info("Removed agent from memory", "name", name)
+	xlog.Info("Removed agent from memory", "id", id)
 	return nil
 }
 
