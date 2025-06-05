@@ -2,28 +2,34 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Header from "../components/Header";
 import { AgentStatus as StatusIndicator } from "../components/AgentComponents";
+import { useAgent } from "../hooks/useAgent";
 
 function AgentStatus() {
-  const { name } = useParams();
+  const { id } = useParams();
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const { agent } = useAgent(id);
+
   // Update document title
   useEffect(() => {
-    if (name) {
-      document.title = `Agent Status: ${name} - LocalAGI`;
+    if (agent) {
+      document.title = `Agent Status: ${agent.name} - LocalAGI`;
     }
     return () => {
       document.title = "LocalAGI";
     };
-  }, [name]);
+  }, [agent]);
 
   // Fetch initial status data
   useEffect(() => {
+    if (!agent) {
+      return;
+    }
     const fetchStatusData = async () => {
       try {
-        const response = await fetch(`/api/agent/${name}/status`);
+        const response = await fetch(`/api/agent/${id}/status`);
         if (!response.ok) {
           throw new Error(`Server responded with status: ${response.status}`);
         }
@@ -31,13 +37,15 @@ function AgentStatus() {
         setStatusData(data);
       } catch (err) {
         console.error("Error fetching agent status:", err);
-        setError(`Failed to load status for agent "${name}": ${err.message}`);
+        setError(
+          `Failed to load status for agent "${agent.name}": ${err.message}`
+        );
       } finally {
         setLoading(false);
       }
     };
     fetchStatusData();
-  }, [name]);
+  }, [agent]);
 
   // Header status helpers
   const isActive = statusData?.active;
@@ -65,10 +73,16 @@ function AgentStatus() {
   // Combine live updates with history
   const allUpdates = statusData?.History || [];
 
+  if (!agent) {
+    return <div></div>;
+  }
+
+  console.log(agent);
+
   // Create header right content
   const headerRightContent = (
     <div className="header-right">
-      <Link to={`/settings/${name}`} className="action-btn pause-resume-btn">
+      <Link to={`/settings/${id}`} className="action-btn pause-resume-btn">
         <i className="fas fa-cogs"></i> Agent Settings
       </Link>
     </div>
@@ -81,7 +95,7 @@ function AgentStatus() {
           <Header
             title="Agent Status"
             description="Live status, activity, and logs for this agent."
-            name={name}
+            name={agent.name}
           />
           {headerRightContent}
         </div>
@@ -98,8 +112,8 @@ function AgentStatus() {
             <div>
               <h3 style={{ fontWeight: 600, marginBottom: 12 }}>Agent Info</h3>
               <div style={{ marginBottom: 18 }}>
-                <strong>Name:</strong> {statusData.name} <br />
-                <strong>Model:</strong> {statusData.model || "-"} <br />
+                <strong>Name:</strong> {agent.name} <br />
+                <strong>Model:</strong> {agent.model || "-"} <br />
                 <strong>Uptime:</strong> {statusData.uptime || "-"} <br />
                 <strong>Status:</strong> {statusText}
               </div>

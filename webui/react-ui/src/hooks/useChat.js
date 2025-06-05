@@ -15,7 +15,34 @@ export function useChat(agentId, model) {
   const processedMessageIds = useRef(new Set());
   const localMessageContents = useRef(new Set()); // Track locally added message contents
 
-  // Use SSE hook to receive real-time messages (only for local models)
+  // Fetch initial chat history on mount or when agentId changes
+  useEffect(() => {
+    if (!agentId) return;
+    const fetchHistory = async () => {
+      try {
+        const result = await chatApi.getChatHistory(agentId);
+        if (result?.messages?.length) {
+          const formatted = result.messages.map((msg, index) => ({
+            id: msg.id || `${index}-${msg.sender}`, // fallback id
+            sender: msg.sender,
+            content: msg.content,
+            timestamp: msg.timestamp || new Date().toISOString(),
+          }));
+          setMessages(formatted);
+          formatted.forEach((msg) => {
+            processedMessageIds.current.add(msg.id);
+            if (msg.sender === "user") {
+              localMessageContents.current.add(msg.content);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch chat history:", err);
+      }
+    };
+    fetchHistory();
+  }, [agentId]);
+
   const {
     messages: sseMessages,
     statusUpdates,
@@ -23,9 +50,7 @@ export function useChat(agentId, model) {
     isConnected,
   } = useSSE(model && typeof model === "string" ? agentId : null);
 
-  console.log("MODEL", model);
-
-  // Process SSE messages into chat messages (local models only)
+  // Process SSE messages
   useEffect(() => {
     if (!sseMessages || sseMessages.length === 0) return;
     const latestMessage = sseMessages[sseMessages.length - 1];
@@ -40,22 +65,28 @@ export function useChat(agentId, model) {
           localMessageContents.current.has(messageData.content)
         )
           return;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: messageData.id,
-            sender: messageData.sender,
-            content: messageData.content,
-            timestamp: messageData.timestamp,
-          },
-        ]);
+        setMessages((prev) => {
+          // Remove the latest loading message if present
+          const withoutLoading = prev.filter(
+            (msg) => !(msg.sender === "assistant" && msg.loading)
+          );
+          return [
+            ...withoutLoading,
+            {
+              id: messageData.id,
+              sender: messageData.sender,
+              content: messageData.content,
+              timestamp: messageData.timestamp,
+            },
+          ];
+        });
       } catch (err) {
         console.error("Error processing JSON message:", err);
       }
     }
   }, [sseMessages]);
 
-  // Process status updates (local models only)
+  // Process status updates
   useEffect(() => {
     if (!statusUpdates || statusUpdates.length === 0) return;
     const latestStatus = statusUpdates[statusUpdates.length - 1];
@@ -73,7 +104,7 @@ export function useChat(agentId, model) {
     }
   }, [statusUpdates]);
 
-  // Process error messages (local models only)
+  // Process errors
   useEffect(() => {
     if (!errorMessages || errorMessages.length === 0) return;
     const latestError = errorMessages[errorMessages.length - 1];
@@ -87,29 +118,37 @@ export function useChat(agentId, model) {
     }
   }, [errorMessages]);
 
-  // Send a message to the agent or OpenRouter
   const sendMessage = useCallback(
     async (content) => {
       if (!model || !content) return false;
-      console.log("[useChat] sendMessage: model object:", model); // DEBUG LOG
       setSending(true);
       setError(null);
+
+      const messageId = `${Date.now()}-${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      const userMessage = {
+        id: messageId,
+        sender: "user",
+        content,
+        timestamp: new Date().toISOString(),
+      };
+
+      const loadingMessageId = `${messageId}-loading`;
+      const loadingMessage = {
+        id: loadingMessageId,
+        sender: "assistant",
+        content: "",
+        loading: true,
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, userMessage, loadingMessage]);
+      localMessageContents.current.add(content);
+
       try {
-        // Add user message to the local state immediately for better UX
-        const messageId = `${Date.now()}-${Math.random()
-          .toString(36)
-          .substr(2, 9)}`;
-        const userMessage = {
-          id: messageId,
-          sender: "user",
-          content,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, userMessage]);
-        localMessageContents.current.add(content);
         if (model.split("/")[0] === "openrouter") {
-          // Send to backend proxy endpoint
-          const res = await fetch("/api/openrouter/chat", {
+          const res = await fetch(`/api/openrouter/${agentId}/chat`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -117,37 +156,46 @@ export function useChat(agentId, model) {
               messages: [{ role: "user", content }],
             }),
           });
+
           if (!res.ok) {
             const err = await res.json();
-            const errorMsg =
-              (typeof err.error === "string" && err.error) ||
-              err.error?.message ||
-              JSON.stringify(err.error) ||
-              "Failed to get OpenRouter response";
-            throw new Error(errorMsg);
+            throw new Error(
+              err.error || err?.error?.message || "OpenRouter error"
+            );
           }
+
           const data = await res.json();
-          // OpenRouter returns choices[0].message
           const reply = data.choices?.[0]?.message;
+
           if (reply) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `${messageId}-openrouter`,
-                sender: "assistant",
-                content: reply.content,
-                timestamp: new Date().toISOString(),
-              },
-            ]);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === loadingMessageId
+                  ? {
+                      id: `${messageId}-openrouter`,
+                      sender: "assistant",
+                      content: reply.content,
+                      timestamp: new Date().toISOString(),
+                    }
+                  : msg
+              )
+            );
+          } else {
+            // If no reply, remove loading
+            setMessages((prev) =>
+              prev.filter((msg) => msg.id !== loadingMessageId)
+            );
           }
         } else {
-          // Use the JSON-based API endpoint for local models
+          // For local model (response comes from SSE), just wait
           await chatApi.sendMessage(agentId, content);
+          // SSE will handle replacement, so leave loading message
         }
-        return true;
       } catch (err) {
         setError(err.message || "Failed to send message");
-        console.error("Error sending message:", err);
+        setMessages((prev) =>
+          prev.filter((msg) => msg.id !== loadingMessageId)
+        );
       } finally {
         setSending(false);
       }
@@ -155,14 +203,17 @@ export function useChat(agentId, model) {
     [agentId, model]
   );
 
-  // Clear chat history
-  const clearChat = useCallback(() => {
+  const clearChat = useCallback(async () => {
+    try {
+      await chatApi.clearChat(agentId);
+    } catch (err) {
+      console.error("Failed to clear chat history:", err);
+    }
     setMessages([]);
     processedMessageIds.current.clear();
     localMessageContents.current.clear();
-  }, []);
+  }, [agentId]);
 
-  // Clear error state
   const clearError = useCallback(() => {
     setError(null);
   }, []);

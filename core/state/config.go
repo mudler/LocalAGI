@@ -129,20 +129,6 @@ func NewAgentConfigMeta(
 				Tags:         config.Tags{Section: "ModelSettings"},
 			},
 			{
-				Name:         "api_url",
-				Label:        "API URL",
-				Type:         "text",
-				DefaultValue: "",
-				Tags:         config.Tags{Section: "ModelSettings"},
-			},
-			{
-				Name:         "api_key",
-				Label:        "API Key",
-				Type:         "password",
-				DefaultValue: "",
-				Tags:         config.Tags{Section: "ModelSettings"},
-			},
-			{
 				Name:         "local_rag_url",
 				Label:        "Local RAG URL",
 				Type:         "text",

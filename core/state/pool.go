@@ -171,21 +171,29 @@ func replaceInvalidChars(s string) string {
 // CreateAgent adds a new agent to the pool
 // and starts it.
 // It also saves the state to the file.
-func (a *AgentPool) CreateAgent(id string, agentConfig *AgentConfig) error {
-	a.Lock()
-	defer a.Unlock()
+func (a *AgentPool) CreateAgent(id string, agentConfig *AgentConfig, notStart bool) error {
 	id = replaceInvalidChars(id)
 	agentConfig.Name = id
-	if _, ok := a.pool[id]; ok {
-		return fmt.Errorf("agent %s already exists", id)
-	}
-	a.pool[id] = *agentConfig
-	// if err := a.save(); err != nil {
-	// 	return err
-	// }
 
-	return a.startAgentWithConfig(id, agentConfig)
+	a.Lock()
+	defer a.Unlock()
+
+	// Check if agent already exists
+	if existingAgent := a.agents[id]; existingAgent != nil {
+		if notStart {
+			_ = a.Remove(id) // Assumes Remove handles its own locking safely
+		} else {
+			return fmt.Errorf("agent %s already exists", id)
+		}
+	}
+
+	// Insert into the pool
+	a.pool[id] = *agentConfig
+
+	return a.startAgentWithConfig(id, agentConfig, notStart)
 }
+
+
 
 func (a *AgentPool) List() []string {
 	a.Lock()
@@ -208,7 +216,8 @@ func (a *AgentPool) GetStatusHistory(id string) *Status {
 	return a.agentStatus[id]
 }
 
-func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
+func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStart bool) error {
+	print("HOHO")
 	manager := sse.NewManager(5)
 	ctx := context.Background()
 	model := a.defaultModel
@@ -415,6 +424,10 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 	a.agents[id] = agent
 	a.managers[id] = manager
 
+	if(notStart) {
+		return nil
+	}
+
 	go func() {
 		if err := agent.Run(); err != nil {
 			xlog.Error("Agent stopped", "error", err.Error(), "id", id)
@@ -449,7 +462,7 @@ func (a *AgentPool) StartAll() error {
 		if a.agents[id] != nil { // Agent already started
 			continue
 		}
-		if err := a.startAgentWithConfig(id, &config); err != nil {
+		if err := a.startAgentWithConfig(id, &config, false); err != nil {
 			xlog.Error("Failed to start agent", "id", id, "error", err)
 		}
 	}
@@ -487,7 +500,7 @@ func (a *AgentPool) Start(id string) error {
 		return nil
 	}
 	if config, ok := a.pool[id]; ok {
-		return a.startAgentWithConfig(id, &config)
+		return a.startAgentWithConfig(id, &config, false)
 	}
 
 	return fmt.Errorf("agent %s not found", id)
@@ -501,8 +514,11 @@ func (a *AgentPool) stateFiles(id string) (string, string) {
 }
 
 func (a *AgentPool) Remove(id string) error {
+	println("A")
+
 	a.Lock()
 	defer a.Unlock()
+	println("B")
 
 	// Stop the running agent
 	a.stop(id)

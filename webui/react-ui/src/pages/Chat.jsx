@@ -3,9 +3,10 @@ import { useParams, useOutletContext } from "react-router-dom";
 import { useChat } from "../hooks/useChat";
 import Header from "../components/Header";
 import { agentApi } from "../utils/api";
+import TypingIndicator from "../components/TypingIndicator";
 
 function Chat() {
-  const { name } = useParams();
+  const { id } = useParams();
   const { showToast } = useOutletContext();
   const [message, setMessage] = useState("");
   const [agentConfig, setAgentConfig] = useState(null);
@@ -16,7 +17,7 @@ function Chat() {
   useEffect(() => {
     const fetchAgentConfig = async () => {
       try {
-        const config = await agentApi.getAgentConfig(name);
+        const config = await agentApi.getAgentConfig(id);
         setAgentConfig(config);
         setIsOpenRouter(config.model.split("/")[0] === "openrouter");
       } catch (error) {
@@ -26,7 +27,7 @@ function Chat() {
       }
     };
     fetchAgentConfig();
-  }, [name, showToast]);
+  }, []);
 
   // Use our custom chat hook with model from agent config
   const {
@@ -37,18 +38,18 @@ function Chat() {
     sendMessage,
     clearChat,
     clearError,
-  } = useChat(name, agentConfig?.model);
+  } = useChat(id, agentConfig?.model);
 
-  console.log("Connected: ", isConnected);
+  console.log("yppp", sending);
 
   useEffect(() => {
-    if (name) {
-      document.title = `Chat with ${name} - LocalAGI`;
+    if (agentConfig) {
+      document.title = `Chat with ${agentConfig.name} - LocalAGI`;
     }
     return () => {
       document.title = "LocalAGI";
     };
-  }, [name]);
+  }, [agentConfig]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -86,7 +87,7 @@ function Chat() {
           <Header
             title="Chat with"
             description="Send messages and interact with your agent in real time."
-            name={name}
+            name={agentConfig.name}
           />
           {/* No right content for chat header */}
         </div>
@@ -143,7 +144,7 @@ function Chat() {
                         msg.sender === "user" ? "flex-end" : "flex-start",
                     }}
                   >
-                    {msg.content}
+                    {msg.loading ? <TypingIndicator /> : msg.content}
                   </div>
                 </div>
               ))

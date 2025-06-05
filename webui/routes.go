@@ -3,6 +3,7 @@ package webui
 import (
 	"crypto/subtle"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -121,7 +122,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		agentID := c.Params("id")
 
 
-		if pool.GetConfig(agentID) == nil {
+		if pool.GetAgent(agentID) == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "Agent not found or unauthorized",
 			})
@@ -266,19 +267,30 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		}
 
 		for _, agent := range dbAgents {
-			id := agent.ID
+			idStr := agent.ID.String()
+
+			// Ensure config is loaded into pool memory
+			if pool.GetAgent(idStr) == nil {
+				var cfg state.AgentConfig
+				if err := json.Unmarshal(agent.Config, &cfg); err == nil {
+					cfg.Name = agent.Name // optionally enforce name
+					println("MOOOOx")
+					_ = pool.CreateAgent(idStr, &cfg, true) 
+				}
+			}
+
+			// Do not start agent, just check if already running
+			instance := pool.GetAgent(idStr)
+
+			running := instance != nil && !instance.Paused()
+
 			agentList = append(agentList, fiber.Map{
-				"id":   id,
+				"id":   agent.ID,
 				"name": agent.Name,
 			})
-
-			running := false
-			println()
-			if instance := pool.GetAgent(id.String()); instance != nil {
-				running = !instance.Paused()
-			}
-			statuses[id.String()] = running
+			statuses[idStr] = running
 		}
+
 
 		// 4. Return final response
 		return c.JSON(fiber.Map{
@@ -358,7 +370,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/settings/import", app.RequireUser(), app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.RequireUser(), app.ExportAgent(pool))
 
-	webapp.Post("/api/openrouter/chat", app.RequireUser(), app.ProxyOpenRouterChat())
+	webapp.Post("/api/openrouter/:id/chat", app.RequireUser(), app.ProxyOpenRouterChat())
+	webapp.Get("/api/agent/:id/chat", app.RequireUser(), app.GetChatHistory())
+	webapp.Delete("/api/agent/:id/chat", app.RequireUser(), app.ClearChat())
 
 }
 

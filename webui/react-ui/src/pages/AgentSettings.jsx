@@ -13,19 +13,19 @@ function AgentSettings() {
   const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({});
 
+  // Use our custom agent hook
+  const { agent, loading, updateAgent, toggleAgentStatus, deleteAgent } =
+    useAgent(id);
+
   // Update document title
   useEffect(() => {
-    if (id) {
-      document.title = `Agent Settings: ${id} - LocalAGI`;
+    if (agent) {
+      document.title = `Agent Settings: ${agent.name} - LocalAGI`;
     }
     return () => {
       document.title = "LocalAGI";
     };
-  }, [id]);
-
-  // Use our custom agent hook
-  const { agent, loading, updateAgent, toggleAgentStatus, deleteAgent } =
-    useAgent(id);
+  }, [agent]);
 
   // Fetch metadata on component mount
   useEffect(() => {
@@ -73,8 +73,6 @@ function AgentSettings() {
   if (!agent) {
     return <div></div>;
   }
-
-  console.log(metadata);
 
   return (
     <div className="dashboard-container">

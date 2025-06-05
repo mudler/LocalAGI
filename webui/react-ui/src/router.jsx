@@ -35,7 +35,7 @@ export const router = createBrowserRouter(
           element: <AgentSettings />,
         },
         {
-          path: "talk/:name",
+          path: "talk/:id",
           element: <Chat />,
         },
         {
@@ -51,7 +51,7 @@ export const router = createBrowserRouter(
           element: <ImportAgent />,
         },
         {
-          path: "status/:name",
+          path: "status/:id",
           element: <AgentStatus />,
         },
       ],
