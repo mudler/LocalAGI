@@ -9,3 +9,4 @@ LocalAGI
 .vscode
 volumes/
 tmp/
+app
