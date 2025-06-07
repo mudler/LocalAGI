@@ -4,6 +4,7 @@ import { useChat } from "../hooks/useChat";
 import Header from "../components/Header";
 import { agentApi } from "../utils/api";
 import TypingIndicator from "../components/TypingIndicator";
+import ReactMarkdown from "react-markdown";
 
 function Chat() {
   const { id } = useParams();
@@ -144,7 +145,13 @@ function Chat() {
                         msg.sender === "user" ? "flex-end" : "flex-start",
                     }}
                   >
-                    {msg.loading ? <TypingIndicator /> : msg.content}
+                    {msg.loading ? (
+                      <TypingIndicator />
+                    ) : (
+                      <div className="markdown-content">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))

@@ -1254,3 +1254,34 @@ a:hover {
   cursor: not-allowed;
   box-shadow: none;
 }
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin: 1.2em 0 0.5em;
+  font-weight: bold;
+}
+
+.markdown-content p {
+  margin: 0.5em 0;
+  line-height: 1.6;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.markdown-content li {
+  margin: 0.25em 0;
+}
+
+.markdown-content hr {
+  margin: 1.5em 0;
+  border: none;
+  border-top: 1px solid #ccc;
+}
