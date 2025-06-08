@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@privy-io/react-auth": "^2.13.2",
+    "date-fns": "^4.1.0",
     "jwt-decode": "^4.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -1285,3 +1285,48 @@ a:hover {
   border: none;
   border-top: 1px solid #ccc;
 }
+
+/* Usage Table Styles */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.usage-table tr:hover {
+  background-color: #f9fafb;
+}
+
+.usage-table td {
+  color: var(--text);
+}
+
+/* Loading state */
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-light);
+  font-size: 1rem;
+}

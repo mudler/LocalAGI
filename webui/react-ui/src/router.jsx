@@ -9,6 +9,7 @@ import ActionsPlayground from "./pages/ActionsPlayground";
 import GroupCreate from "./pages/GroupCreate";
 import AgentStatus from "./pages/AgentStatus";
 import ImportAgent from "./pages/ImportAgent";
+import Usage from "./pages/Usage";
 
 const BASE_URL = import.meta.env.BASE_URL || "/app";
 
@@ -53,6 +54,10 @@ export const router = createBrowserRouter(
         {
           path: "status/:id",
           element: <AgentStatus />,
+        },
+        {
+          path: "usage",
+          element: <Usage />,
         },
       ],
     },

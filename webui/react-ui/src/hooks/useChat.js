@@ -147,50 +147,9 @@ export function useChat(agentId, model) {
       localMessageContents.current.add(content);
 
       try {
-        if (model.split("/")[0] === "openrouter") {
-          const res = await fetch(`/api/openrouter/${agentId}/chat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: model.replace("openrouter/", ""),
-              messages: [{ role: "user", content }],
-            }),
-          });
-
-          if (!res.ok) {
-            const err = await res.json();
-            throw new Error(
-              err.error || err?.error?.message || "OpenRouter error"
-            );
-          }
-
-          const data = await res.json();
-          const reply = data.choices?.[0]?.message;
-
-          if (reply) {
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === loadingMessageId
-                  ? {
-                      id: `${messageId}-openrouter`,
-                      sender: "assistant",
-                      content: reply.content,
-                      timestamp: new Date().toISOString(),
-                    }
-                  : msg
-              )
-            );
-          } else {
-            // If no reply, remove loading
-            setMessages((prev) =>
-              prev.filter((msg) => msg.id !== loadingMessageId)
-            );
-          }
-        } else {
-          // For local model (response comes from SSE), just wait
-          await chatApi.sendMessage(agentId, content);
-          // SSE will handle replacement, so leave loading message
-        }
+        // For local model (response comes from SSE), just wait
+        await chatApi.sendMessage(agentId, content);
+        // SSE will handle replacement, so leave loading message
       } catch (err) {
         setError(err.message || "Failed to send message");
         setMessages((prev) =>

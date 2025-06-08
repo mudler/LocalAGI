@@ -115,6 +115,17 @@ function App() {
                 />
                 Create Group Agent
               </Link>
+              <Link
+                to="/usage"
+                className={`nav-link ${isActive("/usage") ? "active" : ""}`}
+              >
+                <img
+                  src="/app/nav/chart.svg"
+                  alt="Chart"
+                  className="nav-icon"
+                />
+                Usage
+              </Link>
             </>
           </div>
 
@@ -188,6 +199,20 @@ function App() {
                     className="nav-icon"
                   />{" "}
                   Create Group Agent
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/usage"
+                  className="mobile-nav-link"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <img
+                    src="/app/nav/chart.svg"
+                    alt="Chart"
+                    className="nav-icon"
+                  />{" "}
+                  Usage
                 </Link>
               </li>
             </>

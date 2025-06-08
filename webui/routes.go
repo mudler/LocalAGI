@@ -121,7 +121,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 		agentID := c.Params("id")
 
-
 		if pool.GetAgent(agentID) == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "Agent not found or unauthorized",
@@ -138,7 +137,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		manager.Handle(c, sse.NewClient(randStringRunes(10)))
 		return nil
 	})
-
 
 	webapp.Get("/old/status/:name", func(c *fiber.Ctx) error {
 		history := pool.GetStatusHistory(c.Params("name"))
@@ -274,8 +272,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 				var cfg state.AgentConfig
 				if err := json.Unmarshal(agent.Config, &cfg); err == nil {
 					cfg.Name = agent.Name // optionally enforce name
-					println("MOOOOx")
-					_ = pool.CreateAgent(idStr, &cfg, true) 
+					_ = pool.CreateAgent(idStr, &cfg, true)
 				}
 			}
 
@@ -291,7 +288,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			statuses[idStr] = running
 		}
 
-
 		// 4. Return final response
 		return c.JSON(fiber.Map{
 			"agents":     agentList,
@@ -301,8 +297,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			"statuses":   statuses,
 		})
 	})
-
-
 
 	// API endpoint for getting a specific agent's details
 	webapp.Get("/api/agent/:id", app.RequireUser(), app.GetAgentDetails())
@@ -361,18 +355,20 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		}
 
 		return c.JSON(fiber.Map{
-			"id":    agentId,
+			"id":      agentId,
 			"history": entries,
 		})
 	})
 
-
 	webapp.Post("/settings/import", app.RequireUser(), app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.RequireUser(), app.ExportAgent(pool))
 
-	webapp.Post("/api/openrouter/:id/chat", app.RequireUser(), app.ProxyOpenRouterChat())
+	// webapp.Post("/api/openrouter/:id/chat", app.RequireUser(), app.ProxyOpenRouterChat())
 	webapp.Get("/api/agent/:id/chat", app.RequireUser(), app.GetChatHistory())
 	webapp.Delete("/api/agent/:id/chat", app.RequireUser(), app.ClearChat())
+
+	// New API route to get usage for the user
+	webapp.Get("/api/usage", app.RequireUser(), app.GetUsage())
 
 }
 

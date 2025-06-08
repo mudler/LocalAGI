@@ -112,7 +112,6 @@ func (manager *broadcastManager) Send(message Envelope) {
 
 // Handle sets up a new client and handles the connection.
 func (manager *broadcastManager) Handle(c *fiber.Ctx, cl Listener) {
-
 	manager.register(cl)
 	ctx := c.Context()
 
@@ -122,28 +121,52 @@ func (manager *broadcastManager) Handle(c *fiber.Ctx, cl Listener) {
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.Response.Header.Set("Access-Control-Allow-Headers", "Cache-Control")
 	ctx.Response.Header.Set("Access-Control-Allow-Credentials", "true")
+	ctx.Response.Header.Set("X-Accel-Buffering", "no") // Disable proxy buffering
 
 	// Send history to the newly connected client
 	manager.messageHistory.Send(cl)
+
+	// Create a done channel to handle cleanup
+	done := make(chan struct{})
+
+	// Start a goroutine to handle client disconnection
+	go func() {
+		select {
+		case <-ctx.Done():
+			manager.unregister(cl.ID())
+			close(cl.Chan())
+			close(done)
+		case <-done:
+			return
+		}
+	}()
+
 	ctx.SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
+		defer func() {
+			close(done)
+			manager.unregister(cl.ID())
+			close(cl.Chan())
+		}()
+
+		// Send an initial connection message
+		fmt.Fprintf(w, "event: connected\ndata: {\"status\":\"connected\"}\n\n")
+		w.Flush()
+
 		for {
 			select {
 			case msg, ok := <-cl.Chan():
 				if !ok {
-					// If the channel is closed, return from the function
 					return
 				}
 				_, err := fmt.Fprint(w, msg.String())
 				if err != nil {
-					// If an error occurs (e.g., client has disconnected), return from the function
 					return
 				}
-
 				w.Flush()
 
 			case <-ctx.Done():
-				manager.unregister(cl.ID())
-				close(cl.Chan())
+				return
+			case <-done:
 				return
 			}
 		}

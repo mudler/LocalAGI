@@ -40,12 +40,10 @@ import (
 )
 
 var (
-	verificationKey      string
-	privyAppId 			 string
-	privyApiKey			 string
+	verificationKey string
+	privyAppId      string
+	privyApiKey     string
 )
-
-
 
 func init() {
 	_ = godotenv.Load()
@@ -149,7 +147,6 @@ func (a *App) Delete() func(c *fiber.Ctx) error {
 	}
 }
 
-
 func errorJSONMessage(c *fiber.Ctx, message string) error {
 	return c.Status(http.StatusInternalServerError).JSON(struct {
 		Error string `json:"error"`
@@ -213,7 +210,6 @@ func (a *App) Pause() func(c *fiber.Ctx) error {
 	}
 }
 
-
 func (a *App) Start() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// 1. Get user ID
@@ -254,19 +250,55 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 
 		// 4. Try to get the agent from memory
 		agent := pool.GetAgent(agentId)
-		
+
+		// 5. If agent not in memory, load from database
 		if agent == nil {
-			return errorJSONMessage(c, "Agent is not active in memory")
+			// Parse user ID to UUID
+			userUUID, err := uuid.Parse(userIDStr)
+			if err != nil {
+				return errorJSONMessage(c, "Invalid user ID")
+			}
+
+			// Fetch agent from database
+			var agentModel models.Agent
+			if err := db.DB.
+				Where("ID = ? AND UserID = ?", agentId, userUUID).
+				First(&agentModel).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return errorJSONMessage(c, "Agent not found in database")
+				}
+				return errorJSONMessage(c, "Failed to fetch agent from database: "+err.Error())
+			}
+
+			// Parse agent config
+			var config state.AgentConfig
+			if err := json.Unmarshal(agentModel.Config, &config); err != nil {
+				return errorJSONMessage(c, "Failed to parse agent config: "+err.Error())
+			}
+
+			// Always use environment variables for API key and URL
+			config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+			config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
+
+			// Create agent in memory
+			if err := pool.CreateAgent(agentId, &config, false); err != nil {
+				return errorJSONMessage(c, "Failed to create agent in memory: "+err.Error())
+			}
+
+			// Get the newly created agent
+			agent = pool.GetAgent(agentId)
+			if agent == nil {
+				return errorJSONMessage(c, "Failed to get newly created agent")
+			}
 		}
 
-		// 5. Resume agent
+		// 6. Resume agent
 		xlog.Info("Starting agent", "id", agentId)
 		agent.Resume()
 
 		return statusJSONMessage(c, "ok")
 	}
 }
-
 
 func (a *App) Create() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
@@ -292,7 +324,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 
 		// 3. Apply fallback values from env if fields are empty
 		if config.Model == "" {
-			config.Model = "openrouter/deepseek/deepseek-chat-v3-0324:free"
+			config.Model = "deepseek/deepseek-chat-v3-0324:free"
 		}
 		if config.MultimodalModel == "" {
 			config.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
@@ -303,6 +335,12 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 		if config.LocalRAGAPIKey == "" {
 			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
 		}
+
+		// Always use environment variables for API key and URL
+		config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+		config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
+
+		fmt.Println("TTT", config.APIKey)
 
 		// 4. Serialize the enriched config to JSON
 		configJSON, err := json.Marshal(config)
@@ -343,19 +381,18 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
 			if err != nil {
-				return errorJSONMessage(c, "Failed to create agent pool: " + err.Error())
+				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
 			}
 			a.UserPools[userIDStr] = pool
 		}
 		// 7. Register agent in the in-memory pool
 		if err := pool.CreateAgent(id.String(), &config, false); err != nil {
-			return errorJSONMessage(c, "Failed to initialize agent: " + err.Error())
+			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
 		}
 
 		return statusJSONMessage(c, "ok")
 	}
 }
-
 
 // NEW FUNCTION: Get agent configuration
 func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
@@ -408,7 +445,6 @@ func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 	}
 }
 
-
 // UpdateAgentConfig handles updating an agent's configuration
 func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
@@ -445,6 +481,10 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 			xlog.Error("Error parsing agent config", "error", err)
 			return errorJSONMessage(c, "Invalid agent config: "+err.Error())
 		}
+
+		// Always use environment variables for API key and URL
+		newConfig.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+		newConfig.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
 
 		// 5. Update DB
 		newConfigJSON, err := json.Marshal(newConfig)
@@ -658,18 +698,6 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			)
 		}
 
-		send("json_message", map[string]interface{}{
-			"id":        messageID + "-user",
-			"sender":    "user",
-			"content":   message,
-			"timestamp": time.Now().Format(time.RFC3339),
-		})
-
-		send("json_status", map[string]interface{}{
-			"status":    "processing",
-			"timestamp": time.Now().Format(time.RFC3339),
-		})
-
 		// 8. Save user message to DB
 		_ = db.DB.Create(&models.AgentMessage{
 			ID:        uuid.New(),
@@ -679,11 +707,14 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			Timestamp: time.Now(),
 		})
 
+		send("json_status", map[string]interface{}{
+			"status":    "processing",
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
+
 		// 9. Ask agent asynchronously
 		go func() {
 			response := pool.GetAgent(agentId).Ask(coreTypes.WithText(message))
-
-			fmt.Println("BBBA", response)
 
 			if response.Error != nil {
 				send("json_error", map[string]interface{}{
@@ -708,11 +739,6 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				Content:   response.Response,
 				Timestamp: time.Now(),
 			})
-
-			send("json_status", map[string]interface{}{
-				"status":    "completed",
-				"timestamp": time.Now().Format(time.RFC3339),
-			})
 		}()
 
 		// 10. Immediate 202 response
@@ -722,7 +748,6 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 		})
 	}
 }
-
 
 func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
@@ -983,7 +1008,7 @@ func getLocalModels() []map[string]interface{} {
 
 // getOpenRouterModels fetches and filters OpenRouter models for latest OpenAI, Anthropic, and Alibaba
 func getOpenRouterModels() []map[string]interface{} {
-	openrouterApiKey := os.Getenv("OPENROUTER_API_KEY")
+	openrouterApiKey := os.Getenv("LOCALAGI_LLM_API_KEY")
 	if openrouterApiKey == "" {
 		return nil
 	}
@@ -1047,17 +1072,15 @@ func getOpenRouterModels() []map[string]interface{} {
 func getAvailableModels() []map[string]interface{} {
 	openrouterModels := getOpenRouterModels()
 
-
 	for _, model := range openrouterModels {
 		if model["id"] == "openrouter/deepseek/deepseek-chat-v3-0324:free" {
 			return []map[string]interface{}{model}
 		}
 	}
-	
+
 	// Return empty slice if model not found
 	return []map[string]interface{}{}
 }
-
 
 // Proxy OpenRouter chat/completion endpoint
 func (a *App) ProxyOpenRouterChat() func(c *fiber.Ctx) error {
@@ -1180,9 +1203,6 @@ func extractAgentContent(body []byte) (string, error) {
 	return "", errors.New("no agent response found")
 }
 
-
-
-
 // PrivyClaims holds the JWT fields
 type PrivyClaims struct {
 	AppId      string `json:"aud,omitempty"`
@@ -1292,8 +1312,6 @@ func (a *App) RequireUser() func(c *fiber.Ctx) error {
 	}
 }
 
-
-
 func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// 1. Get user ID
@@ -1365,7 +1383,7 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 			var cfg state.AgentConfig
 			if err := json.Unmarshal(agent.Config, &cfg); err == nil {
 				cfg.Name = agent.Name
-				_ = pool.CreateAgent(agentId, &cfg, true) 
+				_ = pool.CreateAgent(agentId, &cfg, true)
 			}
 		}
 
@@ -1483,5 +1501,24 @@ func (a *App) ClearChat() func(c *fiber.Ctx) error {
 		// 5. Optionally: clear in-memory HUD or status if needed
 
 		return c.JSON(fiber.Map{"success": true, "message": "Chat cleared"})
+	}
+}
+
+// GetUsage returns the LLM usage records for the authenticated user
+func (a *App) GetUsage() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+		userUUID, err := uuid.Parse(userID)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
+		}
+		var usages []models.LLMUsage
+		if err := db.DB.Where("UserID = ?", userUUID).Find(&usages).Error; err != nil {
+			return errorJSONMessage(c, "Failed to fetch usage data: "+err.Error())
+		}
+		return c.JSON(usages)
 	}
 }

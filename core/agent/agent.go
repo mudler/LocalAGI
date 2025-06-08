@@ -7,10 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mudler/LocalAGI/pkg/utils"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 
+	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/db"
+	models "github.com/mudler/LocalAGI/dbmodels"
 	"github.com/mudler/LocalAGI/pkg/llm"
 	"github.com/sashabaranov/go-openai"
 )
@@ -185,7 +189,31 @@ func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletion
 				Messages: conversation,
 			},
 		)
+		// prettyJSON, errr := json.MarshalIndent(resp, "", "  ")
+		// if errr != nil {
+		// 	fmt.Println("Error pretty printing response", "error", err)
+		// } else {
+		// 	fmt.Println("LLM Response", "response", string(prettyJSON))
+		// }
 		if err == nil && len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
+			// Track usage after successful API call
+			usage := utils.GetOpenRouterUsage(resp.ID)
+			llmUsage := &models.LLMUsage{
+				ID:               uuid.New(),
+				UserID:           a.options.userID,
+				AgentID:          a.options.agentID,
+				Model:            a.options.LLMAPI.Model,
+				PromptTokens:     usage.PromptTokens,
+				CompletionTokens: usage.CompletionTokens,
+				TotalTokens:      usage.TotalTokens,
+				Cost:             usage.Cost,
+				RequestType:      "chat",
+				GenID:            resp.ID,
+				CreatedAt:        time.Now(),
+			}
+			if err := db.DB.Create(llmUsage).Error; err != nil {
+				xlog.Error("Error tracking LLM usage", "error", err)
+			}
 			break
 		}
 		xlog.Warn("Error asking LLM, retrying", "attempt", attempt+1, "error", err)
@@ -271,7 +299,7 @@ func (a *Agent) runAction(ctx context.Context, chosenAction types.Action, params
 	}
 
 	xlog.Debug("[runAction] Action result", "action", chosenAction.Definition().Name, "params", params.String(), "result", result.Result)
-	
+
 	return result, nil
 }
 
@@ -320,7 +348,6 @@ func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (stri
 			Model: model,
 			Messages: []openai.ChatCompletionMessage{
 				{
-
 					Role: "user",
 					MultiContent: []openai.ChatMessagePart{
 						{
@@ -330,16 +357,38 @@ func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (stri
 						{
 							Type: openai.ChatMessagePartTypeImageURL,
 							ImageURL: &openai.ChatMessageImageURL{
-
 								URL: imageURL,
 							},
 						},
 					},
 				},
-			}})
+			},
+		})
 	if err != nil {
 		return "", err
 	}
+
+	// Track usage after successful API call
+	if len(resp.Choices) > 0 {
+		usage := utils.GetOpenRouterUsage(resp.ID)
+		llmUsage := &models.LLMUsage{
+			ID:               uuid.New(),
+			UserID:           a.options.userID,
+			AgentID:          a.options.agentID,
+			Model:            model,
+			PromptTokens:     usage.PromptTokens,
+			CompletionTokens: usage.CompletionTokens,
+			TotalTokens:      usage.TotalTokens,
+			Cost:             usage.Cost,
+			RequestType:      "chat",
+			GenID:            resp.ID,
+			CreatedAt:        time.Now(),
+		}
+		if err := db.DB.Create(llmUsage).Error; err != nil {
+			xlog.Error("Error tracking LLM usage", "error", err)
+		}
+	}
+
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("no choices")
 	}
@@ -822,6 +871,7 @@ func (a *Agent) addFunctionResultToConversation(chosenAction types.Action, actio
 					Name:      chosenAction.Definition().Name.String(),
 					Arguments: actionParams.String(),
 				},
+				ID: chosenAction.Definition().Name.String(),
 			},
 		},
 	})
@@ -833,7 +883,6 @@ func (a *Agent) addFunctionResultToConversation(chosenAction types.Action, actio
 		Name:       chosenAction.Definition().Name.String(),
 		ToolCallID: chosenAction.Definition().Name.String(),
 	})
-
 	return conv
 }
 
@@ -954,4 +1003,30 @@ func (a *Agent) loop(timer *time.Timer, job *types.Job) {
 	}
 	xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
 	a.consumeJob(job, UserRole)
+}
+
+// calculateCost calculates the cost of the API call based on the model and token usage
+func calculateCost(usage openai.Usage, model string) float64 {
+	// Default costs per 1K tokens (these should be updated based on actual pricing)
+	var promptCost, completionCost float64
+
+	switch model {
+	case "gpt-4":
+		promptCost = 0.03
+		completionCost = 0.06
+	case "gpt-4-turbo-preview":
+		promptCost = 0.01
+		completionCost = 0.03
+	case "gpt-3.5-turbo":
+		promptCost = 0.0015
+		completionCost = 0.002
+	default:
+		// Default to GPT-3.5-turbo pricing for unknown models
+		promptCost = 0.0015
+		completionCost = 0.002
+	}
+
+	// Calculate total cost
+	totalCost := (float64(usage.PromptTokens)/1000.0)*promptCost + (float64(usage.CompletionTokens)/1000.0)*completionCost
+	return totalCost
 }

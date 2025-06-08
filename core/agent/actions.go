@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/db"
+	models "github.com/mudler/LocalAGI/dbmodels"
 
+	"github.com/mudler/LocalAGI/pkg/utils"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 
+	"github.com/google/uuid"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -48,10 +53,32 @@ func (a *Agent) decision(
 		}
 
 		resp, err := a.client.CreateChatCompletion(ctx, decision)
+
 		if err != nil {
 			lastErr = err
 			xlog.Warn("Attempt to make a decision failed", "attempt", attempts+1, "error", err)
 			continue
+		}
+
+		if len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
+			// Track usage after successful API call
+			usage := utils.GetOpenRouterUsage(resp.ID)
+			llmUsage := &models.LLMUsage{
+				ID:               uuid.New(),
+				UserID:           a.options.userID,
+				AgentID:          a.options.agentID,
+				Model:            a.options.LLMAPI.Model,
+				PromptTokens:     usage.PromptTokens,
+				CompletionTokens: usage.CompletionTokens,
+				TotalTokens:      usage.TotalTokens,
+				Cost:             usage.Cost,
+				RequestType:      "chat",
+				GenID:            resp.ID,
+				CreatedAt:        time.Now(),
+			}
+			if err := db.DB.Create(llmUsage).Error; err != nil {
+				xlog.Error("Error tracking LLM usage", "error", err)
+			}
 		}
 
 		jsonResp, _ := json.Marshal(resp)

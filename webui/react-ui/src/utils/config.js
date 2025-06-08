@@ -48,5 +48,8 @@ export const API_CONFIG = {
 
     // Status endpoint
     status: (name) => `/status/${name}`,
+
+    // Usage endpoint
+    usage: "/api/usage",
   },
 };

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai"
 )
@@ -39,6 +40,8 @@ type options struct {
 	periodicRuns          time.Duration
 	kbResults             int
 	ragdb                 RAGDB
+	userID                uuid.UUID
+	agentID               uuid.UUID
 
 	prompts []DynamicPrompt
 
@@ -333,6 +336,20 @@ func WithRandomIdentity(guidance ...string) Option {
 func WithActions(actions ...types.Action) Option {
 	return func(o *options) error {
 		o.userActions = actions
+		return nil
+	}
+}
+
+func WithUserID(id uuid.UUID) Option {
+	return func(o *options) error {
+		o.userID = id
+		return nil
+	}
+}
+
+func WithAgentID(id uuid.UUID) Option {
+	return func(o *options) error {
+		o.agentID = id
 		return nil
 	}
 }

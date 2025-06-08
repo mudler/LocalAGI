@@ -287,3 +287,14 @@ export const statusApi = {
     return handleResponse(response);
   },
 };
+
+// Usage-related API calls
+export const usageApi = {
+  // Get usage statistics
+  getUsage: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.usage), {
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+};

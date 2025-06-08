@@ -20,6 +20,7 @@ import (
 
 	models "github.com/mudler/LocalAGI/dbmodels"
 
+	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 )
 
@@ -161,8 +162,6 @@ func NewEmptyAgentPool(
 	}
 }
 
-
-
 func replaceInvalidChars(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
 	return strings.ReplaceAll(s, " ", "_")
@@ -193,8 +192,6 @@ func (a *AgentPool) CreateAgent(id string, agentConfig *AgentConfig, notStart bo
 	return a.startAgentWithConfig(id, agentConfig, notStart)
 }
 
-
-
 func (a *AgentPool) List() []string {
 	a.Lock()
 	defer a.Unlock()
@@ -217,7 +214,6 @@ func (a *AgentPool) GetStatusHistory(id string) *Status {
 }
 
 func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStart bool) error {
-	print("HOHO")
 	manager := sse.NewManager(5)
 	ctx := context.Background()
 	model := a.defaultModel
@@ -300,6 +296,8 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
 		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, id)),
+		WithUserID(uuid.MustParse(a.userId)),
+		WithAgentID(uuid.MustParse(id)),
 		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",
@@ -424,7 +422,8 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 	a.agents[id] = agent
 	a.managers[id] = manager
 
-	if(notStart) {
+	if notStart {
+		agent.Pause()
 		return nil
 	}
 
@@ -514,11 +513,8 @@ func (a *AgentPool) stateFiles(id string) (string, string) {
 }
 
 func (a *AgentPool) Remove(id string) error {
-	println("A")
-
 	a.Lock()
 	defer a.Unlock()
-	println("B")
 
 	// Stop the running agent
 	a.stop(id)
@@ -532,7 +528,6 @@ func (a *AgentPool) Remove(id string) error {
 	xlog.Info("Removed agent from memory", "id", id)
 	return nil
 }
-
 
 func (a *AgentPool) Save() error {
 	a.Lock()
