@@ -84,28 +84,32 @@ const Usage = () => {
 
         <div className="section-box">
           <div className="table-container">
-            <table className="usage-table">
-              <thead>
-                <tr>
-                  {columns.map((column) => (
-                    <th key={column.key}>{column.title}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {usage.map((record) => (
-                  <tr key={record.id}>
+            {usage.length === 0 ? (
+              <div className="no-usage-message">No usage yet</div>
+            ) : (
+              <table className="usage-table">
+                <thead>
+                  <tr>
                     {columns.map((column) => (
-                      <td key={`${record.id}-${column.key}`}>
-                        {column.render
-                          ? column.render(record[column.dataIndex])
-                          : record[column.dataIndex]}
-                      </td>
+                      <th key={column.key}>{column.title}</th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {usage.map((record) => (
+                    <tr key={record.id}>
+                      {columns.map((column) => (
+                        <td key={`${record.id}-${column.key}`}>
+                          {column.render
+                            ? column.render(record[column.dataIndex])
+                            : record[column.dataIndex]}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

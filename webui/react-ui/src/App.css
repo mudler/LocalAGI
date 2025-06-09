@@ -1330,3 +1330,11 @@ a:hover {
   color: var(--text-light);
   font-size: 1rem;
 }
+
+/* No usage message */
+.no-usage-message {
+  text-align: center;
+  font-weight: bold;
+  padding: 2rem;
+  font-size: 1.1rem;
+}
