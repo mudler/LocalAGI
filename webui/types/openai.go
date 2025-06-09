@@ -1,11 +1,16 @@
 package types
 
-import "github.com/sashabaranov/go-openai"
+import (
+	"encoding/json"
+
+	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/sashabaranov/go-openai"
+)
 
 // RequestBody represents the request body structure for the OpenAI API
 type RequestBody struct {
 	Model              string            `json:"model"`
-	Input              interface{}       `json:"input"`
+	Input              json.RawMessage   `json:"input"`
 	InputText          string            `json:"input_text"`
 	InputMessages      []InputMessage    `json:"input_messages"`
 	Include            []string          `json:"include,omitempty"`
@@ -26,17 +31,34 @@ type RequestBody struct {
 }
 
 func (r *RequestBody) SetInputByType() {
-	switch input := r.Input.(type) {
-	case string:
-		r.InputText = input
-	case []any:
-		for _, i := range input {
-			switch i := i.(type) {
-			case InputMessage:
-				r.InputMessages = append(r.InputMessages, i)
-			}
-		}
+	xlog.Debug("[Parse Request] Set input type", "input", string(r.Input))
+
+	var inputText string
+	if err := json.Unmarshal(r.Input, &inputText); err == nil {
+		r.InputText = inputText
+		return
 	}
+
+	var inputMessages []InputMessage
+	if err := json.Unmarshal(r.Input, &inputMessages); err != nil {
+		xlog.Warn("[Parse Request] Input type not recognized", "input", string(r.Input))
+		return
+	}
+
+	for _, i := range inputMessages {
+		switch content := i.Content.(type) {
+		case []ContentItem:
+			i.ContentItems = content
+		case string:
+			i.ContentText = content
+		default:
+			xlog.Warn("[Parse Request] Input content type not recognized", "content", content)
+		}
+
+		r.InputMessages = append(r.InputMessages, i)
+	}
+
+	xlog.Debug("[Parse Request] Input messages parsed", "messages", r.InputMessages)
 }
 
 func (r *RequestBody) ToChatCompletionMessages() []openai.ChatCompletionMessage {
@@ -45,7 +67,15 @@ func (r *RequestBody) ToChatCompletionMessages() []openai.ChatCompletionMessage 
 	for _, m := range r.InputMessages {
 		content := []openai.ChatMessagePart{}
 		oneImageWasFound := false
-		for _, c := range m.Content {
+
+		if m.ContentText != "" {
+			content = append(content, openai.ChatMessagePart{
+				Type: "text",
+				Text: m.ContentText,
+			})
+		}
+
+		for _, c := range m.ContentItems {
 			switch c.Type {
 			case "text":
 				content = append(content, openai.ChatMessagePart{
@@ -162,8 +192,10 @@ type ResponseBody struct {
 
 // InputMessage represents a user input message
 type InputMessage struct {
-	Role    string        `json:"role"`
-	Content []ContentItem `json:"content"`
+	Role         string        `json:"role"`
+	Content      any           `json:"content"`
+	ContentText  string        `json:"content_text"`
+	ContentItems []ContentItem `json:"content_items"`
 }
 
 // ContentItem represents an item in a content array
