@@ -356,6 +356,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 		return c.JSON(fiber.Map{
 			"id":      agentId,
+			"active":  pool.IsAgentActive(agentId),
 			"history": entries,
 		})
 	})

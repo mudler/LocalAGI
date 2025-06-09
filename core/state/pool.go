@@ -549,6 +549,15 @@ func (a *AgentPool) GetAgent(id string) *Agent {
 	return a.agents[id]
 }
 
+func (a *AgentPool) IsAgentActive(id string) bool {
+	a.Lock()
+	defer a.Unlock()
+	if agent := a.agents[id]; agent != nil {
+		return !agent.Paused()
+	}
+	return false
+}
+
 func (a *AgentPool) AllAgents() []string {
 	a.Lock()
 	defer a.Unlock()

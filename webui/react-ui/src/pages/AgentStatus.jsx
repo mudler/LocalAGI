@@ -114,7 +114,7 @@ function AgentStatus() {
               <div style={{ marginBottom: 18 }}>
                 <strong>Name:</strong> {agent.name} <br />
                 <strong>Model:</strong> {agent.model || "-"} <br />
-                <strong>Uptime:</strong> {statusData.uptime || "-"} <br />
+                {/* <strong>Uptime:</strong> {statusData.uptime || "-"} <br /> */}
                 <strong>Status:</strong> {statusText}
               </div>
               {/* Activity log or live updates */}

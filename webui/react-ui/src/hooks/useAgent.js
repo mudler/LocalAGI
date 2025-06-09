@@ -68,41 +68,6 @@ export function useAgent(agentId) {
     [agentId, fetchAgent]
   );
 
-  // Toggle agent status (pause/start)
-  const toggleAgentStatus = useCallback(
-    async (isActive) => {
-      if (!agentId) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        if (isActive) {
-          await agentApi.pauseAgent(agentId);
-          showToast(`Agent "${agent?.name}" paused successfully`, "success");
-        } else {
-          await agentApi.startAgent(agentId);
-          showToast(`Agent "${agent?.name}" restarted successfully`, "success");
-        }
-
-        // Update the agent's active status in the local state
-        setAgent((prevAgent) => ({
-          ...prevAgent,
-          active: !isActive,
-        }));
-
-        return true;
-      } catch (err) {
-        setError(err.message || "Failed to toggle agent status");
-        console.error("Error toggling agent status:", err);
-        return false;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [agentId]
-  );
-
   // Delete agent
   const deleteAgent = useCallback(async () => {
     if (!agentId) return;
@@ -134,7 +99,7 @@ export function useAgent(agentId) {
     error,
     fetchAgent,
     updateAgent,
-    toggleAgentStatus,
     deleteAgent,
+    setAgent
   };
 }

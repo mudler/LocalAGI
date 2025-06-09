@@ -14,7 +14,7 @@ function AgentSettings() {
   const [formData, setFormData] = useState({});
 
   // Use our custom agent hook
-  const { agent, loading, updateAgent, toggleAgentStatus, deleteAgent } =
+  const { agent, loading, updateAgent, deleteAgent, setAgent } =
     useAgent(id);
 
   // Update document title
@@ -47,11 +47,50 @@ function AgentSettings() {
     }
   }, [agent]);
 
+  const toggleAgentStatus = async (id, name, isActive) => {
+    try {
+      const endpoint = isActive
+        ? `/api/agent/${id}/pause`
+        : `/api/agent/${id}/start`;
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setAgent((prevAgent) => ({
+          ...prevAgent,
+          active: !isActive,
+        }));
+
+        // Show success toast
+        const action = isActive ? "paused" : "started";
+        console.log('response.ok', action);
+        
+        showToast(`Agent "${name}" ${action} successfully`, "success");
+        console.log('agent', `Agent "${name}" ${action} successfully`);
+
+      } else {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error || `Server responded with status: ${response.status}`
+        );
+      }
+    } catch (err) {
+      console.error(`Error toggling agent status:`, err);
+      showToast(`Failed to update agent status: ${err.message}`, "error");
+    }
+  };
+
   // Header action handlers
   const handlePauseResume = async (isActive) => {
     try {
-      await toggleAgentStatus(isActive);
-      showToast(agent?.active ? "Agent paused" : "Agent resumed", "success");
+      const success = await toggleAgentStatus(id, agent.name, isActive);
+      if (success) {
+        showToast(`Agent "${agent.name}" ${isActive ? "resumed" : "paused"}`, "success");
+      }
     } catch (err) {
       console.error("Error toggling agent status:", err);
       showToast("Failed to update agent status", "error");
