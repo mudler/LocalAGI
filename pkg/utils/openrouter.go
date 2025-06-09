@@ -73,8 +73,6 @@ func GetOpenRouterUsage(generationID string) OpenRouterUsage {
 
 	req.Header.Add("Authorization", "Bearer "+openRouterAPIKey)
 
-	println("OPENROUTER_API_KEY", openRouterAPIKey)
-
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -87,13 +85,6 @@ func GetOpenRouterUsage(generationID string) OpenRouterUsage {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		xlog.Error("Error parsing OpenRouter response", "error", err)
 		return OpenRouterUsage{}
-	}
-
-	prettyJSON, err := json.MarshalIndent(result.Data, "", "  ")
-	if err != nil {
-		xlog.Error("Error pretty printing response", "error", err)
-	} else {
-		fmt.Println("OpenRouter Response Data:", string(prettyJSON))
 	}
 
 	return OpenRouterUsage{
