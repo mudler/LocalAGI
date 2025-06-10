@@ -29,11 +29,14 @@ require (
 	github.com/valyala/fasthttp v1.62.0
 	golang.org/x/crypto v0.39.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
-	maunium.net/go/mautrix v0.17.0
+	maunium.net/go/mautrix v0.24.0
 	mvdan.cc/xurls/v2 v2.6.0
 )
 
-require github.com/JohannesKaufmann/dom v0.2.0 // indirect
+require (
+	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/JohannesKaufmann/dom v0.2.0 // indirect
+)
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.3
@@ -89,7 +92,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkoukk/tiktoken-go v0.1.7 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rs/zerolog v1.31.0 // indirect
+	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
@@ -101,11 +104,11 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
-	go.mau.fi/util v0.3.0 // indirect
+	go.mau.fi/util v0.8.7 // indirect
 	go.starlark.net v0.0.0-20250417143717-f57e51f710eb // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/arch v0.16.0 // indirect
-	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
+	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
@@ -113,5 +116,4 @@ require (
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	maunium.net/go/maulogger/v2 v2.4.1 // indirect
 )
