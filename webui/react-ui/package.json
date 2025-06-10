@@ -23,7 +23,7 @@
     "eslint-plugin-react-hooks": "^6.0.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.2.0",
-    "react-router-dom": "^7.6.1",
+    "react-router-dom": "^7.6.2",
     "vite": "^6.3.5"
   }
 }
