@@ -10,7 +10,7 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-func GenerateTypedJSONWithGuidance(ctx context.Context, client *openai.Client, guidance, model string, i jsonschema.Definition, dst any) error {
+func GenerateTypedJSONWithGuidance(ctx context.Context, client LLMClient, guidance, model string, i jsonschema.Definition, dst any) error {
 	return GenerateTypedJSONWithConversation(ctx, client, []openai.ChatCompletionMessage{
 		{
 			Role:    "user",
@@ -19,7 +19,7 @@ func GenerateTypedJSONWithGuidance(ctx context.Context, client *openai.Client, g
 	}, model, i, dst)
 }
 
-func GenerateTypedJSONWithConversation(ctx context.Context, client *openai.Client, conv []openai.ChatCompletionMessage, model string, i jsonschema.Definition, dst any) error {
+func GenerateTypedJSONWithConversation(ctx context.Context, client LLMClient, conv []openai.ChatCompletionMessage, model string, i jsonschema.Definition, dst any) error {
 	toolName := "json"
 	decision := openai.ChatCompletionRequest{
 		Model:    model,
