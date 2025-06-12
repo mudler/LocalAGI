@@ -488,6 +488,63 @@ func (a *App) ListActions() func(c *fiber.Ctx) error {
 	}
 }
 
+// createToolCallResponse generates a proper tool call response for user-defined actions
+func (a *App) createToolCallResponse(id, agentName string, actionState coreTypes.ActionState, conv []openai.ChatCompletionMessage) types.ResponseBody {
+	// Create tool call ID
+	toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+	
+	// Get function name and arguments
+	functionName := actionState.Action.Definition().Name.String()
+	argumentsJSON, err := json.Marshal(actionState.Params)
+	if err != nil {
+		xlog.Error("Error marshaling action params for tool call", "error", err)
+		// Fallback to empty arguments
+		argumentsJSON = []byte("{}")
+	}
+	
+	// Create message object with reasoning
+	messageObj := types.ResponseMessage{
+		Type:   "message",
+		ID:     fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+		Status: "completed",
+		Role:   "assistant",
+		Content: []types.MessageContentItem{
+			{
+				Type: "output_text",
+				Text: actionState.Reasoning,
+			},
+		},
+	}
+	
+	// Create function tool call object
+	functionToolCall := types.FunctionToolCall{
+		Arguments: string(argumentsJSON),
+		CallID:    toolCallID,
+		Name:      functionName,
+		Type:      "function_call",
+		ID:        fmt.Sprintf("tool_%d", time.Now().UnixNano()),
+		Status:    "completed",
+	}
+	
+	// Create response with both message and tool call in output array
+	return types.ResponseBody{
+		ID:        id,
+		Object:    "response",
+		CreatedAt: time.Now().Unix(),
+		Status:    "completed",
+		Model:     agentName,
+		Output: []interface{}{
+			messageObj,
+			functionToolCall,
+		},
+		Usage: types.UsageInfo{
+			InputTokens:  0, // TODO: calculate actual usage
+			OutputTokens: 0,
+			TotalTokens:  0,
+		},
+	}
+}
+
 func (a *App) Responses(pool *state.AgentPool, tracker *conversations.ConversationTracker[string]) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		var request types.RequestBody
@@ -507,15 +564,38 @@ func (a *App) Responses(pool *state.AgentPool, tracker *conversations.Conversati
 		agentName := request.Model
 		messages := append(conv, request.ToChatCompletionMessages()...)
 
-		a := pool.GetAgent(agentName)
-		if a == nil {
+		agent := pool.GetAgent(agentName)
+		if agent == nil {
 			xlog.Info("Agent not found in pool", c.Params("name"))
 			return c.Status(http.StatusInternalServerError).JSON(types.ResponseBody{Error: "Agent not found"})
 		}
 
-		res := a.Ask(
+		// Prepare job options
+		jobOptions := []coreTypes.JobOption{
 			coreTypes.WithConversationHistory(messages),
-		)
+		}
+
+		// Add tools if present in the request
+		if len(request.Tools) > 0 {
+			builtinTools, userTools := types.SeparateTools(request.Tools)
+			if len(builtinTools) > 0 {
+				jobOptions = append(jobOptions, coreTypes.WithBuiltinTools(builtinTools))
+				xlog.Debug("Adding builtin tools to job", "count", len(builtinTools), "agent", agentName)
+			}
+			if len(userTools) > 0 {
+				jobOptions = append(jobOptions, coreTypes.WithUserTools(userTools))
+				xlog.Debug("Adding user tools to job", "count", len(userTools), "agent", agentName)
+			}
+		}
+
+		var choice types.ToolChoice
+		if err := json.Unmarshal(request.ToolChoice, &choice); err == nil {
+			if choice.Type == "function" {
+				jobOptions = append(jobOptions, coreTypes.WithToolChoice(choice.Name))
+			}
+		}
+
+		res := agent.Ask(jobOptions...)
 		if res.Error != nil {
 			xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
 
@@ -524,28 +604,44 @@ func (a *App) Responses(pool *state.AgentPool, tracker *conversations.Conversati
 			xlog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
 		}
 
+		id := uuid.New().String()
+
+		// Check if this is a user-defined tool call
+		if res.Response == "" && len(res.State) > 0 {
+			// Get the last action from state
+			lastAction := res.State[len(res.State)-1]
+			if coreTypes.IsActionUserDefined(lastAction.Action) {
+				xlog.Debug("Detected user-defined action, creating tool call response", "action", lastAction.Action.Definition().Name)
+				
+				// Generate tool call response
+				response := a.createToolCallResponse(id, agentName, lastAction, conv)
+				tracker.SetConversation(id, conv) // Save conversation without adding assistant message
+				return c.JSON(response)
+			}
+		}
+
+		// Regular text response
 		conv = append(conv, openai.ChatCompletionMessage{
 			Role:    "assistant",
 			Content: res.Response,
 		})
 
-		id := uuid.New().String()
-
 		tracker.SetConversation(id, conv)
 
 		response := types.ResponseBody{
-			ID:     id,
-			Object: "response",
-			//   "created_at": 1741476542,
+			ID:        id,
+			Object:    "response",
 			CreatedAt: time.Now().Unix(),
 			Status:    "completed",
-			Output: []types.ResponseMessage{
-				{
+			Model:     agentName,
+			Output: []interface{}{
+				types.ResponseMessage{
 					Type:   "message",
+					ID:     fmt.Sprintf("msg_%d", time.Now().UnixNano()),
 					Status: "completed",
 					Role:   "assistant",
 					Content: []types.MessageContentItem{
-						types.MessageContentItem{
+						{
 							Type: "output_text",
 							Text: res.Response,
 						},

@@ -572,6 +572,66 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
 }
 
+// validateBuiltinTools checks that builtin tools specified by the user can be matched to available actions
+func (a *Agent) validateBuiltinTools(job *types.Job) {
+	builtinTools := job.GetBuiltinTools()
+	if len(builtinTools) == 0 {
+		return
+	}
+	
+	// Get available actions
+	availableActions := a.mcpActions
+	
+	for _, tool := range builtinTools {
+		functionName := tool.Name
+		
+		// Check if this is a web search builtin tool
+		if strings.HasPrefix(string(functionName), "web_search_") {
+			// Look for a search action
+			searchAction := availableActions.Find("search")
+			if searchAction == nil {
+				xlog.Warn("Web search builtin tool specified but no 'search' action available", 
+					"function_name", functionName, 
+					"agent", a.Character.Name)
+			} else {
+				xlog.Debug("Web search builtin tool matched to search action", 
+					"function_name", functionName, 
+					"agent", a.Character.Name)
+			}
+		} else {
+			// For future builtin tools, add more matching logic here
+			xlog.Warn("Unknown builtin tool specified", 
+				"function_name", functionName, 
+				"agent", a.Character.Name)
+		}
+	}
+}
+
+// replyWithToolCall handles user-defined actions by recording the action state without setting Response
+func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMessage, params types.ActionParams, chosenAction types.Action, reasoning string) {
+	// Record the action state so the webui can detect this is a user-defined action
+	stateResult := types.ActionState{
+		ActionCurrentState: types.ActionCurrentState{
+			Job:       job,
+			Action:    chosenAction,
+			Params:    params,
+			Reasoning: reasoning,
+		},
+		ActionResult: types.ActionResult{
+			Result: reasoning, // The reasoning/message to show to user
+		},
+	}
+	
+	// Add the action state to the job result
+	job.Result.SetResult(stateResult)
+	
+	// Set conversation but leave Response empty
+	// The webui will detect the user-defined action and generate the proper tool call response
+	job.Result.Conversation = conv
+	// job.Result.Response remains empty - this signals to webui that it should check State
+	job.Result.Finish(nil)
+}
+
 func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
@@ -624,6 +684,9 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 
 	// RAG
 	conv = a.knowledgeBaseLookup(job, conv)
+
+	// Validate builtin tools against available actions
+	a.validateBuiltinTools(job)
 
 	var pickTemplate string
 	var reEvaluationTemplate string
@@ -843,6 +906,13 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	}
 
 	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
+		// Check if this is a user-defined action
+		if types.IsActionUserDefined(chosenAction) {
+			xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
+			a.replyWithToolCall(job, conv, actionParams, chosenAction, reasoning)
+			return
+		}
+		
 		result, err := a.runAction(job, chosenAction, actionParams)
 		if err != nil {
 			result.Result = fmt.Sprintf("Error running tool: %v", err)
