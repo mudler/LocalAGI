@@ -513,9 +513,25 @@ func (a *App) Responses(pool *state.AgentPool, tracker *conversations.Conversati
 			return c.Status(http.StatusInternalServerError).JSON(types.ResponseBody{Error: "Agent not found"})
 		}
 
-		res := a.Ask(
+		// Prepare job options
+		jobOptions := []coreTypes.JobOption{
 			coreTypes.WithConversationHistory(messages),
-		)
+		}
+
+		// Add tools if present in the request
+		if len(request.Tools) > 0 {
+			builtinTools, userTools := types.SeparateTools(request.Tools)
+			if len(builtinTools) > 0 {
+				jobOptions = append(jobOptions, coreTypes.WithBuiltinTools(builtinTools))
+				xlog.Debug("Adding builtin tools to job", "count", len(builtinTools), "agent", agentName)
+			}
+			if len(userTools) > 0 {
+				jobOptions = append(jobOptions, coreTypes.WithUserTools(userTools))
+				xlog.Debug("Adding user tools to job", "count", len(userTools), "agent", agentName)
+			}
+		}
+
+		res := a.Ask(jobOptions...)
 		if res.Error != nil {
 			xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
 
