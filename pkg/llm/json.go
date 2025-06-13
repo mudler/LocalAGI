@@ -4,13 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/mudler/LocalAGI/db"
+	models "github.com/mudler/LocalAGI/dbmodels"
+	"github.com/mudler/LocalAGI/pkg/utils"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, model string, i jsonschema.Definition, dst any) error {
+func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, model string, userID, agentID uuid.UUID, i jsonschema.Definition, dst any) error {
 	toolName := "json"
 	decision := openai.ChatCompletionRequest{
 		Model: model,
@@ -37,6 +42,28 @@ func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, mod
 	}
 
 	resp, err := client.CreateChatCompletion(ctx, decision)
+
+	if err == nil && len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
+		// Track usage after successful API call
+		usage := utils.GetOpenRouterUsage(resp.ID)
+		llmUsage := &models.LLMUsage{
+			ID:               uuid.New(),
+			UserID:           userID,
+			AgentID:          agentID,
+			Model:            model,
+			PromptTokens:     usage.PromptTokens,
+			CompletionTokens: usage.CompletionTokens,
+			TotalTokens:      usage.TotalTokens,
+			Cost:             usage.Cost,
+			RequestType:      "chat",
+			GenID:            resp.ID,
+			CreatedAt:        time.Now(),
+		}
+		if err := db.DB.Create(llmUsage).Error; err != nil {
+			xlog.Error("Error tracking LLM usage", "error", err)
+		}
+	}
+
 	if err != nil {
 		return err
 	}
@@ -45,13 +72,19 @@ func GenerateTypedJSON(ctx context.Context, client *openai.Client, guidance, mod
 		return fmt.Errorf("no choices: %d", len(resp.Choices))
 	}
 
+	jsonSchema, _ := json.MarshalIndent(i, "", "  ")
+	fmt.Println("JSON Schema:", string(jsonSchema))
+
+	jsonResp, _ := json.MarshalIndent(resp.Choices, "", "  ")
+	fmt.Println("Response choices:", string(jsonResp))
+
 	msg := resp.Choices[0].Message
 
 	if len(msg.ToolCalls) == 0 {
 		return fmt.Errorf("no tool calls: %d", len(msg.ToolCalls))
 	}
 
-	xlog.Debug("JSON generated", "Arguments", msg.ToolCalls[0].Function.Arguments)
+	fmt.Println("JSON generated", "Arguments", msg.ToolCalls)
 
 	return json.Unmarshal([]byte(msg.ToolCalls[0].Function.Arguments), dst)
 }

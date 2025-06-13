@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -250,7 +249,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)
 	actions := a.availableActions(config)(ctx, a)
-	stateFile, characterFile := a.stateFiles(id)
 
 	actionsLog := []string{}
 	for _, action := range actions {
@@ -276,6 +274,8 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 	// 	dynamicPrompts = append(dynamicPrompts, p.ToMap())
 	// }
 
+	fmt.Printf("DEBUG: Creating agent with config - RandomIdentity: %v, IdentityGuidance: '%s'\n", config.RandomIdentity, config.IdentityGuidance)
+
 	opts := []Option{
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
@@ -291,8 +291,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 		WithActions(
 			actions...,
 		),
-		WithStateFile(stateFile),
-		WithCharacterFile(characterFile),
 		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
 		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, id)),
@@ -389,11 +387,16 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 	}
 
 	if config.RandomIdentity {
+		fmt.Printf("DEBUG: RandomIdentity is enabled, IdentityGuidance: '%s'\n", config.IdentityGuidance)
 		if config.IdentityGuidance != "" {
 			opts = append(opts, WithRandomIdentity(config.IdentityGuidance))
+			fmt.Printf("DEBUG: Added WithRandomIdentity with guidance, total opts count: %d\n", len(opts))
 		} else {
 			opts = append(opts, WithRandomIdentity())
+			fmt.Printf("DEBUG: Added WithRandomIdentity without guidance, total opts count: %d\n", len(opts))
 		}
+	} else {
+		fmt.Printf("DEBUG: RandomIdentity is disabled\n")
 	}
 
 	if config.EnableKnowledgeBase {
@@ -505,13 +508,6 @@ func (a *AgentPool) Start(id string) error {
 	return fmt.Errorf("agent %s not found", id)
 }
 
-func (a *AgentPool) stateFiles(id string) (string, string) {
-	stateFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", id))
-	characterFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", id))
-
-	return stateFile, characterFile
-}
-
 func (a *AgentPool) Remove(id string) error {
 	a.Lock()
 	defer a.Unlock()
@@ -582,4 +578,65 @@ func (a *AgentPool) GetManager(id string) sse.Manager {
 	a.Lock()
 	defer a.Unlock()
 	return a.managers[id]
+}
+
+// SetManager sets the SSE manager for a specific agent
+func (a *AgentPool) SetManager(id string, manager sse.Manager) {
+	a.Lock()
+	defer a.Unlock()
+	a.managers[id] = manager
+}
+
+// RemoveAgentOnly removes only the agent instance without touching the manager or other data
+func (a *AgentPool) RemoveAgentOnly(id string) {
+	a.Lock()
+	defer a.Unlock()
+
+	// Remove only the agent instance, keep manager, pool config, and status
+	delete(a.agents, id)
+
+	xlog.Info("Removed agent instance only", "id", id)
+}
+
+// CreateAgentWithExistingManager creates an agent but reuses the existing SSE manager
+func (a *AgentPool) CreateAgentWithExistingManager(id string, agentConfig *AgentConfig, notStart bool) error {
+	id = replaceInvalidChars(id)
+	agentConfig.Name = id
+
+	a.Lock()
+
+	// Check if agent already exists
+	if existingAgent := a.agents[id]; existingAgent != nil {
+		if notStart {
+			// Remove only the agent instance, keep manager, pool config, and status
+			delete(a.agents, id)
+		} else {
+			a.Unlock()
+			return fmt.Errorf("agent %s already exists", id)
+		}
+	}
+
+	// Insert into the pool
+	a.pool[id] = *agentConfig
+
+	// Get existing manager before starting agent
+	existingManager := a.managers[id]
+
+	a.Unlock()
+
+	// Start agent (this will create a new manager)
+	err := a.startAgentWithConfig(id, agentConfig, notStart)
+	if err != nil {
+		return err
+	}
+
+	// Restore the existing manager if it exists
+	if existingManager != nil {
+		a.Lock()
+		a.managers[id] = existingManager
+		a.Unlock()
+		xlog.Info("Restored existing SSE manager", "id", id)
+	}
+
+	return nil
 }

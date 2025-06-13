@@ -33,7 +33,7 @@ func ConnectDB() {
 		log.Fatal("Failed to connect to MySQL:", err)
 	}
 
-	if err := DB.AutoMigrate(&models.User{}, &models.Agent{}, &models.AgentMessage{}, &models.LLMUsage{}); err != nil {
+	if err := DB.AutoMigrate(&models.User{}, &models.Agent{}, &models.AgentMessage{}, &models.LLMUsage{}, &models.Character{}, &models.AgentState{}); err != nil {
 		log.Fatal("Migration failed:", err)
 	}
 }

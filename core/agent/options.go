@@ -32,8 +32,6 @@ type options struct {
 	loopDetectionSteps    int
 	forceReasoning        bool
 	canPlan               bool
-	characterfile         string
-	statefile             string
 	context               context.Context
 	permanentGoal         string
 	timeout               string
@@ -206,20 +204,6 @@ func WithLLMAPIURL(url string) Option {
 	}
 }
 
-func WithStateFile(path string) Option {
-	return func(o *options) error {
-		o.statefile = path
-		return nil
-	}
-}
-
-func WithCharacterFile(path string) Option {
-	return func(o *options) error {
-		o.characterfile = path
-		return nil
-	}
-}
-
 // WithPrompts adds additional block prompts to the agent
 // to be rendered internally in the conversation
 // when processing the conversation to the LLM
@@ -309,17 +293,6 @@ func WithModel(model string) Option {
 func WithCharacter(c Character) Option {
 	return func(o *options) error {
 		o.character = c
-		return nil
-	}
-}
-
-func FromFile(path string) Option {
-	return func(o *options) error {
-		c, err := Load(path)
-		if err != nil {
-			return err
-		}
-		o.character = *c
 		return nil
 	}
 }

@@ -499,12 +499,24 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 		// 6. Reload in-memory agent if active
 		pool, ok := a.UserPools[userIDStr]
 		if ok {
-			if err := pool.Remove(agentId); err != nil {
-				xlog.Warn("Failed to remove old agent from pool", "error", err)
+			// Remember if the agent was running before removal
+			wasRunning := false
+			if existingAgent := pool.GetAgent(agentId); existingAgent != nil {
+				wasRunning = !existingAgent.Paused()
 			}
-			if err := pool.CreateAgent(agentId, &newConfig, false); err != nil {
-				xlog.Error("Failed to recreate agent in memory", "error", err)
-				return errorJSONMessage(c, "Agent config updated in DB but failed to reload in memory")
+
+			if existingAgent := pool.GetAgent(agentId); existingAgent != nil {
+				// Stop the existing agent but keep the manager
+				existingAgent.Stop()
+
+				// Remove only the agent instance, not the manager
+				pool.RemoveAgentOnly(agentId)
+
+				// Create new agent with preserved manager
+				if err := pool.CreateAgentWithExistingManager(agentId, &newConfig, !wasRunning); err != nil {
+					xlog.Error("Failed to recreate agent in memory", "error", err)
+					return errorJSONMessage(c, "Agent config updated in DB but failed to reload in memory")
+				}
 			}
 		}
 
@@ -880,9 +892,16 @@ func (a *App) GenerateGroupProfiles(pool *state.AgentPool) func(c *fiber.Ctx) er
 			Agents []AgentRole `json:"agents"`
 		}
 
+		// Get user ID from context (may be empty if no auth middleware)
+		userIDStr, _ := c.Locals("id").(string)
+		userID := uuid.Nil
+		if userIDStr != "" {
+			userID, _ = uuid.Parse(userIDStr)
+		}
+
 		xlog.Debug("Generating group", "description", request.Descript)
 		client := llm.NewClient(a.config.LLMAPIKey, a.config.LLMAPIURL, "10m")
-		err := llm.GenerateTypedJSON(c.Context(), client, request.Descript, a.config.LLMModel, jsonschema.Definition{
+		err := llm.GenerateTypedJSON(c.Context(), client, request.Descript, a.config.LLMModel, userID, uuid.Nil, jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
 				"agents": {

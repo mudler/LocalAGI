@@ -288,6 +288,11 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		)
 
 		subTaskAction := a.availableActions().Find(subtask.Action)
+		if subTaskAction == nil {
+			xlog.Error("subtask action not found", "action", subtask.Action)
+			return conv, fmt.Errorf("subtask action not found: %s", subtask.Action)
+		}
+
 		subTaskReasoning := fmt.Sprintf("%s Overall goal is: %s", subtask.Reasoning, planResult.Goal)
 
 		params, err := a.generateParameters(ctx, pickTemplate, subTaskAction, conv, subTaskReasoning, maxRetries)

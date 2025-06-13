@@ -3,7 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
-	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,14 +79,6 @@ func New(opts ...Option) (*Agent, error) {
 		newMessagesSubscribers: options.newConversationsSubscribers,
 	}
 
-	if a.options.statefile != "" {
-		if _, err := os.Stat(a.options.statefile); err == nil {
-			if err = a.LoadState(a.options.statefile); err != nil {
-				return a, fmt.Errorf("failed to load state: %v", err)
-			}
-		}
-	}
-
 	// var programLevel = new(xlog.LevelVar) // Info by default
 	// h := xlog.NewTextHandler(os.Stdout, &xlog.HandlerOptions{Level: programLevel})
 	// xlog = xlog.New(h)
@@ -94,6 +86,10 @@ func New(opts ...Option) (*Agent, error) {
 
 	if err := a.prepareIdentity(); err != nil {
 		return nil, fmt.Errorf("failed to prepare identity: %v", err)
+	}
+
+	if err := a.prepareState(); err != nil {
+		return nil, fmt.Errorf("failed to prepare state: %v", err)
 	}
 
 	xlog.Info("Populating actions from MCP Servers (if any)")
@@ -266,41 +262,208 @@ func (a *Agent) Memory() RAGDB {
 }
 
 func (a *Agent) runAction(ctx context.Context, chosenAction types.Action, params types.ActionParams) (result types.ActionResult, err error) {
+	// Initialize state if nil (with lock protection)
+	a.Lock()
+	if a.currentState == nil {
+		a.currentState = &action.AgentInternalState{
+			NowDoing:    "",
+			DoingNext:   "",
+			DoneHistory: []string{},
+			Memories:    []string{},
+			Goal:        "",
+		}
+	}
+
+	// BEFORE ACTION: Update NowDoing
+	actionName := chosenAction.Definition().Name.String()
+	if !chosenAction.Definition().Name.Is(action.StateActionName) {
+		a.currentState.NowDoing = fmt.Sprintf("Executing %s", actionName)
+		xlog.Info("[STATE] BEFORE action", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
+
+		// Save state before action
+		if err := a.SaveStateToDB(); err != nil {
+			xlog.Warn("Failed to save state before action", "error", err)
+		}
+	}
+	a.Unlock()
+
+	// Execute the action
+	actionFound := false
 	for _, act := range a.availableActions() {
 		if act.Definition().Name == chosenAction.Definition().Name {
 			res, err := act.Run(ctx, params)
 			if err != nil {
+				// AFTER ACTION (ERROR): Update state for failed action
+				a.Lock()
+				if !chosenAction.Definition().Name.Is(action.StateActionName) {
+					xlog.Info("[STATE] Clearing NowDoing after action error", "agent", a.Character.Name, "action", actionName, "error", err)
+					a.currentState.NowDoing = ""
+					failureMsg := fmt.Sprintf("Failed: %s - %s", actionName, err.Error())
+					a.currentState.DoneHistory = append(a.currentState.DoneHistory, failureMsg)
+
+					// Keep only last 10 items to avoid bloat
+					if len(a.currentState.DoneHistory) > 10 {
+						a.currentState.DoneHistory = a.currentState.DoneHistory[1:]
+					}
+
+					if saveErr := a.SaveStateToDB(); saveErr != nil {
+						xlog.Warn("Failed to save state after action error", "error", saveErr)
+					} else {
+						xlog.Info("[STATE] Successfully saved state to DB after error", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
+					}
+				}
+				a.Unlock()
 				return types.ActionResult{}, fmt.Errorf("error running action: %w", err)
 			}
-
 			result = res
+			actionFound = true
+			break
 		}
+	}
+
+	// Check if action was found
+	if !actionFound {
+		a.Lock()
+		if !chosenAction.Definition().Name.Is(action.StateActionName) {
+			xlog.Info("[STATE] Clearing NowDoing after action not found", "agent", a.Character.Name, "action", actionName)
+			a.currentState.NowDoing = ""
+			failureMsg := fmt.Sprintf("Failed: %s - action not found", actionName)
+			a.currentState.DoneHistory = append(a.currentState.DoneHistory, failureMsg)
+
+			// Keep only last 10 items to avoid bloat
+			if len(a.currentState.DoneHistory) > 10 {
+				a.currentState.DoneHistory = a.currentState.DoneHistory[1:]
+			}
+
+			if saveErr := a.SaveStateToDB(); saveErr != nil {
+				xlog.Warn("Failed to save state after action not found", "error", saveErr)
+			} else {
+				xlog.Info("[STATE] Successfully saved state to DB after action not found", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
+			}
+		}
+		a.Unlock()
+		return types.ActionResult{}, fmt.Errorf("action not found: %s", actionName)
 	}
 
 	xlog.Info("[runAction] Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name, "params", params.String())
 
+	// Lock for state updates after action execution
+	a.Lock()
+	defer a.Unlock()
+
+	// Handle explicit state updates (existing behavior)
 	if chosenAction.Definition().Name.Is(action.StateActionName) {
-		// We need to store the result in the state
 		state := action.AgentInternalState{}
 
 		err = params.Unmarshal(&state)
 		if err != nil {
 			return types.ActionResult{}, fmt.Errorf("error unmarshalling state of the agent: %w", err)
 		}
+
+		// Preserve automatic tracking fields if not explicitly set
+		if state.NowDoing == "" {
+			state.NowDoing = a.currentState.NowDoing
+		}
+		if len(state.DoneHistory) == 0 {
+			state.DoneHistory = a.currentState.DoneHistory
+		}
+
 		// update the current state with the one we just got from the action
 		a.currentState = &state
 
-		// update the state file
-		if a.options.statefile != "" {
-			if err := a.SaveState(a.options.statefile); err != nil {
-				return types.ActionResult{}, err
-			}
+		xlog.Info("[STATE] Manual state update", "agent", a.Character.Name,
+			"nowDoing", state.NowDoing, "doingNext", state.DoingNext,
+			"goal", state.Goal, "doneHistory", len(state.DoneHistory), "memories", len(state.Memories))
+
+		// Save state to database
+		if err := a.SaveStateToDB(); err != nil {
+			return types.ActionResult{}, err
+		}
+	} else {
+		// AFTER ACTION (SUCCESS): Update state for successful action
+		xlog.Info("[STATE] Clearing NowDoing after successful action", "agent", a.Character.Name, "action", actionName, "prevNowDoing", a.currentState.NowDoing)
+		a.currentState.NowDoing = ""
+
+		// Add to done history with timestamp
+		timestamp := time.Now().Format("15:04")
+		successMsg := fmt.Sprintf("[%s] %s", timestamp, actionName)
+		if len(result.Result) > 0 && len(result.Result) < 100 {
+			successMsg += fmt.Sprintf(" - %s", result.Result)
+		}
+
+		a.currentState.DoneHistory = append(a.currentState.DoneHistory, successMsg)
+
+		// Keep only last 10 items to avoid bloat
+		if len(a.currentState.DoneHistory) > 10 {
+			a.currentState.DoneHistory = a.currentState.DoneHistory[1:]
+		}
+
+		// Optionally set DoingNext based on action patterns
+		a.updateDoingNext(actionName)
+
+		xlog.Info("[STATE] AFTER action", "agent", a.Character.Name,
+			"completed", actionName, "nowDoing", a.currentState.NowDoing,
+			"doingNext", a.currentState.DoingNext,
+			"doneHistory", len(a.currentState.DoneHistory))
+
+		// Save state after action
+		if err := a.SaveStateToDB(); err != nil {
+			xlog.Warn("Failed to save state after action", "error", err)
+		} else {
+			xlog.Info("[STATE] Successfully saved state to DB", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
 		}
 	}
 
 	xlog.Debug("[runAction] Action result", "action", chosenAction.Definition().Name, "params", params.String(), "result", result.Result)
 
 	return result, nil
+}
+
+// updateDoingNext sets intelligent next action suggestions based on current action
+func (a *Agent) updateDoingNext(actionName string) {
+	if a.currentState == nil {
+		return
+	}
+
+	// Set DoingNext based on action patterns
+	switch actionName {
+	case "search_internet":
+		a.currentState.DoingNext = "Analyze search results"
+	case "plan":
+		a.currentState.DoingNext = "Execute planned subtasks"
+	case "reply":
+		a.currentState.DoingNext = "Wait for user response"
+	case "browse":
+		a.currentState.DoingNext = "Extract key information from page"
+	case "wikipedia":
+		a.currentState.DoingNext = "Analyze Wikipedia content"
+	case "scraper":
+		a.currentState.DoingNext = "Process scraped data"
+	case "counter":
+		a.currentState.DoingNext = "Continue with next counting task"
+	case "shell":
+		a.currentState.DoingNext = "Review command output"
+	case "generate_image":
+		a.currentState.DoingNext = "Review generated image"
+	case "send_mail":
+		a.currentState.DoingNext = "Confirm email delivery"
+	default:
+		// Check for GitHub actions
+		if strings.Contains(actionName, "github") {
+			if strings.Contains(actionName, "search") {
+				a.currentState.DoingNext = "Review GitHub search results"
+			} else if strings.Contains(actionName, "read") {
+				a.currentState.DoingNext = "Analyze GitHub content"
+			} else if strings.Contains(actionName, "create") || strings.Contains(actionName, "comment") {
+				a.currentState.DoingNext = "Confirm GitHub action completed"
+			} else {
+				a.currentState.DoingNext = "Continue GitHub workflow"
+			}
+		} else {
+			// For unknown actions, suggest continuing with analysis
+			a.currentState.DoingNext = "Continue with next logical step"
+		}
+	}
 }
 
 func (a *Agent) processPrompts(conversation Messages) Messages {
