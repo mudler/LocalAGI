@@ -716,12 +716,12 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			AgentID:   agentModel.ID,
 			Sender:    "user",
 			Content:   message,
-			Timestamp: time.Now(),
+			CreatedAt: time.Now(),
 		})
 
 		send("json_status", map[string]interface{}{
 			"status":    "processing",
-			"timestamp": time.Now().Format(time.RFC3339),
+			"createdAt": time.Now().Format(time.RFC3339),
 		})
 
 		// 9. Ask agent asynchronously
@@ -731,7 +731,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			if response.Error != nil {
 				send("json_error", map[string]interface{}{
 					"error":     response.Error.Error(),
-					"timestamp": time.Now().Format(time.RFC3339),
+					"createdAt": time.Now().Format(time.RFC3339),
 				})
 				return
 			}
@@ -740,7 +740,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				"id":        messageID + "-agent",
 				"sender":    "agent",
 				"content":   response.Response,
-				"timestamp": time.Now().Format(time.RFC3339),
+				"createdAt": time.Now().Format(time.RFC3339),
 			})
 
 			// Save agent reply to DB
@@ -749,7 +749,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				AgentID:   agentModel.ID,
 				Sender:    "agent",
 				Content:   response.Response,
-				Timestamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 		}()
 
@@ -1130,7 +1130,7 @@ func (a *App) ProxyOpenRouterChat() func(c *fiber.Ctx) error {
 				AgentID:   uuid.MustParse(agentId),
 				Sender:    "user",
 				Content:   userContent,
-				Timestamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 		}
 
@@ -1170,7 +1170,7 @@ func (a *App) ProxyOpenRouterChat() func(c *fiber.Ctx) error {
 				AgentID:   uuid.MustParse(agentId),
 				Sender:    "agent",
 				Content:   agentContent,
-				Timestamp: time.Now(),
+				CreatedAt: time.Now(),
 			})
 		}
 
@@ -1463,7 +1463,7 @@ func (a *App) GetChatHistory() func(c *fiber.Ctx) error {
 		var messages []models.AgentMessage
 		if err := db.DB.
 			Where("AgentID = ?", agentUUID).
-			Order("timestamp ASC").
+			Order("createdAt ASC").
 			Find(&messages).Error; err != nil {
 			return errorJSONMessage(c, "Failed to fetch messages: "+err.Error())
 		}
@@ -1474,7 +1474,7 @@ func (a *App) GetChatHistory() func(c *fiber.Ctx) error {
 			formatted = append(formatted, fiber.Map{
 				"sender":    msg.Sender,
 				"content":   msg.Content,
-				"timestamp": msg.Timestamp,
+				"createdAt": msg.CreatedAt,
 			})
 		}
 

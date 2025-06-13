@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -655,7 +656,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	conv = a.processUserInputs(job, role, conv)
 
 	// RAG
-	a.knowledgeBaseLookup(conv)
+	conv = a.knowledgeBaseLookup(conv)
+	jsonBytes, _ := json.MarshalIndent(conv, "", "  ")
+	fmt.Printf("DEBUG: BBBB MMM: %s\n", string(jsonBytes))
 
 	var pickTemplate string
 	var reEvaluationTemplate string
@@ -995,6 +998,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", conv))
+	fmt.Printf("DEBUG: Reply CONVOVOVO: %v\n", conv)
 	msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
 	if err != nil {
 		job.Result.Conversation = conv

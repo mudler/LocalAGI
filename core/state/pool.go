@@ -415,6 +415,8 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 		opts = append(opts, WithLoopDetectionSteps(config.LoopDetectionSteps))
 	}
 
+	opts = append(opts, WithMySQLForSummaries())
+
 	xlog.Info("Starting agent", "id", id, "config", config)
 
 	agent, err := New(opts...)

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,11 +11,11 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-func (a *Agent) knowledgeBaseLookup(conv Messages) {
+func (a *Agent) knowledgeBaseLookup(conv Messages) Messages {
 	if (!a.options.enableKB && !a.options.enableLongTermMemory && !a.options.enableSummaryMemory) ||
 		len(conv) <= 0 {
 		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
-		return
+		return conv
 	}
 
 	// Walk conversation from bottom to top, and find the first message of the user
@@ -25,17 +26,28 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) {
 
 	if userMessage == "" {
 		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)
-		return
+		return conv
 	}
 
-	results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
+	var results []string
+	var err error
+
+	if a.options.useMySQLForSummaries {
+		mysqlStorage := NewMySQLStorage(a.options.agentID, a.options.userID)
+		results, err = mysqlStorage.Search(userMessage, a.options.kbResults)
+		fmt.Printf("DEBUGOOOOOOO: MySQL search results: %v\n", results)
+	} else {
+		results, err = a.options.ragdb.Search(userMessage, a.options.kbResults)
+		fmt.Printf("DEBUG: RagDB search results: %v\n", results)
+	}
+
 	if err != nil {
 		xlog.Info("Error finding similar strings inside KB:", "error", err)
 	}
 
 	if len(results) == 0 {
 		xlog.Info("[Knowledge Base Lookup] No similar strings found in KB", "agent", a.Character.Name)
-		return
+		return conv
 	}
 
 	formatResults := ""
@@ -55,6 +67,11 @@ func (a *Agent) knowledgeBaseLookup(conv Messages) {
 			Role:    "system",
 			Content: fmt.Sprintf("Given the user input you have the following in memory:\n%s", formatResults),
 		}}, conv...)
+
+	jsonBytes, _ := json.MarshalIndent(conv, "", "  ")
+	fmt.Printf("DEBUG: LOLPOPOP MMM: %s\n", string(jsonBytes))
+
+	return conv
 }
 
 func (a *Agent) saveConversation(m Messages, prefix string) error {
@@ -81,27 +98,44 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 		return
 	}
 
-	xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(conv))
+	// xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(conv))
 
-	if a.options.enableSummaryMemory && len(conv) > 0 {
-		msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
-			Role:    "user",
-			Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(conv).String(),
-		}}, maxRetries)
-		if err != nil {
-			xlog.Error("Error summarizing conversation", "error", err)
-		}
+	// if a.options.enableSummaryMemory && len(conv) > 0 {
+	// 	msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
+	// 		Role:    "user",
+	// 		Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(conv).String(),
+	// 	}}, maxRetries)
+	// 	if err != nil {
+	// 		xlog.Error("Error summarizing conversation", "error", err)
+	// 	}
 
-		if err := a.options.ragdb.Store(msg.Content); err != nil {
-			xlog.Error("Error storing into memory", "error", err)
-		}
-	} else {
-		for _, message := range conv {
-			if message.Role == "user" {
-				if err := a.options.ragdb.Store(message.Content); err != nil {
-					xlog.Error("Error storing into memory", "error", err)
-				}
-			}
-		}
-	}
+	// 	// Use MySQL storage for summaries if configured
+	// 	if a.options.useMySQLForSummaries {
+	// 		fmt.Printf("DEBUG: Storing summary into MySQL: %s\n", msg.Content)
+	// 		mysqlStorage := NewMySQLStorage(a.options.agentID, a.options.userID)
+	// 		if err := mysqlStorage.Store(msg.Content); err != nil {
+	// 			xlog.Error("Error storing summary into MySQL", "error", err)
+	// 		}
+	// 	} else {
+	// 		// Fallback to RagDB
+	// 		if err := a.options.ragdb.Store(msg.Content); err != nil {
+	// 			xlog.Error("Error storing into memory", "error", err)
+	// 		}
+	// 	}
+	// } else {
+	// 	for _, message := range conv {
+	// 		if message.Role == "user" {
+	// 			if a.options.useMySQLForSummaries {
+	// 				mysqlStorage := NewMySQLStorage(a.options.agentID, a.options.userID)
+	// 				if err := mysqlStorage.Store(message.Content); err != nil {
+	// 					xlog.Error("Error storing user message into MySQL", "error", err)
+	// 				}
+	// 			} else {
+	// 				if err := a.options.ragdb.Store(message.Content); err != nil {
+	// 					xlog.Error("Error storing into memory", "error", err)
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 }

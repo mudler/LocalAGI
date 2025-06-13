@@ -419,6 +419,7 @@ func (a *Agent) pickAction(ctx context.Context, templ string, messages []openai.
 
 	if !a.options.forceReasoning {
 		xlog.Debug("not forcing reasoning")
+
 		// We also could avoid to use functions here and get just a reply from the LLM
 		// and then use the reply to get the action
 		thought, err := a.decision(ctx,

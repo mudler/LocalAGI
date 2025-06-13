@@ -40,6 +40,7 @@ type options struct {
 	ragdb                 RAGDB
 	userID                uuid.UUID
 	agentID               uuid.UUID
+	useMySQLForSummaries  bool
 
 	prompts []DynamicPrompt
 
@@ -233,6 +234,13 @@ func WithPrompts(prompts ...DynamicPrompt) Option {
 func WithLLMAPIKey(key string) Option {
 	return func(o *options) error {
 		o.LLMAPI.APIKey = key
+		return nil
+	}
+}
+
+func WithMySQLForSummaries() Option {
+	return func(o *options) error {
+		o.useMySQLForSummaries = true
 		return nil
 	}
 }
