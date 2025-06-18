@@ -419,6 +419,22 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 	return conv, nil
 }
 
+// getAvailableActionsForJob returns available actions including user-defined ones for a specific job
+func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
+	// Start with regular available actions
+	baseActions := a.availableActions()
+	
+	// Add user-defined actions from the job
+	userTools := job.GetUserTools()
+	if len(userTools) > 0 {
+		userDefinedActions := types.CreateUserDefinedActions(userTools)
+		baseActions = append(baseActions, userDefinedActions...)
+		xlog.Debug("Added user-defined actions", "count", len(userDefinedActions))
+	}
+	
+	return baseActions
+}
+
 func (a *Agent) availableActions() types.Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
 
@@ -485,6 +501,9 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 
 	xlog.Debug("[pickAction] picking action starts", "messages", messages)
 
+	// Get available actions including user-defined ones
+	availableActions := a.getAvailableActionsForJob(job)
+
 	// Identify the goal of this conversation
 
 	if !a.options.forceReasoning {
@@ -493,7 +512,7 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		// and then use the reply to get the action
 		thought, err := a.decision(job,
 			messages,
-			a.availableActions().ToTools(),
+			availableActions.ToTools(),
 			"",
 			maxRetries)
 		if err != nil {
@@ -504,7 +523,7 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		xlog.Debug("thought message", "message", thought.message)
 
 		// Find the action
-		chosenAction := a.availableActions().Find(thought.actionName)
+		chosenAction := availableActions.Find(thought.actionName)
 		if chosenAction == nil || thought.actionName == "" {
 			xlog.Debug("no answer")
 

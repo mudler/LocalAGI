@@ -20,6 +20,10 @@ type Job struct {
 	UUID                string
 	Metadata            map[string]interface{}
 	DoneFilter          bool
+	
+	// Tools available for this job
+	BuiltinTools []ActionDefinition // Built-in tools like web search
+	UserTools    []ActionDefinition // User-defined function tools
 
 	pastActions         []*ActionRequest
 	nextAction          *Action
@@ -42,6 +46,18 @@ type JobOption func(*Job)
 func WithConversationHistory(history []openai.ChatCompletionMessage) JobOption {
 	return func(j *Job) {
 		j.ConversationHistory = history
+	}
+}
+
+func WithBuiltinTools(tools []ActionDefinition) JobOption {
+	return func(j *Job) {
+		j.BuiltinTools = tools
+	}
+}
+
+func WithUserTools(tools []ActionDefinition) JobOption {
+	return func(j *Job) {
+		j.UserTools = tools
 	}
 }
 
@@ -226,4 +242,22 @@ func (j *Job) IncrementEvaluationLoop() {
 	}
 	currentLoop := j.GetEvaluationLoop()
 	j.Metadata["evaluation_loop"] = currentLoop + 1
+}
+
+// GetBuiltinTools returns the builtin tools for this job
+func (j *Job) GetBuiltinTools() []ActionDefinition {
+	return j.BuiltinTools
+}
+
+// GetUserTools returns the user tools for this job
+func (j *Job) GetUserTools() []ActionDefinition {
+	return j.UserTools
+}
+
+// GetAllTools returns all tools (builtin + user) for this job
+func (j *Job) GetAllTools() []ActionDefinition {
+	allTools := make([]ActionDefinition, 0, len(j.BuiltinTools)+len(j.UserTools))
+	allTools = append(allTools, j.BuiltinTools...)
+	allTools = append(allTools, j.UserTools...)
+	return allTools
 }
