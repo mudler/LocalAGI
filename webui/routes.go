@@ -215,8 +215,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/api/action/:name/run", app.RequireUser(), app.ExecuteAction(pool))
 	webapp.Get("/api/actions", app.ListActions())
 
-	webapp.Post("/api/agent/group/generateProfiles", app.RequireUser(), app.GenerateGroupProfiles(pool))
-	webapp.Post("/api/agent/group/create", app.RequireUser(), app.CreateGroup(pool))
+	webapp.Post("/api/agent/group/generateProfiles", app.RequireUser(), app.GenerateGroupProfiles())
+	webapp.Post("/api/agent/group/create", app.RequireUser(), app.CreateGroup())
 
 	// Dashboard API endpoint for React UI
 	webapp.Get("/api/agents", app.RequireUser(), func(c *fiber.Ctx) error {

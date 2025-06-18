@@ -324,7 +324,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 
 		// 3. Apply fallback values from env if fields are empty
 		if config.Model == "" {
-			config.Model = "deepseek/deepseek-chat-v3-0324:free"
+			config.Model = "gpt-4o-mini"
 		}
 		if config.MultimodalModel == "" {
 			config.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
@@ -878,7 +878,7 @@ type AgentRole struct {
 	SystemPrompt string `json:"system_prompt"`
 }
 
-func (a *App) GenerateGroupProfiles(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) GenerateGroupProfiles() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		var request struct {
 			Descript string `json:"description"`
@@ -935,8 +935,18 @@ func (a *App) GenerateGroupProfiles(pool *state.AgentPool) func(c *fiber.Ctx) er
 	}
 }
 
-func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		// 1. Get user ID
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		userID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
+		}
 
 		var config struct {
 			Agents      []AgentRole       `json:"agents"`
@@ -946,13 +956,76 @@ func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, err.Error())
 		}
 
+		// 2. Get or create user pool
+		pool, ok := a.UserPools[userIDStr]
+		if !ok {
+			var err error
+			pool, err = state.NewAgentPool(
+				userIDStr,
+				os.Getenv("LOCALAGI_MODEL"),
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
+			}
+			a.UserPools[userIDStr] = pool
+		}
+
 		agentConfig := &config.AgentConfig
 		for _, agent := range config.Agents {
 			xlog.Info("Creating agent", "name", agent.Name, "description", agent.Description)
 			agentConfig.Name = agent.Name
 			agentConfig.Description = agent.Description
 			agentConfig.SystemPrompt = agent.SystemPrompt
-			if err := pool.CreateAgent(agent.Name, agentConfig, false); err != nil {
+
+			// 3. Apply fallback values from env if fields are empty
+			if agentConfig.Model == "" {
+				agentConfig.Model = "gpt-4o-mini"
+			}
+			if agentConfig.MultimodalModel == "" {
+				agentConfig.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
+			}
+			if agentConfig.LocalRAGURL == "" {
+				agentConfig.LocalRAGURL = os.Getenv("LOCALAGI_LOCALRAG_URL")
+			}
+			if agentConfig.LocalRAGAPIKey == "" {
+				agentConfig.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
+			}
+
+			// Always use environment variables for API key and URL
+			agentConfig.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+			agentConfig.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
+
+			// 4. Serialize the enriched config to JSON
+			configJSON, err := json.Marshal(agentConfig)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to serialize config")
+			}
+
+			// 5. Store config in DB
+			id := uuid.New()
+			agentModel := models.Agent{
+				ID:     id,
+				UserID: userID,
+				Name:   agentConfig.Name,
+				Config: configJSON,
+			}
+
+			if err := db.DB.Create(&agentModel).Error; err != nil {
+				return errorJSONMessage(c, "Failed to store agent: "+err.Error())
+			}
+
+			// 6. Create agent in memory pool using the DB ID
+			if err := pool.CreateAgent(id.String(), agentConfig, false); err != nil {
 				return errorJSONMessage(c, err.Error())
 			}
 		}
