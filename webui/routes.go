@@ -105,7 +105,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// Define a route for the GET method on the root path '/'
-	webapp.Get("/sse/:id", app.RequireUser(), func(c *fiber.Ctx) error {
+	webapp.Get("/sse/:id", app.RequireUser(), app.RequireActiveAgent(), func(c *fiber.Ctx) error {
 		userID, ok := c.Locals("id").(string)
 
 		if !ok || userID == "" {
@@ -155,11 +155,11 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/old/chat/:name", app.RequireUser(), app.OldChat(pool))
 
 	webapp.Post("/api/agent/create", app.RequireUser(), app.Create())
-	webapp.Delete("/api/agent/:id", app.RequireUser(), app.Delete())
-	webapp.Put("/api/agent/:id/pause", app.RequireUser(), app.Pause())
-	webapp.Put("/api/agent/:id/start", app.RequireUser(), app.Start())
+	webapp.Delete("/api/agent/:id", app.RequireUser(), app.RequireActiveAgent(), app.Delete())
+	webapp.Put("/api/agent/:id/pause", app.RequireUser(), app.RequireActiveAgent(), app.Pause())
+	webapp.Put("/api/agent/:id/start", app.RequireUser(), app.RequireActiveAgent(), app.Start())
 
-	webapp.Post("/api/chat/:id", app.RequireUser(), app.Chat())
+	webapp.Post("/api/chat/:id", app.RequireUser(), app.RequireActiveAgent(), app.Chat())
 
 	conversationTracker := connectors.NewConversationTracker[string](time.Minute)
 
@@ -202,9 +202,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// New API endpoints for getting and updating agent configuration
-	webapp.Get("/api/agent/:id/config", app.RequireUser(), app.GetAgentConfig())
+	webapp.Get("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.GetAgentConfig())
 
-	webapp.Put("/api/agent/:id/config", app.RequireUser(), app.UpdateAgentConfig())
+	webapp.Put("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.UpdateAgentConfig())
 
 	// Metadata endpoint for agent configuration fields
 	webapp.Get("/api/agent/config/metadata", app.RequireUser(), app.GetAgentConfigMeta())
@@ -231,9 +231,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			return errorJSONMessage(c, "Invalid user ID")
 		}
 
-		// 2. Fetch agents directly from MySQL
+		// 2. Fetch non-archived agents directly from MySQL
 		var dbAgents []models.Agent
-		if err := db.DB.Where("UserId = ?", userUUID).Find(&dbAgents).Error; err != nil {
+		if err := db.DB.Where("UserId = ? AND archive = false", userUUID).Find(&dbAgents).Error; err != nil {
 			return errorJSONMessage(c, "Failed to fetch agents: "+err.Error())
 		}
 
@@ -246,7 +246,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		if !ok {
 			pool, err = state.NewAgentPool(
 				userID,
-				os.Getenv("LOCALAGI_MODEL"),
+				"",
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -299,10 +299,10 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	})
 
 	// API endpoint for getting a specific agent's details
-	webapp.Get("/api/agent/:id", app.RequireUser(), app.GetAgentDetails())
+	webapp.Get("/api/agent/:id", app.RequireUser(), app.RequireActiveAgent(), app.GetAgentDetails())
 
 	// API endpoint for agent status history
-	webapp.Get("/api/agent/:id/status", app.RequireUser(), func(c *fiber.Ctx) error {
+	webapp.Get("/api/agent/:id/status", app.RequireUser(), app.RequireActiveAgent(), func(c *fiber.Ctx) error {
 		userID, ok := c.Locals("id").(string)
 		if !ok || userID == "" {
 			return errorJSONMessage(c, "User ID missing")
@@ -318,7 +318,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		if !ok {
 			newPool, err := state.NewAgentPool(
 				userID,
-				os.Getenv("LOCALAGI_MODEL"),
+				"",
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -365,8 +365,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Get("/settings/export/:name", app.RequireUser(), app.ExportAgent(pool))
 
 	// webapp.Post("/api/openrouter/:id/chat", app.RequireUser(), app.ProxyOpenRouterChat())
-	webapp.Get("/api/agent/:id/chat", app.RequireUser(), app.GetChatHistory())
-	webapp.Delete("/api/agent/:id/chat", app.RequireUser(), app.ClearChat())
+	webapp.Get("/api/agent/:id/chat", app.RequireUser(), app.RequireActiveAgent(), app.GetChatHistory())
+	webapp.Delete("/api/agent/:id/chat", app.RequireUser(), app.RequireActiveAgent(), app.ClearChat())
 
 	// New API route to get usage for the user
 	webapp.Get("/api/usage", app.RequireUser(), app.GetUsage())

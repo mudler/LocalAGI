@@ -112,37 +112,35 @@ func (a *App) Notify(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 func (a *App) Delete() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID
+		// 1. Get user ID and agent from context
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
 			return errorJSONMessage(c, "User ID missing")
 		}
-		userUUID, err := uuid.Parse(userIDStr)
-		if err != nil {
-			return errorJSONMessage(c, "Invalid user ID")
+
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		// 2. Get agent id
-		agentId := c.Params("id")
-		if agentId == "" {
-			return errorJSONMessage(c, "Agent id is required")
-		}
+		agentId := agent.ID.String()
 
-		// 3. Delete from DB
+		// 2. Archive in DB (soft delete)
 		if err := db.DB.
-			Where("ID = ? AND UserID = ?", agentId, userUUID).
-			Delete(&models.Agent{}).Error; err != nil {
-			return errorJSONMessage(c, "Failed to delete agent from DB: "+err.Error())
+			Model(&models.Agent{}).
+			Where("ID = ?", agent.ID).
+			Update("archive", true).Error; err != nil {
+			return errorJSONMessage(c, "Failed to archive agent in DB: "+err.Error())
 		}
 
-		// 4. Remove from in-memory pool if exists
+		// 3. Remove from in-memory pool if exists
 		if pool, ok := a.UserPools[userIDStr]; ok {
 			if err := pool.Remove(agentId); err != nil {
-				xlog.Warn("Agent deleted from DB but failed to remove from memory", "error", err)
+				xlog.Warn("Agent archived in DB but failed to remove from memory", "error", err)
 			}
 		}
 
-		xlog.Info("Agent deleted", "user", userIDStr, "agent", agentId)
+		xlog.Info("Agent archived", "user", userIDStr, "agent", agentId)
 		return statusJSONMessage(c, "ok")
 	}
 }
@@ -161,25 +159,26 @@ func statusJSONMessage(c *fiber.Ctx, message string) error {
 
 func (a *App) Pause() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID
+		// 1. Get user ID and agent from context
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
 			return errorJSONMessage(c, "User ID missing")
 		}
 
-		// 2. Get agent id
-		agentId := c.Params("id")
-		if agentId == "" {
-			return errorJSONMessage(c, "Agent id is required")
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		// 3. Get or init pool
+		agentId := agent.ID.String()
+
+		// 2. Get or init pool
 		pool, ok := a.UserPools[userIDStr]
 		if !ok {
 			// Rehydrate pool from DB (no file fallback)
 			newPool, err := state.NewAgentPool(
 				userIDStr,
-				os.Getenv("LOCALAGI_MODEL"),
+				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -198,10 +197,10 @@ func (a *App) Pause() func(c *fiber.Ctx) error {
 			pool = newPool
 		}
 
-		// 4. Pause agent if exists in memory
-		if agent := pool.GetAgent(agentId); agent != nil {
+		// 3. Pause agent if exists in memory
+		if agentInstance := pool.GetAgent(agentId); agentInstance != nil {
 			xlog.Info("Pausing agent", "Id", agentId)
-			agent.Pause()
+			agentInstance.Pause()
 		} else {
 			return errorJSONMessage(c, "Agent is not active in memory")
 		}
@@ -212,24 +211,25 @@ func (a *App) Pause() func(c *fiber.Ctx) error {
 
 func (a *App) Start() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID
+		// 1. Get user ID and agent from context
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
 			return errorJSONMessage(c, "User ID missing")
 		}
 
-		// 2. Get agent id
-		agentId := c.Params("id")
-		if agentId == "" {
-			return errorJSONMessage(c, "Agent id is required")
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		// 3. Load or create in-memory pool
+		agentId := agent.ID.String()
+
+		// 2. Load or create in-memory pool
 		pool, ok := a.UserPools[userIDStr]
 		if !ok {
 			newPool, err := state.NewAgentPool(
 				userIDStr,
-				os.Getenv("LOCALAGI_MODEL"),
+				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -248,31 +248,14 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 			pool = newPool
 		}
 
-		// 4. Try to get the agent from memory
-		agent := pool.GetAgent(agentId)
+		// 3. Try to get the agent from memory
+		agentInstance := pool.GetAgent(agentId)
 
-		// 5. If agent not in memory, load from database
-		if agent == nil {
-			// Parse user ID to UUID
-			userUUID, err := uuid.Parse(userIDStr)
-			if err != nil {
-				return errorJSONMessage(c, "Invalid user ID")
-			}
-
-			// Fetch agent from database
-			var agentModel models.Agent
-			if err := db.DB.
-				Where("ID = ? AND UserID = ?", agentId, userUUID).
-				First(&agentModel).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return errorJSONMessage(c, "Agent not found in database")
-				}
-				return errorJSONMessage(c, "Failed to fetch agent from database: "+err.Error())
-			}
-
+		// 4. If agent not in memory, load from context agent config
+		if agentInstance == nil {
 			// Parse agent config
 			var config state.AgentConfig
-			if err := json.Unmarshal(agentModel.Config, &config); err != nil {
+			if err := json.Unmarshal(agent.Config, &config); err != nil {
 				return errorJSONMessage(c, "Failed to parse agent config: "+err.Error())
 			}
 
@@ -286,15 +269,15 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 			}
 
 			// Get the newly created agent
-			agent = pool.GetAgent(agentId)
-			if agent == nil {
+			agentInstance = pool.GetAgent(agentId)
+			if agentInstance == nil {
 				return errorJSONMessage(c, "Failed to get newly created agent")
 			}
 		}
 
-		// 6. Resume agent
+		// 5. Resume agent
 		xlog.Info("Starting agent", "id", agentId)
-		agent.Resume()
+		agentInstance.Resume()
 
 		return statusJSONMessage(c, "ok")
 	}
@@ -322,10 +305,12 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Name is required")
 		}
 
-		// 3. Apply fallback values from env if fields are empty
-		if config.Model == "" {
-			config.Model = "gpt-4o-mini"
+		// 3. Validate and set model
+		if err := validateModel(config.Model); err != nil {
+			return errorJSONMessage(c, err.Error())
 		}
+
+		// 4. Apply fallback values from env if fields are empty
 		if config.MultimodalModel == "" {
 			config.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
 		}
@@ -340,15 +325,20 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 		config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
 		config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
 
-		fmt.Println("TTT", config.APIKey)
-
-		// 4. Serialize the enriched config to JSON
+		// 5. Serialize the enriched config to JSON
 		configJSON, err := json.Marshal(config)
 		if err != nil {
 			return errorJSONMessage(c, "Failed to serialize config")
 		}
 
-		// 5. Store config in DB
+		// Pretty print the config for debugging
+		prettyConfig, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			return errorJSONMessage(c, "Failed to pretty print config")
+		}
+		xlog.Debug("Creating agent with config", "config", string(prettyConfig))
+
+		// 6. Store config in DB
 		id := uuid.New()
 		agent := models.Agent{
 			ID:     id,
@@ -361,14 +351,14 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Failed to store agent: "+err.Error())
 		}
 
-		// 6. Ensure agent pool is initialized
+		// 7. Ensure agent pool is initialized
 		var pool *state.AgentPool
 		if p, ok := a.UserPools[userIDStr]; ok {
 			pool = p
 		} else {
 			pool, err = state.NewAgentPool(
 				userIDStr,
-				os.Getenv("LOCALAGI_MODEL"),
+				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -385,7 +375,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			}
 			a.UserPools[userIDStr] = pool
 		}
-		// 7. Register agent in the in-memory pool
+		// 8. Register agent in the in-memory pool
 		if err := pool.CreateAgent(id.String(), &config, false); err != nil {
 			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
 		}
@@ -397,41 +387,13 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 // NEW FUNCTION: Get agent configuration
 func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID
-		userID, ok := c.Locals("id").(string)
-		if !ok || userID == "" {
-			return errorJSONMessage(c, "User ID missing")
+		// 1. Get agent from context (set by RequireActiveAgent middleware)
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		userUUID, err := uuid.Parse(userID)
-		if err != nil {
-			return errorJSONMessage(c, "Invalid user ID")
-		}
-
-		// 2. Get agent id from route param
-		agentId := c.Params("id")
-		if agentId == "" {
-			return errorJSONMessage(c, "Agent id is required")
-		}
-
-		// 3. Fetch agent config from DB
-		var agent models.Agent
-		if err := db.DB.
-			Where("ID = ? AND UserId = ?", agentId, userUUID).
-			First(&agent).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-					"error":   "Agent not found",
-					"success": false,
-				})
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error":   "Failed to query agent config",
-				"success": false,
-			})
-		}
-
-		// 4. Unmarshal config JSON
+		// 2. Unmarshal config JSON
 		var config state.AgentConfig
 		if err := json.Unmarshal(agent.Config, &config); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -440,7 +402,7 @@ func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 			})
 		}
 
-		// 5. Return the config
+		// 3. Return the config
 		return c.JSON(config)
 	}
 }
@@ -448,45 +410,36 @@ func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 // UpdateAgentConfig handles updating an agent's configuration
 func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Extract and validate user ID
+		// 1. Get user ID and agent from context
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
 			return errorJSONMessage(c, "User ID missing")
 		}
-		userUUID, err := uuid.Parse(userIDStr)
-		if err != nil {
-			return errorJSONMessage(c, "Invalid user ID")
+
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		// 2. Extract agent id
-		agentId := c.Params("id")
-		if agentId == "" {
-			return errorJSONMessage(c, "Agent id is required")
-		}
+		agentId := agent.ID.String()
 
-		// 3. Fetch agent from DB
-		var agent models.Agent
-		if err := db.DB.
-			Where("ID = ? AND UserId = ?", agentId, userUUID).
-			First(&agent).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errorJSONMessage(c, "Agent not found")
-			}
-			return errorJSONMessage(c, "Failed to fetch agent: "+err.Error())
-		}
-
-		// 4. Parse new config
+		// 2. Parse new config
 		var newConfig state.AgentConfig
 		if err := c.BodyParser(&newConfig); err != nil {
 			xlog.Error("Error parsing agent config", "error", err)
 			return errorJSONMessage(c, "Invalid agent config: "+err.Error())
 		}
 
+		// 3. Validate model
+		if err := validateModel(newConfig.Model); err != nil {
+			return errorJSONMessage(c, err.Error())
+		}
+
 		// Always use environment variables for API key and URL
 		newConfig.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
 		newConfig.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
 
-		// 5. Update DB
+		// 3. Update DB
 		newConfigJSON, err := json.Marshal(newConfig)
 		if err != nil {
 			return errorJSONMessage(c, "Failed to serialize config")
@@ -496,7 +449,7 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Failed to update config in DB: "+err.Error())
 		}
 
-		// 6. Reload in-memory agent if active
+		// 4. Reload in-memory agent if active
 		pool, ok := a.UserPools[userIDStr]
 		if ok {
 			// Remember if the agent was running before removal
@@ -571,6 +524,11 @@ func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Name is required")
 		}
 
+		// Validate model
+		if err := validateModel(config.Model); err != nil {
+			return errorJSONMessage(c, err.Error())
+		}
+
 		if err := pool.CreateAgent(config.Name, &config, false); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
@@ -640,11 +598,18 @@ func (a *App) OldChat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 // This is designed to work better with the React UI
 func (a *App) Chat() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID
+		// 1. Get user ID and agent from context
 		userID, ok := c.Locals("id").(string)
 		if !ok || userID == "" {
 			return errorJSONMessage(c, "User ID missing")
 		}
+
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
+		}
+
+		agentId := agent.ID.String()
 
 		// 2. Parse body
 		var payload struct {
@@ -659,26 +624,20 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Message cannot be empty")
 		}
 
-		agentId := c.Params("id")
-		var agentModel models.Agent
-		if err := db.DB.Where("ID = ? AND userID = ?", agentId, userID).First(&agentModel).Error; err != nil {
-			return errorJSONMessage(c, "Agent not found")
-		}
-
-		// 4. Parse agent config
+		// 3. Parse agent config
 		var config state.AgentConfig
-		if err := json.Unmarshal(agentModel.Config, &config); err != nil {
+		if err := json.Unmarshal(agent.Config, &config); err != nil {
 			return errorJSONMessage(c, "Invalid agent config")
 		}
 
-		// 5. Ensure in-memory pool exists
+		// 4. Ensure in-memory pool exists
 		var pool *state.AgentPool
 		if p, ok := a.UserPools[userID]; ok {
 			pool = p
 		} else {
 			pool := state.NewEmptyAgentPool(
 				userID,
-				os.Getenv("LOCALAGI_MODEL"),
+				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -693,14 +652,14 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			a.UserPools[userID] = pool
 		}
 
-		// 6. Start agent in memory if not running
+		// 5. Start agent in memory if not running
 		if pool.GetAgent(agentId) == nil {
 			if err := pool.CreateAgent(agentId, &config, false); err != nil {
 				return errorJSONMessage(c, "Failed to start agent: "+err.Error())
 			}
 		}
 
-		// 7. Emit user message via SSE
+		// 6. Emit user message via SSE
 		manager := pool.GetManager(agentId)
 		messageID := fmt.Sprintf("%d", time.Now().UnixNano())
 
@@ -710,10 +669,10 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			)
 		}
 
-		// 8. Save user message to DB
+		// 7. Save user message to DB
 		_ = db.DB.Create(&models.AgentMessage{
 			ID:        uuid.New(),
-			AgentID:   agentModel.ID,
+			AgentID:   agent.ID,
 			Sender:    "user",
 			Content:   message,
 			CreatedAt: time.Now(),
@@ -724,7 +683,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			"createdAt": time.Now().Format(time.RFC3339),
 		})
 
-		// 9. Ask agent asynchronously
+		// 8. Ask agent asynchronously
 		go func() {
 			response := pool.GetAgent(agentId).Ask(coreTypes.WithText(message))
 
@@ -746,14 +705,14 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			// Save agent reply to DB
 			_ = db.DB.Create(&models.AgentMessage{
 				ID:        uuid.New(),
-				AgentID:   agentModel.ID,
+				AgentID:   agent.ID,
 				Sender:    "agent",
 				Content:   response.Response,
 				CreatedAt: time.Now(),
 			})
 		}()
 
-		// 10. Immediate 202 response
+		// 9. Immediate 202 response
 		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 			"status":     "message_received",
 			"message_id": messageID,
@@ -962,7 +921,7 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			var err error
 			pool, err = state.NewAgentPool(
 				userIDStr,
-				os.Getenv("LOCALAGI_MODEL"),
+				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -987,10 +946,12 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			agentConfig.Description = agent.Description
 			agentConfig.SystemPrompt = agent.SystemPrompt
 
-			// 3. Apply fallback values from env if fields are empty
-			if agentConfig.Model == "" {
-				agentConfig.Model = "gpt-4o-mini"
+			// 3. Validate model
+			if err := validateModel(agentConfig.Model); err != nil {
+				return errorJSONMessage(c, fmt.Sprintf("Agent '%s': %s", agent.Name, err.Error()))
 			}
+
+			// 4. Apply fallback values from env if fields are empty
 			if agentConfig.MultimodalModel == "" {
 				agentConfig.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
 			}
@@ -1005,13 +966,13 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			agentConfig.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
 			agentConfig.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
 
-			// 4. Serialize the enriched config to JSON
+			// 5. Serialize the enriched config to JSON
 			configJSON, err := json.Marshal(agentConfig)
 			if err != nil {
 				return errorJSONMessage(c, "Failed to serialize config")
 			}
 
-			// 5. Store config in DB
+			// 6. Store config in DB
 			id := uuid.New()
 			agentModel := models.Agent{
 				ID:     id,
@@ -1024,7 +985,7 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 				return errorJSONMessage(c, "Failed to store agent: "+err.Error())
 			}
 
-			// 6. Create agent in memory pool using the DB ID
+			// 7. Create agent in memory pool using the DB ID
 			if err := pool.CreateAgent(id.String(), agentConfig, false); err != nil {
 				return errorJSONMessage(c, err.Error())
 			}
@@ -1087,9 +1048,7 @@ func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
 // getLocalModels returns the local model(s) configured via environment variables
 func getLocalModels() []map[string]interface{} {
 	modelName := os.Getenv("MODEL_NAME")
-	if modelName == "" {
-		modelName = os.Getenv("LOCALAGI_MODEL")
-	}
+	// Remove dependency on LOCALAGI_MODEL since we always use agent config
 	if modelName == "" {
 		return nil
 	}
@@ -1147,7 +1106,7 @@ func getOpenRouterModels() []map[string]interface{} {
 		id, _ := m["id"].(string)
 		if allowed[id] {
 			m["source"] = "openrouter"
-			m["id"] = "openrouter/" + id // Prefix to avoid collision
+			m["id"] = id // Prefix to avoid collision
 			models = append(models, m)
 		}
 	}
@@ -1165,13 +1124,29 @@ func getAvailableModels() []map[string]interface{} {
 	openrouterModels := getOpenRouterModels()
 
 	for _, model := range openrouterModels {
-		if model["id"] == "openrouter/deepseek/deepseek-chat-v3-0324:free" {
+		if model["id"] == "deepseek/deepseek-chat-v3-0324:free" {
 			return []map[string]interface{}{model}
 		}
 	}
 
 	// Return empty slice if model not found
 	return []map[string]interface{}{}
+}
+
+// validateModel checks if the provided model is valid and available
+func validateModel(model string) error {
+	if model == "" {
+		return fmt.Errorf("model is required")
+	}
+
+	availableModels := getAvailableModels()
+	for _, availableModel := range availableModels {
+		if availableModel["id"].(string) == model {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("model '%s' is not available. Please choose from available models", model)
 }
 
 // Proxy OpenRouter chat/completion endpoint
@@ -1404,9 +1379,61 @@ func (a *App) RequireUser() func(c *fiber.Ctx) error {
 	}
 }
 
+func (a *App) RequireActiveAgent() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		// 1. Get user ID from context (must be called after RequireUser)
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"error":   "User ID missing from context",
+			})
+		}
+
+		userID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"success": false,
+				"error":   "Invalid user ID",
+			})
+		}
+
+		// 2. Get agent ID from route parameter
+		agentId := c.Params("id")
+		if agentId == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"success": false,
+				"error":   "Agent ID is required",
+			})
+		}
+
+		// 3. Check if agent exists and is not archived
+		var agent models.Agent
+		if err := db.DB.
+			Where("ID = ? AND UserID = ? AND archive = false", agentId, userID).
+			First(&agent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"success": false,
+					"error":   "Agent not found or has been archived",
+				})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"success": false,
+				"error":   "Failed to query agent",
+			})
+		}
+
+		// 4. Set agent context for potential use in handlers
+		c.Locals("agent", &agent)
+
+		return c.Next()
+	}
+}
+
 func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID
+		// 1. Get user ID and agent from context
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -1414,43 +1441,23 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 			})
 		}
 
-		userID, err := uuid.Parse(userIDStr)
-		if err != nil {
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Invalid user ID",
+				"error": "Agent not found in context",
 			})
 		}
 
-		// 2. Get agent id from URL param
-		agentId := c.Params("id")
-		if agentId == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Agent id is required",
-			})
-		}
+		agentId := agent.ID.String()
 
-		// 3. Look up agent config in MySQL
-		var agent models.Agent
-		if err := db.DB.
-			Where("Id = ? AND UserId = ?", agentId, userID).
-			First(&agent).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-					"error": "Agent not found",
-				})
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to fetch agent",
-			})
-		}
-
-		// 4. Load or create pool in memory
+		// 2. Load or create pool in memory
 		var pool *state.AgentPool
 		var exists bool
 		if pool, exists = a.UserPools[userIDStr]; !exists {
+			var err error
 			pool, err = state.NewAgentPool(
 				userIDStr,
-				os.Getenv("LOCALAGI_MODEL"),
+				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LLM_API_URL"),
@@ -1470,7 +1477,7 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 			a.UserPools[userIDStr] = pool
 		}
 
-		// 5. Load config into pool if missing
+		// 3. Load config into pool if missing
 		if pool.GetAgent(agentId) == nil {
 			var cfg state.AgentConfig
 			if err := json.Unmarshal(agent.Config, &cfg); err == nil {
@@ -1479,13 +1486,13 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 			}
 		}
 
-		// 6. Check if agent is running
+		// 4. Check if agent is running
 		active := false
 		if instance := pool.GetAgent(agentId); instance != nil {
 			active = !instance.Paused()
 		}
 
-		// 7. Return status
+		// 5. Return status
 		return c.JSON(fiber.Map{
 			"active": active,
 		})
@@ -1499,49 +1506,22 @@ func mustStringify(v interface{}) string {
 
 func (a *App) GetChatHistory() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID from context
-		userIDStr, ok := c.Locals("id").(string)
-		if !ok || userIDStr == "" {
-			return errorJSONMessage(c, "User ID missing")
+		// 1. Get agent from context
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		// 2. Validate and parse agent ID from URL
-		agentID := c.Params("id")
-		if agentID == "" {
-			return errorJSONMessage(c, "Agent ID is required")
-		}
-
-		userUUID, err := uuid.Parse(userIDStr)
-		if err != nil {
-			return errorJSONMessage(c, "Invalid user ID")
-		}
-
-		agentUUID, err := uuid.Parse(agentID)
-		if err != nil {
-			return errorJSONMessage(c, "Invalid agent ID")
-		}
-
-		// 3. Confirm the agent belongs to the user
-		var agent models.Agent
-		if err := db.DB.
-			Where("ID = ? AND UserID = ?", agentUUID, userUUID).
-			First(&agent).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errorJSONMessage(c, "Agent not found")
-			}
-			return errorJSONMessage(c, "Failed to fetch agent: "+err.Error())
-		}
-
-		// 4. Fetch messages (you can sort DESC + limit for recent)
+		// 2. Fetch messages (you can sort DESC + limit for recent)
 		var messages []models.AgentMessage
 		if err := db.DB.
-			Where("AgentID = ?", agentUUID).
+			Where("AgentID = ?", agent.ID).
 			Order("createdAt ASC").
 			Find(&messages).Error; err != nil {
 			return errorJSONMessage(c, "Failed to fetch messages: "+err.Error())
 		}
 
-		// 5. Format for frontend
+		// 3. Format for frontend
 		formatted := make([]fiber.Map, 0, len(messages))
 		for _, msg := range messages {
 			formatted = append(formatted, fiber.Map{
@@ -1559,38 +1539,20 @@ func (a *App) GetChatHistory() func(c *fiber.Ctx) error {
 
 func (a *App) ClearChat() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID from context
-		userIDStr, ok := c.Locals("id").(string)
-		if !ok || userIDStr == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User ID missing"})
-		}
-		userID, err := uuid.Parse(userIDStr)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
+		// 1. Get agent from context
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Agent not found in context"})
 		}
 
-		// 2. Get agent ID
-		agentId := c.Params("id")
-		if agentId == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Agent ID required"})
-		}
-
-		// 3. Verify agent ownership
-		var agent models.Agent
+		// 2. Delete agent messages from DB
 		if err := db.DB.
-			Where("id = ? AND UserID = ?", agentId, userID).
-			First(&agent).Error; err != nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Agent not found"})
-		}
-
-		// 4. Delete agent messages from DB
-		if err := db.DB.
-			Where("AgentID = ?", agentId).
+			Where("AgentID = ?", agent.ID).
 			Delete(&models.AgentMessage{}).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to clear chat"})
 		}
 
-		// 5. Optionally: clear in-memory HUD or status if needed
+		// 3. Optionally: clear in-memory HUD or status if needed
 
 		return c.JSON(fiber.Map{"success": true, "message": "Chat cleared"})
 	}

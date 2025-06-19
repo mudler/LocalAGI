@@ -36,9 +36,56 @@ function CreateAgent() {
     fetchMetadata();
   }, []);
 
+  // Initialize formData with default values when metadata is loaded
+  useEffect(() => {
+    if (metadata && Object.keys(formData).length === 0) {
+      const defaultFormData = {
+        // Initialize arrays for complex fields
+        connectors: [],
+        actions: [],
+        dynamic_prompts: [],
+        mcp_servers: [],
+      };
+
+      // Process all field sections to extract default values
+      // const sections = [
+      //   'BasicInfoSection',
+      //   'ModelSettingsSection', 
+      //   'MemorySettingsSection',
+      //   'PromptsGoalsSection',
+      //   'AdvancedSettingsSection'
+      // ];
+
+      const sections = [
+        'ModelSettingsSection', 
+      ];
+
+      sections.forEach((sectionKey) => {
+        if (metadata[sectionKey] && Array.isArray(metadata[sectionKey])) {
+          metadata[sectionKey].forEach((field) => {
+            if (field.name) {
+              let defaultValue = field.defaultValue;
+              
+              // If field has options array, use the first option's value
+              if (field.options && Array.isArray(field.options) && field.options.length > 0) {
+                defaultValue = field.options[0].value;
+              } else if (field.hasOwnProperty('defaultValue')) {
+                defaultValue = field.defaultValue;
+              }
+              
+              defaultFormData[field.name] = defaultValue;
+            }
+          });
+        }
+      });
+
+      setFormData(defaultFormData);
+    }
+  }, [metadata, formData]);
+
   // Handle form submission
   const handleSubmit = async (data) => {
-    console.log("[CreateAgent] Submitting agent with model:", data.model); // DEBUG LOG
+    console.log("[CreateAgent] Submitting agent with full data:", data); // DEBUG LOG
     setLoading(true);
     try {
       await agentApi.createAgent(data);

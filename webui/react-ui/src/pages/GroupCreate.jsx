@@ -146,6 +146,53 @@ function GroupCreate() {
     </button>
   );
 
+  // Initialize formData with default values when metadata is loaded
+  useEffect(() => {
+    if (metadata && Object.keys(formData).length === 0) {
+      const defaultFormData = {
+        // Initialize arrays for complex fields
+        connectors: [],
+        actions: [],
+        dynamic_prompts: [],
+        mcp_servers: [],
+      };
+
+      // Process all field sections to extract default values
+      // const sections = [
+      //   'BasicInfoSection',
+      //   'ModelSettingsSection', 
+      //   'MemorySettingsSection',
+      //   'PromptsGoalsSection',
+      //   'AdvancedSettingsSection'
+      // ];
+
+      const sections = [
+        'ModelSettingsSection', 
+      ];
+
+      sections.forEach((sectionKey) => {
+        if (metadata[sectionKey] && Array.isArray(metadata[sectionKey])) {
+          metadata[sectionKey].forEach((field) => {
+            if (field.name) {
+              let defaultValue = field.defaultValue;
+              
+              // If field has options array, use the first option's value
+              if (field.options && Array.isArray(field.options) && field.options.length > 0) {
+                defaultValue = field.options[0].value;
+              } else if (field.hasOwnProperty('defaultValue')) {
+                defaultValue = field.defaultValue;
+              }
+              
+              defaultFormData[field.name] = defaultValue;
+            }
+          });
+        }
+      });
+
+      setFormData(defaultFormData);
+    }
+  }, [metadata, formData]);
+
   // Create agent group
   const handleCreateGroup = async (e) => {
     e.preventDefault();
