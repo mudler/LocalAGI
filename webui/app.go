@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -301,11 +302,13 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 		if err := c.BodyParser(&config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
-		if config.Name == "" {
-			return errorJSONMessage(c, "Name is required")
+
+		// 3. Validate config fields
+		if err := validateAgentConfig(&config); err != nil {
+			return errorJSONMessage(c, err.Error())
 		}
 
-		// 3. Validate and set model
+		// 4. Validate and set model
 		if err := validateModel(config.Model); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
@@ -430,7 +433,12 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Invalid agent config: "+err.Error())
 		}
 
-		// 3. Validate model
+		// 3. Validate config fields
+		if err := validateAgentConfig(&newConfig); err != nil {
+			return errorJSONMessage(c, err.Error())
+		}
+
+		// 4. Validate model
 		if err := validateModel(newConfig.Model); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
@@ -520,8 +528,9 @@ func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		xlog.Info("Importing agent", config.Name)
 
-		if config.Name == "" {
-			return errorJSONMessage(c, "Name is required")
+		// Validate config fields
+		if err := validateAgentConfig(&config); err != nil {
+			return errorJSONMessage(c, err.Error())
 		}
 
 		// Validate model
@@ -946,7 +955,12 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			agentConfig.Description = agent.Description
 			agentConfig.SystemPrompt = agent.SystemPrompt
 
-			// 3. Validate model
+			// 3. Validate config fields
+			if err := validateAgentConfig(agentConfig); err != nil {
+				return errorJSONMessage(c, fmt.Sprintf("Agent '%s': %s", agent.Name, err.Error()))
+			}
+
+			// 4. Validate model
 			if err := validateModel(agentConfig.Model); err != nil {
 				return errorJSONMessage(c, fmt.Sprintf("Agent '%s': %s", agent.Name, err.Error()))
 			}
@@ -1147,6 +1161,495 @@ func validateModel(model string) error {
 	}
 
 	return fmt.Errorf("model '%s' is not available. Please choose from available models", model)
+}
+
+// validateAgentConfig validates all agent configuration fields
+func validateAgentConfig(config *state.AgentConfig) error {
+	// Name validation
+	if config.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	if len(config.Name) > 50 {
+		return fmt.Errorf("name must be 50 characters or less")
+	}
+
+	// Description validation
+	if len(config.Description) > 500 {
+		return fmt.Errorf("description must be 500 characters or less")
+	}
+
+	// System prompt validation
+	if len(config.SystemPrompt) > 10000 {
+		return fmt.Errorf("system prompt must be 10,000 characters or less")
+	}
+
+	// Identity guidance validation
+	if len(config.IdentityGuidance) > 1000 {
+		return fmt.Errorf("identity guidance must be 1,000 characters or less")
+	}
+
+	// Permanent goal validation
+	if len(config.PermanentGoal) > 2000 {
+		return fmt.Errorf("permanent goal must be 2,000 characters or less")
+	}
+
+	// Periodic runs validation (if provided, should be a valid duration)
+	if config.PeriodicRuns != "" {
+		if _, err := time.ParseDuration(config.PeriodicRuns); err != nil {
+			return fmt.Errorf("periodic runs must be a valid duration (e.g., '10m', '1h'): %v", err)
+		}
+	}
+
+	// Validate numeric fields have reasonable values
+	if config.KnowledgeBaseResults < 0 {
+		return fmt.Errorf("knowledge base results must be non-negative")
+	}
+	if config.KnowledgeBaseResults > 50 {
+		return fmt.Errorf("knowledge base results must be 50 or less")
+	}
+
+	if config.LoopDetectionSteps < 0 {
+		return fmt.Errorf("loop detection steps must be non-negative")
+	}
+	if config.LoopDetectionSteps > 10 {
+		return fmt.Errorf("loop detection steps must be 10 or less")
+	}
+
+	// URL validations (basic format check)
+	if config.APIURL != "" && !isValidURL(config.APIURL) {
+		return fmt.Errorf("api URL is not a valid URL format")
+	}
+	if config.LocalRAGURL != "" && !isValidURL(config.LocalRAGURL) {
+		return fmt.Errorf("local RAG URL is not a valid URL format")
+	}
+
+	// Connector validations
+	if len(config.Connector) > 20 {
+		return fmt.Errorf("maximum 20 connectors allowed")
+	}
+
+	// Get connector field groups for validation
+	connectorGroups := services.ConnectorsConfigMeta()
+	validConnectorTypes := make(map[string]bool)
+	for _, group := range connectorGroups {
+		validConnectorTypes[group.Name] = true
+	}
+
+	for i, connector := range config.Connector {
+		if connector.Type == "" {
+			return fmt.Errorf("connector %d: type is required", i+1)
+		}
+		if len(connector.Type) > 50 {
+			return fmt.Errorf("connector %d: type must be 50 characters or less", i+1)
+		}
+
+		// Validate connector type exists
+		if !validConnectorTypes[connector.Type] {
+			return fmt.Errorf("connector %d: invalid connector type '%s'", i+1, connector.Type)
+		}
+
+		// Parse and validate connector config JSON
+		if connector.Config != "" {
+			var connectorConfig map[string]interface{}
+			if err := json.Unmarshal([]byte(connector.Config), &connectorConfig); err != nil {
+				return fmt.Errorf("connector %d: invalid JSON in config: %v", i+1, err)
+			}
+
+			// Validate required fields and values based on connector type
+			if err := validateConnectorFields(connector.Type, connectorConfig, i+1); err != nil {
+				return err
+			}
+
+			// Basic validations for all fields
+			for fieldName, fieldValue := range connectorConfig {
+				if fieldValue == nil {
+					continue
+				}
+
+				fieldValueStr := fmt.Sprintf("%v", fieldValue)
+
+				// Validate field length
+				if len(fieldValueStr) > 1000 {
+					return fmt.Errorf("connector %d (%s): field '%s' must be 1000 characters or less", i+1, connector.Type, fieldName)
+				}
+
+				// Special validation for token fields
+				if strings.Contains(fieldName, "token") || strings.Contains(fieldName, "Token") {
+					if fieldValueStr != "" {
+						if len(fieldValueStr) < 10 {
+							return fmt.Errorf("connector %d (%s): %s must be at least 10 characters", i+1, connector.Type, fieldName)
+						}
+						if len(fieldValueStr) > 500 {
+							return fmt.Errorf("connector %d (%s): %s must be 500 characters or less", i+1, connector.Type, fieldName)
+						}
+					}
+				}
+
+				// Validate duration fields
+				if (strings.Contains(fieldName, "Duration") || strings.Contains(fieldName, "Interval")) && fieldValueStr != "" {
+					if _, err := time.ParseDuration(fieldValueStr); err != nil {
+						return fmt.Errorf("connector %d (%s): field '%s' must be a valid duration (e.g., '5m', '1h'): %v", i+1, connector.Type, fieldName, err)
+					}
+				}
+
+				// Validate port fields
+				if fieldName == "port" && fieldValueStr != "" {
+					if port, err := strconv.Atoi(fieldValueStr); err != nil || port < 1 || port > 65535 {
+						return fmt.Errorf("connector %d (%s): port must be a valid port number (1-65535)", i+1, connector.Type)
+					}
+				}
+
+				// Validate boolean-like fields
+				if strings.Contains(fieldName, "always") || strings.Contains(fieldName, "Always") ||
+					strings.Contains(fieldName, "Reply") || strings.Contains(fieldName, "Limit") {
+					if fieldValueStr != "" && fieldValueStr != "true" && fieldValueStr != "false" &&
+						fieldValueStr != "1" && fieldValueStr != "0" {
+						// Allow these to be strings or booleans, just warn if not recognizable
+					}
+				}
+			}
+		}
+	}
+
+	// Actions validations
+	if len(config.Actions) > 50 {
+		return fmt.Errorf("maximum 50 actions allowed")
+	}
+
+	// Get action field groups for validation
+	actionGroups := services.ActionsConfigMeta()
+	validActionTypes := make(map[string]bool)
+	for _, group := range actionGroups {
+		validActionTypes[group.Name] = true
+	}
+
+	for i, action := range config.Actions {
+		if action.Name == "" {
+			return fmt.Errorf("action %d: type is required", i+1)
+		}
+		if len(action.Name) > 100 {
+			return fmt.Errorf("action %d: type must be 100 characters or less", i+1)
+		}
+
+		// Validate action type exists
+		if !validActionTypes[action.Name] {
+			return fmt.Errorf("action %d: invalid action type '%s'", i+1, action.Name)
+		}
+
+		// Parse and validate action config JSON
+		if action.Config != "" {
+			var actionConfig map[string]interface{}
+			if err := json.Unmarshal([]byte(action.Config), &actionConfig); err != nil {
+				return fmt.Errorf("action %d: invalid JSON in config: %v", i+1, err)
+			}
+
+			// Validate required fields and values based on action type
+			if err := validateActionFields(action.Name, actionConfig, i+1); err != nil {
+				return err
+			}
+
+			// Basic validations for all fields
+			for fieldName, fieldValue := range actionConfig {
+				if fieldValue == nil {
+					continue
+				}
+
+				fieldValueStr := fmt.Sprintf("%v", fieldValue)
+
+				// Validate field length
+				if len(fieldValueStr) > 1000 {
+					return fmt.Errorf("action %d (%s): field '%s' must be 1000 characters or less", i+1, action.Name, fieldName)
+				}
+
+				// Special validation for token/key fields
+				if strings.Contains(fieldName, "token") || strings.Contains(fieldName, "Token") ||
+					strings.Contains(fieldName, "key") || strings.Contains(fieldName, "Key") {
+					if fieldValueStr != "" {
+						if len(fieldValueStr) < 10 {
+							return fmt.Errorf("action %d (%s): %s must be at least 10 characters", i+1, action.Name, fieldName)
+						}
+						if len(fieldValueStr) > 2000 {
+							return fmt.Errorf("action %d (%s): %s must be 2,000 characters or less", i+1, action.Name, fieldName)
+						}
+					}
+				}
+
+				// Validate URL fields
+				if (strings.Contains(fieldName, "URL") || strings.Contains(fieldName, "Url") ||
+					strings.Contains(fieldName, "Host") || strings.Contains(fieldName, "host")) && fieldValueStr != "" {
+					if !isValidURL(fieldValueStr) && !isValidHost(fieldValueStr) {
+						return fmt.Errorf("action %d (%s): field '%s' must be a valid URL or host", i+1, action.Name, fieldName)
+					}
+				}
+
+				// Validate email fields
+				if (strings.Contains(fieldName, "email") || strings.Contains(fieldName, "Email")) && fieldValueStr != "" {
+					if !isValidEmail(fieldValueStr) {
+						return fmt.Errorf("action %d (%s): field '%s' must be a valid email address", i+1, action.Name, fieldName)
+					}
+				}
+
+				// Validate port fields
+				if (strings.Contains(fieldName, "port") || strings.Contains(fieldName, "Port")) && fieldValueStr != "" {
+					if port, err := strconv.Atoi(fieldValueStr); err != nil || port < 1 || port > 65535 {
+						return fmt.Errorf("action %d (%s): %s must be a valid port number (1-65535)", i+1, action.Name, fieldName)
+					}
+				}
+			}
+		}
+	}
+
+	// Dynamic prompts validations
+	if len(config.DynamicPrompts) > 20 {
+		return fmt.Errorf("maximum 20 dynamic prompts allowed")
+	}
+	for i, prompt := range config.DynamicPrompts {
+		if prompt.Type == "" {
+			return fmt.Errorf("dynamic prompt %d: type is required", i+1)
+		}
+		if len(prompt.Type) > 50 {
+			return fmt.Errorf("dynamic prompt %d: type must be 50 characters or less", i+1)
+		}
+	}
+
+	// MCP servers validations
+	if len(config.MCPServers) > 10 {
+		return fmt.Errorf("maximum 10 MCP servers allowed")
+	}
+	for i, server := range config.MCPServers {
+		if server.URL == "" {
+			return fmt.Errorf("MCP server %d: URL is required", i+1)
+		}
+		if !isValidURL(server.URL) {
+			return fmt.Errorf("MCP server %d: URL is not a valid URL format", i+1)
+		}
+		if len(server.URL) > 500 {
+			return fmt.Errorf("MCP server %d: URL must be 500 characters or less", i+1)
+		}
+		if len(server.Token) > 1000 {
+			return fmt.Errorf("MCP server %d: token must be 1,000 characters or less", i+1)
+		}
+	}
+
+	return nil
+}
+
+// validateConnectorFields validates specific fields based on connector type
+func validateConnectorFields(connectorType string, config map[string]interface{}, connectorIndex int) error {
+	switch connectorType {
+	case "discord":
+		return validateDiscordFields(config, connectorIndex)
+	case "slack":
+		return validateSlackFields(config, connectorIndex)
+	case "telegram":
+		return validateTelegramFields(config, connectorIndex)
+	case "github-issues", "github-prs":
+		return validateGitHubFields(config, connectorIndex, connectorType)
+	case "irc":
+		return validateIRCFields(config, connectorIndex)
+	case "twitter":
+		return validateTwitterFields(config, connectorIndex)
+	}
+	return nil
+}
+
+// validateDiscordFields validates Discord-specific required fields
+func validateDiscordFields(config map[string]interface{}, index int) error {
+	if token, ok := config["token"]; !ok || fmt.Sprintf("%v", token) == "" {
+		return fmt.Errorf("connector %d (discord): token is required", index)
+	}
+	return nil
+}
+
+// validateSlackFields validates Slack-specific required fields
+func validateSlackFields(config map[string]interface{}, index int) error {
+	if appToken, ok := config["appToken"]; !ok || fmt.Sprintf("%v", appToken) == "" {
+		return fmt.Errorf("connector %d (slack): appToken is required", index)
+	}
+	if botToken, ok := config["botToken"]; !ok || fmt.Sprintf("%v", botToken) == "" {
+		return fmt.Errorf("connector %d (slack): botToken is required", index)
+	}
+	return nil
+}
+
+// validateTelegramFields validates Telegram-specific required fields
+func validateTelegramFields(config map[string]interface{}, index int) error {
+	if token, ok := config["token"]; !ok || fmt.Sprintf("%v", token) == "" {
+		return fmt.Errorf("connector %d (telegram): token is required", index)
+	}
+	return nil
+}
+
+// validateGitHubFields validates GitHub-specific required fields
+func validateGitHubFields(config map[string]interface{}, index int, connectorType string) error {
+	if token, ok := config["token"]; !ok || fmt.Sprintf("%v", token) == "" {
+		return fmt.Errorf("connector %d (%s): token is required", index, connectorType)
+	}
+	if repository, ok := config["repository"]; !ok || fmt.Sprintf("%v", repository) == "" {
+		return fmt.Errorf("connector %d (%s): repository is required", index, connectorType)
+	}
+	if owner, ok := config["owner"]; !ok || fmt.Sprintf("%v", owner) == "" {
+		return fmt.Errorf("connector %d (%s): owner is required", index, connectorType)
+	}
+	return nil
+}
+
+// validateIRCFields validates IRC-specific required fields
+func validateIRCFields(config map[string]interface{}, index int) error {
+	requiredFields := []string{"server", "port", "nickname", "channel"}
+	for _, field := range requiredFields {
+		if value, ok := config[field]; !ok || fmt.Sprintf("%v", value) == "" {
+			return fmt.Errorf("connector %d (irc): %s is required", index, field)
+		}
+	}
+	return nil
+}
+
+// validateTwitterFields validates Twitter-specific required fields
+func validateTwitterFields(config map[string]interface{}, index int) error {
+	if token, ok := config["token"]; !ok || fmt.Sprintf("%v", token) == "" {
+		return fmt.Errorf("connector %d (twitter): token is required", index)
+	}
+	if botUsername, ok := config["botUsername"]; !ok || fmt.Sprintf("%v", botUsername) == "" {
+		return fmt.Errorf("connector %d (twitter): botUsername is required", index)
+	}
+	return nil
+}
+
+// isValidURL performs basic URL validation
+func isValidURL(str string) bool {
+	return strings.HasPrefix(str, "http://") || strings.HasPrefix(str, "https://")
+}
+
+// isValidHost performs basic host validation (for SMTP hosts, etc.)
+func isValidHost(str string) bool {
+	// Allow hostname or hostname:port format
+	return len(str) > 0 && !strings.Contains(str, "/") && !strings.HasPrefix(str, ".")
+}
+
+// isValidEmail performs basic email validation
+func isValidEmail(str string) bool {
+	return strings.Contains(str, "@") && strings.Contains(str, ".") && len(strings.TrimSpace(str)) > 5
+}
+
+// validateActionFields validates specific fields based on action type
+func validateActionFields(actionType string, config map[string]interface{}, actionIndex int) error {
+	switch actionType {
+	case "search":
+		return validateSearchFields(config, actionIndex)
+	case "generate_image":
+		return validateGenerateImageFields(config, actionIndex)
+	case "github-issue-labeler", "github-issue-opener", "github-issue-closer",
+		"github-issue-commenter", "github-issue-reader", "github-issue-searcher":
+		return validateBasicGitHubFields(config, actionIndex, actionType)
+	case "github-repository-get-content", "github-get-all-repository-content",
+		"github-repository-create-or-update-content":
+		return validateBasicGitHubFields(config, actionIndex, actionType)
+	case "github-readme":
+		return validateGitHubReadmeFields(config, actionIndex)
+	case "github-pr-reader", "github-pr-commenter", "github-pr-reviewer", "github-pr-creator":
+		return validateGitHubPRFields(config, actionIndex, actionType)
+	case "twitter-post":
+		return validateTwitterActionFields(config, actionIndex)
+	case "send-mail":
+		return validateSendMailFields(config, actionIndex)
+	case "shell-command":
+		return validateShellCommandFields(config, actionIndex)
+	case "custom":
+		return validateCustomActionFields(config, actionIndex)
+	// Actions with no required fields: scraper, wikipedia, browse, counter, call_agents
+	case "scraper", "wikipedia", "browse", "counter", "call_agents":
+		return nil
+	}
+	return nil
+}
+
+// validateSearchFields validates search action fields
+func validateSearchFields(config map[string]interface{}, index int) error {
+	if results, ok := config["results"]; ok && results != nil {
+		resultsStr := fmt.Sprintf("%v", results)
+		if resultsInt, err := strconv.Atoi(resultsStr); err != nil || resultsInt < 1 || resultsInt > 100 {
+			return fmt.Errorf("action %d (search): results must be a number between 1 and 100", index)
+		}
+	}
+	return nil
+}
+
+// validateGenerateImageFields validates generate image action fields
+func validateGenerateImageFields(config map[string]interface{}, index int) error {
+	requiredFields := []string{"apiKey", "apiURL", "model"}
+	for _, field := range requiredFields {
+		if value, ok := config[field]; !ok || fmt.Sprintf("%v", value) == "" {
+			return fmt.Errorf("action %d (generate_image): %s is required", index, field)
+		}
+	}
+	return nil
+}
+
+// validateBasicGitHubFields validates basic GitHub action fields (token, repository, owner)
+func validateBasicGitHubFields(config map[string]interface{}, index int, actionType string) error {
+	requiredFields := []string{"token", "repository", "owner"}
+	for _, field := range requiredFields {
+		if value, ok := config[field]; !ok || fmt.Sprintf("%v", value) == "" {
+			return fmt.Errorf("action %d (%s): %s is required", index, actionType, field)
+		}
+	}
+	return nil
+}
+
+// validateGitHubReadmeFields validates GitHub README action fields
+func validateGitHubReadmeFields(config map[string]interface{}, index int) error {
+	if token, ok := config["token"]; !ok || fmt.Sprintf("%v", token) == "" {
+		return fmt.Errorf("action %d (github-readme): token is required", index)
+	}
+	return nil
+}
+
+// validateGitHubPRFields validates GitHub PR action fields
+func validateGitHubPRFields(config map[string]interface{}, index int, actionType string) error {
+	if token, ok := config["token"]; !ok || fmt.Sprintf("%v", token) == "" {
+		return fmt.Errorf("action %d (%s): token is required", index, actionType)
+	}
+	// repository and owner are not required for some PR actions
+	return nil
+}
+
+// validateTwitterActionFields validates Twitter action fields
+func validateTwitterActionFields(config map[string]interface{}, index int) error {
+	if token, ok := config["token"]; !ok || fmt.Sprintf("%v", token) == "" {
+		return fmt.Errorf("action %d (twitter-post): token is required", index)
+	}
+	return nil
+}
+
+// validateSendMailFields validates send mail action fields
+func validateSendMailFields(config map[string]interface{}, index int) error {
+	requiredFields := []string{"smtpHost", "smtpPort", "username", "password", "email"}
+	for _, field := range requiredFields {
+		if value, ok := config[field]; !ok || fmt.Sprintf("%v", value) == "" {
+			return fmt.Errorf("action %d (send-mail): %s is required", index, field)
+		}
+	}
+	return nil
+}
+
+// validateShellCommandFields validates shell command action fields
+func validateShellCommandFields(config map[string]interface{}, index int) error {
+	if privateKey, ok := config["privateKey"]; !ok || fmt.Sprintf("%v", privateKey) == "" {
+		return fmt.Errorf("action %d (shell-command): privateKey is required", index)
+	}
+	return nil
+}
+
+// validateCustomActionFields validates custom action fields
+func validateCustomActionFields(config map[string]interface{}, index int) error {
+	requiredFields := []string{"name", "code"}
+	for _, field := range requiredFields {
+		if value, ok := config[field]; !ok || fmt.Sprintf("%v", value) == "" {
+			return fmt.Errorf("action %d (custom): %s is required", index, field)
+		}
+	}
+	return nil
 }
 
 // Proxy OpenRouter chat/completion endpoint

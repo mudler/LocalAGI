@@ -58,6 +58,11 @@ export function useAgent(agentId) {
         await fetchAgent();
         return true;
       } catch (err) {
+        if(err?.message){
+          showToast && showToast(err.message.charAt(0).toUpperCase() + err.message.slice(1), "error");
+        } else {
+          showToast && showToast("Failed to create agent", "error");
+        }
         setError(err.message || "Failed to update agent configuration");
         console.error("Error updating agent:", err);
         return false;

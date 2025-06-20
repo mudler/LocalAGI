@@ -222,8 +222,12 @@ function GroupCreate() {
       showToast(`Agent group "${formData.group_name}" created successfully`, 'success');
       navigate('/agents');
     } catch (err) {
+      if(error?.message){
+        showToast && showToast(error.message.charAt(0).toUpperCase() + error.message.slice(1), "error");
+      } else {
+        showToast && showToast("Failed to create agent", "error");
+      }
       console.error('Error creating group:', err);
-      showToast(`Failed to create group: ${err.message}`, 'error');
     } finally {
       setLoading(false);
     }

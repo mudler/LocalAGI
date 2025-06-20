@@ -14,19 +14,32 @@ function App() {
   const location = useLocation();
 
   // Show toast notification (queue support, can show same toast multiple times)
-  const showToast = (message, type = "success", duration = 10_000) => {
-    setToastQueue((prevQueue) => [...prevQueue, { message, type, duration }]);
+  const showToast = (message, type = "success", duration = 3_000) => {
+    // If no toast is currently visible, show immediately
+    if (!toast.visible) {
+      setToast({ visible: true, message, type });
+      // Auto-hide after duration
+      setTimeout(() => {
+        setToast({ visible: false, message: "", type: "success" });
+      }, duration);
+    } else {
+      // Add to queue if a toast is already showing
+      setToastQueue((prevQueue) => [...prevQueue, { message, type, duration }]);
+    }
   };
 
-  // Toast display logic: show next toast in queue
+  // Toast display logic: show next toast in queue when current one is hidden
   useEffect(() => {
     if (!toast.visible && toastQueue.length > 0) {
       const { message, type, duration } = toastQueue[0];
       setToast({ visible: true, message, type });
+      
+      // Auto-hide after duration and remove from queue
       const timer = setTimeout(() => {
         setToast({ visible: false, message: "", type: "success" });
         setToastQueue((prevQueue) => prevQueue.slice(1));
       }, duration);
+      
       return () => clearTimeout(timer);
     }
   }, [toast.visible, toastQueue]);

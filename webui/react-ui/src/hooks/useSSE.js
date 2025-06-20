@@ -13,8 +13,6 @@ export function useSSE(agentId) {
   const [isConnected, setIsConnected] = useState(false);
   const eventSourceRef = useRef(null);
 
-  console.log("ag id", agentId);
-
   // Connect to SSE endpoint
   const connect = useCallback(() => {
     console.log("AGENT ID", agentId);
