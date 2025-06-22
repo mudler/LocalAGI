@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
 
-const ExportSection = ({ agentName }) => {
+const ExportSection = ({ id }) => {
   useEffect(() => {
-    console.log("ExportSection rendered with agentName:", agentName);
-  }, [agentName]);
+    console.log("ExportSection rendered with id:", id);
+  }, [id]);
 
   return (
     <div className="">
@@ -16,7 +16,7 @@ const ExportSection = ({ agentName }) => {
           Export your agent configuration for backup or transfer.
         </p>
         <a
-          href={`/settings/export/${agentName}`}
+          href={`/settings/export/${id}`}
           className="action-btn"
           style={{
             display: "inline-flex",

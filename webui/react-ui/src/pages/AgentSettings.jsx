@@ -144,6 +144,7 @@ function AgentSettings() {
               loading={loading}
               submitButtonText="Save Changes"
               metadata={metadata}
+              id={id}
             />
           ) : (
             <div style={{ color: "var(--text-light)", padding: 24 }}>

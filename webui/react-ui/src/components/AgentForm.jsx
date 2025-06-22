@@ -22,6 +22,7 @@ const AgentForm = ({
   isGroupForm = false,
   noFormWrapper = false,
   metadata = null,
+  id,
 }) => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(
@@ -372,7 +373,7 @@ const AgentForm = ({
                       activeSection === "export-section" ? "block" : "none",
                   }}
                 >
-                  <ExportSection agentName={formData.name} />
+                  <ExportSection id={id} />
                 </div>
               </>
             )}
@@ -495,7 +496,7 @@ const AgentForm = ({
                       activeSection === "export-section" ? "block" : "none",
                   }}
                 >
-                  <ExportSection agentName={formData.name} />
+                  <ExportSection id={id} />
                 </div>
               </>
             )}

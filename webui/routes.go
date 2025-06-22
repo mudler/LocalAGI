@@ -361,8 +361,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
-	webapp.Post("/settings/import", app.RequireUser(), app.ImportAgent(pool))
-	webapp.Get("/settings/export/:name", app.RequireUser(), app.ExportAgent(pool))
+	webapp.Post("/settings/import", app.RequireUser(), app.ImportAgent())
+	webapp.Get("/settings/export/:id", app.RequireUser(), app.RequireActiveAgent(), app.ExportAgent())
 
 	// webapp.Post("/api/openrouter/:id/chat", app.RequireUser(), app.ProxyOpenRouterChat())
 	webapp.Get("/api/agent/:id/chat", app.RequireUser(), app.RequireActiveAgent(), app.GetChatHistory())

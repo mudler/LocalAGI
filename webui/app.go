@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -486,61 +485,141 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) ExportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) ExportAgent() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		agent := pool.GetConfig(c.Params("name"))
-		if agent == nil {
-			return errorJSONMessage(c, "Agent not found")
+		// 1. Get agent from context (set by RequireActiveAgent middleware)
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.json", agent.Name))
-		return c.JSON(agent)
+		// 2. Parse the agent config from database
+		var config state.AgentConfig
+		if err := json.Unmarshal(agent.Config, &config); err != nil {
+			return errorJSONMessage(c, "Failed to parse agent config: "+err.Error())
+		}
+
+		// 3. Set the filename for download
+		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.json", config.Name))
+
+		// 4. Return the config as JSON
+		return c.JSON(config)
 	}
 }
 
-func (a *App) ImportAgent(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		// 1. Get user ID
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		userID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
+		}
+
+		// 2. Get uploaded file
 		file, err := c.FormFile("file")
 		if err != nil {
-			// Handle error
-			return err
+			return errorJSONMessage(c, "Failed to get uploaded file: "+err.Error())
 		}
 
-		os.MkdirAll("./uploads", os.ModePerm)
-
-		// Safely save the file to prevent path traversal
-		destination := filepath.Join("./uploads", file.Filename)
-		if err := c.SaveFile(file, destination); err != nil {
-			// Handle error
-			return err
-		}
-
-		// Safely read the file
-		data, err := os.ReadFile(destination)
+		// 3. Read file content directly from memory (no filesystem needed)
+		src, err := file.Open()
 		if err != nil {
-			return err
+			return errorJSONMessage(c, "Failed to open uploaded file: "+err.Error())
+		}
+		defer src.Close()
+
+		data, err := io.ReadAll(src)
+		if err != nil {
+			return errorJSONMessage(c, "Failed to read file content: "+err.Error())
 		}
 
-		config := state.AgentConfig{}
+		// 4. Parse JSON config
+		var config state.AgentConfig
 		if err := json.Unmarshal(data, &config); err != nil {
-			return err
+			return errorJSONMessage(c, "Invalid JSON format: "+err.Error())
 		}
 
-		xlog.Info("Importing agent", config.Name)
+		xlog.Info("Importing agent", "name", config.Name)
 
-		// Validate config fields
+		// 5. Validate config fields
 		if err := validateAgentConfig(&config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		// Validate model
+		// 6. Validate and set model
 		if err := validateModel(config.Model); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		if err := pool.CreateAgent(config.Name, &config, false); err != nil {
-			return errorJSONMessage(c, err.Error())
+		// 7. Apply fallback values from env if fields are empty
+		if config.MultimodalModel == "" {
+			config.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
 		}
+		if config.LocalRAGURL == "" {
+			config.LocalRAGURL = os.Getenv("LOCALAGI_LOCALRAG_URL")
+		}
+		if config.LocalRAGAPIKey == "" {
+			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
+		}
+
+		// Always use environment variables for API key and URL
+		config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
+		config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
+
+		// 8. Serialize the enriched config to JSON
+		configJSON, err := json.Marshal(config)
+		if err != nil {
+			return errorJSONMessage(c, "Failed to serialize config")
+		}
+
+		// 9. Store config in DB
+		id := uuid.New()
+		agent := models.Agent{
+			ID:     id,
+			UserID: userID,
+			Name:   config.Name,
+			Config: configJSON,
+		}
+
+		if err := db.DB.Create(&agent).Error; err != nil {
+			return errorJSONMessage(c, "Failed to store agent: "+err.Error())
+		}
+
+		// 10. Ensure agent pool is initialized
+		var pool *state.AgentPool
+		if p, ok := a.UserPools[userIDStr]; ok {
+			pool = p
+		} else {
+			pool, err = state.NewAgentPool(
+				userIDStr,
+				"", // Always use model from agent config
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LLM_API_URL"),
+				os.Getenv("LOCALAGI_LLM_API_KEY"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
+			}
+			a.UserPools[userIDStr] = pool
+		}
+
+		// 11. Register agent in the in-memory pool
+		if err := pool.CreateAgent(id.String(), &config, false); err != nil {
+			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
+		}
+
 		return statusJSONMessage(c, "ok")
 	}
 }
