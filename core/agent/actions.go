@@ -236,7 +236,9 @@ func (m Messages) IsLastMessageFromRole(role string) bool {
 }
 
 func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act types.Action, c []openai.ChatCompletionMessage, reasoning string, maxAttempts int) (*decisionResult, error) {
-
+	if act == nil {
+		return nil, fmt.Errorf("action is nil")
+	}
 	if len(act.Definition().Properties) > 0 {
 		xlog.Debug("Action has properties", "action", act.Definition().Name, "properties", act.Definition().Properties)
 	} else {
@@ -363,6 +365,11 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		)
 
 		subTaskAction := a.availableActions().Find(subtask.Action)
+		if subTaskAction == nil {
+			xlog.Error("Action not found: %s", subtask.Action)
+			return conv, fmt.Errorf("action %s not found", subtask.Action)
+		}
+
 		subTaskReasoning := fmt.Sprintf("%s Overall goal is: %s", subtask.Reasoning, planResult.Goal)
 
 		params, err := a.generateParameters(job, pickTemplate, subTaskAction, conv, subTaskReasoning, maxRetries)
