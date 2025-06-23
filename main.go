@@ -31,7 +31,7 @@ func init() {
 		panic("LOCALAGI_MODEL not set")
 	}
 	if apiURL == "" {
-		panic("LOCALAGI_API_URL not set")
+		panic("LOCALAGI_LLM_API_URL not set")
 	}
 	if timeout == "" {
 		timeout = "5m"
