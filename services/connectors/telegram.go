@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -52,6 +53,68 @@ type Telegram struct {
 // isBotMentioned checks if the bot is mentioned in the message
 func (t *Telegram) isBotMentioned(message string, botUsername string) bool {
 	return strings.Contains(message, "@"+botUsername)
+}
+
+func (t *Telegram) chatFromMessage(update *models.Update) (openai.ChatCompletionMessage, error) {
+
+	if len(update.Message.Photo) == 0 {
+		return openai.ChatCompletionMessage{
+			Content: update.Message.Text,
+			Role:    "user",
+		}, nil
+	}
+
+	xlog.Debug("Image", "found image")
+	// Get the largest photo
+	photo := update.Message.Photo[len(update.Message.Photo)-1]
+
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	// Download the photo
+	file, err := t.bot.GetFile(ctx, &bot.GetFileParams{
+		FileID: photo.FileID,
+	})
+	if err != nil {
+		xlog.Error("Error getting file", "error", err)
+	} else {
+		// Construct the full URL for downloading the file
+		fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", t.Token, file.FilePath)
+
+		// Download the file content
+		resp, err := http.Get(fileURL)
+		if err != nil {
+			xlog.Error("Error downloading file", "error", err)
+		} else {
+			defer resp.Body.Close()
+			imageBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				xlog.Error("Error reading image", "error", err)
+			} else {
+				// Encode to base64
+				imgBase64 := base64.StdEncoding.EncodeToString(imageBytes)
+				xlog.Debug("Image", "sending encoded image")
+				// Add to conversation as multi-content message
+				return openai.ChatCompletionMessage{
+					Role: "user",
+					MultiContent: []openai.ChatMessagePart{
+						{
+							Text: update.Message.Caption,
+							Type: openai.ChatMessagePartTypeText,
+						},
+						{
+							Type: openai.ChatMessagePartTypeImageURL,
+							ImageURL: &openai.ChatMessageImageURL{
+								URL: fmt.Sprintf("data:image/jpeg;base64,%s", imgBase64),
+							},
+						},
+					},
+				}, nil
+			}
+		}
+	}
+
+	return openai.ChatCompletionMessage{}, errors.New("no image found")
 }
 
 // handleGroupMessage handles messages in group chats
@@ -115,60 +178,14 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 		"chatID": update.Message.Chat.ID,
 	}
 
-	// Handle images if present
-	if len(update.Message.Photo) > 0 {
-		// Get the largest photo
-		photo := update.Message.Photo[len(update.Message.Photo)-1]
-
-		// Download the photo
-		file, err := b.GetFile(ctx, &bot.GetFileParams{
-			FileID: photo.FileID,
-		})
-		if err != nil {
-			xlog.Error("Error getting file", "error", err)
-		} else {
-			// Download the file content
-			resp, err := http.Get(file.FilePath)
-			if err != nil {
-				xlog.Error("Error downloading file", "error", err)
-			} else {
-				defer resp.Body.Close()
-				imageBytes, err := io.ReadAll(resp.Body)
-				if err != nil {
-					xlog.Error("Error reading image", "error", err)
-				} else {
-					// Encode to base64
-					imgBase64 := base64.StdEncoding.EncodeToString(imageBytes)
-
-					// Add to conversation as multi-content message
-					currentConv = append(currentConv, openai.ChatCompletionMessage{
-						Role: "user",
-						MultiContent: []openai.ChatMessagePart{
-							{
-								Text: message,
-								Type: openai.ChatMessagePartTypeText,
-							},
-							{
-								Type: openai.ChatMessagePartTypeImageURL,
-								ImageURL: &openai.ChatMessageImageURL{
-									URL: fmt.Sprintf("data:image/jpeg;base64,%s", imgBase64),
-								},
-							},
-						},
-					})
-				}
-			}
-		}
-	} else {
-		currentConv = append(currentConv, openai.ChatCompletionMessage{
-			Content: message,
-			Role:    "user",
-		})
+	chatMessage, err := t.chatFromMessage(update)
+	if err != nil {
+		xlog.Error("Error extracting chat message", "error", err)
 	}
 
 	a.SharedState().ConversationTracker.AddMessage(
 		fmt.Sprintf("telegram:%d", update.Message.Chat.ID),
-		currentConv[len(currentConv)-1],
+		chatMessage,
 	)
 
 	// Create a new job with the conversation history and metadata
@@ -486,17 +503,18 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 	t.cancelActiveJobForChat(update.Message.Chat.ID)
 
 	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("telegram:%d", update.Message.From.ID))
-	currentConv = append(currentConv, openai.ChatCompletionMessage{
-		Content: update.Message.Text,
-		Role:    "user",
-	})
+
+	message, err := t.chatFromMessage(update)
+	if err != nil {
+		xlog.Error("Error extracting chat message", "error", err)
+		return
+	}
+
+	currentConv = append(currentConv, message)
 
 	a.SharedState().ConversationTracker.AddMessage(
 		fmt.Sprintf("telegram:%d", update.Message.From.ID),
-		openai.ChatCompletionMessage{
-			Content: update.Message.Text,
-			Role:    "user",
-		},
+		message,
 	)
 
 	// Send initial placeholder message

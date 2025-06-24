@@ -221,10 +221,13 @@ func scanImagesInMessages(api *slack.Client, ev *slackevents.MessageEvent) (*byt
 	if err != nil {
 		xlog.Error(fmt.Sprintf("Error fetching messages: %v", err))
 	} else {
+		xlog.Debug("Scanning images in messages", "messages", messages)
 		for _, msg := range messages {
 			if len(msg.Files) == 0 {
+				xlog.Debug("No files in message", "message", msg.Text)
 				continue
 			}
+			xlog.Debug("Files in message", "files", msg.Files)
 			for _, attachment := range msg.Files {
 				if attachment.URLPrivate != "" {
 					xlog.Debug(fmt.Sprintf("Getting Attachment: %+v", attachment))
@@ -528,7 +531,7 @@ func (t *Slack) handleMention(
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error fetching thread messages: %v", err))
 			} else {
-				for i, msg := range messages {
+				for _, msg := range messages {
 					// Skip our placeholder message
 					if msg.Timestamp == msgTs {
 						continue
@@ -544,6 +547,7 @@ func (t *Slack) handleMention(
 
 					xlog.Debug(fmt.Sprintf("Message: %+v", msg))
 					if len(msg.Files) > 0 {
+						xlog.Debug("found files in the message", "files", len(msg.Files))
 						for _, attachment := range msg.Files {
 
 							if attachment.URLPrivate != "" {
@@ -557,13 +561,17 @@ func (t *Slack) handleMention(
 						}
 					}
 					// If the last message has an image, we send it as a multi content message
-					if len(imageBytes.Bytes()) > 0 && i == len(messages)-1 {
+					if len(imageBytes.Bytes()) > 0 {
+
+						xlog.Debug("found image in an existing thread", "image", len(imageBytes.Bytes()))
 
 						// // Encode the image to base64
 						imgBase64, err := encodeImageFromURL(*imageBytes)
 						if err != nil {
 							xlog.Error(fmt.Sprintf("Error encoding image to base64: %v", err))
 						}
+
+						xlog.Debug("Image", "sending encoded image")
 
 						threadMessages = append(
 							threadMessages,
@@ -585,6 +593,7 @@ func (t *Slack) handleMention(
 							},
 						)
 					} else {
+						xlog.Debug("no image in the last message of the thread", "message", msg.Text)
 						threadMessages = append(
 							threadMessages,
 							openai.ChatCompletionMessage{
@@ -611,10 +620,12 @@ func (t *Slack) handleMention(
 			} else {
 				for _, msg := range messages {
 					if len(msg.Files) == 0 {
+						xlog.Debug("no files in the message", "message", msg.Text)
 						continue
 					}
 					for _, attachment := range msg.Files {
 						if attachment.URLPrivate != "" {
+							xlog.Debug("found image in the  message of the thread", "image", attachment.URLPrivate)
 							xlog.Debug(fmt.Sprintf("Getting Attachment: %+v", attachment))
 							// download image with slack api
 							mimeType = attachment.Mimetype
@@ -629,6 +640,7 @@ func (t *Slack) handleMention(
 			// If the last message has an image, we send it as a multi content message
 			if len(imageBytes.Bytes()) > 0 {
 
+				xlog.Debug("found image in the last message of the thread", "image", len(imageBytes.Bytes()))
 				// // Encode the image to base64
 				imgBase64, err := encodeImageFromURL(*imageBytes)
 				if err != nil {

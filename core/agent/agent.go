@@ -410,7 +410,7 @@ func (a *Agent) processPrompts(conversation Messages) Messages {
 }
 
 func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (string, error) {
-	xlog.Debug("Describing image", "model", model, "image", imageURL)
+	xlog.Debug("Describing image", "model", model)
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
 			Model: model,
@@ -469,10 +469,15 @@ func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Me
 	if !a.options.SeparatedMultimodalModel() {
 		return conv
 	}
+
+	xlog.Debug("Processing user inputs", "agent", a.Character.Name, "conversation", conv)
+
 	lastUserMessage := conv.GetLatestUserMessage()
+	xlog.Debug("Last user message", "lastUserMessage", lastUserMessage)
 	if lastUserMessage != nil && conv.IsLastMessageFromRole(UserRole) {
 		imageURL, text, err := extractImageContent(*lastUserMessage)
 		if err == nil {
+			xlog.Debug("Found image in user input", "image", imageURL)
 			// We have an image, we need to describe it first
 			// and add it to the conversation context
 			imageDescription, err := a.describeImage(a.context.Context, a.options.LLMAPI.MultimodalModel, imageURL)
