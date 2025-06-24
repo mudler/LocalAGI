@@ -39,8 +39,6 @@ type AgentConfig struct {
 
 	Model           string `json:"model" form:"model"`
 	MultimodalModel string `json:"multimodal_model" form:"multimodal_model"`
-	APIURL          string `json:"api_url" form:"api_url"`
-	APIKey          string `json:"api_key" form:"api_key"`
 	LocalRAGURL     string `json:"local_rag_url" form:"local_rag_url"`
 	LocalRAGAPIKey  string `json:"local_rag_api_key" form:"local_rag_api_key"`
 

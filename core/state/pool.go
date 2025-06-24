@@ -25,20 +25,20 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	userId                                       string
-	file                                         string
-	pooldir                                      string
-	pool                                         AgentPoolData
-	agents                                       map[string]*Agent
-	managers                                     map[string]sse.Manager
-	agentStatus                                  map[string]*Status
-	apiURL, defaultModel, defaultMultimodalModel string
-	imageModel, localRAGAPI, localRAGKey, apiKey string
-	availableActions                             func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
-	connectors                                   func(*AgentConfig) []Connector
-	dynamicPrompt                                func(*AgentConfig) []DynamicPrompt
-	timeout                                      string
-	conversationLogs                             string
+	userId                               string
+	file                                 string
+	pooldir                              string
+	pool                                 AgentPoolData
+	agents                               map[string]*Agent
+	managers                             map[string]sse.Manager
+	agentStatus                          map[string]*Status
+	defaultModel, defaultMultimodalModel string
+	imageModel, localRAGAPI, localRAGKey string
+	availableActions                     func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
+	connectors                           func(*AgentConfig) []Connector
+	dynamicPrompt                        func(*AgentConfig) []DynamicPrompt
+	timeout                              string
+	conversationLogs                     string
 }
 
 type Status struct {
@@ -72,7 +72,7 @@ type AgentPoolData map[string]AgentConfig
 // }
 
 func NewAgentPool(
-	userId, defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey string,
+	userId, defaultModel, defaultMultimodalModel, imageModel,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -108,12 +108,10 @@ func NewAgentPool(
 	// 4. Return fully initialized pool
 	return &AgentPool{
 		userId:                 userId,
-		apiURL:                 apiURL,
 		defaultModel:           defaultModel,
 		defaultMultimodalModel: defaultMultimodalModel,
 		imageModel:             imageModel,
 		localRAGAPI:            LocalRAGAPI,
-		apiKey:                 apiKey,
 		agents:                 make(map[string]*Agent),
 		pool:                   poolMap,
 		agentStatus:            make(map[string]*Status),
@@ -127,7 +125,7 @@ func NewAgentPool(
 }
 
 func NewEmptyAgentPool(
-	userId, defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey string,
+	userId, defaultModel, defaultMultimodalModel, imageModel,
 	localRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -143,12 +141,10 @@ func NewEmptyAgentPool(
 
 	return &AgentPool{
 		userId:                 userId,
-		apiURL:                 apiURL,
 		defaultModel:           defaultModel,
 		defaultMultimodalModel: defaultMultimodalModel,
 		imageModel:             imageModel,
 		localRAGAPI:            localRAGAPI,
-		apiKey:                 apiKey,
 		agents:                 make(map[string]*Agent),
 		pool:                   make(map[string]AgentConfig),
 		agentStatus:            make(map[string]*Status),
@@ -230,14 +226,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 		config.PeriodicRuns = "10m"
 	}
 
-	if config.APIURL != "" {
-		a.apiURL = config.APIURL
-	}
-
-	if config.APIKey != "" {
-		a.apiKey = config.APIKey
-	}
-
 	if config.LocalRAGURL != "" {
 		a.localRAGAPI = config.LocalRAGURL
 	}
@@ -264,7 +252,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 		"Creating agent",
 		"id", id,
 		"model", model,
-		"api_url", a.apiURL,
 		"actions", actionsLog,
 		"connectors", connectorLog,
 	)
@@ -278,7 +265,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 
 	opts := []Option{
 		WithModel(model),
-		WithLLMAPIURL(a.apiURL),
 		WithContext(ctx),
 		WithMCPServers(config.MCPServers...),
 		WithPeriodicRuns(config.PeriodicRuns),
@@ -291,7 +277,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 		WithActions(
 			actions...,
 		),
-		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
 		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, id)),
 		WithUserID(uuid.MustParse(a.userId)),
@@ -352,6 +337,8 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, notStar
 				c.AgentResultCallback()(state)
 			}
 		}),
+		WithLLMAPIURL(os.Getenv("LOCALAGI_LLM_API_URL")),
+		WithLLMAPIKey(os.Getenv("LOCALAGI_LLM_API_KEY")),
 	}
 
 	if config.HUD {

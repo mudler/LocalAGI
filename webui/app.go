@@ -181,8 +181,6 @@ func (a *App) Pause() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -232,8 +230,6 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -258,10 +254,6 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 			if err := json.Unmarshal(agent.Config, &config); err != nil {
 				return errorJSONMessage(c, "Failed to parse agent config: "+err.Error())
 			}
-
-			// Always use environment variables for API key and URL
-			config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
-			config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
 
 			// Create agent in memory
 			if err := pool.CreateAgent(agentId, &config, false); err != nil {
@@ -323,10 +315,6 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
 		}
 
-		// Always use environment variables for API key and URL
-		config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
-		config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
-
 		// 5. Serialize the enriched config to JSON
 		configJSON, err := json.Marshal(config)
 		if err != nil {
@@ -363,8 +351,6 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -441,10 +427,6 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 		if err := validateModel(newConfig.Model); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
-
-		// Always use environment variables for API key and URL
-		newConfig.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
-		newConfig.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
 
 		// 3. Update DB
 		newConfigJSON, err := json.Marshal(newConfig)
@@ -567,10 +549,6 @@ func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
 		}
 
-		// Always use environment variables for API key and URL
-		config.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
-		config.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
-
 		// 8. Serialize the enriched config to JSON
 		configJSON, err := json.Marshal(config)
 		if err != nil {
@@ -600,8 +578,6 @@ func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -728,8 +704,6 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -947,7 +921,7 @@ func (a *App) GenerateGroupProfiles() func(c *fiber.Ctx) error {
 		}
 
 		xlog.Debug("Generating group", "description", request.Descript)
-		client := llm.NewClient(a.config.LLMAPIKey, a.config.LLMAPIURL, "10m")
+		client := llm.NewClient(os.Getenv("LOCALAGI_LLM_API_KEY"), os.Getenv("LOCALAGI_LLM_API_URL"), "10m")
 		err := llm.GenerateTypedJSON(c.Context(), client, request.Descript, a.config.LLMModel, userID, uuid.Nil, jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
@@ -1012,8 +986,6 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
@@ -1054,10 +1026,6 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			if agentConfig.LocalRAGAPIKey == "" {
 				agentConfig.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
 			}
-
-			// Always use environment variables for API key and URL
-			agentConfig.APIKey = os.Getenv("LOCALAGI_LLM_API_KEY")
-			agentConfig.APIURL = os.Getenv("LOCALAGI_LLM_API_URL")
 
 			// 5. Serialize the enriched config to JSON
 			configJSON, err := json.Marshal(agentConfig)
@@ -1294,10 +1262,6 @@ func validateAgentConfig(config *state.AgentConfig) error {
 		return fmt.Errorf("loop detection steps must be 10 or less")
 	}
 
-	// URL validations (basic format check)
-	if config.APIURL != "" && !isValidURL(config.APIURL) {
-		return fmt.Errorf("api URL is not a valid URL format")
-	}
 	if config.LocalRAGURL != "" && !isValidURL(config.LocalRAGURL) {
 		return fmt.Errorf("local RAG URL is not a valid URL format")
 	}
@@ -2042,8 +2006,6 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_LLM_API_URL"),
-				os.Getenv("LOCALAGI_LLM_API_KEY"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions,
 				services.Connectors,
