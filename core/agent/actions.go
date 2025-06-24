@@ -217,6 +217,7 @@ func (m Messages) Save(path string) error {
 }
 
 func (m Messages) GetLatestUserMessage() *openai.ChatCompletionMessage {
+	xlog.Debug("Getting latest user message", "messages", m)
 	for i := len(m) - 1; i >= 0; i-- {
 		msg := m[i]
 		if msg.Role == UserRole {
