@@ -246,6 +246,60 @@ a:hover {
   color: var(--warning);
 }
 
+/* User actions container */
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Logout button */
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.logout-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Mobile logout button */
+.logout-mobile {
+  background: none !important;
+  border: none !important;
+  width: 100% !important;
+  text-align: left !important;
+  border-radius: 0 !important;
+  display: flex!important;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.logout-mobile:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-left-color: white !important;
+}
+
 /* Mobile menu toggle */
 .mobile-menu-toggle {
   display: none;
@@ -761,6 +815,10 @@ a:hover {
   }
 
   .status-text {
+    display: none;
+  }
+
+  .user-actions {
     display: none;
   }
 }

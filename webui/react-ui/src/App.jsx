@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 import { usePrivy } from "@privy-io/react-auth";
 
@@ -12,6 +12,7 @@ function App() {
   const [toastQueue, setToastQueue] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Show toast notification (queue support, can show same toast multiple times)
   const showToast = (message, type = "success", duration = 3_000) => {
@@ -54,15 +55,24 @@ function App() {
     return location.pathname === path;
   };
 
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, logout } = usePrivy();
 
   const isAuthLoading = !ready;
 
   const isAuthenticated = ready && authenticated;
 
+  // Redirect to /app if authenticated and not already on /app
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated && location.pathname !== '/app') {
+      navigate('/');
+    }
+  }, [isAuthenticated, location.pathname, navigate, isAuthLoading]);
+
   if (isAuthLoading) {
     return <div></div>;
   }
+
+  
 
   if (!isAuthenticated) {
     return (
@@ -71,6 +81,7 @@ function App() {
       </main>
     );
   }
+
 
   return (
     <div className="app-container">
@@ -142,9 +153,19 @@ function App() {
             </>
           </div>
 
-          <div className="status-text">
-            <span className="status-indicator"></span>
-            Active
+          <div className="user-actions">
+            <button 
+              onClick={logout}
+              className="logout-btn"
+              title="Logout"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16,17 21,12 16,7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
+            </button>
           </div>
 
           <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
@@ -227,6 +248,22 @@ function App() {
                   />{" "}
                   Usage
                 </Link>
+              </li>
+              <li>
+                <button 
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    logout();
+                  }}
+                  className="mobile-nav-link logout-mobile"
+                >
+                  <svg className="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16,17 21,12 16,7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                  Logout
+                </button>
               </li>
             </>
           </ul>
