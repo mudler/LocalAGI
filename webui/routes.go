@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/dave-gray101/v2keyauth"
 	fiber "github.com/gofiber/fiber/v2"
@@ -19,11 +18,9 @@ import (
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/db"
 	models "github.com/mudler/LocalAGI/dbmodels"
-	"github.com/mudler/LocalAGI/services/connectors"
 
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services"
 )
 
@@ -31,18 +28,18 @@ import (
 var viewsfs embed.FS
 
 //go:embed old/public/*
-var embeddedFiles embed.FS
+// var embeddedFiles embed.FS
 
 //go:embed react-ui/dist/*
 var reactUI embed.FS
 
-func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
+func (app *App) registerRoutes(webapp *fiber.App) {
 
-	webapp.Use("/old/public", filesystem.New(filesystem.Config{
-		Root:       http.FS(embeddedFiles),
-		PathPrefix: "/old/public",
-		Browse:     true,
-	}))
+	// webapp.Use("/old/public", filesystem.New(filesystem.Config{
+	// 	Root:       http.FS(embeddedFiles),
+	// 	PathPrefix: "/old/public",
+	// 	Browse:     true,
+	// }))
 
 	if len(app.config.ApiKeys) > 0 {
 		kaConfig, err := GetKeyAuthConfig(app.config.ApiKeys)
@@ -52,14 +49,14 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		webapp.Use(v2keyauth.New(*kaConfig))
 	}
 
-	webapp.Get("/old", func(c *fiber.Ctx) error {
-		return c.Render("old/views/index", fiber.Map{
-			"Agents":     pool.List(),
-			"AgentCount": len(pool.List()),
-			"Actions":    len(services.AvailableActions),
-			"Connectors": len(services.AvailableConnectors),
-		})
-	})
+	// webapp.Get("/old", func(c *fiber.Ctx) error {
+	// 	return c.Render("old/views/index", fiber.Map{
+	// 		"Agents":     pool.List(),
+	// 		"AgentCount": len(pool.List()),
+	// 		"Actions":    len(services.AvailableActions),
+	// 		"Connectors": len(services.AvailableConnectors),
+	// 	})
+	// })
 
 	webapp.Get("/", func(c *fiber.Ctx) error {
 		return c.Redirect("/app")
@@ -80,29 +77,29 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		return c.Send(indexHTML)
 	})
 
-	webapp.Get("/old/agents", func(c *fiber.Ctx) error {
-		statuses := map[string]bool{}
-		for _, a := range pool.List() {
-			agent := pool.GetAgent(a)
-			if agent == nil {
-				xlog.Error("Agent not found", "name", a)
-				continue
-			}
-			statuses[a] = !agent.Paused()
-		}
-		return c.Render("old/views/agents", fiber.Map{
-			"Agents": pool.List(),
-			"Status": statuses,
-		})
-	})
+	// webapp.Get("/old/agents", func(c *fiber.Ctx) error {
+	// 	statuses := map[string]bool{}
+	// 	for _, a := range pool.List() {
+	// 		agent := pool.GetAgent(a)
+	// 		if agent == nil {
+	// 			xlog.Error("Agent not found", "name", a)
+	// 			continue
+	// 		}
+	// 		statuses[a] = !agent.Paused()
+	// 	}
+	// 	return c.Render("old/views/agents", fiber.Map{
+	// 		"Agents": pool.List(),
+	// 		"Status": statuses,
+	// 	})
+	// })
 
-	webapp.Get("/old/create", func(c *fiber.Ctx) error {
-		return c.Render("old/views/create", fiber.Map{
-			"Actions":      services.AvailableActions,
-			"Connectors":   services.AvailableConnectors,
-			"PromptBlocks": services.AvailableBlockPrompts,
-		})
-	})
+	// webapp.Get("/old/create", func(c *fiber.Ctx) error {
+	// 	return c.Render("old/views/create", fiber.Map{
+	// 		"Actions":      services.AvailableActions,
+	// 		"Connectors":   services.AvailableConnectors,
+	// 		"PromptBlocks": services.AvailableBlockPrompts,
+	// 	})
+	// })
 
 	// Define a route for the GET method on the root path '/'
 	webapp.Get("/sse/:id", app.RequireUser(), app.RequireActiveAgent(), func(c *fiber.Ctx) error {
@@ -138,21 +135,21 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		return nil
 	})
 
-	webapp.Get("/old/status/:name", func(c *fiber.Ctx) error {
-		history := pool.GetStatusHistory(c.Params("name"))
-		if history == nil {
-			history = &state.Status{ActionResults: []types.ActionState{}}
-		}
-		// reverse history
+	// webapp.Get("/old/status/:name", func(c *fiber.Ctx) error {
+	// 	history := pool.GetStatusHistory(c.Params("name"))
+	// 	if history == nil {
+	// 		history = &state.Status{ActionResults: []types.ActionState{}}
+	// 	}
+	// 	// reverse history
 
-		return c.Render("old/views/status", fiber.Map{
-			"Name":    c.Params("name"),
-			"History": Reverse(history.Results()),
-		})
-	})
+	// 	return c.Render("old/views/status", fiber.Map{
+	// 		"Name":    c.Params("name"),
+	// 		"History": Reverse(history.Results()),
+	// 	})
+	// })
 
-	webapp.Get("/api/notify/:name", app.RequireUser(), app.Notify(pool))
-	webapp.Post("/old/chat/:name", app.RequireUser(), app.OldChat(pool))
+	// webapp.Get("/api/notify/:name", app.RequireUser(), app.Notify(pool))
+	// webapp.Post("/old/chat/:name", app.RequireUser(), app.OldChat(pool))
 
 	webapp.Post("/api/agent/create", app.RequireUser(), app.Create())
 	webapp.Delete("/api/agent/:id", app.RequireUser(), app.RequireActiveAgent(), app.Delete())
@@ -161,45 +158,45 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Post("/api/chat/:id", app.RequireUser(), app.RequireActiveAgent(), app.Chat())
 
-	conversationTracker := connectors.NewConversationTracker[string](time.Minute)
+	// conversationTracker := connectors.NewConversationTracker[string](time.Minute)
 
-	webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
+	// webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
 
-	webapp.Get("/old/talk/:name", func(c *fiber.Ctx) error {
-		return c.Render("old/views/chat", fiber.Map{
-			//	"Character": agent.Character,
-			"Name": c.Params("name"),
-		})
-	})
+	// webapp.Get("/old/talk/:name", func(c *fiber.Ctx) error {
+	// 	return c.Render("old/views/chat", fiber.Map{
+	// 		//	"Character": agent.Character,
+	// 		"Name": c.Params("name"),
+	// 	})
+	// })
 
-	webapp.Get("/old/settings/:name", func(c *fiber.Ctx) error {
-		status := false
-		for _, a := range pool.List() {
-			if a == c.Params("name") {
-				status = !pool.GetAgent(a).Paused()
-			}
-		}
+	// webapp.Get("/old/settings/:name", func(c *fiber.Ctx) error {
+	// 	status := false
+	// 	for _, a := range pool.List() {
+	// 		if a == c.Params("name") {
+	// 			status = !pool.GetAgent(a).Paused()
+	// 		}
+	// 	}
 
-		return c.Render("old/views/settings", fiber.Map{
-			"Name":         c.Params("name"),
-			"Status":       status,
-			"Actions":      services.AvailableActions,
-			"Connectors":   services.AvailableConnectors,
-			"PromptBlocks": services.AvailableBlockPrompts,
-		})
-	})
+	// 	return c.Render("old/views/settings", fiber.Map{
+	// 		"Name":         c.Params("name"),
+	// 		"Status":       status,
+	// 		"Actions":      services.AvailableActions,
+	// 		"Connectors":   services.AvailableConnectors,
+	// 		"PromptBlocks": services.AvailableBlockPrompts,
+	// 	})
+	// })
 
-	webapp.Get("/old/actions-playground", func(c *fiber.Ctx) error {
-		return c.Render("old/views/actions", fiber.Map{})
-	})
+	// webapp.Get("/old/actions-playground", func(c *fiber.Ctx) error {
+	// 	return c.Render("old/views/actions", fiber.Map{})
+	// })
 
-	webapp.Get("/old/group-create", func(c *fiber.Ctx) error {
-		return c.Render("old/views/group-create", fiber.Map{
-			"Actions":      services.AvailableActions,
-			"Connectors":   services.AvailableConnectors,
-			"PromptBlocks": services.AvailableBlockPrompts,
-		})
-	})
+	// webapp.Get("/old/group-create", func(c *fiber.Ctx) error {
+	// 	return c.Render("old/views/group-create", fiber.Map{
+	// 		"Actions":      services.AvailableActions,
+	// 		"Connectors":   services.AvailableConnectors,
+	// 		"PromptBlocks": services.AvailableBlockPrompts,
+	// 	})
+	// })
 
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.GetAgentConfig())
@@ -212,7 +209,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	// Add endpoint for getting agent config metadata
 	webapp.Get("/api/meta/agent/config", app.RequireUser(), app.GetAgentConfigMeta())
 
-	webapp.Post("/api/action/:name/run", app.RequireUser(), app.ExecuteAction(pool))
+	webapp.Post("/api/action/:name/run", app.RequireUser(), app.ExecuteAction())
 	webapp.Get("/api/actions", app.ListActions())
 
 	webapp.Post("/api/agent/group/generateProfiles", app.RequireUser(), app.GenerateGroupProfiles())

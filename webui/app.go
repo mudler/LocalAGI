@@ -79,7 +79,7 @@ func NewApp(opts ...Option) *App {
 		App:       webapp,
 	}
 
-	a.registerRoutes(config.Pool, webapp)
+	a.registerRoutes(webapp)
 
 	return a
 }
@@ -782,8 +782,44 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		// 1. Get user ID from context
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		// Parse user ID to UUID
+		userID, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid user ID")
+		}
+
+		// 2. Get or create user pool
+		var pool *state.AgentPool
+		if p, ok := a.UserPools[userIDStr]; ok {
+			pool = p
+		} else {
+			var err error
+			pool, err = state.NewAgentPool(
+				userIDStr,
+				"", // Always use model from agent config
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions,
+				services.Connectors,
+				services.DynamicPrompts,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
+			}
+			a.UserPools[userIDStr] = pool
+		}
+
 		payload := struct {
 			Config map[string]string      `json:"config"`
 			Params coreTypes.ActionParams `json:"params"`
@@ -796,9 +832,77 @@ func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 
 		actionName := c.Params("name")
 
-		xlog.Debug("Executing action", "action", actionName, "config", payload.Config, "params", payload.Params)
-		a, err := services.Action(actionName, "", payload.Config, pool)
+		// 3. Check if both config and params are empty
+		if len(payload.Config) == 0 && len(payload.Params) == 0 {
+			return errorJSONMessage(c, "Action execution requires both config or params to be provided")
+		}
+
+		// 4. Validate action config
+		if payload.Config != nil {
+			// Convert map[string]string to map[string]interface{} for validation
+			configForValidation := make(map[string]interface{})
+			for k, v := range payload.Config {
+				configForValidation[k] = v
+			}
+
+			if err := validateActionFields(actionName, configForValidation, 1); err != nil {
+				xlog.Error("Action config validation failed", "action", actionName, "error", err)
+				return errorJSONMessage(c, err.Error())
+			}
+		}
+
+		// 5. Validate action params against schema
+		if payload.Params != nil {
+			action, err := services.Action(actionName, "", payload.Config, pool)
+			if err != nil {
+				xlog.Error("Error creating action for validation", "error", err)
+				return errorJSONMessage(c, "Failed to create action for validation: "+err.Error())
+			}
+
+			definition := action.Definition()
+
+			// Check required fields
+			for _, required := range definition.Required {
+				if _, exists := payload.Params[required]; !exists {
+					return errorJSONMessage(c, fmt.Sprintf("Required parameter '%s' is missing", required))
+				}
+			}
+
+			// Validate parameter types and values
+			for paramName, paramValue := range payload.Params {
+				if prop, exists := definition.Properties[paramName]; exists {
+					if err := validateParamValue(paramName, paramValue, prop); err != nil {
+						return errorJSONMessage(c, err.Error())
+					}
+				}
+			}
+		}
+
+		// 6. Create action execution record
+		executionID := uuid.New()
+		actionExecution := models.ActionExecution{
+			ID:         executionID,
+			UserID:     userID,
+			ActionName: actionName,
+			Status:     "running",
+			CreatedAt:  time.Now(),
+		}
+
+		if err := db.DB.Create(&actionExecution).Error; err != nil {
+			xlog.Error("Failed to create action execution record", "error", err)
+			// Continue with execution even if DB logging fails
+		}
+
+		xlog.Debug("Executing action", "action", actionName, "executionId", executionID, "config", payload.Config, "params", payload.Params)
+
+		// 7. Execute the action
+		action, err := services.Action(actionName, "", payload.Config, pool)
 		if err != nil {
+			// Update status to error
+			_ = db.DB.Model(&actionExecution).Updates(map[string]interface{}{
+				"Status":    "error",
+				"UpdatedAt": time.Now(),
+			})
 			xlog.Error("Error creating action", "error", err)
 			return errorJSONMessage(c, err.Error())
 		}
@@ -806,13 +910,24 @@ func (a *App) ExecuteAction(pool *state.AgentPool) func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(c.Context(), 200*time.Second)
 		defer cancel()
 
-		res, err := a.Run(ctx, payload.Params)
+		res, err := action.Run(ctx, payload.Params)
 		if err != nil {
+			// Update status to error
+			_ = db.DB.Model(&actionExecution).Updates(map[string]interface{}{
+				"Status":    "error",
+				"UpdatedAt": time.Now(),
+			})
 			xlog.Error("Error running action", "error", err)
 			return errorJSONMessage(c, err.Error())
 		}
 
-		xlog.Info("Action executed", "action", actionName, "result", res)
+		// 8. Update status to success
+		_ = db.DB.Model(&actionExecution).Updates(map[string]interface{}{
+			"Status":    "success",
+			"UpdatedAt": time.Now(),
+		})
+
+		xlog.Info("Action executed successfully", "action", actionName, "executionId", executionID, "result", res)
 		return c.JSON(res)
 	}
 }
@@ -1691,6 +1806,56 @@ func validateCustomActionFields(config map[string]interface{}, index int) error 
 		if value, ok := config[field]; !ok || fmt.Sprintf("%v", value) == "" {
 			return fmt.Errorf("action %d (custom): %s is required", index, field)
 		}
+	}
+	return nil
+}
+
+// validateParamValue validates a parameter value against its schema definition
+func validateParamValue(paramName string, paramValue interface{}, schema jsonschema.Definition) error {
+	if paramValue == nil {
+		return nil // Allow nil values for optional parameters
+	}
+
+	switch schema.Type {
+	case jsonschema.String:
+		if _, ok := paramValue.(string); !ok {
+			return fmt.Errorf("parameter '%s' must be a string", paramName)
+		}
+		// Check enum values if specified
+		if len(schema.Enum) > 0 {
+			valueStr := paramValue.(string)
+			valid := false
+			for _, enum := range schema.Enum {
+				if enum == valueStr {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return fmt.Errorf("parameter '%s' must be one of: %v", paramName, schema.Enum)
+			}
+		}
+	case jsonschema.Number, jsonschema.Integer:
+		switch paramValue.(type) {
+		case int, int32, int64, float32, float64:
+			// Valid numeric types
+		default:
+			return fmt.Errorf("parameter '%s' must be a number", paramName)
+		}
+	case jsonschema.Boolean:
+		if _, ok := paramValue.(bool); !ok {
+			return fmt.Errorf("parameter '%s' must be a boolean", paramName)
+		}
+	case jsonschema.Array:
+		if _, ok := paramValue.([]interface{}); !ok {
+			return fmt.Errorf("parameter '%s' must be an array", paramName)
+		}
+		// Could add more detailed array validation here if needed
+	case jsonschema.Object:
+		if _, ok := paramValue.(map[string]interface{}); !ok {
+			return fmt.Errorf("parameter '%s' must be an object", paramName)
+		}
+		// Could add more detailed object validation here if needed
 	}
 	return nil
 }
