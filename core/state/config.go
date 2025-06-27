@@ -252,12 +252,6 @@ func NewAgentConfigMeta(
 				Type:     config.FieldTypeText,
 				Required: true,
 			},
-			{
-				Name:     "token",
-				Label:    "API Key",
-				Type:     config.FieldTypeText,
-				Required: true,
-			},
 		},
 		DynamicPrompts: dynamicPromptsConfig,
 		Connectors:     connectorsConfig,

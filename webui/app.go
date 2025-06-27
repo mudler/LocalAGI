@@ -1581,11 +1581,11 @@ func validateAgentConfig(config *state.AgentConfig) error {
 		if !isValidURL(server.URL) {
 			return fmt.Errorf("MCP server %d: URL is not a valid URL format", i+1)
 		}
+		if !isValidMCPServerURL(server.URL) {
+			return fmt.Errorf("MCP server %d: URL must be from allowed domains (server.smithery.ai or glama.ai/mcp/instances)", i+1)
+		}
 		if len(server.URL) > 500 {
 			return fmt.Errorf("MCP server %d: URL must be 500 characters or less", i+1)
-		}
-		if len(server.Token) > 1000 {
-			return fmt.Errorf("MCP server %d: token must be 1,000 characters or less", i+1)
 		}
 	}
 
@@ -1688,6 +1688,34 @@ func isValidHost(str string) bool {
 // isValidEmail performs basic email validation
 func isValidEmail(str string) bool {
 	return strings.Contains(str, "@") && strings.Contains(str, ".") && len(strings.TrimSpace(str)) > 5
+}
+
+// isValidMCPServerURL validates that the MCP server URL is from allowed domains
+func isValidMCPServerURL(str string) bool {
+	// Parse the URL to extract the hostname
+	if !strings.HasPrefix(str, "https://") {
+		return false
+	}
+
+	// Remove https:// prefix and find the first slash to get the hostname
+	urlWithoutScheme := str[8:] // Remove "https://"
+	slashIndex := strings.Index(urlWithoutScheme, "/")
+	if slashIndex == -1 {
+		return false // No path found
+	}
+
+	hostname := urlWithoutScheme[:slashIndex]
+	path := urlWithoutScheme[slashIndex:]
+
+	// Check for allowed domains with specific path requirements
+	switch hostname {
+	case "server.smithery.ai":
+		return true // Any path allowed for smithery
+	case "glama.ai":
+		return strings.HasPrefix(path, "/mcp/instances/") // Must be MCP instances path
+	default:
+		return false
+	}
 }
 
 // validateActionFields validates specific fields based on action type

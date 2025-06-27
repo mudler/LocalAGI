@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
-	mcp "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/http"
+	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -15,12 +16,11 @@ import (
 var _ types.Action = &mcpAction{}
 
 type MCPServer struct {
-	URL   string `json:"url"`
-	Token string `json:"token"`
+	URL string `json:"url"`
 }
 
 type mcpAction struct {
-	mcpClient       *mcp.Client
+	mcpClient       *client.Client
 	inputSchema     ToolInputSchema
 	toolName        string
 	toolDescription string
@@ -31,7 +31,24 @@ func (a *mcpAction) Plannable() bool {
 }
 
 func (m *mcpAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
-	resp, err := m.mcpClient.CallTool(ctx, m.toolName, params)
+	// Convert params to map[string]interface{} for CallTool
+	args := make(map[string]interface{})
+	for k, v := range params {
+		args[k] = v
+	}
+
+	// Use proper CallTool request format with Params structure
+	req := mcp.CallToolRequest{
+		Request: mcp.Request{
+			Method: "tools/call",
+		},
+		Params: mcp.CallToolParams{
+			Name:      m.toolName,
+			Arguments: args,
+		},
+	}
+
+	resp, err := m.mcpClient.CallTool(ctx, req)
 	if err != nil {
 		xlog.Error("Failed to call tool", "error", err.Error())
 		return types.ActionResult{}, err
@@ -40,14 +57,19 @@ func (m *mcpAction) Run(ctx context.Context, params types.ActionParams) (types.A
 	xlog.Debug("MCP response", "response", resp)
 
 	textResult := ""
-	for _, c := range resp.Content {
-		switch c.Type {
-		case mcp.ContentTypeText:
-			textResult += c.TextContent.Text + "\n"
-		case mcp.ContentTypeImage:
-			xlog.Error("Image content not supported yet")
-		case mcp.ContentTypeEmbeddedResource:
-			xlog.Error("Embedded resource content not supported yet")
+	for _, content := range resp.Content {
+		// Handle different content types based on the mcp-go API
+		if textContent, ok := mcp.AsTextContent(content); ok {
+			textResult += textContent.Text + "\n"
+		} else if imageContent, ok := mcp.AsImageContent(content); ok {
+			xlog.Debug("Image content received", "mimeType", imageContent.MIMEType)
+			textResult += "[Image content received]\n"
+		} else if audioContent, ok := mcp.AsAudioContent(content); ok {
+			xlog.Debug("Audio content received", "mimeType", audioContent.MIMEType)
+			textResult += "[Audio content received]\n"
+		} else if embeddedResource, ok := mcp.AsEmbeddedResource(content); ok {
+			xlog.Debug("Embedded resource content received", "resource", embeddedResource.Resource)
+			textResult += "[Embedded resource content received]\n"
 		}
 	}
 
@@ -68,8 +90,7 @@ func (m *mcpAction) Definition() types.ActionDefinition {
 		Name:        types.ActionDefinitionName(m.toolName),
 		Description: m.toolDescription,
 		Required:    m.inputSchema.Required,
-		//Properties:  ,
-		Properties: props,
+		Properties:  props,
 	}
 }
 
@@ -80,25 +101,67 @@ type ToolInputSchema struct {
 }
 
 func (a *Agent) initMCPActions() error {
-
 	a.mcpActions = nil
 	var err error
 
 	generatedActions := types.Actions{}
 
 	for _, mcpServer := range a.options.mcpServers {
-		transport := http.NewHTTPClientTransport("/mcp")
-		transport.WithBaseURL(mcpServer.URL)
-		if mcpServer.Token != "" {
-			transport.WithHeader("Authorization", "Bearer "+mcpServer.Token)
+		// Create a new client using the appropriate transport based on URL
+		var mcpClient *client.Client
+		var e error
+		var isSSE bool
+
+		if strings.Contains(mcpServer.URL, "/sse") {
+			// Use SSE client for URLs containing "/sse"
+			mcpClient, e = client.NewSSEMCPClient(mcpServer.URL)
+			isSSE = true
+		} else {
+			// Use streamable HTTP client for other URLs
+			mcpClient, e = client.NewStreamableHttpClient(mcpServer.URL)
+			isSSE = false
 		}
 
-		// Create a new client
-		client := mcp.NewClient(transport)
+		if e != nil {
+			xlog.Error("Failed to create MCP client", "error", e.Error(), "server", mcpServer)
+			if err == nil {
+				err = e
+			} else {
+				err = errors.Join(err, e)
+			}
+			continue
+		}
+
+		// Start the client if it's an SSE client (SSE transports require explicit start)
+		if isSSE {
+			if e := mcpClient.Start(a.context); e != nil {
+				xlog.Error("Failed to start SSE MCP client", "error", e.Error(), "server", mcpServer)
+				if err == nil {
+					err = e
+				} else {
+					err = errors.Join(err, e)
+				}
+				continue
+			}
+			xlog.Debug("SSE client started successfully", "server", mcpServer.URL)
+		}
 
 		xlog.Debug("Initializing client", "server", mcpServer.URL)
-		// Initialize the client
-		response, e := client.Initialize(a.context)
+		// Initialize the client with proper InitializeRequest
+		initReq := mcp.InitializeRequest{
+			Request: mcp.Request{
+				Method: "initialize",
+			},
+			Params: mcp.InitializeParams{
+				ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
+				Capabilities:    mcp.ClientCapabilities{},
+				ClientInfo: mcp.Implementation{
+					Name:    "LocalAGI",
+					Version: "1.0.0",
+				},
+			},
+		}
+		response, e := mcpClient.Initialize(a.context, initReq)
 		if e != nil {
 			xlog.Error("Failed to initialize client", "error", e.Error(), "server", mcpServer)
 			if err == nil {
@@ -109,11 +172,23 @@ func (a *Agent) initMCPActions() error {
 			continue
 		}
 
-		xlog.Debug("Client initialized: %v", response.Instructions)
+		xlog.Debug("Client initialized", "instructions", response.Instructions)
 
-		var cursor *string
+		var cursor *mcp.Cursor
 		for {
-			tools, err := client.ListTools(a.context, cursor)
+			listReq := mcp.ListToolsRequest{
+				PaginatedRequest: mcp.PaginatedRequest{
+					Request: mcp.Request{
+						Method: "tools/list",
+					},
+					Params: mcp.PaginatedParams{},
+				},
+			}
+			if cursor != nil {
+				listReq.Params.Cursor = *cursor
+			}
+
+			tools, err := mcpClient.ListTools(a.context, listReq)
 			if err != nil {
 				xlog.Error("Failed to list tools", "error", err.Error())
 				return err
@@ -121,8 +196,8 @@ func (a *Agent) initMCPActions() error {
 
 			for _, t := range tools.Tools {
 				desc := ""
-				if t.Description != nil {
-					desc = *t.Description
+				if t.Description != "" {
+					desc = t.Description
 				}
 
 				xlog.Debug("Tool", "mcpServer", mcpServer, "name", t.Name, "description", desc)
@@ -143,17 +218,17 @@ func (a *Agent) initMCPActions() error {
 
 				// Create a new action with Client + tool
 				generatedActions = append(generatedActions, &mcpAction{
-					mcpClient:       client,
+					mcpClient:       mcpClient,
 					toolName:        t.Name,
 					inputSchema:     inputSchema,
 					toolDescription: desc,
 				})
 			}
 
-			if tools.NextCursor == nil {
+			if tools.NextCursor == "" {
 				break // No more pages
 			}
-			cursor = tools.NextCursor
+			cursor = &tools.NextCursor
 		}
 
 	}

@@ -18,13 +18,7 @@ const MCPServersSection = ({
       type: 'text',
       defaultValue: '',
       placeholder: 'https://example.com/mcp',
-    },
-    {
-      name: 'token',
-      label: 'API Key',
-      type: 'password',
-      defaultValue: '',
-    },
+    }
   ];
 
   // Handle field value changes for a specific server
