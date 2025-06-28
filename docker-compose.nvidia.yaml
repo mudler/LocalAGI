@@ -6,7 +6,7 @@ services:
     environment:
       - LOCALAI_SINGLE_ACTIVE_BACKEND=true
       - DEBUG=true
-    image: localai/localai:master-cublas-cuda12
+    image: localai/localai:master-gpu-nvidia-cuda12
     # For images with python backends, use:
     # image: localai/localai:master-cublas-cuda12-ffmpeg
     deploy:
