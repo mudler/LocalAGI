@@ -414,6 +414,251 @@ For more details about available configuration options and features, refer to th
 
 </details>
 
+## 🔧 Extending LocalAGI
+
+LocalAGI provides two powerful ways to extend its functionality with custom actions:
+
+### 1. Custom Actions (Go Code)
+
+LocalAGI supports custom actions written in Go that can be defined inline when creating an agent. These actions are interpreted at runtime, so no compilation is required.
+
+#### How Custom Actions Work
+
+Custom actions in LocalAGI require three main functions:
+
+1. **`Run(config map[string]interface{}) (string, map[string]interface{}, error)`** - The main execution function
+2. **`Definition() map[string][]string`** - Defines the action's parameters and their types
+3. **`RequiredFields() []string`** - Specifies which parameters are required
+
+#### Example: Weather Information Action
+
+Here's a practical example of a custom action that fetches weather information:
+
+```go
+import (
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "io"
+)
+
+type WeatherParams struct {
+    City    string `json:"city"`
+    Country string `json:"country"`
+}
+
+type WeatherResponse struct {
+    Main struct {
+        Temp     float64 `json:"temp"`
+        Humidity int     `json:"humidity"`
+    } `json:"main"`
+    Weather []struct {
+        Description string `json:"description"`
+    } `json:"weather"`
+}
+
+func Run(config map[string]interface{}) (string, map[string]interface{}, error) {
+    // Parse parameters
+    p := WeatherParams{}
+    b, err := json.Marshal(config)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+    if err := json.Unmarshal(b, &p); err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    // Make API call to weather service
+    url := fmt.Sprintf("http://api.openweathermap.org/data/2.5/weather?q=%s,%s&appid=YOUR_API_KEY&units=metric", p.City, p.Country)
+    resp, err := http.Get(url)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    var weather WeatherResponse
+    if err := json.Unmarshal(body, &weather); err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    // Format response
+    result := fmt.Sprintf("Weather in %s, %s: %.1f°C, %s, Humidity: %d%%", 
+        p.City, p.Country, weather.Main.Temp, weather.Weather[0].Description, weather.Main.Humidity)
+
+    return result, map[string]interface{}{}, nil
+}
+
+func Definition() map[string][]string {
+    return map[string][]string{
+        "city": []string{
+            "string",
+            "The city name to get weather for",
+        },
+        "country": []string{
+            "string", 
+            "The country code (e.g., US, UK, DE)",
+        },
+    }
+}
+
+func RequiredFields() []string {
+    return []string{"city", "country"}
+}
+```
+
+#### Example: File System Action
+
+Here's another example that demonstrates file system operations:
+
+```go
+import (
+    "encoding/json"
+    "fmt"
+    "os"
+    "path/filepath"
+)
+
+type FileParams struct {
+    Path    string `json:"path"`
+    Action  string `json:"action"`
+    Content string `json:"content,omitempty"`
+}
+
+func Run(config map[string]interface{}) (string, map[string]interface{}, error) {
+    p := FileParams{}
+    b, err := json.Marshal(config)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+    if err := json.Unmarshal(b, &p); err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    switch p.Action {
+    case "read":
+        content, err := os.ReadFile(p.Path)
+        if err != nil {
+            return "", map[string]interface{}{}, err
+        }
+        return string(content), map[string]interface{}{}, nil
+        
+    case "write":
+        err := os.WriteFile(p.Path, []byte(p.Content), 0644)
+        if err != nil {
+            return "", map[string]interface{}{}, err
+        }
+        return fmt.Sprintf("Successfully wrote to %s", p.Path), map[string]interface{}{}, nil
+        
+    case "list":
+        files, err := os.ReadDir(p.Path)
+        if err != nil {
+            return "", map[string]interface{}{}, err
+        }
+        
+        var fileList []string
+        for _, file := range files {
+            fileList = append(fileList, file.Name())
+        }
+        
+        result, _ := json.Marshal(fileList)
+        return string(result), map[string]interface{}{}, nil
+        
+    default:
+        return "", map[string]interface{}{}, fmt.Errorf("unknown action: %s", p.Action)
+    }
+}
+
+func Definition() map[string][]string {
+    return map[string][]string{
+        "path": []string{
+            "string",
+            "The file or directory path",
+        },
+        "action": []string{
+            "string",
+            "The action to perform: read, write, or list",
+        },
+        "content": []string{
+            "string",
+            "Content to write (required for write action)",
+        },
+    }
+}
+
+func RequiredFields() []string {
+    return []string{"path", "action"}
+}
+```
+
+#### Using Custom Actions in Agents
+
+To use custom actions, add them to your agent configuration:
+
+1. **Via Web UI**: In the agent creation form, add a "Custom" action and paste your Go code
+2. **Via API**: Include the custom action in your agent configuration JSON
+3. **Via Library**: Add the custom action to your agent's actions list
+
+### 2. MCP (Model Context Protocol) Servers
+
+LocalAGI supports both local and remote MCP servers, allowing you to extend functionality with external tools and services.
+
+#### What is MCP?
+
+The Model Context Protocol (MCP) is a standard for connecting AI applications to external data sources and tools. LocalAGI can connect to any MCP-compliant server to access additional capabilities.
+
+#### Local MCP Servers
+
+Local MCP servers run as processes that LocalAGI can spawn and communicate with via STDIO.
+
+##### Example: GitHub MCP Server
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_TOKEN>"
+      }
+    }
+  }
+}
+```
+
+#### Remote MCP Servers
+
+Remote MCP servers are HTTP-based and can be accessed over the network.
+
+#### Creating Your Own MCP Server
+
+You can create MCP servers in any language that supports the MCP protocol and add the URLs of the servers to LocalAGI.
+
+#### Configuring MCP Servers in LocalAGI
+
+1. **Via Web UI**: In the MCP Settings section of agent creation, add MCP servers
+2. **Via API**: Include MCP server configuration in your agent config
+
+#### Best Practices
+
+- **Security**: Always validate inputs and use proper authentication for remote MCP servers
+- **Error Handling**: Implement robust error handling in your MCP servers
+- **Documentation**: Provide clear descriptions for all tools exposed by your MCP server
+- **Testing**: Test your MCP servers independently before integrating with LocalAGI
+- **Resource Management**: Ensure your MCP servers properly clean up resources
+
 ### Development
 
 The development workflow is similar to the source build, but with additional steps for hot reloading of the frontend:
