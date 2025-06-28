@@ -424,11 +424,15 @@ LocalAGI supports custom actions written in Go that can be defined inline when c
 
 #### How Custom Actions Work
 
+When creating a new Agent, in the action sections select the "custom" action, you can add the Golang code directly there.
+
 Custom actions in LocalAGI require three main functions:
 
 1. **`Run(config map[string]interface{}) (string, map[string]interface{}, error)`** - The main execution function
 2. **`Definition() map[string][]string`** - Defines the action's parameters and their types
 3. **`RequiredFields() []string`** - Specifies which parameters are required
+
+Note: You can't use additional modules, but just use libraries that are included in Go.
 
 #### Example: Weather Information Action
 
