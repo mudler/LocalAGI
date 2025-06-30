@@ -256,7 +256,7 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 			}
 
 			// Create agent in memory
-			if err := pool.CreateAgent(agentId, &config, false); err != nil {
+			if err := pool.CreateAgent(agentId, &config); err != nil {
 				return errorJSONMessage(c, "Failed to create agent in memory: "+err.Error())
 			}
 
@@ -364,7 +364,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			a.UserPools[userIDStr] = pool
 		}
 		// 8. Register agent in the in-memory pool
-		if err := pool.CreateAgent(id.String(), &config, false); err != nil {
+		if err := pool.CreateAgent(id.String(), &config); err != nil {
 			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
 		}
 
@@ -592,7 +592,7 @@ func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 		}
 
 		// 11. Register agent in the in-memory pool
-		if err := pool.CreateAgent(id.String(), &config, false); err != nil {
+		if err := pool.CreateAgent(id.String(), &config); err != nil {
 			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
 		}
 
@@ -716,7 +716,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 
 		// 5. Start agent in memory if not running
 		if pool.GetAgent(agentId) == nil {
-			if err := pool.CreateAgent(agentId, &config, false); err != nil {
+			if err := pool.CreateAgent(agentId, &config); err != nil {
 				return errorJSONMessage(c, "Failed to start agent: "+err.Error())
 			}
 		}
@@ -1162,7 +1162,7 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			}
 
 			// 7. Create agent in memory pool using the DB ID
-			if err := pool.CreateAgent(id.String(), agentConfig, false); err != nil {
+			if err := pool.CreateAgent(id.String(), agentConfig); err != nil {
 				return errorJSONMessage(c, err.Error())
 			}
 		}
@@ -2170,6 +2170,59 @@ func (a *App) RequireActiveAgent() func(c *fiber.Ctx) error {
 	}
 }
 
+func (a *App) RequireActiveStatusAgent() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		// 1. Get user ID from context (must be called after RequireUser)
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"error":   "User ID missing from context",
+			})
+		}
+
+		// 2. Get agent from context (must be called after RequireActiveAgent)
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"success": false,
+				"error":   "Agent not found in context",
+			})
+		}
+
+		agentId := agent.ID.String()
+
+		// 3. Check if user has an agent pool in memory
+		pool, ok := a.UserPools[userIDStr]
+		if !ok {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"success": false,
+				"error":   "Agent is paused. Please resume the agent first",
+			})
+		}
+
+		// 4. Check if agent is actually running in memory and active
+		agentInstance := pool.GetAgent(agentId)
+		if agentInstance == nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"success": false,
+				"error":   "Agent is paused. Please resume the agent first",
+			})
+		}
+
+		// 5. Check if agent is paused
+		if agentInstance.Paused() {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"success": false,
+				"error":   "Agent is paused. Please resume the agent first",
+			})
+		}
+
+		// Agent is active and running, continue to handler
+		return c.Next()
+	}
+}
+
 func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// 1. Get user ID and agent from context
@@ -2214,16 +2267,7 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 			a.UserPools[userIDStr] = pool
 		}
 
-		// 3. Load config into pool if missing
-		if pool.GetAgent(agentId) == nil {
-			var cfg state.AgentConfig
-			if err := json.Unmarshal(agent.Config, &cfg); err == nil {
-				cfg.Name = agent.Name
-				_ = pool.CreateAgent(agentId, &cfg, true)
-			}
-		}
-
-		// 4. Check if agent is running
+		// 3. Just check if agent is running in memory, don't create it
 		active := false
 		if instance := pool.GetAgent(agentId); instance != nil {
 			active = !instance.Paused()

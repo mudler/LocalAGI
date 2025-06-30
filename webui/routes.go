@@ -3,7 +3,6 @@ package webui
 import (
 	"crypto/subtle"
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -102,7 +101,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 	// })
 
 	// Define a route for the GET method on the root path '/'
-	webapp.Get("/sse/:id", app.RequireUser(), app.RequireActiveAgent(), func(c *fiber.Ctx) error {
+	webapp.Get("/sse/:id", app.RequireUser(), app.RequireActiveAgent(), app.RequireActiveStatusAgent(), func(c *fiber.Ctx) error {
 		userID, ok := c.Locals("id").(string)
 
 		if !ok || userID == "" {
@@ -156,7 +155,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 	webapp.Put("/api/agent/:id/pause", app.RequireUser(), app.RequireActiveAgent(), app.Pause())
 	webapp.Put("/api/agent/:id/start", app.RequireUser(), app.RequireActiveAgent(), app.Start())
 
-	webapp.Post("/api/chat/:id", app.RequireUser(), app.RequireActiveAgent(), app.Chat())
+	webapp.Post("/api/chat/:id", app.RequireUser(), app.RequireActiveAgent(), app.RequireActiveStatusAgent(), app.Chat())
 
 	// conversationTracker := connectors.NewConversationTracker[string](time.Minute)
 
@@ -201,7 +200,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.GetAgentConfig())
 
-	webapp.Put("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.UpdateAgentConfig())
+	webapp.Put("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.RequireActiveStatusAgent(), app.UpdateAgentConfig())
 
 	// Metadata endpoint for agent configuration fields
 	webapp.Get("/api/agent/config/metadata", app.RequireUser(), app.GetAgentConfigMeta())
@@ -262,18 +261,8 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 		for _, agent := range dbAgents {
 			idStr := agent.ID.String()
 
-			// Ensure config is loaded into pool memory
-			if pool.GetAgent(idStr) == nil {
-				var cfg state.AgentConfig
-				if err := json.Unmarshal(agent.Config, &cfg); err == nil {
-					cfg.Name = agent.Name // optionally enforce name
-					_ = pool.CreateAgent(idStr, &cfg, true)
-				}
-			}
-
-			// Do not start agent, just check if already running
+			// Just check if agent is already running in memory, don't create it
 			instance := pool.GetAgent(idStr)
-
 			running := instance != nil && !instance.Paused()
 
 			agentList = append(agentList, fiber.Map{
