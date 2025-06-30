@@ -444,12 +444,13 @@ func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (stri
 	return resp.Choices[0].Message.Content, nil
 }
 
-func extractImageContent(message openai.ChatCompletionMessage) (imageURL, text string, e error) {
+// extractAllImageContent extracts all images from a message
+func extractAllImageContent(message openai.ChatCompletionMessage) (images []string, text string, e error) {
 	e = fmt.Errorf("no image found")
 	if message.MultiContent != nil {
 		for _, content := range message.MultiContent {
 			if content.Type == openai.ChatMessagePartTypeImageURL {
-				imageURL = content.ImageURL.URL
+				images = append(images, content.ImageURL.URL)
 				e = nil
 			}
 			if content.Type == openai.ChatMessagePartTypeText {
@@ -463,43 +464,73 @@ func extractImageContent(message openai.ChatCompletionMessage) (imageURL, text s
 
 func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Messages {
 
-	// walk conversation history, and check if last message from user contains image.
-	// If it does, we need to describe the image first with a model that supports image understanding (if the current model doesn't support it)
-	// and add it to the conversation context
+	// walk conversation history, and check if any message contains images.
+	// If they do, we need to describe the images first with a model that supports image understanding (if the current model doesn't support it)
+	// and add them to the conversation context
 	if !a.options.SeparatedMultimodalModel() {
 		return conv
 	}
 
 	xlog.Debug("Processing user inputs", "agent", a.Character.Name, "conversation", conv)
 
-	lastUserMessage := conv.GetLatestUserMessage()
-	xlog.Debug("Last user message", "lastUserMessage", lastUserMessage)
-	if lastUserMessage != nil && conv.IsLastMessageFromRole(UserRole) {
-		imageURL, text, err := extractImageContent(*lastUserMessage)
-		if err == nil {
-			xlog.Debug("Found image in user input", "image", imageURL)
-			// We have an image, we need to describe it first
-			// and add it to the conversation context
-			imageDescription, err := a.describeImage(a.context.Context, a.options.LLMAPI.MultimodalModel, imageURL)
-			if err != nil {
-				xlog.Error("Error describing image", "error", err)
-			} else {
-				// We replace the user message with the image description
-				// and add the user text to the conversation
-				explainerMessage := openai.ChatCompletionMessage{
-					Role:    "system",
-					Content: fmt.Sprintf("The user shared an image which can be described as: %s", imageDescription),
-				}
+	// Process all messages in the conversation to extract and describe images
+	var processedMessages Messages
+	var messagesToRemove []int
 
-				// remove lastUserMessage from the conversation
-				conv = conv.RemoveLastUserMessage()
-				conv = append(conv, explainerMessage)
-				conv = append(conv, openai.ChatCompletionMessage{
-					Role:    role,
-					Content: text,
-				})
+	for i, message := range conv {
+		images, text, err := extractAllImageContent(message)
+		if err == nil && len(images) > 0 {
+			xlog.Debug("Found images in message", "messageIndex", i, "imageCount", len(images), "role", message.Role)
+
+			// Mark this message for removal
+			messagesToRemove = append(messagesToRemove, i)
+
+			// Process each image in the message
+			var imageDescriptions []string
+			for j, image := range images {
+				imageDescription, err := a.describeImage(a.context.Context, a.options.LLMAPI.MultimodalModel, image)
+				if err != nil {
+					xlog.Error("Error describing image", "error", err, "messageIndex", i, "imageIndex", j)
+					imageDescriptions = append(imageDescriptions, fmt.Sprintf("Image %d: [Error describing image: %v]", j+1, err))
+				} else {
+					imageDescriptions = append(imageDescriptions, fmt.Sprintf("Image %d: %s", j+1, imageDescription))
+				}
 			}
+
+			// Add the text content as a new message with the same role first
+			if text != "" {
+				textMessage := openai.ChatCompletionMessage{
+					Role:    message.Role,
+					Content: text,
+				}
+				processedMessages = append(processedMessages, textMessage)
+
+				// Add the image descriptions as a system message after the text
+				explainerMessage := openai.ChatCompletionMessage{
+					Role: "system",
+					Content: fmt.Sprintf("The above message also contains %d image(s) which can be described as: %s",
+						len(images), strings.Join(imageDescriptions, "; ")),
+				}
+				processedMessages = append(processedMessages, explainerMessage)
+			} else {
+				// If there's no text, just add the image descriptions as a system message
+				explainerMessage := openai.ChatCompletionMessage{
+					Role: "system",
+					Content: fmt.Sprintf("Message contains %d image(s) which can be described as: %s",
+						len(images), strings.Join(imageDescriptions, "; ")),
+				}
+				processedMessages = append(processedMessages, explainerMessage)
+			}
+		} else {
+			// No image found, keep the original message
+			processedMessages = append(processedMessages, message)
 		}
+	}
+
+	// If we found and processed any images, replace the conversation
+	if len(messagesToRemove) > 0 {
+		xlog.Info("Processed images in conversation", "messagesWithImages", len(messagesToRemove), "agent", a.Character.Name)
+		return processedMessages
 	}
 
 	return conv
@@ -578,30 +609,30 @@ func (a *Agent) validateBuiltinTools(job *types.Job) {
 	if len(builtinTools) == 0 {
 		return
 	}
-	
+
 	// Get available actions
 	availableActions := a.mcpActions
-	
+
 	for _, tool := range builtinTools {
 		functionName := tool.Name
-		
+
 		// Check if this is a web search builtin tool
 		if strings.HasPrefix(string(functionName), "web_search_") {
 			// Look for a search action
 			searchAction := availableActions.Find("search")
 			if searchAction == nil {
-				xlog.Warn("Web search builtin tool specified but no 'search' action available", 
-					"function_name", functionName, 
+				xlog.Warn("Web search builtin tool specified but no 'search' action available",
+					"function_name", functionName,
 					"agent", a.Character.Name)
 			} else {
-				xlog.Debug("Web search builtin tool matched to search action", 
-					"function_name", functionName, 
+				xlog.Debug("Web search builtin tool matched to search action",
+					"function_name", functionName,
 					"agent", a.Character.Name)
 			}
 		} else {
 			// For future builtin tools, add more matching logic here
-			xlog.Warn("Unknown builtin tool specified", 
-				"function_name", functionName, 
+			xlog.Warn("Unknown builtin tool specified",
+				"function_name", functionName,
 				"agent", a.Character.Name)
 		}
 	}
@@ -621,10 +652,10 @@ func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMe
 			Result: reasoning, // The reasoning/message to show to user
 		},
 	}
-	
+
 	// Add the action state to the job result
 	job.Result.SetResult(stateResult)
-	
+
 	// Set conversation but leave Response empty
 	// The webui will detect the user-defined action and generate the proper tool call response
 	job.Result.Conversation = conv
@@ -912,7 +943,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 			a.replyWithToolCall(job, conv, actionParams, chosenAction, reasoning)
 			return
 		}
-		
+
 		result, err := a.runAction(job, chosenAction, actionParams)
 		if err != nil {
 			result.Result = fmt.Sprintf("Error running tool: %v", err)
