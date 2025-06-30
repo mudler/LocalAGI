@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -30,9 +31,15 @@ func NewDiscord(config map[string]string) *Discord {
 		duration = 5 * time.Minute
 	}
 
+	token := config["token"]
+
+	if !strings.HasPrefix(token, "Bot ") {
+		token = "Bot " + token
+	}
+
 	return &Discord{
 		conversationTracker: NewConversationTracker[string](duration),
-		token:               config["token"],
+		token:               token,
 		defaultChannel:      config["defaultChannel"],
 	}
 }
@@ -227,29 +234,57 @@ func (d *Discord) messageCreate(a *agent.Agent) func(s *discordgo.Session, m *di
 		mm, _ := json.Marshal(m)
 		xlog.Debug("Discord message", "message", string(mm))
 
-		isThread := func() bool {
-			// NOTE: this doesn't seem to work,
-			// even if used in https://github.com/bwmarrin/discordgo/blob/5571950c905ff94d898501e5a0d76895fa140069/examples/threads/main.go#L33
-			ch, err := s.State.Channel(m.ChannelID)
-			return !(err != nil || !ch.IsThread())
+		// Get channel info and determine if this is a thread
+		var parentChannelID string
+		var isThreadMessage bool
+
+		ch, err := s.State.Channel(m.ChannelID)
+		if err != nil {
+			xlog.Debug("Error getting channel from state", "error", err, "channelID", m.ChannelID)
+			// Fallback: try to get channel info directly from Discord API
+			ch, err = s.Channel(m.ChannelID)
+			if err != nil {
+				xlog.Error("Error getting channel info", "error", err, "channelID", m.ChannelID)
+				return
+			}
 		}
 
+		// Check if this is a thread by looking at the channel type
+		isThreadMessage = ch.Type == discordgo.ChannelTypeGuildPublicThread ||
+			ch.Type == discordgo.ChannelTypeGuildPrivateThread ||
+			ch.Type == discordgo.ChannelTypeGuildNewsThread
+
+		if isThreadMessage {
+			parentChannelID = ch.ParentID
+			xlog.Debug("Thread message detected", "threadID", m.ChannelID, "parentChannelID", parentChannelID, "channelType", ch.Type)
+		} else {
+			parentChannelID = m.ChannelID
+			xlog.Debug("Channel message detected", "channelID", m.ChannelID, "channelType", ch.Type)
+		}
+
+		fmt.Println("Is thread", isThreadMessage, "Parent/Channel ID:", parentChannelID)
+
 		// check if the message is in a thread and get all messages in the thread
-		if isThread() {
-			xlog.Debug("Thread message")
-			if (d.defaultChannel != "" && m.ChannelID == d.defaultChannel) || (mentioned && d.defaultChannel == "") {
-				xlog.Debug("Thread message")
+		if isThreadMessage {
+			xlog.Debug("Processing thread message")
+			// Check if the parent channel matches our default channel OR if we're mentioned
+			if (d.defaultChannel != "" && parentChannelID == d.defaultChannel) || (mentioned && d.defaultChannel == "") {
+				xlog.Debug("Handling thread message")
 				d.handleThreadMessage(a, s, m)
+			} else {
+				xlog.Info("Ignoring thread message - parent channel doesn't match default channel and not mentioned", "parentChannelID", parentChannelID, "defaultChannel", d.defaultChannel)
 			}
-			xlog.Info("ignoring thread message")
 			return
 		}
 
 		// Or we are in the default channel (if one is set!)
+		xlog.Debug("Processing channel message", "defaultChannel", d.defaultChannel, "currentChannel", m.ChannelID, "mentioned", mentioned)
 		if (d.defaultChannel != "" && m.ChannelID == d.defaultChannel) || (mentioned && d.defaultChannel == "") {
-			xlog.Debug("Channel message")
+			xlog.Debug("Handling channel message")
 			d.handleChannelMessage(a, s, m)
 			return
 		}
+
+		xlog.Debug("Message ignored - no conditions met")
 	}
 }
