@@ -43,7 +43,7 @@ var _ = Describe("Agent test", func() {
 			Expect(result).ToNot(BeEmpty())
 		})
 
-		It("tool call", func() {
+		It("can do tool call; create task", func() {
 			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
 
 			err := client.CreateAgent(&localagi.AgentConfig{
@@ -224,5 +224,119 @@ var _ = Describe("Agent test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(fnc.Arguments).To(ContainSubstring("true"))
 		})
+
+		It("can tool call; web search", func() {
+			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
+
+			err := client.CreateAgent(&localagi.AgentConfig{
+				Name: "testagent",
+			})
+			Expect(err).ToNot(HaveOccurred())
+
+			req := localagi.RequestBody{
+				Model: "testagent",
+				Input: "What's the weather like in Berlin?",
+				Tools: []localagi.Tool{
+					{
+						Type:        "function",
+						Name:        ptr.To("WebSearch"),
+						Description: ptr.To("Search the internet for up-to-date information"),
+						Parameters: ptr.To(jsonschema.Definition{
+							Type: "object",
+							Properties: map[string]jsonschema.Definition{
+								"SearchPrompt": {
+									Type:        "string",
+									Description: "The query that is sent to a search engine",
+								},
+							},
+							Required: []string{
+								"SearchPrompt",
+							},
+						}),
+					},
+				}}
+			result, err := client.GetAIResponse(&req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).ToNot(BeNil())
+
+			var call localagi.ResponseFunctionToolCall
+			var args struct {
+				SearchPrompt string `json:"SearchPrompt"`
+			}
+
+			for _, out := range result.Output {
+				msg, err := out.ToMessage()
+				if err == nil && msg.Role == "assistant" {
+					xlog.Info("Agent returned message", "message", msg)
+					continue
+				}
+				fnc, err := out.ToFunctionToolCall()
+				call = fnc
+				Expect(err).ToNot(HaveOccurred())
+				Expect(string(fnc.Type)).To(Equal("function_call"))
+				Expect(fnc.Name).To(Equal("WebSearch"))
+
+				err = json.Unmarshal([]byte(fnc.Arguments), &args)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(args.SearchPrompt).To(ContainSubstring("Berlin"))
+			}
+
+			req = localagi.RequestBody{
+				Model: "testagent",
+				Input: []any{
+					localagi.InputMessage{
+						Type:    "message",
+						Role:    "user",
+						Content: "What's the weather like in Berlin compared to normal for Spring/Autumn?",
+					},
+					call,
+					localagi.InputFunctionToolCallOutput{
+						Type:   "function_call_output",
+						CallID: call.CallID,
+						Output: "The current weather in Berlin: temp 30C!, heavy rain with risk of flooding, light wind, Humidity 90%, Pressure 900mb, visibility poor",
+					},
+				},
+				Tools: []localagi.Tool{
+					{
+						Type:        "function",
+						Name:        ptr.To("ChooseAnswer"),
+						Description: ptr.To("Select a multiple choice answer from a predefined list"),
+						Parameters: ptr.To(jsonschema.Definition{
+							Type: "object",
+							Properties: map[string]jsonschema.Definition{
+								"answer": {
+									Type:        "string",
+									Description: "Choice of answer",
+									Enum: []string{
+										"Very hot and wet",
+										"Very hot and dry",
+										"About Average temp and very wet",
+										"About Average",
+										"About Average temp and very dry",
+										"Very cold and wet",
+										"Very cold and dry",
+									},
+								},
+							},
+							Required: []string{
+								"answer",
+							},
+						}),
+					},
+				},
+				ToolChoice: &localagi.ToolChoice{
+					Type: "function",
+					Name: "ChooseAnswer",
+				},
+			}
+			result, err = client.GetAIResponse(&req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(result.Output)).To(BeNumerically(">", 0))
+			fnc, err := result.Output[len(result.Output)-1].ToFunctionToolCall()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fnc.Arguments).To(ContainSubstring("Very hot and wet"))
+		})
+
 	})
 })
