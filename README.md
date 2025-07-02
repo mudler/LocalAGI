@@ -58,6 +58,9 @@ docker compose -f docker-compose.nvidia.yaml up
 # Intel GPU setup (for Intel Arc and integrated GPUs)
 docker compose -f docker-compose.intel.yaml up
 
+# AMD GPU setup
+docker compose -f docker-compose.amd.yaml up
+
 # Start with a specific model (see available models in models.localai.io, or localai.io to use any model in huggingface)
 MODEL_NAME=gemma-3-12b-it docker compose up
 
