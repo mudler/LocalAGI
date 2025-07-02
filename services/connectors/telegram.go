@@ -163,7 +163,8 @@ func (t *Telegram) Start(a *agent.Agent) {
 
 	b, err := bot.New(t.Token, opts...)
 	if err != nil {
-		panic(err)
+		xlog.Error("Failed to create Telegram bot", "error", err)
+		return
 	}
 
 	t.bot = b
