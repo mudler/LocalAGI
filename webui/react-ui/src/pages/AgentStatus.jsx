@@ -31,7 +31,15 @@ function ObservableSummary({ observable }) {
   const completion = observable?.completion || {};
   // ChatCompletionResponse summary
   let completionChatMsg = '';
-  const chatCompletion = completion?.chat_completion_response;
+  let chatCompletion = completion?.chat_completion_response;
+
+  if (!chatCompletion && Array.isArray(completion?.conversation) && completion.conversation.length > 0) {
+    chatCompletion = { choices: completion.conversation.map(m => {
+      return { message: m }
+    }) }
+    console.log("converted conversation to choices", chatCompletion)
+  }
+
   if (
     chatCompletion &&
     Array.isArray(chatCompletion.choices) &&
@@ -62,14 +70,8 @@ function ObservableSummary({ observable }) {
       completionChatMsg = { toolCallSummary, message: completionChatMsg };
     }
     // Else, it's just a string
-
   }
-  // Conversation summary
-  let completionConversation = '';
-  if (Array.isArray(completion?.conversation) && completion.conversation.length > 0) {
-    const lastConv = completion.conversation[completion.conversation.length - 1];
-    completionConversation = lastConv?.content ? `${lastConv.content}` : '';
-  }
+  
   // ActionResult summary
   let completionActionResult = '';
   if (completion?.action_result) {
@@ -100,7 +102,7 @@ function ObservableSummary({ observable }) {
 
   // Only show if any summary is present
   if (!creationChatMsg && !creationFunctionDef && !creationFunctionParams &&
-      !completionChatMsg && !completionConversation && !completionActionResult && 
+      !completionChatMsg && !completionActionResult && 
       !completionAgentState && !completionError && !completionFilter) {
     return null;
   }
@@ -159,12 +161,6 @@ function ObservableSummary({ observable }) {
         >
           <i className="fas fa-robot" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{typeof completionChatMsg === 'object' ? completionChatMsg.message : completionChatMsg}</span>
-        </div>
-      )}
-      {completionConversation && (
-        <div title={completionConversation} style={{ display: 'flex', alignItems: 'center', color: '#b8e2ff', fontSize: 14 }}>
-          <i className="fas fa-comments" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionConversation}</span>
         </div>
       )}
       {completionActionResult && (
