@@ -25,7 +25,7 @@ var _ = Describe("Agent test", func() {
 			}, "10m", "10s").ShouldNot(HaveOccurred())
 
 			client := localagi.NewClient(localagiURL, "", time.Minute)
-			err := client.DeleteAgent("testagent")
+			err := client.DeleteAgent("testagent1")
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -33,26 +33,39 @@ var _ = Describe("Agent test", func() {
 			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
 
 			err := client.CreateAgent(&localagi.AgentConfig{
-				Name: "testagent",
+				Name: "testagent1",
 			})
 			Expect(err).ToNot(HaveOccurred())
 
-			result, err := client.SimpleAIResponse("testagent", "hello")
+			result, err := client.SimpleAIResponse("testagent1", "hello")
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(result).ToNot(BeEmpty())
 		})
+	})
 
-		It("can do tool call; create task", func() {
-			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
+	Context("Can do user defined tool calls", Ordered, func() {
+		BeforeAll(func() {
+			Eventually(func() error {
+				// test apiURL is working and available
+				_, err := http.Get(localagiURL + "/readyz")
+				return err
+			}, "10m", "10s").ShouldNot(HaveOccurred())
 
-			err := client.CreateAgent(&localagi.AgentConfig{
-				Name: "testagent",
+			client := localagi.NewClient(localagiURL, "", time.Minute)
+			err := client.DeleteAgent("testagent2")
+			Expect(err).ToNot(HaveOccurred())
+			err = client.CreateAgent(&localagi.AgentConfig{
+				Name: "testagent2",
 			})
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("can create a task", func() {
+			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
 
 			req := localagi.RequestBody{
-				Model: "testagent",
+				Model: "testagent2",
 				Input: "Create an appointment next week on wednesday at 10:00 am for the whole day. The topic is about AI and you include ABC and DEF to the appointment.",
 				Tools: []localagi.Tool{
 					{
@@ -157,6 +170,7 @@ var _ = Describe("Agent test", func() {
 				msg, err := out.ToMessage()
 				if err == nil && msg.Role == "assistant" {
 					xlog.Info("Agent returned message", "message", msg)
+					Expect(len(result.Output)).To(BeNumerically(">", 1))
 					continue
 				}
 				fnc, err := out.ToFunctionToolCall()
@@ -174,7 +188,7 @@ var _ = Describe("Agent test", func() {
 			}
 
 			req = localagi.RequestBody{
-				Model: "testagent",
+				Model: "testagent2",
 				Input: []any{
 					localagi.InputMessage{
 						Type:    "message",
@@ -228,13 +242,8 @@ var _ = Describe("Agent test", func() {
 		It("can tool call; web search", func() {
 			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
 
-			err := client.CreateAgent(&localagi.AgentConfig{
-				Name: "testagent",
-			})
-			Expect(err).ToNot(HaveOccurred())
-
 			req := localagi.RequestBody{
-				Model: "testagent",
+				Model: "testagent2",
 				Input: "What's the weather like in Berlin?",
 				Tools: []localagi.Tool{
 					{
@@ -283,7 +292,7 @@ var _ = Describe("Agent test", func() {
 			}
 
 			req = localagi.RequestBody{
-				Model: "testagent",
+				Model: "testagent2",
 				Input: []any{
 					localagi.InputMessage{
 						Type:    "message",

@@ -656,6 +656,20 @@ func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMe
 	// Add the action state to the job result
 	job.Result.SetResult(stateResult)
 
+	// Used by the observer
+	conv = append(conv, openai.ChatCompletionMessage{
+		Role: "assistant",
+		ToolCalls: []openai.ToolCall{
+			{
+				Type: openai.ToolTypeFunction,
+				Function: openai.FunctionCall{
+					Name: chosenAction.Definition().ToFunctionDefinition().Name,
+					Arguments: params.String(),
+				},
+			},
+		},
+	})
+
 	// Set conversation but leave Response empty
 	// The webui will detect the user-defined action and generate the proper tool call response
 	job.Result.Conversation = conv
