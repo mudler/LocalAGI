@@ -46,10 +46,34 @@ func (g *GithubIssuesReader) Run(ctx context.Context, params types.ActionParams)
 
 	issue, _, err := g.client.Issues.Get(ctx, result.Owner, result.Repository, result.IssueNumber)
 	if err == nil && issue != nil {
+		// Safe access to potentially nil fields
+		var issueNumber int
+		var repoName string
+		var title string
+		var body string
+
+		if issue.Number != nil {
+			issueNumber = *issue.Number
+		}
+
+		if issue.Repository != nil && issue.Repository.FullName != nil {
+			repoName = *issue.Repository.FullName
+		} else {
+			repoName = fmt.Sprintf("%s/%s", result.Owner, result.Repository)
+		}
+
+		if issue.Title != nil {
+			title = *issue.Title
+		}
+
+		if issue.Body != nil {
+			body = *issue.Body
+		}
+
 		return types.ActionResult{
 			Result: fmt.Sprintf(
 				"Issue %d Repository: %s\nTitle: %s\nBody: %s",
-				*issue.Number, *issue.Repository.FullName, *issue.Title, *issue.Body)}, nil
+				issueNumber, repoName, title, body)}, nil
 	}
 	if err != nil {
 		return types.ActionResult{Result: fmt.Sprintf("Error fetching issue: %s", err.Error())}, err
@@ -82,11 +106,11 @@ func (g *GithubIssuesReader) Definition() types.ActionDefinition {
 		Properties: map[string]jsonschema.Definition{
 			"issue_number": {
 				Type:        jsonschema.Number,
-				Description: "The number of the issue to add the label to.",
+				Description: "The number of the issue to read.",
 			},
 			"repository": {
 				Type:        jsonschema.String,
-				Description: "The repository to add the label to.",
+				Description: "The repository to read the issue from.",
 			},
 			"owner": {
 				Type:        jsonschema.String,

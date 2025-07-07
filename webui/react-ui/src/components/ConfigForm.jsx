@@ -32,26 +32,59 @@ const ConfigForm = ({
     })),
   ];
 
-  // Parse the config JSON string to an object
+  // Parse the config JSON string to an object and ensure default values are applied
   const parseConfig = (item) => {
     if (!item || !item.config) return {};
 
+    let config = {};
     try {
-      return typeof item.config === "string"
+      config = typeof item.config === "string"
         ? JSON.parse(item.config || "{}")
         : item.config;
     } catch (error) {
       console.error(`Error parsing ${itemType} config:`, error);
-      return {};
+      config = {};
     }
+
+    // Ensure default values are applied for any missing fields
+    const itemTypeName = item[typeField] || "";
+    const fieldGroup = fieldGroups.find((group) => group.name === itemTypeName);
+    
+    if (fieldGroup && fieldGroup.fields) {
+      fieldGroup.fields.forEach((field) => {
+        // Only set default if the field doesn't already have a value
+        if (field.hasOwnProperty('defaultValue') && 
+            field.defaultValue !== undefined && 
+            !config.hasOwnProperty(field.name)) {
+          config[field.name] = field.defaultValue;
+        }
+      });
+    }
+
+    return config;
   };
 
   // Handle item type change
   const handleTypeChange = (index, value) => {
     const item = items[index];
+    
+    // Find the field group for the selected type
+    const fieldGroup = fieldGroups.find((group) => group.name === value);
+    
+    // Initialize config with default values for all fields
+    let defaultConfig = {};
+    if (fieldGroup && fieldGroup.fields) {
+      fieldGroup.fields.forEach((field) => {
+        if (field.hasOwnProperty('defaultValue') && field.defaultValue !== undefined) {
+          defaultConfig[field.name] = field.defaultValue;
+        }
+      });
+    }
+    
     onChange(index, {
       ...item,
       [typeField]: value,
+      config: JSON.stringify(defaultConfig),
     });
   };
 
@@ -61,8 +94,24 @@ const ConfigForm = ({
     const item = items[index];
     const config = parseConfig(item);
 
+    // Update the specific field
     if (type === "checkbox") config[key] = checked ? "true" : "false";
     else config[key] = value;
+
+    // Ensure all default values are preserved for fields that haven't been explicitly set
+    const itemTypeName = item[typeField] || "";
+    const fieldGroup = fieldGroups.find((group) => group.name === itemTypeName);
+    
+    if (fieldGroup && fieldGroup.fields) {
+      fieldGroup.fields.forEach((field) => {
+        // Only set default if the field doesn't already have a value
+        if (field.hasOwnProperty('defaultValue') && 
+            field.defaultValue !== undefined && 
+            !config.hasOwnProperty(field.name)) {
+          config[field.name] = field.defaultValue;
+        }
+      });
+    }
 
     onChange(index, {
       ...item,
@@ -80,6 +129,21 @@ const ConfigForm = ({
     const fieldGroup = fieldGroups.find((group) => group.name === itemTypeName);
     const itemTypeLabel =
       itemType.charAt(0).toUpperCase() + itemType.slice(1).replace("_", " ");
+
+    // Ensure config includes default values (this will update the form data if needed)
+    const configWithDefaults = parseConfig(safeItem);
+    const currentConfigString = JSON.stringify(configWithDefaults);
+    
+    // Update the form data if the config has changed to include defaults
+    if (safeItem.config !== currentConfigString && itemTypeName) {
+      // Trigger update to include default values in the actual form data
+      setTimeout(() => {
+        onChange(index, {
+          ...safeItem,
+          config: currentConfigString,
+        });
+      }, 0);
+    }
 
     return (
       <div key={index} className="config-item mb-4 card">
@@ -126,7 +190,7 @@ const ConfigForm = ({
         {fieldGroup && fieldGroup.fields && (
           <FormFieldDefinition
             fields={fieldGroup.fields}
-            values={parseConfig(item)}
+            values={configWithDefaults}
             onChange={(e) => handleConfigChange(index, e)}
             idPrefix={`${itemType}-${index}-`}
           />

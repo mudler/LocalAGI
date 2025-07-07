@@ -1301,6 +1301,9 @@ func getAvailableModels() []map[string]interface{} {
 
 	for _, model := range openrouterModels {
 		if model["id"] == "deepseek/deepseek-chat-v3-0324:free" {
+			model["id"] = "gpt-4o"
+			model["name"] = "gpt-4o"
+			model["description"] = "gpt-4o"
 			return []map[string]interface{}{model}
 		}
 	}
