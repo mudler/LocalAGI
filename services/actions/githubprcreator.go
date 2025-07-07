@@ -18,13 +18,18 @@ type GithubPRCreator struct {
 func NewGithubPRCreator(config map[string]string) *GithubPRCreator {
 	client := github.NewClient(nil).WithAuthToken(config["token"])
 
+	defaultBranch := config["defaultBranch"]
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
 	return &GithubPRCreator{
 		client:           client,
 		token:            config["token"],
 		repository:       config["repository"],
 		owner:            config["owner"],
 		customActionName: config["customActionName"],
-		defaultBranch:    config["defaultBranch"],
+		defaultBranch:    defaultBranch,
 	}
 }
 
@@ -115,6 +120,11 @@ func (g *GithubPRCreator) Run(ctx context.Context, params types.ActionParams) (t
 
 	if result.BaseBranch == "" {
 		result.BaseBranch = g.defaultBranch
+	}
+
+	// Final safety check to ensure BaseBranch is never empty
+	if result.BaseBranch == "" {
+		result.BaseBranch = "main"
 	}
 
 	// Create or update branch

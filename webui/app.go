@@ -1731,9 +1731,10 @@ func validateActionFields(actionType string, config map[string]interface{}, acti
 	case "github-issue-labeler", "github-issue-opener", "github-issue-closer",
 		"github-issue-commenter", "github-issue-reader", "github-issue-searcher":
 		return validateBasicGitHubFields(config, actionIndex, actionType)
-	case "github-repository-get-content", "github-get-all-repository-content",
-		"github-repository-create-or-update-content":
+	case "github-repository-get-content", "github-get-all-repository-content":
 		return validateBasicGitHubFields(config, actionIndex, actionType)
+	case "github-repository-create-or-update-content":
+		return validateGitHubCreateUpdateFields(config, actionIndex, actionType)
 	case "github-readme":
 		return validateGitHubReadmeFields(config, actionIndex)
 	case "github-pr-reader", "github-pr-commenter", "github-pr-reviewer", "github-pr-creator":
@@ -1783,6 +1784,32 @@ func validateBasicGitHubFields(config map[string]interface{}, index int, actionT
 			return fmt.Errorf("action %d (%s): %s is required", index, actionType, field)
 		}
 	}
+	return nil
+}
+
+// validateGitHubCreateUpdateFields validates GitHub repository create/update action fields
+func validateGitHubCreateUpdateFields(config map[string]interface{}, index int, actionType string) error {
+	// First validate the basic required fields
+	if err := validateBasicGitHubFields(config, index, actionType); err != nil {
+		return err
+	}
+
+	// Validate commitMail if provided (should be valid email format)
+	if commitMail, ok := config["commitMail"]; ok && commitMail != nil {
+		commitMailStr := fmt.Sprintf("%v", commitMail)
+		if commitMailStr != "" && !isValidEmail(commitMailStr) {
+			return fmt.Errorf("action %d (%s): commitMail must be a valid email address", index, actionType)
+		}
+	}
+
+	// Validate commitAuthor if provided (reasonable length)
+	if commitAuthor, ok := config["commitAuthor"]; ok && commitAuthor != nil {
+		commitAuthorStr := fmt.Sprintf("%v", commitAuthor)
+		if len(commitAuthorStr) > 100 {
+			return fmt.Errorf("action %d (%s): commitAuthor must be 100 characters or less", index, actionType)
+		}
+	}
+
 	return nil
 }
 

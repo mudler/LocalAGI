@@ -154,20 +154,10 @@ func (g *GithubPRCommenter) Run(ctx context.Context, params types.ActionParams) 
 		return types.ActionResult{Result: "No comment provided"}, nil
 	}
 
-	// Try both PullRequests and Issues API for general comments
-	var resp *github.Response
-
-	// First try PullRequests API
-	_, resp, err = g.client.PullRequests.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, &github.PullRequestComment{
+	// Use Issues API for general comments (GitHub treats PR comments as issue comments)
+	_, _, err = g.client.Issues.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, &github.IssueComment{
 		Body: &result.Comment,
 	})
-
-	// If that fails with 403, try Issues API
-	if err != nil && resp != nil && resp.StatusCode == 403 {
-		_, resp, err = g.client.Issues.CreateComment(ctx, result.Owner, result.Repository, result.PRNumber, &github.IssueComment{
-			Body: &result.Comment,
-		})
-	}
 
 	if err != nil {
 		return types.ActionResult{Result: fmt.Sprintf("Error adding general comment: %s", err.Error())}, nil
