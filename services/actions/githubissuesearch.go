@@ -28,7 +28,7 @@ func NewGithubIssueSearch(config map[string]string) *GithubIssueSearch {
 	}
 }
 
-func (g *GithubIssueSearch) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubIssueSearch) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Query      string `json:"query"`
 		Repository string `json:"repository"`

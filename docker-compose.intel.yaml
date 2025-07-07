@@ -7,16 +7,21 @@ services:
       - LOCALAI_SINGLE_ACTIVE_BACKEND=true
       - DEBUG=true
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-    image: localai/localai:master-sycl-f32-ffmpeg-core
+    image: localai/localai:master-gpu-intel-f32
     devices:
       # On a system with integrated GPU and an Arc 770, this is the Arc 770
       - /dev/dri/card1
       - /dev/dri/renderD129
-    command: 
-    - ${MODEL_NAME:-arcee-agent}
-    - ${MULTIMODAL_MODEL:-minicpm-v-2_6}
-    - ${IMAGE_MODEL:-sd-1.5-ggml}
-    - granite-embedding-107m-multilingual
+
+  mcpbox:
+    extends:
+      file: docker-compose.yaml
+      service: mcpbox
+
+  dind:
+    extends:
+      file: docker-compose.yaml
+      service: dind
 
   localrecall:
     extends:

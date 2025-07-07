@@ -30,7 +30,7 @@ func NewGithubRepositoryCreateOrUpdateContent(config map[string]string) *GithubR
 	}
 }
 
-func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Path          string `json:"path"`
 		Repository    string `json:"repository"`

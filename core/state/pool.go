@@ -39,6 +39,8 @@ type AgentPool struct {
 	dynamicPrompt                        func(*AgentConfig) []DynamicPrompt
 	timeout                              string
 	conversationLogs                     string
+	mcpBoxURL                            string
+	filters                              func(*AgentConfig) types.JobFilters
 }
 
 type Status struct {
@@ -72,11 +74,12 @@ type AgentPoolData map[string]AgentConfig
 // }
 
 func NewAgentPool(
-	userId, defaultModel, defaultMultimodalModel, imageModel,
+	userId, defaultModel, defaultMultimodalModel, imageModel, mcpBoxURL string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) []DynamicPrompt,
+	filters func(*AgentConfig) types.JobFilters,
 	timeout string,
 	withLogs bool,
 ) (*AgentPool, error) {
@@ -110,6 +113,7 @@ func NewAgentPool(
 		userId:                 userId,
 		defaultModel:           defaultModel,
 		defaultMultimodalModel: defaultMultimodalModel,
+		mcpBoxURL:              mcpBoxURL,
 		imageModel:             imageModel,
 		localRAGAPI:            LocalRAGAPI,
 		agents:                 make(map[string]*Agent),
@@ -117,6 +121,7 @@ func NewAgentPool(
 		agentStatus:            make(map[string]*Status),
 		managers:               make(map[string]sse.Manager),
 		connectors:             connectors,
+		filters:                filters,
 		availableActions:       availableActions,
 		dynamicPrompt:          promptBlocks,
 		timeout:                timeout,
@@ -125,11 +130,12 @@ func NewAgentPool(
 }
 
 func NewEmptyAgentPool(
-	userId, defaultModel, defaultMultimodalModel, imageModel,
+	userId, defaultModel, defaultMultimodalModel, imageModel, mcpBoxURL string,
 	localRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) []DynamicPrompt,
+	filters func(*AgentConfig) types.JobFilters,
 	timeout string,
 	withLogs bool,
 ) *AgentPool {
@@ -180,7 +186,7 @@ func (a *AgentPool) CreateAgent(id string, agentConfig *AgentConfig) error {
 	// Insert into the pool
 	a.pool[id] = *agentConfig
 
-	return a.startAgentWithConfig(id, agentConfig)
+	return a.startAgentWithConfig(id, agentConfig, nil)
 }
 
 func (a *AgentPool) List() []string {
@@ -204,8 +210,13 @@ func (a *AgentPool) GetStatusHistory(id string) *Status {
 	return a.agentStatus[id]
 }
 
-func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
-	manager := sse.NewManager(5)
+func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Observer) error {
+	var manager sse.Manager
+	if m, ok := a.managers[id]; ok {
+		manager = m
+	} else {
+		manager = sse.NewManager(5)
+	}
 	ctx := context.Background()
 	model := a.defaultModel
 	multimodalModel := a.defaultMultimodalModel
@@ -216,6 +227,12 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 
 	if config.Model != "" {
 		model = config.Model
+	} else {
+		config.Model = model
+	}
+
+	if config.MCPBoxURL != "" {
+		a.mcpBoxURL = config.MCPBoxURL
 	}
 
 	if config.PeriodicRuns == "" {
@@ -233,6 +250,7 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)
 	actions := a.availableActions(config)(ctx, a)
+	filters := a.filters(config)
 
 	actionsLog := []string{}
 	for _, action := range actions {
@@ -244,12 +262,18 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 		connectorLog = append(connectorLog, fmt.Sprintf("%+v", connector))
 	}
 
+	filtersLog := []string{}
+	for _, filter := range filters {
+		filtersLog = append(filtersLog, filter.Name())
+	}
+
 	xlog.Info(
 		"Creating agent",
 		"id", id,
 		"model", model,
 		"actions", actionsLog,
 		"connectors", connectorLog,
+		"filters", filtersLog,
 	)
 
 	// dynamicPrompts := []map[string]string{}
@@ -258,6 +282,9 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 	// }
 
 	fmt.Printf("DEBUG: Creating agent with config - RandomIdentity: %v, IdentityGuidance: '%s'\n", config.RandomIdentity, config.IdentityGuidance)
+	if obs == nil {
+		obs = NewSSEObserver(id, manager)
+	}
 
 	opts := []Option{
 		WithModel(model),
@@ -265,7 +292,11 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 		WithMCPServers(config.MCPServers...),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
+		WithMCPSTDIOServers(config.MCPSTDIOServers...),
+		WithMCPBoxURL(a.mcpBoxURL),
 		WithPrompts(promptBlocks...),
+		WithJobFilters(filters...),
+		WithMCPPrepareScript(config.MCPPrepareScript),
 		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
 			Name: id,
@@ -335,6 +366,7 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 		}),
 		WithLLMAPIURL(os.Getenv("LOCALAGI_LLM_API_URL")),
 		WithLLMAPIKey(os.Getenv("LOCALAGI_LLM_API_KEY")),
+		WithObserver(obs),
 	}
 
 	if config.HUD {
@@ -390,6 +422,10 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 		opts = append(opts, EnableForceReasoning)
 	}
 
+	if config.StripThinkingTags {
+		opts = append(opts, EnableStripThinkingTags)
+	}
+
 	if config.KnowledgeBaseResults > 0 {
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
@@ -399,6 +435,17 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig) error {
 	}
 
 	opts = append(opts, WithMySQLForSummaries())
+
+	if config.ParallelJobs > 0 {
+		opts = append(opts, WithParallelJobs(config.ParallelJobs))
+	}
+
+	if config.EnableEvaluation {
+		opts = append(opts, EnableEvaluation())
+		if config.MaxEvaluationLoops > 0 {
+			opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
+		}
+	}
 
 	xlog.Info("Starting agent", "id", id, "config", config)
 
@@ -444,7 +491,7 @@ func (a *AgentPool) StartAll() error {
 		if a.agents[id] != nil { // Agent already started
 			continue
 		}
-		if err := a.startAgentWithConfig(id, &config); err != nil {
+		if err := a.startAgentWithConfig(id, &config, nil); err != nil {
 			xlog.Error("Failed to start agent", "id", id, "error", err)
 		}
 	}
@@ -482,7 +529,7 @@ func (a *AgentPool) Start(id string) error {
 		return nil
 	}
 	if config, ok := a.pool[id]; ok {
-		return a.startAgentWithConfig(id, &config)
+		return a.startAgentWithConfig(id, &config, nil)
 	}
 
 	return fmt.Errorf("agent %s not found", id)
@@ -604,9 +651,24 @@ func (a *AgentPool) CreateAgentWithExistingManager(id string, agentConfig *Agent
 
 	a.Unlock()
 
+	oldAgent := a.agents[id]
+	var o *types.Observable
+	obs := oldAgent.Observer()
+	if obs != nil {
+		o = obs.NewObservable()
+		o.Name = "Restarting Agent"
+		o.Icon = "sync"
+		o.Creation = &types.Creation{}
+		obs.Update(*o)
+	}
+
 	// Start agent (this will create a new manager)
-	err := a.startAgentWithConfig(id, agentConfig)
+	err := a.startAgentWithConfig(id, agentConfig, obs)
 	if err != nil {
+		if obs != nil {
+			o.Completion = &types.Completion{Error: err.Error()}
+			obs.Update(*o)
+		}
 		return err
 	}
 
@@ -616,6 +678,11 @@ func (a *AgentPool) CreateAgentWithExistingManager(id string, agentConfig *Agent
 		a.managers[id] = existingManager
 		a.Unlock()
 		xlog.Info("Restored existing SSE manager", "id", id)
+	}
+
+	if obs != nil {
+		o.Completion = &types.Completion{}
+		obs.Update(*o)
 	}
 
 	return nil

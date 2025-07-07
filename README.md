@@ -2,7 +2,7 @@
   <img src="./webui/react-ui/public/logo_1.png" alt="LocalAGI Logo" width="220"/>
 </p>
 
-<h3 align="center"><em>Your AI. Your Hardware. Your Rules.</em></h3>
+<h3 align="center"><em>Your AI. Your Hardware. Your Rules</em></h3>
 
 <div align="center">
   
@@ -11,11 +11,14 @@
 [![GitHub stars](https://img.shields.io/github/stars/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/mudler/LocalAGI)](https://github.com/mudler/LocalAGI/issues)
 
+
+Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/LocalAGI_bot)
+
 </div>
 
-We empower you building AI Agents that you can run locally, without coding.
+Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
 
-**LocalAGI** is a powerful, self-hostable AI Agent platform designed for maximum privacy and flexibility. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
+**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
 
 ## 🛡️ Take Back Your Privacy
 
@@ -37,6 +40,7 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 🖼 **Multimodal Support**: Ready for vision, text, and more.
 - 🔧 **Extensible Custom Actions**: Easily script dynamic agent behaviors in Go (interpreted, no compilation!).
 - 🛠 **Fully Customizable Models**: Use your own models or integrate seamlessly with [LocalAI](https://github.com/mudler/LocalAI).
+- 📊 **Observability**: Monitor agent status and view detailed observable updates in real-time.
 
 ## 🛠️ Quickstart
 
@@ -54,17 +58,30 @@ docker compose -f docker-compose.nvidia.yaml up
 # Intel GPU setup (for Intel Arc and integrated GPUs)
 docker compose -f docker-compose.intel.yaml up
 
+# AMD GPU setup
+docker compose -f docker-compose.amd.yaml up
+
 # Start with a specific model (see available models in models.localai.io, or localai.io to use any model in huggingface)
 MODEL_NAME=gemma-3-12b-it docker compose up
 
 # NVIDIA GPU setup with custom multimodal and image models
 MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
-IMAGE_MODEL=flux.1-dev \
+MULTIMODAL_MODEL=moondream2-20250414 \
+IMAGE_MODEL=flux.1-dev-ggml \
 docker compose -f docker-compose.nvidia.yaml up
 ```
 
 Now you can access and manage your agents at [http://localhost:8080](http://localhost:8080)
+
+Still having issues? see this Youtube video: https://youtu.be/HtVwIxW3ePg
+
+## Videos
+
+[![Creating a basic agent](https://img.youtube.com/vi/HtVwIxW3ePg/mqdefault.jpg)](https://youtu.be/HtVwIxW3ePg)
+[![Agent Observability](https://img.youtube.com/vi/v82rswGJt_M/mqdefault.jpg)](https://youtu.be/v82rswGJt_M)
+[![Filters and Triggers](https://img.youtube.com/vi/d_we-AYksSw/mqdefault.jpg)](https://youtu.be/d_we-AYksSw)
+[![RAG and Matrix](https://img.youtube.com/vi/2Xvx78i5oBs/mqdefault.jpg)](https://youtu.be/2Xvx78i5oBs)
+
 
 ## 📚🆕 Local Stack Family
 
@@ -74,11 +91,11 @@ Now you can access and manage your agents at [http://localhost:8080](http://loca
   <tr>
     <td width="50%" valign="top">
       <a href="https://github.com/mudler/LocalAI">
-        <img src="https://raw.githubusercontent.com/mudler/LocalAI/refs/heads/rebranding/core/http/static/logo_horizontal.png" width="300" alt="LocalAI Logo">
+        <img src="https://raw.githubusercontent.com/mudler/LocalAI/refs/heads/master/core/http/static/logo_horizontal.png" width="300" alt="LocalAI Logo">
       </a>
     </td>
     <td width="50%" valign="top">
-      <h3><a href="https://github.com/mudler/LocalRecall">LocalAI</a></h3>
+      <h3><a href="https://github.com/mudler/LocalAI">LocalAI</a></h3>
       <p>LocalAI is the free, Open Source OpenAI alternative. LocalAI act as a drop-in replacement REST API that's compatible with OpenAI API specifications for local AI inferencing. Does not require GPU.</p>
     </td>
   </tr>
@@ -112,9 +129,9 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose -f docker-compose.nvidia.yaml up`
 - Default models:
-  - Text: `arcee-agent`
-  - Multimodal: `minicpm-v-2_6`
-  - Image: `flux.1-dev`
+  - Text: `gemma-3-4b-it-qat`
+  - Multimodal: `moondream2-20250414`
+  - Image: `sd-1.5-ggml`
 - Environment variables:
   - `MODEL_NAME`: Text model to use
   - `MULTIMODAL_MODEL`: Multimodal model to use
@@ -128,8 +145,8 @@ LocalAGI supports multiple hardware configurations through Docker Compose profil
 - Supports text, multimodal, and image generation models
 - Run with: `docker compose -f docker-compose.intel.yaml up`
 - Default models:
-  - Text: `arcee-agent`
-  - Multimodal: `minicpm-v-2_6`
+  - Text: `gemma-3-4b-it-qat`
+  - Multimodal: `moondream2-20250414`
   - Image: `sd-1.5-ggml`
 - Environment variables:
   - `MODEL_NAME`: Text model to use
@@ -147,21 +164,21 @@ MODEL_NAME=gemma-3-12b-it docker compose up
 
 # NVIDIA GPU with custom models
 MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
-IMAGE_MODEL=flux.1-dev \
+MULTIMODAL_MODEL=moondream2-20250414 \
+IMAGE_MODEL=flux.1-dev-ggml \
 docker compose -f docker-compose.nvidia.yaml up
 
 # Intel GPU with custom models
 MODEL_NAME=gemma-3-12b-it \
-MULTIMODAL_MODEL=minicpm-v-2_6 \
+MULTIMODAL_MODEL=moondream2-20250414 \
 IMAGE_MODEL=sd-1.5-ggml \
 docker compose -f docker-compose.intel.yaml up
 ```
 
 If no models are specified, it will use the defaults:
-- Text model: `arcee-agent`
-- Multimodal model: `minicpm-v-2_6`
-- Image model: `flux.1-dev` (NVIDIA) or `sd-1.5-ggml` (Intel)
+- Text model: `gemma-3-4b-it-qat`
+- Multimodal model: `moondream2-20250414`
+- Image model: `sd-1.5-ggml`
 
 Good (relatively small) models that have been tested are:
 
@@ -177,14 +194,6 @@ Good (relatively small) models that have been tested are:
 - **✓ Effortless Setup**: Simple Docker compose setups and pre-built binaries.
 - **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, LocalAGI has it all.
 
-## 🌐 The Local Ecosystem
-
-LocalAGI is part of the powerful Local family of privacy-focused AI tools:
-
-- [**LocalAI**](https://github.com/mudler/LocalAI): Run Large Language Models locally.
-- [**LocalRecall**](https://github.com/mudler/LocalRecall): Retrieval-Augmented Generation with local storage.
-- [**LocalAGI**](https://github.com/mudler/LocalAGI): Deploy intelligent AI agents securely and privately.
-
 ## 🌟 Screenshots
 
 ### Powerful Web UI
@@ -192,6 +201,8 @@ LocalAGI is part of the powerful Local family of privacy-focused AI tools:
 ![Web UI Dashboard](https://github.com/user-attachments/assets/a40194f9-af3a-461f-8b39-5f4612fbf221)
 ![Web UI Agent Settings](https://github.com/user-attachments/assets/fb3c3e2a-cd53-4ca8-97aa-c5da51ff1f83)
 ![Web UI Create Group](https://github.com/user-attachments/assets/102189a2-0fba-4a1e-b0cb-f99268ef8062)
+![Web UI Agent Observability](https://github.com/user-attachments/assets/f7359048-9d28-4cf1-9151-1f5556ce9235)
+
 
 ### Connectors Ready-to-Go
 
@@ -254,6 +265,407 @@ go build -o localagi
 ./localagi
 ```
 
+### Using as a Library
+
+LocalAGI can be used as a Go library to programmatically create and manage AI agents. Let's start with a simple example of creating a single agent:
+
+<details>
+<summary><strong>Basic Usage: Single Agent</strong></summary>
+
+```go
+import (
+    "github.com/mudler/LocalAGI/core/agent"
+    "github.com/mudler/LocalAGI/core/types"
+)
+
+// Create a new agent with basic configuration
+agent, err := agent.New(
+    agent.WithModel("gpt-4"),
+    agent.WithLLMAPIURL("http://localhost:8080"),
+    agent.WithLLMAPIKey("your-api-key"),
+    agent.WithSystemPrompt("You are a helpful assistant."),
+    agent.WithCharacter(agent.Character{
+        Name: "my-agent",
+    }),
+    agent.WithActions(
+        // Add your custom actions here
+    ),
+    agent.WithStateFile("./state/my-agent.state.json"),
+    agent.WithCharacterFile("./state/my-agent.character.json"),
+    agent.WithTimeout("10m"),
+    agent.EnableKnowledgeBase(),
+    agent.EnableReasoning(),
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+// Start the agent
+go func() {
+    if err := agent.Run(); err != nil {
+        log.Printf("Agent stopped: %v", err)
+    }
+}()
+
+// Stop the agent when done
+agent.Stop()
+```
+
+This basic example shows how to:
+- Create a single agent with essential configuration
+- Set up the agent's model and API connection
+- Configure basic features like knowledge base and reasoning
+- Start and stop the agent
+
+</details>
+
+<details>
+<summary><strong>Advanced Usage: Agent Pools</strong></summary>
+
+For managing multiple agents, you can use the AgentPool system:
+
+```go
+import (
+    "github.com/mudler/LocalAGI/core/state"
+    "github.com/mudler/LocalAGI/core/types"
+)
+
+// Create a new agent pool
+pool, err := state.NewAgentPool(
+    "default-model",           // default model name
+    "default-multimodal-model", // default multimodal model
+    "image-model",            // image generation model
+    "http://localhost:8080",  // API URL
+    "your-api-key",          // API key
+    "./state",               // state directory
+    "",                      // MCP box URL (optional)
+    "http://localhost:8081", // LocalRAG API URL
+    func(config *AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action {
+        // Define available actions for agents
+        return func(ctx context.Context, pool *AgentPool) []types.Action {
+            return []types.Action{
+                // Add your custom actions here
+            }
+        }
+    },
+    func(config *AgentConfig) []Connector {
+        // Define connectors for agents
+        return []Connector{
+            // Add your custom connectors here
+        }
+    },
+    func(config *AgentConfig) []DynamicPrompt {
+        // Define dynamic prompts for agents
+        return []DynamicPrompt{
+            // Add your custom prompts here
+        }
+    },
+    func(config *AgentConfig) types.JobFilters {
+        // Define job filters for agents
+        return types.JobFilters{
+            // Add your custom filters here
+        }
+    },
+    "10m", // timeout
+    true,  // enable conversation logs
+)
+
+// Create a new agent in the pool
+agentConfig := &AgentConfig{
+    Name: "my-agent",
+    Model: "gpt-4",
+    SystemPrompt: "You are a helpful assistant.",
+    EnableKnowledgeBase: true,
+    EnableReasoning: true,
+    // Add more configuration options as needed
+}
+
+err = pool.CreateAgent("my-agent", agentConfig)
+
+// Start all agents
+err = pool.StartAll()
+
+// Get agent status
+status := pool.GetStatusHistory("my-agent")
+
+// Stop an agent
+pool.Stop("my-agent")
+
+// Remove an agent
+err = pool.Remove("my-agent")
+```
+
+</details>
+
+<details>
+<summary><strong>Available Features</strong></summary>
+
+Key features available through the library:
+
+- **Single Agent Management**: Create and manage individual agents with basic configuration
+- **Agent Pool Management**: Create, start, stop, and remove multiple agents
+- **Configuration**: Customize agent behavior through AgentConfig
+- **Actions**: Define custom actions for agents to perform
+- **Connectors**: Add custom connectors for external services
+- **Dynamic Prompts**: Create dynamic prompt templates
+- **Job Filters**: Implement custom job filtering logic
+- **Status Tracking**: Monitor agent status and history
+- **State Persistence**: Automatic state saving and loading
+
+For more details about available configuration options and features, refer to the [Agent Configuration Reference](#agent-configuration-reference) section.
+
+</details>
+
+## 🔧 Extending LocalAGI
+
+LocalAGI provides two powerful ways to extend its functionality with custom actions:
+
+### 1. Custom Actions (Go Code)
+
+LocalAGI supports custom actions written in Go that can be defined inline when creating an agent. These actions are interpreted at runtime, so no compilation is required.
+
+#### How Custom Actions Work
+
+When creating a new Agent, in the action sections select the "custom" action, you can add the Golang code directly there.
+
+Custom actions in LocalAGI require three main functions:
+
+1. **`Run(config map[string]interface{}) (string, map[string]interface{}, error)`** - The main execution function
+2. **`Definition() map[string][]string`** - Defines the action's parameters and their types
+3. **`RequiredFields() []string`** - Specifies which parameters are required
+
+Note: You can't use additional modules, but just use libraries that are included in Go.
+
+#### Example: Weather Information Action
+
+Here's a practical example of a custom action that fetches weather information:
+
+```go
+import (
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "io"
+)
+
+type WeatherParams struct {
+    City    string `json:"city"`
+    Country string `json:"country"`
+}
+
+type WeatherResponse struct {
+    Main struct {
+        Temp     float64 `json:"temp"`
+        Humidity int     `json:"humidity"`
+    } `json:"main"`
+    Weather []struct {
+        Description string `json:"description"`
+    } `json:"weather"`
+}
+
+func Run(config map[string]interface{}) (string, map[string]interface{}, error) {
+    // Parse parameters
+    p := WeatherParams{}
+    b, err := json.Marshal(config)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+    if err := json.Unmarshal(b, &p); err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    // Make API call to weather service
+    url := fmt.Sprintf("http://api.openweathermap.org/data/2.5/weather?q=%s,%s&appid=YOUR_API_KEY&units=metric", p.City, p.Country)
+    resp, err := http.Get(url)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    var weather WeatherResponse
+    if err := json.Unmarshal(body, &weather); err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    // Format response
+    result := fmt.Sprintf("Weather in %s, %s: %.1f°C, %s, Humidity: %d%%", 
+        p.City, p.Country, weather.Main.Temp, weather.Weather[0].Description, weather.Main.Humidity)
+
+    return result, map[string]interface{}{}, nil
+}
+
+func Definition() map[string][]string {
+    return map[string][]string{
+        "city": []string{
+            "string",
+            "The city name to get weather for",
+        },
+        "country": []string{
+            "string", 
+            "The country code (e.g., US, UK, DE)",
+        },
+    }
+}
+
+func RequiredFields() []string {
+    return []string{"city", "country"}
+}
+```
+
+#### Example: File System Action
+
+Here's another example that demonstrates file system operations:
+
+```go
+import (
+    "encoding/json"
+    "fmt"
+    "os"
+    "path/filepath"
+)
+
+type FileParams struct {
+    Path    string `json:"path"`
+    Action  string `json:"action"`
+    Content string `json:"content,omitempty"`
+}
+
+func Run(config map[string]interface{}) (string, map[string]interface{}, error) {
+    p := FileParams{}
+    b, err := json.Marshal(config)
+    if err != nil {
+        return "", map[string]interface{}{}, err
+    }
+    if err := json.Unmarshal(b, &p); err != nil {
+        return "", map[string]interface{}{}, err
+    }
+
+    switch p.Action {
+    case "read":
+        content, err := os.ReadFile(p.Path)
+        if err != nil {
+            return "", map[string]interface{}{}, err
+        }
+        return string(content), map[string]interface{}{}, nil
+        
+    case "write":
+        err := os.WriteFile(p.Path, []byte(p.Content), 0644)
+        if err != nil {
+            return "", map[string]interface{}{}, err
+        }
+        return fmt.Sprintf("Successfully wrote to %s", p.Path), map[string]interface{}{}, nil
+        
+    case "list":
+        files, err := os.ReadDir(p.Path)
+        if err != nil {
+            return "", map[string]interface{}{}, err
+        }
+        
+        var fileList []string
+        for _, file := range files {
+            fileList = append(fileList, file.Name())
+        }
+        
+        result, _ := json.Marshal(fileList)
+        return string(result), map[string]interface{}{}, nil
+        
+    default:
+        return "", map[string]interface{}{}, fmt.Errorf("unknown action: %s", p.Action)
+    }
+}
+
+func Definition() map[string][]string {
+    return map[string][]string{
+        "path": []string{
+            "string",
+            "The file or directory path",
+        },
+        "action": []string{
+            "string",
+            "The action to perform: read, write, or list",
+        },
+        "content": []string{
+            "string",
+            "Content to write (required for write action)",
+        },
+    }
+}
+
+func RequiredFields() []string {
+    return []string{"path", "action"}
+}
+```
+
+#### Using Custom Actions in Agents
+
+To use custom actions, add them to your agent configuration:
+
+1. **Via Web UI**: In the agent creation form, add a "Custom" action and paste your Go code
+2. **Via API**: Include the custom action in your agent configuration JSON
+3. **Via Library**: Add the custom action to your agent's actions list
+
+### 2. MCP (Model Context Protocol) Servers
+
+LocalAGI supports both local and remote MCP servers, allowing you to extend functionality with external tools and services.
+
+#### What is MCP?
+
+The Model Context Protocol (MCP) is a standard for connecting AI applications to external data sources and tools. LocalAGI can connect to any MCP-compliant server to access additional capabilities.
+
+#### Local MCP Servers
+
+Local MCP servers run as processes that LocalAGI can spawn and communicate with via STDIO.
+
+##### Example: GitHub MCP Server
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_TOKEN>"
+      }
+    }
+  }
+}
+```
+
+#### Remote MCP Servers
+
+Remote MCP servers are HTTP-based and can be accessed over the network.
+
+#### Creating Your Own MCP Server
+
+You can create MCP servers in any language that supports the MCP protocol and add the URLs of the servers to LocalAGI.
+
+#### Configuring MCP Servers in LocalAGI
+
+1. **Via Web UI**: In the MCP Settings section of agent creation, add MCP servers
+2. **Via API**: Include MCP server configuration in your agent config
+
+#### Best Practices
+
+- **Security**: Always validate inputs and use proper authentication for remote MCP servers
+- **Error Handling**: Implement robust error handling in your MCP servers
+- **Documentation**: Provide clear descriptions for all tools exposed by your MCP server
+- **Testing**: Test your MCP servers independently before integrating with LocalAGI
+- **Resource Management**: Ensure your MCP servers properly clean up resources
+
 ### Development
 
 The development workflow is similar to the source build, but with additional steps for hot reloading of the frontend:
@@ -267,7 +679,7 @@ cd LocalAGI
 cd webui/react-ui && bun i && bun run dev
 ```
 
-Then in seperate terminal:
+Then in separate terminal:
 
 ```bash
 # Start development server
@@ -280,7 +692,8 @@ cd ../.. && go run main.go
 
 Link your agents to the services you already use. Configuration examples below.
 
-### GitHub Issues
+<details>
+<summary><strong>GitHub Issues</strong></summary>
 
 ```json
 {
@@ -290,8 +703,10 @@ Link your agents to the services you already use. Configuration examples below.
   "botUserName": "bot-username"
 }
 ```
+</details>
 
-### Discord
+<details>
+<summary><strong>Discord</strong></summary>
 
 After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/discord.html):
 
@@ -303,8 +718,10 @@ After [creating your Discord bot](https://discordpy.readthedocs.io/en/stable/dis
 ```
 > Don't forget to enable "Message Content Intent" in Bot(tab) settings!
 > Enable " Message Content Intent " in the Bot tab!
+</details>
 
-### Slack
+<details>
+<summary><strong>Slack</strong></summary>
 
 Use the included `slack.yaml` manifest to create your app, then configure:
 
@@ -317,19 +734,39 @@ Use the included `slack.yaml` manifest to create your app, then configure:
 
 - Create Oauth token bot token from "OAuth & Permissions" -> "OAuth Tokens for Your Workspace"
 - Create App level token (from "Basic Information" -> "App-Level Tokens" ( scope connections:writeRoute authorizations:read ))
+</details>
 
-
-### Telegram
+<details>
+<summary><strong>Telegram</strong></summary>
 
 Get a token from @botfather, then:
 
 ```json
 { 
-  "token": "your-bot-father-token" 
+  "token": "your-bot-father-token",
+  "group_mode": "true",
+  "mention_only": "true",
+  "admins": "username1,username2"
 }
 ```
 
-### IRC
+Configuration options:
+- `token`: Your bot token from BotFather
+- `group_mode`: Enable/disable group chat functionality
+- `mention_only`: When enabled, bot only responds when mentioned in groups
+- `admins`: Comma-separated list of Telegram usernames allowed to use the bot in private chats
+- `channel_id`: Optional channel ID for the bot to send messages to
+
+> **Important**: For group functionality to work properly:
+> 1. Go to @BotFather
+> 2. Select your bot
+> 3. Go to "Bot Settings" > "Group Privacy"
+> 4. Select "Turn off" to allow the bot to read all messages in groups
+> 5. Restart your bot after changing this setting
+</details>
+
+<details>
+<summary><strong>IRC</strong></summary>
 
 Connect to IRC networks:
 
@@ -342,10 +779,29 @@ Connect to IRC networks:
   "alwaysReply": "false"
 }
 ```
+</details>
+
+<details>
+<summary><strong>Email</strong></summary>
+
+```json
+{
+  "smtpServer": "smtp.gmail.com:587",
+  "imapServer": "imap.gmail.com:993",
+  "smtpInsecure": "false",
+  "imapInsecure": "false",
+  "username": "user@gmail.com",
+  "email": "user@gmail.com",
+  "password": "correct-horse-battery-staple",
+  "name": "LogalAGI Agent"
+}
+```
+</details>
 
 ## REST API
 
-### Agent Management
+<details>
+<summary><strong>Agent Management</strong></summary>
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
@@ -360,8 +816,10 @@ Connect to IRC networks:
 | `/api/meta/agent/config` | GET | Get agent configuration metadata | |
 | `/settings/export/:name` | GET | Export agent config | [Example](#export-agent) |
 | `/settings/import` | POST | Import agent config | [Example](#import-agent) |
+</details>
 
-### Actions and Groups
+<details>
+<summary><strong>Actions and Groups</strong></summary>
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
@@ -369,8 +827,10 @@ Connect to IRC networks:
 | `/api/action/:name/run` | POST | Execute an action | |
 | `/api/agent/group/generateProfiles` | POST | Generate group profiles | |
 | `/api/agent/group/create` | POST | Create a new agent group | |
+</details>
 
-### Chat Interactions
+<details>
+<summary><strong>Chat Interactions</strong></summary>
 
 | Endpoint | Method | Description | Example |
 |----------|--------|-------------|---------|
@@ -378,6 +838,7 @@ Connect to IRC networks:
 | `/api/notify/:name` | POST | Send notification to agent | [Example](#notify-agent) |
 | `/api/sse/:name` | GET | Real-time agent event stream | [Example](#agent-sse-stream) |
 | `/v1/responses` | POST | Send message & get response | [OpenAI's Responses](https://platform.openai.com/docs/api-reference/responses/create) |
+</details>
 
 <details>
 <summary><strong>Curl Examples</strong></summary>
@@ -465,10 +926,12 @@ curl -X POST "http://localhost:3000/api/notify/my-agent" \
 curl -N -X GET "http://localhost:3000/api/sse/my-agent"
 ```
 Note: For proper SSE handling, you should use a client that supports SSE natively.
-
 </details>
 
 ### Agent Configuration Reference
+
+<details>
+<summary><strong>Configuration Structure</strong></summary>
 
 The agent configuration defines how an agent behaves and what capabilities it has. You can view the available configuration options and their descriptions by using the metadata endpoint:
 
@@ -502,6 +965,27 @@ Here's an example of the agent configuration structure:
   "summary_long_term_memory": false
 }
 ```
+</details>
+
+<details>
+<summary><strong>Environment Configuration</strong></summary>
+
+LocalAGI supports environment configurations. Note that these environment variables needs to be specified in the localagi container in the docker-compose file to have effect.
+
+| Variable | What It Does |
+|----------|--------------|
+| `LOCALAGI_MODEL` | Your go-to model |
+| `LOCALAGI_MULTIMODAL_MODEL` | Optional model for multimodal capabilities |
+| `LOCALAGI_LLM_API_URL` | OpenAI-compatible API server URL |
+| `LOCALAGI_LLM_API_KEY` | API authentication |
+| `LOCALAGI_TIMEOUT` | Request timeout settings |
+| `LOCALAGI_STATE_DIR` | Where state gets stored |
+| `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
+| `LOCALAGI_SSHBOX_URL` | LocalAGI SSHBox URL, e.g. user:pass@ip:port |
+| `LOCALAGI_MCPBOX_URL` | LocalAGI MCPBox URL, e.g. http://mcpbox:8080 |
+| `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
+| `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
+</details>
 
 ## LICENSE
 

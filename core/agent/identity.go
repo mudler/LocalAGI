@@ -12,7 +12,8 @@ func (a *Agent) generateIdentity(guidance string, userID, agentID uuid.UUID, mod
 		guidance = "Generate a random character for roleplaying."
 	}
 
-	err := llm.GenerateTypedJSON(a.context.Context, a.client, "Generate a character as JSON data. "+guidance, model, userID, agentID, a.options.character.ToJSONSchema(), &a.options.character)
+	err := llm.GenerateTypedJSONWithGuidance(a.context.Context, a.client, "Generate a character as JSON data. "+guidance, model, userID, agentID, a.options.character.ToJSONSchema(), &a.options.character)
+	//err := llm.GenerateJSONFromStruct(a.context.Context, a.client, guidance, a.options.LLMAPI.Model, &a.options.character)
 	a.Character = a.options.character
 
 	fmt.Println("generateIdentity", a.options.character, a.options.LLMAPI.Model, a.options.LLMAPI.APIKey)

@@ -25,7 +25,9 @@ type options struct {
 	randomIdentityGuidance                                                                       string
 	randomIdentity                                                                               bool
 	userActions                                                                                  types.Actions
+	jobFilters                                                                                   types.JobFilters
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
+	stripThinkingTags                                                                            bool
 
 	canStopItself         bool
 	initiateConversations bool
@@ -42,6 +44,10 @@ type options struct {
 	agentID               uuid.UUID
 	useMySQLForSummaries  bool
 
+	// Evaluation settings
+	maxEvaluationLoops int
+	enableEvaluation   bool
+
 	prompts []DynamicPrompt
 
 	systemPrompt string
@@ -52,9 +58,16 @@ type options struct {
 
 	conversationsPath string
 
-	mcpServers []MCPServer
-
+	mcpServers                  []MCPServer
+	mcpStdioServers             []MCPSTDIOServer
+	mcpBoxURL                   string
+	mcpPrepareScript            string
 	newConversationsSubscribers []func(openai.ChatCompletionMessage)
+
+	observer     Observer
+	parallelJobs int
+
+	lastMessageDuration time.Duration
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -63,7 +76,11 @@ func (o *options) SeparatedMultimodalModel() bool {
 
 func defaultOptions() *options {
 	return &options{
-		periodicRuns: 15 * time.Minute,
+		parallelJobs:       1,
+		periodicRuns:       15 * time.Minute,
+		loopDetectionSteps: 10,
+		maxEvaluationLoops: 2,
+		enableEvaluation:   false,
 		LLMAPI: llmOptions{
 			APIURL: "http://localhost:8080",
 			Model:  "gpt-4",
@@ -138,6 +155,24 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 	}
 }
 
+func WithLastMessageDuration(duration string) Option {
+	return func(o *options) error {
+		d, err := time.ParseDuration(duration)
+		if err != nil {
+			d = types.DefaultLastMessageDuration
+		}
+		o.lastMessageDuration = d
+		return nil
+	}
+}
+
+func WithParallelJobs(jobs int) Option {
+	return func(o *options) error {
+		o.parallelJobs = jobs
+		return nil
+	}
+}
+
 func WithNewConversationSubscriber(sub func(openai.ChatCompletionMessage)) Option {
 	return func(o *options) error {
 		o.newConversationsSubscribers = append(o.newConversationsSubscribers, sub)
@@ -194,6 +229,27 @@ func WithSystemPrompt(prompt string) Option {
 func WithMCPServers(servers ...MCPServer) Option {
 	return func(o *options) error {
 		o.mcpServers = servers
+		return nil
+	}
+}
+
+func WithMCPSTDIOServers(servers ...MCPSTDIOServer) Option {
+	return func(o *options) error {
+		o.mcpStdioServers = servers
+		return nil
+	}
+}
+
+func WithMCPBoxURL(url string) Option {
+	return func(o *options) error {
+		o.mcpBoxURL = url
+		return nil
+	}
+}
+
+func WithMCPPrepareScript(script string) Option {
+	return func(o *options) error {
+		o.mcpPrepareScript = script
 		return nil
 	}
 }
@@ -328,9 +384,42 @@ func WithUserID(id uuid.UUID) Option {
 	}
 }
 
+func WithJobFilters(filters ...types.JobFilter) Option {
+	return func(o *options) error {
+		o.jobFilters = filters
+		return nil
+	}
+}
+
 func WithAgentID(id uuid.UUID) Option {
 	return func(o *options) error {
 		o.agentID = id
+		return nil
+	}
+}
+
+func WithObserver(observer Observer) Option {
+	return func(o *options) error {
+		o.observer = observer
+		return nil
+	}
+}
+
+var EnableStripThinkingTags = func(o *options) error {
+	o.stripThinkingTags = true
+	return nil
+}
+
+func WithMaxEvaluationLoops(loops int) Option {
+	return func(o *options) error {
+		o.maxEvaluationLoops = loops
+		return nil
+	}
+}
+
+func EnableEvaluation() Option {
+	return func(o *options) error {
+		o.enableEvaluation = true
 		return nil
 	}
 }

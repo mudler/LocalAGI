@@ -1,0 +1,37 @@
+services:
+  localai:
+    extends:
+      file: docker-compose.yaml
+      service: localai
+    environment:
+      - LOCALAI_SINGLE_ACTIVE_BACKEND=true
+      - DEBUG=true
+    image: localai/localai:master-gpu-hipblas
+    devices:
+      - /dev/dri
+      - /dev/kfd
+
+  mcpbox:
+    extends:
+      file: docker-compose.yaml
+      service: mcpbox
+
+  dind:
+    extends:
+      file: docker-compose.yaml
+      service: dind
+
+  localrecall:
+    extends:
+      file: docker-compose.yaml
+      service: localrecall
+
+  localrecall-healthcheck:
+    extends:
+      file: docker-compose.yaml
+      service: localrecall-healthcheck
+
+  localagi:
+    extends:
+      file: docker-compose.yaml
+      service: localagi

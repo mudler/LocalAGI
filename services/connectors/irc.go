@@ -15,28 +15,22 @@ import (
 )
 
 type IRC struct {
-	server              string
-	port                string
-	nickname            string
-	channel             string
-	conn                *irc.Connection
-	alwaysReply         bool
-	conversationTracker *ConversationTracker[string]
+	server      string
+	port        string
+	nickname    string
+	channel     string
+	conn        *irc.Connection
+	alwaysReply bool
 }
 
 func NewIRC(config map[string]string) *IRC {
 
-	duration, err := time.ParseDuration(config["lastMessageDuration"])
-	if err != nil {
-		duration = 5 * time.Minute
-	}
 	return &IRC{
-		server:              config["server"],
-		port:                config["port"],
-		nickname:            config["nickname"],
-		channel:             config["channel"],
-		alwaysReply:         config["alwaysReply"] == "true",
-		conversationTracker: NewConversationTracker[string](duration),
+		server:      config["server"],
+		port:        config["port"],
+		nickname:    config["nickname"],
+		channel:     config["channel"],
+		alwaysReply: config["alwaysReply"] == "true",
 	}
 }
 
@@ -76,9 +70,56 @@ func (i *IRC) Start(a *agent.Agent) {
 		return
 	}
 	i.conn.UseTLS = false
+
+	if i.channel != "" {
+		// handle new conversations
+		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
+			xlog.Debug("Subscriber(irc)", "message", ccm.Content)
+
+			// Split the response into multiple messages if it's too long
+			maxLength := 400 // Safe limit for most IRC servers
+			response := ccm.Content
+
+			// Handle multiline responses
+			lines := strings.Split(response, "\n")
+			for _, line := range lines {
+				if line == "" {
+					continue
+				}
+
+				// Split long lines
+				for len(line) > 0 {
+					var chunk string
+					if len(line) > maxLength {
+						chunk = line[:maxLength]
+						line = line[maxLength:]
+					} else {
+						chunk = line
+						line = ""
+					}
+
+					// Send the message to the channel
+					i.conn.Privmsg(i.channel, chunk)
+
+					// Small delay to prevent flooding
+					time.Sleep(500 * time.Millisecond)
+				}
+			}
+
+			a.SharedState().ConversationTracker.AddMessage(
+				fmt.Sprintf("irc:%s", i.channel),
+				openai.ChatCompletionMessage{
+					Content: ccm.Content,
+					Role:    "assistant",
+				},
+			)
+		})
+	}
+
 	i.conn.AddCallback("001", func(e *irc.Event) {
-		xlog.Info("Connected to IRC server", "server", i.server)
+		xlog.Info("Connected to IRC server", "server", i.server, "arguments", e.Arguments)
 		i.conn.Join(i.channel)
+		i.nickname = e.Arguments[0]
 		xlog.Info("Joined channel", "channel", i.channel)
 	})
 
@@ -114,7 +155,7 @@ func (i *IRC) Start(a *agent.Agent) {
 		cleanedMessage := cleanUpMessage(message, i.nickname)
 
 		go func() {
-			conv := i.conversationTracker.GetConversation(channel)
+			conv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("irc:%s", channel))
 
 			conv = append(conv,
 				openai.ChatCompletionMessage{
@@ -124,7 +165,7 @@ func (i *IRC) Start(a *agent.Agent) {
 			)
 
 			// Update the conversation history
-			i.conversationTracker.AddMessage(channel, openai.ChatCompletionMessage{
+			a.SharedState().ConversationTracker.AddMessage(fmt.Sprintf("irc:%s", channel), openai.ChatCompletionMessage{
 				Content: cleanedMessage,
 				Role:    "user",
 			})
@@ -139,7 +180,7 @@ func (i *IRC) Start(a *agent.Agent) {
 			}
 
 			// Update the conversation history
-			i.conversationTracker.AddMessage(channel, openai.ChatCompletionMessage{
+			a.SharedState().ConversationTracker.AddMessage(fmt.Sprintf("irc:%s", channel), openai.ChatCompletionMessage{
 				Content: res.Response,
 				Role:    "assistant",
 			})
@@ -207,6 +248,13 @@ func (i *IRC) Start(a *agent.Agent) {
 
 	// Start the IRC client in a goroutine
 	go i.conn.Loop()
+	go func() {
+		select {
+		case <-a.Context().Done():
+			i.conn.Quit()
+			return
+		}
+	}()
 }
 
 // IRCConfigMeta returns the metadata for IRC connector configuration fields
@@ -240,12 +288,6 @@ func IRCConfigMeta() []config.Field {
 			Name:  "alwaysReply",
 			Label: "Always Reply",
 			Type:  config.FieldTypeCheckbox,
-		},
-		{
-			Name:         "lastMessageDuration",
-			Label:        "Last Message Duration",
-			Type:         config.FieldTypeText,
-			DefaultValue: "5m",
 		},
 	}
 }

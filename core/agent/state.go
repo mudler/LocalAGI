@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/action"
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/db"
 	models "github.com/mudler/LocalAGI/dbmodels"
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -17,10 +18,10 @@ import (
 // all information that should be displayed to the LLM
 // in the prompts
 type PromptHUD struct {
-	Character     Character                 `json:"character"`
-	CurrentState  action.AgentInternalState `json:"current_state"`
-	PermanentGoal string                    `json:"permanent_goal"`
-	ShowCharacter bool                      `json:"show_character"`
+	Character     Character                `json:"character"`
+	CurrentState  types.AgentInternalState `json:"current_state"`
+	PermanentGoal string                   `json:"permanent_goal"`
+	ShowCharacter bool                     `json:"show_character"`
 }
 
 type Character struct {

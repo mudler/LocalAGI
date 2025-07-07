@@ -157,7 +157,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 	webapp.Post("/api/chat/:id", app.RequireUser(), app.RequireActiveAgent(), app.RequireActiveStatusAgent(), app.Chat())
 
-	// conversationTracker := connectors.NewConversationTracker[string](time.Minute)
+	// conversationTracker := conversations.NewConversationTracker[string](app.config.ConversationStoreDuration)
 
 	// webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
 
@@ -209,6 +209,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 	webapp.Get("/api/meta/agent/config", app.RequireUser(), app.GetAgentConfigMeta())
 
 	webapp.Post("/api/action/:name/run", app.RequireUser(), app.ExecuteAction())
+	webapp.Post("/api/action/:name/definition", app.GetActionDefinition(pool))
 	webapp.Get("/api/actions", app.ListActions())
 
 	webapp.Post("/api/agent/group/generateProfiles", app.RequireUser(), app.GenerateGroupProfiles())
@@ -245,10 +246,16 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 				"",
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -305,10 +312,16 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 				"",
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -327,13 +340,14 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 		entries := []string{}
 		for _, h := range Reverse(history.Results()) {
-			entries = append(entries, fmt.Sprintf(
-				"Result: %v Action: %v Params: %v Reasoning: %v",
-				h.Result,
-				h.Action.Definition().Name,
-				h.Params,
+			entries = append(entries, fmt.Sprintf(`Reasoning: %s
+			Action taken: %+v
+			Parameters: %+v
+			Result: %s`,
 				h.Reasoning,
-			))
+				h.ActionCurrentState.Action.Definition().Name,
+				h.ActionCurrentState.Params,
+				h.Result))
 		}
 
 		return c.JSON(fiber.Map{
@@ -352,7 +366,20 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 	// New API route to get usage for the user
 	webapp.Get("/api/usage", app.RequireUser(), app.GetUsage())
+	webapp.Get("/api/agent/:name/observables", func(c *fiber.Ctx) error {
+		name := c.Params("name")
+		agent := pool.GetAgent(name)
+		if agent == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent not found",
+			})
+		}
 
+		return c.JSON(fiber.Map{
+			"Name":    name,
+			"History": agent.Observer().History(),
+		})
+	})
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

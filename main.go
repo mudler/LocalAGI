@@ -21,7 +21,7 @@ func init() {
 	apiKey = os.Getenv("LOCALAGI_LLM_API_KEY")
 
 	if apiURL == "" {
-		panic("LOCALAGI_API_URL not set")
+		panic("LOCALAGI_LLM_API_URL not set")
 	}
 }
 

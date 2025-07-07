@@ -22,7 +22,7 @@ type IntentResponse struct {
 	Reasoning string `json:"reasoning"`
 }
 
-func (a *IntentAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+func (a *IntentAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	return types.ActionResult{}, nil
 }
 

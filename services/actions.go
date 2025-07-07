@@ -18,8 +18,11 @@ const (
 	// Actions
 	ActionSearch                         = "search"
 	ActionCustom                         = "custom"
+	ActionBrowserAgentRunner             = "browser-agent-runner"
+	ActionDeepResearchRunner             = "deep-research-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
 	ActionGithubIssueOpener              = "github-issue-opener"
+	ActionGithubIssueEditor              = "github-issue-editor"
 	ActionGithubIssueCloser              = "github-issue-closer"
 	ActionGithubIssueSearcher            = "github-issue-searcher"
 	ActionGithubRepositoryGet            = "github-repository-get-content"
@@ -32,6 +35,8 @@ const (
 	ActionGithubPRCreator                = "github-pr-creator"
 	ActionGithubGetAllContent            = "github-get-all-repository-content"
 	ActionGithubREADME                   = "github-readme"
+	ActionGithubRepositorySearchFiles    = "github-repository-search-files"
+	ActionGithubRepositoryListFiles      = "github-repository-list-files"
 	ActionScraper                        = "scraper"
 	ActionWikipedia                      = "wikipedia"
 	ActionBrowse                         = "browse"
@@ -41,6 +46,10 @@ const (
 	ActionCounter                        = "counter"
 	ActionCallAgents                     = "call_agents"
 	ActionShellcommand                   = "shell-command"
+	ActionSendTelegramMessage            = "send-telegram-message"
+	ActionSetReminder                    = "set_reminder"
+	ActionListReminders                  = "list_reminders"
+	ActionRemoveReminder                 = "remove_reminder"
 )
 
 var AvailableActions = []string{
@@ -48,10 +57,15 @@ var AvailableActions = []string{
 	ActionCustom,
 	ActionGithubIssueLabeler,
 	ActionGithubIssueOpener,
+	ActionGithubIssueEditor,
 	ActionGithubIssueCloser,
 	ActionGithubIssueSearcher,
 	ActionGithubRepositoryGet,
 	ActionGithubGetAllContent,
+	ActionGithubRepositorySearchFiles,
+	ActionGithubRepositoryListFiles,
+	ActionBrowserAgentRunner,
+	ActionDeepResearchRunner,
 	ActionGithubRepositoryCreateOrUpdate,
 	ActionGithubIssueReader,
 	ActionGithubIssueCommenter,
@@ -69,35 +83,52 @@ var AvailableActions = []string{
 	ActionCounter,
 	ActionCallAgents,
 	ActionShellcommand,
+	ActionSendTelegramMessage,
+	ActionSetReminder,
+	ActionListReminders,
+	ActionRemoveReminder,
 }
 
-func Actions(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
-	return func(ctx context.Context, pool *state.AgentPool) []types.Action {
-		allActions := []types.Action{}
+const (
+	ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
+	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
+	ActionConfigSSHBoxURL          = "sshbox-url"
+)
 
-		agentName := a.Name
+func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+		return func(ctx context.Context, pool *state.AgentPool) []types.Action {
+			allActions := []types.Action{}
 
-		for _, a := range a.Actions {
-			var config map[string]string
-			if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
-				xlog.Error("Error unmarshalling action config", "error", err)
-				continue
+			agentName := a.Name
+
+			for _, a := range a.Actions {
+				var config map[string]string
+				if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
+					xlog.Error("Error unmarshalling action config", "error", err)
+					continue
+				}
+
+				a, err := Action(a.Name, agentName, config, pool, actionsConfigs)
+				if err != nil {
+					continue
+				}
+				allActions = append(allActions, a)
 			}
 
-			a, err := Action(a.Name, agentName, config, pool)
-			if err != nil {
-				continue
-			}
-			allActions = append(allActions, a)
+			return allActions
 		}
-
-		return allActions
 	}
+
 }
 
-func Action(name, agentName string, config map[string]string, pool *state.AgentPool) (types.Action, error) {
+func Action(name, agentName string, config map[string]string, pool *state.AgentPool, actionsConfigs map[string]string) (types.Action, error) {
 	var a types.Action
 	var err error
+
+	if config == nil {
+		config = map[string]string{}
+	}
 
 	switch name {
 	case ActionCustom:
@@ -110,10 +141,16 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubIssueLabeler(config)
 	case ActionGithubIssueOpener:
 		a = actions.NewGithubIssueOpener(config)
+	case ActionGithubIssueEditor:
+		a = actions.NewGithubIssueEditor(config)
 	case ActionGithubIssueCloser:
 		a = actions.NewGithubIssueCloser(config)
 	case ActionGithubIssueSearcher:
 		a = actions.NewGithubIssueSearch(config)
+	case ActionBrowserAgentRunner:
+		a = actions.NewBrowserAgentRunner(config, actionsConfigs[ActionConfigBrowserAgentRunner])
+	case ActionDeepResearchRunner:
+		a = actions.NewDeepResearchRunner(config, actionsConfigs[ActionConfigDeepResearchRunner])
 	case ActionGithubIssueReader:
 		a = actions.NewGithubIssueReader(config)
 	case ActionGithubPRReader:
@@ -126,6 +163,10 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubPRCreator(config)
 	case ActionGithubGetAllContent:
 		a = actions.NewGithubRepositoryGetAllContent(config)
+	case ActionGithubRepositorySearchFiles:
+		a = actions.NewGithubRepositorySearchFiles(config)
+	case ActionGithubRepositoryListFiles:
+		a = actions.NewGithubRepositoryListFiles(config)
 	case ActionGithubIssueCommenter:
 		a = actions.NewGithubIssueCommenter(config)
 	case ActionGithubRepositoryGet:
@@ -149,7 +190,15 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	case ActionCallAgents:
 		a = actions.NewCallAgent(config, agentName, pool.InternalAPI())
 	case ActionShellcommand:
-		a = actions.NewShell(config)
+		a = actions.NewShell(config, actionsConfigs[ActionConfigSSHBoxURL])
+	case ActionSendTelegramMessage:
+		a = actions.NewSendTelegramMessageRunner(config)
+	case ActionSetReminder:
+		a = action.NewReminder()
+	case ActionListReminders:
+		a = action.NewListReminders()
+	case ActionRemoveReminder:
+		a = action.NewRemoveReminder()
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -170,6 +219,16 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Fields: actions.SearchConfigMeta(),
 		},
 		{
+			Name:   "browser-agent-runner",
+			Label:  "Browser Agent Runner",
+			Fields: actions.BrowserAgentRunnerConfigMeta(),
+		},
+		{
+			Name:   "deep-research-runner",
+			Label:  "Deep Research Runner",
+			Fields: actions.DeepResearchRunnerConfigMeta(),
+		},
+		{
 			Name:   "generate_image",
 			Label:  "Generate Image",
 			Fields: actions.GenImageConfigMeta(),
@@ -183,6 +242,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "github-issue-opener",
 			Label:  "GitHub Issue Opener",
 			Fields: actions.GithubIssueOpenerConfigMeta(),
+		},
+		{
+			Name:   "github-issue-editor",
+			Label:  "GitHub Issue Editor",
+			Fields: actions.GithubIssueEditorConfigMeta(),
 		},
 		{
 			Name:   "github-issue-closer",
@@ -213,6 +277,16 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "github-get-all-repository-content",
 			Label:  "GitHub Get All Repository Content",
 			Fields: actions.GithubRepositoryGetAllContentConfigMeta(),
+		},
+		{
+			Name:   "github-repository-search-files",
+			Label:  "GitHub Repository Search Files",
+			Fields: actions.GithubRepositorySearchFilesConfigMeta(),
+		},
+		{
+			Name:   "github-repository-list-files",
+			Label:  "GitHub Repository List Files",
+			Fields: actions.GithubRepositoryListFilesConfigMeta(),
 		},
 		{
 			Name:   "github-repository-create-or-update-content",
@@ -287,6 +361,26 @@ func ActionsConfigMeta() []config.FieldGroup {
 		{
 			Name:   "call_agents",
 			Label:  "Call Agents",
+			Fields: actions.CallAgentConfigMeta(),
+		},
+		{
+			Name:   "send-telegram-message",
+			Label:  "Send Telegram Message",
+			Fields: actions.SendTelegramMessageConfigMeta(),
+		},
+		{
+			Name:   "set_reminder",
+			Label:  "Set Reminder",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "list_reminders",
+			Label:  "List Reminders",
+			Fields: []config.Field{},
+		},
+		{
+			Name:   "remove_reminder",
+			Label:  "Remove Reminder",
 			Fields: []config.Field{},
 		},
 	}

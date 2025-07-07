@@ -29,7 +29,7 @@ type GenImageAction struct {
 	imageModel string
 }
 
-func (a *GenImageAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *GenImageAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Prompt string `json:"prompt"`
 		Size   string `json:"size"`

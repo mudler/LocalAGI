@@ -14,7 +14,9 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"github.com/mudler/LocalAGI/core/conversations"
 	coreTypes "github.com/mudler/LocalAGI/core/types"
+	internalTypes "github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/db"
 	models "github.com/mudler/LocalAGI/dbmodels"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -22,8 +24,8 @@ import (
 	"github.com/mudler/LocalAGI/pkg/utils"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services"
-	"github.com/mudler/LocalAGI/services/connectors"
 	"github.com/mudler/LocalAGI/webui/types"
+
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 
@@ -59,6 +61,7 @@ type (
 		htmx      *htmx.HTMX
 		config    *Config
 		*fiber.App
+		sharedState *internalTypes.AgentSharedState
 	}
 )
 
@@ -73,10 +76,11 @@ func NewApp(opts ...Option) *App {
 	})
 
 	a := &App{
-		UserPools: make(map[string]*state.AgentPool),
-		htmx:      htmx.New(),
-		config:    config,
-		App:       webapp,
+		UserPools:   make(map[string]*state.AgentPool),
+		htmx:        htmx.New(),
+		config:      config,
+		App:         webapp,
+		sharedState: internalTypes.NewAgentSharedState(5 * time.Minute),
 	}
 
 	a.registerRoutes(webapp)
@@ -181,10 +185,16 @@ func (a *App) Pause() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -230,10 +240,16 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -351,10 +367,16 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -459,6 +481,7 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 					xlog.Error("Failed to recreate agent in memory", "error", err)
 					return errorJSONMessage(c, "Agent config updated in DB but failed to reload in memory")
 				}
+
 			}
 		}
 
@@ -578,10 +601,16 @@ func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -704,10 +733,16 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -740,10 +775,18 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			CreatedAt: time.Now(),
 		})
 
-		send("json_status", map[string]interface{}{
+		// Send processing status
+		statusData, err := json.Marshal(map[string]interface{}{
 			"status":    "processing",
-			"createdAt": time.Now().Format(time.RFC3339),
+			"timestamp": time.Now().Format(time.RFC3339),
 		})
+
+		if err != nil {
+			xlog.Error("Error marshaling status message", "error", err)
+		} else {
+			manager.Send(
+				sse.NewMessage(string(statusData)).WithEvent("json_message_status"))
+		}
 
 		// 8. Ask agent asynchronously
 		go func() {
@@ -772,6 +815,19 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				Content:   response.Response,
 				CreatedAt: time.Now(),
 			})
+
+			// Send completed status
+			completedData, err := json.Marshal(map[string]interface{}{
+				"status":    "completed",
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			if err != nil {
+				xlog.Error("Error marshaling completed status", "error", err)
+			} else {
+				manager.Send(
+					sse.NewMessage(string(completedData)).WithEvent("json_message_status"))
+			}
+
 		}()
 
 		// 9. Immediate 202 response
@@ -779,6 +835,30 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			"status":     "message_received",
 			"message_id": messageID,
 		})
+	}
+}
+
+func (a *App) GetActionDefinition(pool *state.AgentPool) func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		payload := struct {
+			Config map[string]string `json:"config"`
+		}{}
+
+		if err := c.BodyParser(&payload); err != nil {
+			xlog.Error("Error parsing action payload", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		actionName := c.Params("name")
+
+		xlog.Debug("Executing action", "action", actionName, "config", payload.Config)
+		a, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
+		if err != nil {
+			xlog.Error("Error creating action", "error", err)
+			return errorJSONMessage(c, err.Error())
+		}
+
+		return c.JSON(a.Definition())
 	}
 }
 
@@ -807,10 +887,16 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -853,7 +939,7 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 
 		// 5. Validate action params against schema
 		if payload.Params != nil {
-			action, err := services.Action(actionName, "", payload.Config, pool)
+			action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
 			if err != nil {
 				xlog.Error("Error creating action for validation", "error", err)
 				return errorJSONMessage(c, "Failed to create action for validation: "+err.Error())
@@ -893,10 +979,9 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 			// Continue with execution even if DB logging fails
 		}
 
-		xlog.Debug("Executing action", "action", actionName, "executionId", executionID, "config", payload.Config, "params", payload.Params)
+		xlog.Debug("Executing action", "action", actionName, "config", payload.Config, "params", payload.Params)
+		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
 
-		// 7. Execute the action
-		action, err := services.Action(actionName, "", payload.Config, pool)
 		if err != nil {
 			// Update status to error
 			_ = db.DB.Model(&actionExecution).Updates(map[string]interface{}{
@@ -910,7 +995,7 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 		ctx, cancel := context.WithTimeout(c.Context(), 200*time.Second)
 		defer cancel()
 
-		res, err := action.Run(ctx, payload.Params)
+		res, err := action.Run(ctx, a.sharedState, payload.Params)
 		if err != nil {
 			// Update status to error
 			_ = db.DB.Model(&actionExecution).Updates(map[string]interface{}{
@@ -938,7 +1023,64 @@ func (a *App) ListActions() func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) Responses(pool *state.AgentPool, tracker *connectors.ConversationTracker[string]) func(c *fiber.Ctx) error {
+// createToolCallResponse generates a proper tool call response for user-defined actions
+func (a *App) createToolCallResponse(id, agentName string, actionState coreTypes.ActionState, conv []openai.ChatCompletionMessage) types.ResponseBody {
+	// Create tool call ID
+	toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
+
+	// Get function name and arguments
+	functionName := actionState.Action.Definition().Name.String()
+	argumentsJSON, err := json.Marshal(actionState.Params)
+	if err != nil {
+		xlog.Error("Error marshaling action params for tool call", "error", err)
+		// Fallback to empty arguments
+		argumentsJSON = []byte("{}")
+	}
+
+	// Create message object with reasoning
+	messageObj := types.ResponseMessage{
+		Type:   "message",
+		ID:     fmt.Sprintf("msg_%d", time.Now().UnixNano()),
+		Status: "completed",
+		Role:   "assistant",
+		Content: []types.MessageContentItem{
+			{
+				Type: "output_text",
+				Text: actionState.Reasoning,
+			},
+		},
+	}
+
+	// Create function tool call object
+	functionToolCall := types.FunctionToolCall{
+		Arguments: string(argumentsJSON),
+		CallID:    toolCallID,
+		Name:      functionName,
+		Type:      "function_call",
+		ID:        fmt.Sprintf("tool_%d", time.Now().UnixNano()),
+		Status:    "completed",
+	}
+
+	// Create response with both message and tool call in output array
+	return types.ResponseBody{
+		ID:        id,
+		Object:    "response",
+		CreatedAt: time.Now().Unix(),
+		Status:    "completed",
+		Model:     agentName,
+		Output: []interface{}{
+			messageObj,
+			functionToolCall,
+		},
+		Usage: types.UsageInfo{
+			InputTokens:  0, // TODO: calculate actual usage
+			OutputTokens: 0,
+			TotalTokens:  0,
+		},
+	}
+}
+
+func (a *App) Responses(pool *state.AgentPool, tracker *conversations.ConversationTracker[string]) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		var request types.RequestBody
 		if err := c.BodyParser(&request); err != nil {
@@ -957,15 +1099,38 @@ func (a *App) Responses(pool *state.AgentPool, tracker *connectors.ConversationT
 		agentName := request.Model
 		messages := append(conv, request.ToChatCompletionMessages()...)
 
-		a := pool.GetAgent(agentName)
-		if a == nil {
+		agent := pool.GetAgent(agentName)
+		if agent == nil {
 			xlog.Info("Agent not found in pool", c.Params("name"))
 			return c.Status(http.StatusInternalServerError).JSON(types.ResponseBody{Error: "Agent not found"})
 		}
 
-		res := a.Ask(
+		// Prepare job options
+		jobOptions := []coreTypes.JobOption{
 			coreTypes.WithConversationHistory(messages),
-		)
+		}
+
+		// Add tools if present in the request
+		if len(request.Tools) > 0 {
+			builtinTools, userTools := types.SeparateTools(request.Tools)
+			if len(builtinTools) > 0 {
+				jobOptions = append(jobOptions, coreTypes.WithBuiltinTools(builtinTools))
+				xlog.Debug("Adding builtin tools to job", "count", len(builtinTools), "agent", agentName)
+			}
+			if len(userTools) > 0 {
+				jobOptions = append(jobOptions, coreTypes.WithUserTools(userTools))
+				xlog.Debug("Adding user tools to job", "count", len(userTools), "agent", agentName)
+			}
+		}
+
+		var choice types.ToolChoice
+		if err := json.Unmarshal(request.ToolChoice, &choice); err == nil {
+			if choice.Type == "function" {
+				jobOptions = append(jobOptions, coreTypes.WithToolChoice(choice.Name))
+			}
+		}
+
+		res := agent.Ask(jobOptions...)
 		if res.Error != nil {
 			xlog.Error("Error asking agent", "agent", agentName, "error", res.Error)
 
@@ -974,28 +1139,44 @@ func (a *App) Responses(pool *state.AgentPool, tracker *connectors.ConversationT
 			xlog.Info("we got a response from the agent", "agent", agentName, "response", res.Response)
 		}
 
+		id := uuid.New().String()
+
+		// Check if this is a user-defined tool call
+		if res.Response == "" && len(res.State) > 0 {
+			// Get the last action from state
+			lastAction := res.State[len(res.State)-1]
+			if coreTypes.IsActionUserDefined(lastAction.Action) {
+				xlog.Debug("Detected user-defined action, creating tool call response", "action", lastAction.Action.Definition().Name)
+
+				// Generate tool call response
+				response := a.createToolCallResponse(id, agentName, lastAction, conv)
+				tracker.SetConversation(id, conv) // Save conversation without adding assistant message
+				return c.JSON(response)
+			}
+		}
+
+		// Regular text response
 		conv = append(conv, openai.ChatCompletionMessage{
 			Role:    "assistant",
 			Content: res.Response,
 		})
 
-		id := uuid.New().String()
-
 		tracker.SetConversation(id, conv)
 
 		response := types.ResponseBody{
-			ID:     id,
-			Object: "response",
-			//   "created_at": 1741476542,
+			ID:        id,
+			Object:    "response",
 			CreatedAt: time.Now().Unix(),
 			Status:    "completed",
-			Output: []types.ResponseMessage{
-				{
+			Model:     agentName,
+			Output: []interface{}{
+				types.ResponseMessage{
 					Type:   "message",
+					ID:     fmt.Sprintf("msg_%d", time.Now().UnixNano()),
 					Status: "completed",
 					Role:   "assistant",
 					Content: []types.MessageContentItem{
-						types.MessageContentItem{
+						{
 							Type: "output_text",
 							Text: res.Response,
 						},
@@ -1037,7 +1218,7 @@ func (a *App) GenerateGroupProfiles() func(c *fiber.Ctx) error {
 
 		xlog.Debug("Generating group", "description", request.Descript)
 		client := llm.NewClient(os.Getenv("LOCALAGI_LLM_API_KEY"), os.Getenv("LOCALAGI_LLM_API_URL"), "10m")
-		err := llm.GenerateTypedJSON(c.Context(), client, request.Descript, a.config.LLMModel, userID, uuid.Nil, jsonschema.Definition{
+		err := llm.GenerateTypedJSONWithGuidance(c.Context(), client, request.Descript, a.config.LLMModel, userID, uuid.Nil, jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
 				"agents": {
@@ -1101,10 +1282,16 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)
@@ -1193,6 +1380,7 @@ func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
 			services.ActionsConfigMeta(),
 			services.ConnectorsConfigMeta(),
 			services.DynamicPromptsConfigMeta(),
+			services.FiltersConfigMeta(),
 		)
 
 		// 3. Add available models (could be filtered per-user later)
@@ -2282,10 +2470,16 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
-				services.Actions,
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
 				services.Connectors,
 				services.DynamicPrompts,
+				services.Filters,
 				os.Getenv("LOCALAGI_TIMEOUT"),
 				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
 			)

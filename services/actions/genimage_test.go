@@ -42,7 +42,7 @@ var _ = Describe("GenImageAction", func() {
 				"size":   "256x256",
 			}
 
-			url, err := action.Run(ctx, params)
+			url, err := action.Run(ctx, nil, params)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(url).ToNot(BeEmpty())
 		})
@@ -52,7 +52,7 @@ var _ = Describe("GenImageAction", func() {
 				"size": "256x256",
 			}
 
-			_, err := action.Run(ctx, params)
+			_, err := action.Run(ctx, nil, params)
 			Expect(err).To(HaveOccurred())
 		})
 	})

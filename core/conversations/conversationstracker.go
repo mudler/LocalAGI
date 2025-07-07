@@ -1,4 +1,4 @@
-package connectors
+package conversations
 
 import (
 	"fmt"

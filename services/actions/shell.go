@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -11,24 +12,27 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func NewShell(config map[string]string) *ShellAction {
+func NewShell(config map[string]string, sshBoxURL string) *ShellAction {
 	return &ShellAction{
 		privateKey:        config["privateKey"],
 		user:              config["user"],
 		host:              config["host"],
+		password:          config["password"],
 		customName:        config["customName"],
 		customDescription: config["customDescription"],
+		sshBoxURL:         sshBoxURL,
 	}
 }
 
 type ShellAction struct {
-	privateKey        string
-	user, host        string
-	customName        string
-	customDescription string
+	privateKey           string
+	user, host, password string
+	customName           string
+	customDescription    string
+	sshBoxURL            string
 }
 
-func (a *ShellAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *ShellAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Command string `json:"command"`
 		Host    string `json:"host"`
@@ -46,7 +50,23 @@ func (a *ShellAction) Run(ctx context.Context, params types.ActionParams) (types
 		result.User = a.user
 	}
 
-	output, err := sshCommand(a.privateKey, result.Command, result.User, result.Host)
+	password := a.password
+	if a.sshBoxURL != "" && result.Host == "" && result.User == "" && password == "" {
+		// sshbox url can be root:root@localhost:2222
+		parts := strings.Split(a.sshBoxURL, "@")
+		if len(parts) == 2 {
+			if strings.Contains(parts[0], ":") {
+				userPass := strings.Split(parts[0], ":")
+				result.User = userPass[0]
+				password = userPass[1]
+			} else {
+				result.User = parts[0]
+			}
+			result.Host = parts[1]
+		}
+	}
+
+	output, err := sshCommand(a.privateKey, result.Command, result.User, result.Host, password)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
@@ -55,15 +75,15 @@ func (a *ShellAction) Run(ctx context.Context, params types.ActionParams) (types
 }
 
 func (a *ShellAction) Definition() types.ActionDefinition {
-	name := "shell"
-	description := "Run a shell command on a remote server."
+	name := "run_command"
+	description := "Run a command on a linux environment."
 	if a.customName != "" {
 		name = a.customName
 	}
 	if a.customDescription != "" {
 		description = a.customDescription
 	}
-	if a.host != "" && a.user != "" {
+	if (a.host != "" && a.user != "") || a.sshBoxURL != "" {
 		return types.ActionDefinition{
 			Name:        types.ActionDefinitionName(name),
 			Description: description,
@@ -104,7 +124,7 @@ func ShellConfigMeta() []config.Field {
 			Name:     "privateKey",
 			Label:    "Private Key",
 			Type:     config.FieldTypeTextarea,
-			Required: true,
+			Required: false,
 			HelpText: "SSH private key for connecting to remote servers",
 		},
 		{
@@ -112,6 +132,12 @@ func ShellConfigMeta() []config.Field {
 			Label:    "Default User",
 			Type:     config.FieldTypeText,
 			HelpText: "Default SSH user for connecting to remote servers",
+		},
+		{
+			Name:     "password",
+			Label:    "Default Password",
+			Type:     config.FieldTypeText,
+			HelpText: "Default SSH password for connecting to remote servers",
 		},
 		{
 			Name:     "host",
@@ -134,19 +160,25 @@ func ShellConfigMeta() []config.Field {
 	}
 }
 
-func sshCommand(privateKey, command, user, host string) (string, error) {
-	// Create signer from private key string
-	key, err := ssh.ParsePrivateKey([]byte(privateKey))
-	if err != nil {
-		log.Fatalf("failed to parse private key: %v", err)
+func sshCommand(privateKey, command, user, host, password string) (string, error) {
+
+	authMethods := []ssh.AuthMethod{}
+	if password != "" {
+		authMethods = append(authMethods, ssh.Password(password))
+	}
+	if privateKey != "" {
+		// Create signer from private key string
+		key, err := ssh.ParsePrivateKey([]byte(privateKey))
+		if err != nil {
+			log.Fatalf("failed to parse private key: %v", err)
+		}
+		authMethods = append(authMethods, ssh.PublicKeys(key))
 	}
 
 	// SSH client configuration
 	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeys(key),
-		},
+		User:            user,
+		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
@@ -165,12 +197,15 @@ func sshCommand(privateKey, command, user, host string) (string, error) {
 	defer session.Close()
 
 	// Run a command
-	output, err := session.CombinedOutput(command)
-	if err != nil {
-		return "", fmt.Errorf("failed to run: %v", err)
+	cmdOut, err := session.CombinedOutput(command)
+	result := string(cmdOut)
+	if strings.TrimSpace(result) == "" {
+		result += "\nCommand has exited with no output"
 	}
-
-	return string(output), nil
+	if err != nil {
+		result += "\nError: " + err.Error()
+	}
+	return result, nil
 }
 
 func (a *ShellAction) Plannable() bool {

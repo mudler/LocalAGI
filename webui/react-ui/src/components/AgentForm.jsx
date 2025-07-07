@@ -2,15 +2,16 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Import form sections
-import BasicInfoSection from "./agent-form-sections/BasicInfoSection";
-import ConnectorsSection from "./agent-form-sections/ConnectorsSection";
-import ActionsSection from "./agent-form-sections/ActionsSection";
-import MCPServersSection from "./agent-form-sections/MCPServersSection";
-import MemorySettingsSection from "./agent-form-sections/MemorySettingsSection";
-import ModelSettingsSection from "./agent-form-sections/ModelSettingsSection";
-import PromptsGoalsSection from "./agent-form-sections/PromptsGoalsSection";
-import AdvancedSettingsSection from "./agent-form-sections/AdvancedSettingsSection";
-import ExportSection from "./agent-form-sections/ExportSection";
+import BasicInfoSection from './agent-form-sections/BasicInfoSection';
+import ConnectorsSection from './agent-form-sections/ConnectorsSection';
+import ActionsSection from './agent-form-sections/ActionsSection';
+import MCPServersSection from './agent-form-sections/MCPServersSection';
+import MemorySettingsSection from './agent-form-sections/MemorySettingsSection';
+import ModelSettingsSection from './agent-form-sections/ModelSettingsSection';
+import PromptsGoalsSection from './agent-form-sections/PromptsGoalsSection';
+import AdvancedSettingsSection from './agent-form-sections/AdvancedSettingsSection';
+import ExportSection from './agent-form-sections/ExportSection';
+import FiltersSection from './agent-form-sections/FiltersSection';
 
 const AgentForm = ({
   isEdit = false,
@@ -193,10 +194,15 @@ const AgentForm = ({
             Connectors
           </li>
           <li
-            className={`wizard-nav-item ${
-              activeSection === "actions-section" ? "active" : ""
-            }`}
-            onClick={() => handleSectionChange("actions-section")}
+            className={`wizard-nav-item ${activeSection === 'filters-section' ? 'active' : ''}`}
+            onClick={() => handleSectionChange('filters-section')}
+          >
+            <i className="fas fa-shield"></i>
+            Filters &amp; Triggers
+          </li>
+          <li 
+            className={`wizard-nav-item ${activeSection === 'actions-section' ? 'active' : ''}`} 
+            onClick={() => handleSectionChange('actions-section')}
           >
             <i className="fas fa-bolt"></i>
             Actions
@@ -299,16 +305,12 @@ const AgentForm = ({
               />
             </div>
 
-            <div
-              style={{
-                display: activeSection === "actions-section" ? "block" : "none",
-              }}
-            >
-              <ActionsSection
-                formData={formData}
-                setFormData={setFormData}
-                metadata={metadata}
-              />
+            <div style={{ display: activeSection === 'filters-section' ? 'block' : 'none' }}>
+              <FiltersSection formData={formData} setFormData={setFormData} metadata={metadata} />
+            </div>
+
+            <div style={{ display: activeSection === 'actions-section' ? 'block' : 'none' }}>
+              <ActionsSection formData={formData} setFormData={setFormData} metadata={metadata} />
             </div>
 
             <div
@@ -422,16 +424,12 @@ const AgentForm = ({
               />
             </div>
 
-            <div
-              style={{
-                display: activeSection === "actions-section" ? "block" : "none",
-              }}
-            >
-              <ActionsSection
-                formData={formData}
-                setFormData={setFormData}
-                metadata={metadata}
-              />
+            <div style={{ display: activeSection === 'filters-section' ? 'block' : 'none' }}>
+              <FiltersSection formData={formData} setFormData={setFormData} metadata={metadata} />
+            </div>
+
+            <div style={{ display: activeSection === 'actions-section' ? 'block' : 'none' }}>
+              <ActionsSection formData={formData} setFormData={setFormData} metadata={metadata} />
             </div>
 
             <div

@@ -2,8 +2,9 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/mudler/LocalAGI/db"
 	models "github.com/mudler/LocalAGI/dbmodels"
 	"github.com/mudler/LocalAGI/pkg/llm"
+	"github.com/robfig/cron/v3"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -35,7 +37,7 @@ type Agent struct {
 	jobQueue  chan *types.Job
 	context   *types.ActionContext
 
-	currentState *action.AgentInternalState
+	currentState *types.AgentInternalState
 
 	selfEvaluationInProgress bool
 	pause                    bool
@@ -46,6 +48,10 @@ type Agent struct {
 
 	subscriberMutex        sync.Mutex
 	newMessagesSubscribers []func(openai.ChatCompletionMessage)
+
+	observer Observer
+
+	sharedState *types.AgentSharedState
 }
 
 type RAGDB interface {
@@ -74,10 +80,16 @@ func New(opts ...Option) (*Agent, error) {
 		options:                options,
 		client:                 client,
 		Character:              options.character,
-		currentState:           &action.AgentInternalState{},
+		currentState:           &types.AgentInternalState{},
 		context:                types.NewActionContext(ctx, cancel),
 		newConversations:       make(chan openai.ChatCompletionMessage),
 		newMessagesSubscribers: options.newConversationsSubscribers,
+		sharedState:            types.NewAgentSharedState(options.lastMessageDuration),
+	}
+
+	// Initialize observer if provided
+	if options.observer != nil {
+		a.observer = options.observer
 	}
 
 	// var programLevel = new(xlog.LevelVar) // Info by default
@@ -107,6 +119,10 @@ func New(opts ...Option) (*Agent, error) {
 	)
 
 	return a, nil
+}
+
+func (a *Agent) SharedState() *types.AgentSharedState {
+	return a.sharedState
 }
 
 func (a *Agent) startNewConversationsConsumer() {
@@ -147,6 +163,14 @@ func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 		xlog.Debug("Agent has finished being asked", "agent", a.Character.Name)
 	}()
 
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "job"
+		obs.Icon = "plug"
+		a.observer.Update(*obs)
+		opts = append(opts, types.WithObservable(obs))
+	}
+
 	return a.Execute(types.NewJob(
 		append(
 			opts,
@@ -163,6 +187,26 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 	defer func() {
 		xlog.Debug("Agent has finished", "agent", a.Character.Name)
 	}()
+
+	if j.Obs != nil {
+		if len(j.ConversationHistory) > 0 {
+			m := j.ConversationHistory[len(j.ConversationHistory)-1]
+			j.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
+			a.observer.Update(*j.Obs)
+		}
+
+		j.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
+			j.Obs.Completion = &types.Completion{
+				Conversation: ccm,
+			}
+
+			if j.Result.Error != nil {
+				j.Obs.Completion.Error = j.Result.Error.Error()
+			}
+
+			a.observer.Update(*j.Obs)
+		})
+	}
 
 	a.Enqueue(j)
 	return j.Result.WaitResult()
@@ -236,6 +280,7 @@ func (a *Agent) Stop() {
 	a.Lock()
 	defer a.Unlock()
 	xlog.Debug("Stopping agent", "agent", a.Character.Name)
+	a.closeMCPSTDIOServers()
 	a.context.Cancel()
 }
 
@@ -262,103 +307,61 @@ func (a *Agent) Memory() RAGDB {
 	return a.options.ragdb
 }
 
-func (a *Agent) runAction(ctx context.Context, chosenAction types.Action, params types.ActionParams) (result types.ActionResult, err error) {
-	// Initialize state if nil (with lock protection)
-	a.Lock()
-	if a.currentState == nil {
-		a.currentState = &action.AgentInternalState{
-			NowDoing:    "",
-			DoingNext:   "",
-			DoneHistory: []string{},
-			Memories:    []string{},
-			Goal:        "",
+func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params types.ActionParams) (result types.ActionResult, err error) {
+	var obs *types.Observable
+	if job.Obs != nil {
+		obs = a.observer.NewObservable()
+		obs.Name = "action"
+		obs.Icon = "bolt"
+		obs.ParentID = job.Obs.ID
+		obs.Creation = &types.Creation{
+			FunctionDefinition: chosenAction.Definition().ToFunctionDefinition(),
+			FunctionParams:     params,
 		}
+		a.observer.Update(*obs)
 	}
 
-	// BEFORE ACTION: Update NowDoing
-	actionName := chosenAction.Definition().Name.String()
-	if !chosenAction.Definition().Name.Is(action.StateActionName) {
-		a.currentState.NowDoing = fmt.Sprintf("Executing %s", actionName)
-		xlog.Info("[STATE] BEFORE action", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
+	xlog.Info("[runAction] Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name, "params", params.String())
 
-		// Save state before action
-		if err := a.SaveStateToDB(); err != nil {
-			xlog.Warn("Failed to save state before action", "error", err)
-		}
-	}
-	a.Unlock()
-
-	// Execute the action
-	actionFound := false
 	for _, act := range a.availableActions() {
 		if act.Definition().Name == chosenAction.Definition().Name {
-			res, err := act.Run(ctx, params)
+			res, err := act.Run(job.GetContext(), a.sharedState, params)
 			if err != nil {
-				// AFTER ACTION (ERROR): Update state for failed action
-				a.Lock()
-				if !chosenAction.Definition().Name.Is(action.StateActionName) {
-					xlog.Info("[STATE] Clearing NowDoing after action error", "agent", a.Character.Name, "action", actionName, "error", err)
-					a.currentState.NowDoing = ""
-					failureMsg := fmt.Sprintf("Failed: %s - %s", actionName, err.Error())
-					a.currentState.DoneHistory = append(a.currentState.DoneHistory, failureMsg)
-
-					// Keep only last 10 items to avoid bloat
-					if len(a.currentState.DoneHistory) > 10 {
-						a.currentState.DoneHistory = a.currentState.DoneHistory[1:]
-					}
-
-					if saveErr := a.SaveStateToDB(); saveErr != nil {
-						xlog.Warn("Failed to save state after action error", "error", saveErr)
-					} else {
-						xlog.Info("[STATE] Successfully saved state to DB after error", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
+				if obs != nil {
+					obs.Completion = &types.Completion{
+						Error: err.Error(),
 					}
 				}
-				a.Unlock()
+
 				return types.ActionResult{}, fmt.Errorf("error running action: %w", err)
 			}
+
+			if obs != nil {
+				obs.Progress = append(obs.Progress, types.Progress{
+					ActionResult: res.Result,
+				})
+				a.observer.Update(*obs)
+			}
+
 			result = res
 			actionFound = true
 			break
 		}
 	}
 
-	// Check if action was found
-	if !actionFound {
-		a.Lock()
-		if !chosenAction.Definition().Name.Is(action.StateActionName) {
-			xlog.Info("[STATE] Clearing NowDoing after action not found", "agent", a.Character.Name, "action", actionName)
-			a.currentState.NowDoing = ""
-			failureMsg := fmt.Sprintf("Failed: %s - action not found", actionName)
-			a.currentState.DoneHistory = append(a.currentState.DoneHistory, failureMsg)
-
-			// Keep only last 10 items to avoid bloat
-			if len(a.currentState.DoneHistory) > 10 {
-				a.currentState.DoneHistory = a.currentState.DoneHistory[1:]
-			}
-
-			if saveErr := a.SaveStateToDB(); saveErr != nil {
-				xlog.Warn("Failed to save state after action not found", "error", saveErr)
-			} else {
-				xlog.Info("[STATE] Successfully saved state to DB after action not found", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
-			}
-		}
-		a.Unlock()
-		return types.ActionResult{}, fmt.Errorf("action not found: %s", actionName)
-	}
-
-	xlog.Info("[runAction] Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name, "params", params.String())
-
-	// Lock for state updates after action execution
-	a.Lock()
-	defer a.Unlock()
-
-	// Handle explicit state updates (existing behavior)
 	if chosenAction.Definition().Name.Is(action.StateActionName) {
-		state := action.AgentInternalState{}
+		// We need to store the result in the state
+		state := types.AgentInternalState{}
 
 		err = params.Unmarshal(&state)
 		if err != nil {
-			return types.ActionResult{}, fmt.Errorf("error unmarshalling state of the agent: %w", err)
+			werr := fmt.Errorf("error unmarshalling state of the agent: %w", err)
+			if obs != nil {
+				obs.Completion = &types.Completion{
+					Error: werr.Error(),
+				}
+			}
+			return types.ActionResult{}, werr
 		}
 
 		// Preserve automatic tracking fields if not explicitly set
@@ -371,51 +374,25 @@ func (a *Agent) runAction(ctx context.Context, chosenAction types.Action, params
 
 		// update the current state with the one we just got from the action
 		a.currentState = &state
-
-		xlog.Info("[STATE] Manual state update", "agent", a.Character.Name,
-			"nowDoing", state.NowDoing, "doingNext", state.DoingNext,
-			"goal", state.Goal, "doneHistory", len(state.DoneHistory), "memories", len(state.Memories))
+		if obs != nil {
+			obs.Progress = append(obs.Progress, types.Progress{
+				AgentState: &state,
+			})
+			a.observer.Update(*obs)
+		}
 
 		// Save state to database
 		if err := a.SaveStateToDB(); err != nil {
 			return types.ActionResult{}, err
 		}
-	} else {
-		// AFTER ACTION (SUCCESS): Update state for successful action
-		xlog.Info("[STATE] Clearing NowDoing after successful action", "agent", a.Character.Name, "action", actionName, "prevNowDoing", a.currentState.NowDoing)
-		a.currentState.NowDoing = ""
-
-		// Add to done history with timestamp
-		timestamp := time.Now().Format("15:04")
-		successMsg := fmt.Sprintf("[%s] %s", timestamp, actionName)
-		if len(result.Result) > 0 && len(result.Result) < 100 {
-			successMsg += fmt.Sprintf(" - %s", result.Result)
-		}
-
-		a.currentState.DoneHistory = append(a.currentState.DoneHistory, successMsg)
-
-		// Keep only last 10 items to avoid bloat
-		if len(a.currentState.DoneHistory) > 10 {
-			a.currentState.DoneHistory = a.currentState.DoneHistory[1:]
-		}
-
-		// Optionally set DoingNext based on action patterns
-		a.updateDoingNext(actionName)
-
-		xlog.Info("[STATE] AFTER action", "agent", a.Character.Name,
-			"completed", actionName, "nowDoing", a.currentState.NowDoing,
-			"doingNext", a.currentState.DoingNext,
-			"doneHistory", len(a.currentState.DoneHistory))
-
-		// Save state after action
-		if err := a.SaveStateToDB(); err != nil {
-			xlog.Warn("Failed to save state after action", "error", err)
-		} else {
-			xlog.Info("[STATE] Successfully saved state to DB", "agent", a.Character.Name, "nowDoing", a.currentState.NowDoing)
-		}
 	}
 
 	xlog.Debug("[runAction] Action result", "action", chosenAction.Definition().Name, "params", params.String(), "result", result.Result)
+
+	if obs != nil {
+		obs.MakeLastProgressCompletion()
+		a.observer.Update(*obs)
+	}
 
 	return result, nil
 }
@@ -506,7 +483,7 @@ func (a *Agent) processPrompts(conversation Messages) Messages {
 }
 
 func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (string, error) {
-	xlog.Debug("Describing image", "model", model, "image", imageURL)
+	xlog.Debug("Describing image", "model", model)
 	resp, err := a.client.CreateChatCompletion(ctx,
 		openai.ChatCompletionRequest{
 			Model: model,
@@ -561,12 +538,13 @@ func (a *Agent) describeImage(ctx context.Context, model, imageURL string) (stri
 	return resp.Choices[0].Message.Content, nil
 }
 
-func extractImageContent(message openai.ChatCompletionMessage) (imageURL, text string, e error) {
+// extractAllImageContent extracts all images from a message
+func extractAllImageContent(message openai.ChatCompletionMessage) (images []string, text string, e error) {
 	e = fmt.Errorf("no image found")
 	if message.MultiContent != nil {
 		for _, content := range message.MultiContent {
 			if content.Type == openai.ChatMessagePartTypeImageURL {
-				imageURL = content.ImageURL.URL
+				images = append(images, content.ImageURL.URL)
 				e = nil
 			}
 			if content.Type == openai.ChatMessagePartTypeText {
@@ -580,47 +558,227 @@ func extractImageContent(message openai.ChatCompletionMessage) (imageURL, text s
 
 func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Messages {
 
-	// walk conversation history, and check if last message from user contains image.
-	// If it does, we need to describe the image first with a model that supports image understanding (if the current model doesn't support it)
-	// and add it to the conversation context
+	// walk conversation history, and check if any message contains images.
+	// If they do, we need to describe the images first with a model that supports image understanding (if the current model doesn't support it)
+	// and add them to the conversation context
 	if !a.options.SeparatedMultimodalModel() {
 		return conv
 	}
-	lastUserMessage := conv.GetLatestUserMessage()
-	if lastUserMessage != nil && conv.IsLastMessageFromRole(UserRole) {
-		imageURL, text, err := extractImageContent(*lastUserMessage)
-		if err == nil {
-			// We have an image, we need to describe it first
-			// and add it to the conversation context
-			imageDescription, err := a.describeImage(a.context.Context, a.options.LLMAPI.MultimodalModel, imageURL)
-			if err != nil {
-				xlog.Error("Error describing image", "error", err)
-			} else {
-				// We replace the user message with the image description
-				// and add the user text to the conversation
-				explainerMessage := openai.ChatCompletionMessage{
-					Role:    "system",
-					Content: fmt.Sprintf("The user shared an image which can be described as: %s", imageDescription),
-				}
 
-				// remove lastUserMessage from the conversation
-				conv = conv.RemoveLastUserMessage()
-				conv = append(conv, explainerMessage)
-				conv = append(conv, openai.ChatCompletionMessage{
-					Role:    role,
-					Content: text,
-				})
+	xlog.Debug("Processing user inputs", "agent", a.Character.Name, "conversation", conv)
+
+	// Process all messages in the conversation to extract and describe images
+	var processedMessages Messages
+	var messagesToRemove []int
+
+	for i, message := range conv {
+		images, text, err := extractAllImageContent(message)
+		if err == nil && len(images) > 0 {
+			xlog.Debug("Found images in message", "messageIndex", i, "imageCount", len(images), "role", message.Role)
+
+			// Mark this message for removal
+			messagesToRemove = append(messagesToRemove, i)
+
+			// Process each image in the message
+			var imageDescriptions []string
+			for j, image := range images {
+				imageDescription, err := a.describeImage(a.context.Context, a.options.LLMAPI.MultimodalModel, image)
+				if err != nil {
+					xlog.Error("Error describing image", "error", err, "messageIndex", i, "imageIndex", j)
+					imageDescriptions = append(imageDescriptions, fmt.Sprintf("Image %d: [Error describing image: %v]", j+1, err))
+				} else {
+					imageDescriptions = append(imageDescriptions, fmt.Sprintf("Image %d: %s", j+1, imageDescription))
+				}
 			}
+
+			// Add the text content as a new message with the same role first
+			if text != "" {
+				textMessage := openai.ChatCompletionMessage{
+					Role:    message.Role,
+					Content: text,
+				}
+				processedMessages = append(processedMessages, textMessage)
+
+				// Add the image descriptions as a system message after the text
+				explainerMessage := openai.ChatCompletionMessage{
+					Role: "system",
+					Content: fmt.Sprintf("The above message also contains %d image(s) which can be described as: %s",
+						len(images), strings.Join(imageDescriptions, "; ")),
+				}
+				processedMessages = append(processedMessages, explainerMessage)
+			} else {
+				// If there's no text, just add the image descriptions as a system message
+				explainerMessage := openai.ChatCompletionMessage{
+					Role: "system",
+					Content: fmt.Sprintf("Message contains %d image(s) which can be described as: %s",
+						len(images), strings.Join(imageDescriptions, "; ")),
+				}
+				processedMessages = append(processedMessages, explainerMessage)
+			}
+		} else {
+			// No image found, keep the original message
+			processedMessages = append(processedMessages, message)
 		}
+	}
+
+	// If we found and processed any images, replace the conversation
+	if len(messagesToRemove) > 0 {
+		xlog.Info("Processed images in conversation", "messagesWithImages", len(messagesToRemove), "agent", a.Character.Name)
+		return processedMessages
 	}
 
 	return conv
 }
 
-func (a *Agent) consumeJob(job *types.Job, role string) {
+func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
+	hasTriggers := false
+	triggeredBy := ""
+	failedBy := ""
 
+	if job.DoneFilter {
+		return true, nil
+	}
+	job.DoneFilter = true
+
+	if len(a.options.jobFilters) < 1 {
+		xlog.Debug("No filters")
+		return true, nil
+	}
+
+	for _, filter := range a.options.jobFilters {
+		name := filter.Name()
+		if triggeredBy != "" && filter.IsTrigger() {
+			continue
+		}
+
+		ok, err = filter.Apply(job)
+		if err != nil {
+			xlog.Error("Error in job filter", "filter", name, "error", err)
+			failedBy = name
+			break
+		}
+
+		if filter.IsTrigger() {
+			hasTriggers = true
+			if ok {
+				triggeredBy = name
+				xlog.Info("Job triggered by filter", "filter", name)
+			}
+		} else if !ok {
+			failedBy = name
+			xlog.Info("Job failed filter", "filter", name)
+			break
+		} else {
+			xlog.Debug("Job passed filter", "filter", name)
+		}
+	}
+
+	if a.Observer() != nil {
+		obs := a.Observer().NewObservable()
+		obs.Name = "filter"
+		obs.Icon = "shield"
+		obs.ParentID = job.Obs.ID
+		if err == nil {
+			obs.Completion = &types.Completion{
+				FilterResult: &types.FilterResult{
+					HasTriggers: hasTriggers,
+					TriggeredBy: triggeredBy,
+					FailedBy:    failedBy,
+				},
+			}
+		} else {
+			obs.Completion = &types.Completion{
+				Error: err.Error(),
+			}
+		}
+		a.Observer().Update(*obs)
+	}
+
+	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
+}
+
+// validateBuiltinTools checks that builtin tools specified by the user can be matched to available actions
+func (a *Agent) validateBuiltinTools(job *types.Job) {
+	builtinTools := job.GetBuiltinTools()
+	if len(builtinTools) == 0 {
+		return
+	}
+
+	// Get available actions
+	availableActions := a.mcpActions
+
+	for _, tool := range builtinTools {
+		functionName := tool.Name
+
+		// Check if this is a web search builtin tool
+		if strings.HasPrefix(string(functionName), "web_search_") {
+			// Look for a search action
+			searchAction := availableActions.Find("search")
+			if searchAction == nil {
+				xlog.Warn("Web search builtin tool specified but no 'search' action available",
+					"function_name", functionName,
+					"agent", a.Character.Name)
+			} else {
+				xlog.Debug("Web search builtin tool matched to search action",
+					"function_name", functionName,
+					"agent", a.Character.Name)
+			}
+		} else {
+			// For future builtin tools, add more matching logic here
+			xlog.Warn("Unknown builtin tool specified",
+				"function_name", functionName,
+				"agent", a.Character.Name)
+		}
+	}
+}
+
+// replyWithToolCall handles user-defined actions by recording the action state without setting Response
+func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMessage, params types.ActionParams, chosenAction types.Action, reasoning string) {
+	// Record the action state so the webui can detect this is a user-defined action
+	stateResult := types.ActionState{
+		ActionCurrentState: types.ActionCurrentState{
+			Job:       job,
+			Action:    chosenAction,
+			Params:    params,
+			Reasoning: reasoning,
+		},
+		ActionResult: types.ActionResult{
+			Result: reasoning, // The reasoning/message to show to user
+		},
+	}
+
+	// Add the action state to the job result
+	job.Result.SetResult(stateResult)
+
+	// Used by the observer
+	conv = append(conv, openai.ChatCompletionMessage{
+		Role: "assistant",
+		ToolCalls: []openai.ToolCall{
+			{
+				Type: openai.ToolTypeFunction,
+				Function: openai.FunctionCall{
+					Name:      chosenAction.Definition().ToFunctionDefinition().Name,
+					Arguments: params.String(),
+				},
+			},
+		},
+	})
+
+	// Set conversation but leave Response empty
+	// The webui will detect the user-defined action and generate the proper tool call response
+	job.Result.Conversation = conv
+	// job.Result.Response remains empty - this signals to webui that it should check State
+	job.Result.Finish(nil)
+}
+
+func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
+		return
+	}
+
+	if retries < 1 {
+		job.Result.Finish(fmt.Errorf("Exceeded recursive retries"))
 		return
 	}
 
@@ -653,12 +811,21 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	conv = a.processPrompts(conv)
+	if ok, err := a.filterJob(job); !ok || err != nil {
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("Error in job filter: %w", err))
+		} else {
+			job.Result.Finish(nil)
+		}
+		return
+	}
 	conv = a.processUserInputs(job, role, conv)
 
 	// RAG
-	conv = a.knowledgeBaseLookup(conv)
-	jsonBytes, _ := json.MarshalIndent(conv, "", "  ")
-	fmt.Printf("DEBUG: BBBB MMM: %s\n", string(jsonBytes))
+	conv = a.knowledgeBaseLookup(job, conv)
+
+	// Validate builtin tools against available actions
+	a.validateBuiltinTools(job)
 
 	var pickTemplate string
 	var reEvaluationTemplate string
@@ -683,12 +850,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		chosenAction = *action
 		reasoning = reason
 		if params == nil {
-			p, err := a.generateParameters(job.GetContext(), pickTemplate, chosenAction, conv, reasoning, maxRetries)
+			p, err := a.generateParameters(job, pickTemplate, chosenAction, conv, reasoning, maxRetries)
 			if err != nil {
 				xlog.Error("Error generating parameters, trying again", "error", err)
 				// try again
 				job.SetNextAction(&chosenAction, nil, reasoning)
-				a.consumeJob(job, role)
+				a.consumeJob(job, role, retries-1)
 				return
 			}
 			actionParams = p.actionParams
@@ -698,7 +865,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		job.ResetNextAction()
 	} else {
 		var err error
-		chosenAction, actionParams, reasoning, err = a.pickAction(job.GetContext(), pickTemplate, conv, maxRetries)
+		chosenAction, actionParams, reasoning, err = a.pickAction(job, pickTemplate, conv, maxRetries)
 		if err != nil {
 			xlog.Error("Error picking action", "error", err)
 			job.Result.Finish(err)
@@ -706,36 +873,15 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		}
 	}
 
-	// check if the agent is looping over the same action
-	// if so, we need to stop it
-	if a.options.loopDetectionSteps > 0 && len(job.GetPastActions()) > 0 {
-		count := map[string]int{}
-		for i := len(job.GetPastActions()) - 1; i >= 0; i-- {
-			pastAction := job.GetPastActions()[i]
-			if pastAction.Action.Definition().Name == chosenAction.Definition().Name &&
-				pastAction.Params.String() == actionParams.String() {
-				count[chosenAction.Definition().Name.String()]++
-			}
-		}
-		if count[chosenAction.Definition().Name.String()] > a.options.loopDetectionSteps {
-			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
-			a.reply(job, role, conv, actionParams, chosenAction, reasoning)
-			return
-		}
-	}
-
-	//xlog.Debug("Picked action", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "reasoning", reasoning)
 	if chosenAction == nil {
 		// If no action was picked up, the reasoning is the message returned by the assistant
 		// so we can consume it as if it was a reply.
-		//job.Result.SetResult(ActionState{ActionCurrentState{nil, nil, "No action to do, just reply"}, ""})
-		//job.Result.Finish(fmt.Errorf("no action to do"))\
 		xlog.Info("No action to do, just reply", "agent", a.Character.Name, "reasoning", reasoning)
 
 		if reasoning != "" {
 			conv = append(conv, openai.ChatCompletionMessage{
 				Role:    "assistant",
-				Content: reasoning,
+				Content: a.cleanupLLMResponse(reasoning),
 			})
 		} else {
 			xlog.Info("No reasoning, just reply", "agent", a.Character.Name)
@@ -744,8 +890,26 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				job.Result.Finish(fmt.Errorf("error asking LLM for a reply: %w", err))
 				return
 			}
+			msg.Content = a.cleanupLLMResponse(msg.Content)
 			conv = append(conv, msg)
 			reasoning = msg.Content
+		}
+
+		var satisfied bool
+		var err error
+		// Evaluate the response
+		satisfied, conv, err = a.handleEvaluation(job, conv, job.GetEvaluationLoop())
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("error evaluating response: %w", err))
+			return
+		}
+
+		if !satisfied {
+			// If not satisfied, continue with the conversation
+			job.ConversationHistory = conv
+			job.IncrementEvaluationLoop()
+			a.consumeJob(job, role, retries)
+			return
 		}
 
 		xlog.Debug("Finish job with reasoning", "reasoning", reasoning, "agent", a.Character.Name, "conversation", fmt.Sprintf("%+v", conv))
@@ -772,12 +936,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			"reasoning", reasoning,
 		)
 
-		params, err := a.generateParameters(job.GetContext(), pickTemplate, chosenAction, conv, reasoning, maxRetries)
+		params, err := a.generateParameters(job, pickTemplate, chosenAction, conv, reasoning, maxRetries)
 		if err != nil {
 			xlog.Error("Error generating parameters, trying again", "error", err)
 			// try again
 			job.SetNextAction(&chosenAction, nil, reasoning)
-			a.consumeJob(job, role)
+			a.consumeJob(job, role, retries-1)
 			return
 		}
 		actionParams = params.actionParams
@@ -795,6 +959,22 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		job.Result.Finish(fmt.Errorf("no parameters"))
 		xlog.Error("No parameters", "agent", a.Character.Name)
 		return
+	}
+
+	if a.options.loopDetectionSteps > 0 && len(job.GetPastActions()) > 0 {
+		count := 0
+		for _, pastAction := range job.GetPastActions() {
+			if pastAction.Action.Definition().Name == chosenAction.Definition().Name &&
+				pastAction.Params.String() == actionParams.String() {
+				count++
+			}
+		}
+		if count > a.options.loopDetectionSteps {
+			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
+			a.reply(job, role, conv, actionParams, chosenAction, reasoning)
+			return
+		}
+		xlog.Debug("Checked for loops", "action", chosenAction.Definition().Name, "count", count)
 	}
 
 	job.AddPastAction(chosenAction, &actionParams)
@@ -821,8 +1001,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)
 	if err != nil {
 		xlog.Error("error handling planning", "error", err)
-		//job.Result.Conversation = conv
-		//job.Result.SetResponse(msg.Content)
 		a.reply(job, role, append(conv, openai.ChatCompletionMessage{
 			Role:    "assistant",
 			Content: fmt.Sprintf("Error handling planning: %v", err),
@@ -867,11 +1045,15 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
-		result, err := a.runAction(job.GetContext(), chosenAction, actionParams)
+		// Check if this is a user-defined action
+		if types.IsActionUserDefined(chosenAction) {
+			xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
+			a.replyWithToolCall(job, conv, actionParams, chosenAction, reasoning)
+			return
+		}
+
+		result, err := a.runAction(job, chosenAction, actionParams)
 		if err != nil {
-			//job.Result.Finish(fmt.Errorf("error running action: %w", err))
-			//return
-			// make the LLM aware of the error of running the action instead of stopping the job here
 			result.Result = fmt.Sprintf("Error running tool: %v", err)
 		}
 
@@ -892,7 +1074,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	// given the result, we can now re-evaluate the conversation
-	followingAction, followingParams, reasoning, err := a.pickAction(job.GetContext(), reEvaluationTemplate, conv, maxRetries)
+	followingAction, followingParams, reasoning, err := a.pickAction(job, reEvaluationTemplate, conv, maxRetries)
 	if err != nil {
 		job.Result.Conversation = conv
 		job.Result.Finish(fmt.Errorf("error picking action: %w", err))
@@ -910,11 +1092,45 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		// The agent decided to do another action
 		// call ourselves again
 		job.SetNextAction(&followingAction, &followingParams, reasoning)
-		a.consumeJob(job, role)
+		a.consumeJob(job, role, retries)
+		return
+	}
+
+	// Evaluate the final response
+	var satisfied bool
+	satisfied, conv, err = a.handleEvaluation(job, conv, job.GetEvaluationLoop())
+	if err != nil {
+		job.Result.Finish(fmt.Errorf("error evaluating response: %w", err))
+		return
+	}
+
+	if !satisfied {
+		// If not satisfied, continue with the conversation
+		job.ConversationHistory = conv
+		job.IncrementEvaluationLoop()
+		a.consumeJob(job, role, retries)
 		return
 	}
 
 	a.reply(job, role, conv, actionParams, chosenAction, reasoning)
+}
+
+func stripThinkingTags(content string) string {
+	// Remove content between <thinking> and </thinking> (including multi-line)
+	content = regexp.MustCompile(`(?s)<thinking>.*?</thinking>`).ReplaceAllString(content, "")
+	// Remove content between <think> and </think> (including multi-line)
+	content = regexp.MustCompile(`(?s)<think>.*?</think>`).ReplaceAllString(content, "")
+	// Clean up any extra whitespace
+	content = strings.TrimSpace(content)
+	return content
+}
+
+func (a *Agent) cleanupLLMResponse(content string) string {
+	if a.options.stripThinkingTags {
+		content = stripThinkingTags(content)
+	}
+	// Future post-processing options can be added here
+	return content
 }
 
 func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams types.ActionParams, chosenAction types.Action, reasoning string) {
@@ -923,29 +1139,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	// At this point can only be a reply action
 	xlog.Info("Computing reply", "agent", a.Character.Name)
 
-	// decode the response
-	replyResponse := action.ReplyResponse{}
-
-	if err := actionParams.Unmarshal(&replyResponse); err != nil {
-		job.Result.Conversation = conv
-		job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
-		return
-	}
-
-	// If we have already a reply from the action, just return it.
-	// Otherwise generate a full conversation to get a proper message response
-	// if chosenAction.Definition().Name.Is(action.ReplyActionName) {
-	// 	replyResponse := action.ReplyResponse{}
-	// 	if err := params.actionParams.Unmarshal(&replyResponse); err != nil {
-	// 		job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
-	// 		return
-	// 	}
-	// 	if replyResponse.Message != "" {
-	// 		job.Result.SetResponse(replyResponse.Message)
-	// 		job.Result.Finish(nil)
-	// 		return
-	// 	}
-	// }
+	forceResponsePrompt := "Reply to the user without using any tools or function calls. Just reply with the message."
 
 	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {
@@ -961,39 +1155,19 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 					Role:    "system",
 					Content: prompt,
 				},
+				{
+					Role:    "system",
+					Content: forceResponsePrompt,
+				},
 			}, conv...)
 		}
-	}
-
-	// Generate a human-readable response
-	// resp, err := a.client.CreateChatCompletion(ctx,
-	// 	openai.ChatCompletionRequest{
-	// 		Model: a.options.LLMAPI.Model,
-	// 		Messages: append(conv,
-	// 			openai.ChatCompletionMessage{
-	// 				Role:    "system",
-	// 				Content: "Assistant thought: " + replyResponse.Message,
-	// 			},
-	// 		),
-	// 	},
-	// )
-
-	if replyResponse.Message != "" {
-		xlog.Info("Return reply message", "reply", replyResponse.Message, "agent", a.Character.Name)
-
-		msg := openai.ChatCompletionMessage{
-			Role:    "assistant",
-			Content: replyResponse.Message,
-		}
-
-		conv = append(conv, msg)
-		job.Result.Conversation = conv
-		job.Result.SetResponse(msg.Content)
-		job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
-			a.saveCurrentConversation(conv)
-		})
-		job.Result.Finish(nil)
-		return
+	} else {
+		conv = append([]openai.ChatCompletionMessage{
+			{
+				Role:    "system",
+				Content: forceResponsePrompt,
+			},
+		}, conv...)
 	}
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
@@ -1007,13 +1181,21 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 		return
 	}
 
-	// If we didn't got any message, we can use the response from the action
-	if chosenAction.Definition().Name.Is(action.ReplyActionName) && msg.Content == "" {
-		xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
+	msg.Content = a.cleanupLLMResponse(msg.Content)
 
-		msg = openai.ChatCompletionMessage{
-			Role:    "assistant",
-			Content: replyResponse.Message,
+	if msg.Content == "" {
+		// If we didn't got any message, we can use the response from the action (it should be a reply)
+
+		replyResponse := action.ReplyResponse{}
+		if err := actionParams.Unmarshal(&replyResponse); err != nil {
+			job.Result.Conversation = conv
+			job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
+			return
+		}
+
+		if chosenAction.Definition().Name.Is(action.ReplyActionName) && replyResponse.Message != "" {
+			xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
+			msg.Content = a.cleanupLLMResponse(replyResponse.Message)
 		}
 	}
 
@@ -1060,25 +1242,83 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 
 	xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 
-	// TODO: Would be nice if we have a special action to
-	// contact the user. This would actually make sure that
-	// if the agent wants to initiate a conversation, it can do so.
-	// This would be a special action that would be picked up by the agent
-	// and would be used to contact the user.
+	// Check for reminders that need to be triggered
+	now := time.Now()
+	var triggeredReminders []types.ReminderActionResponse
+	var remainingReminders []types.ReminderActionResponse
 
-	// if len(conv()) != 0 {
-	// 	// Here the LLM could decide to store some part of the conversation too in the memory
-	// 	evaluateMemory := NewJob(
-	// 		WithText(
-	// 			`Evaluate the current conversation and decide if we need to store some relevant informations from it`,
-	// 		),
-	// 		WithReasoningCallback(a.options.reasoningCallback),
-	// 		WithResultCallback(a.options.resultCallback),
-	// 	)
-	// 	a.consumeJob(evaluateMemory, SystemRole)
+	for _, reminder := range a.sharedState.Reminders {
+		xlog.Debug("Checking reminder", "reminder", reminder)
+		if now.After(reminder.NextRun) {
+			triggeredReminders = append(triggeredReminders, reminder)
+			xlog.Debug("Reminder triggered", "reminder", reminder)
+			// Calculate next run time for recurring reminders
+			if reminder.IsRecurring {
+				xlog.Debug("Reminder is recurring", "reminder", reminder)
+				parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+				schedule, err := parser.Parse(reminder.CronExpr)
+				if err == nil {
+					nextRun := schedule.Next(now)
+					xlog.Debug("Next run time", "reminder", reminder, "nextRun", nextRun)
+					reminder.LastRun = now
+					reminder.NextRun = nextRun
+					remainingReminders = append(remainingReminders, reminder)
+				}
+			}
+		} else {
+			xlog.Debug("Reminder not triggered", "reminder", reminder)
+			remainingReminders = append(remainingReminders, reminder)
+		}
+	}
 
-	// 	a.ResetConversation()
-	// }
+	// Update the reminders list
+	a.sharedState.Reminders = remainingReminders
+
+	// Handle triggered reminders
+	for _, reminder := range triggeredReminders {
+		xlog.Info("Processing triggered reminder", "agent", a.Character.Name, "message", reminder.Message)
+
+		// Create a more natural conversation flow for the reminder
+		reminderJob := types.NewJob(
+			types.WithText(fmt.Sprintf("I have a reminder for you: %s", reminder.Message)),
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)
+
+		// Add the reminder message to the job's metadata
+		reminderJob.Metadata = map[string]interface{}{
+			"message":     reminder.Message,
+			"is_reminder": true,
+		}
+
+		// Process the reminder as a normal conversation
+		a.consumeJob(reminderJob, UserRole, a.options.loopDetectionSteps)
+
+		// After the reminder job is complete, ensure the user is notified
+		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
+			// Get the last assistant message from the conversation
+			var lastAssistantMsg *openai.ChatCompletionMessage
+			for i := len(reminderJob.Result.Conversation) - 1; i >= 0; i-- {
+				if reminderJob.Result.Conversation[i].Role == AssistantRole {
+					lastAssistantMsg = &reminderJob.Result.Conversation[i]
+					break
+				}
+			}
+
+			if lastAssistantMsg != nil && lastAssistantMsg.Content != "" {
+				// Send the reminder response to the user
+				msg := openai.ChatCompletionMessage{
+					Role:    "assistant",
+					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, lastAssistantMsg.Content),
+				}
+
+				go func(agent *Agent) {
+					xlog.Info("Sending reminder response to user", "agent", agent.Character.Name, "message", msg.Content)
+					agent.newConversations <- msg
+				}(a)
+			}
+		}
+	}
 
 	if !a.options.standaloneJob {
 		return
@@ -1090,44 +1330,17 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// - evaluating the result
 	// - asking the agent to do something else based on the result
 
-	//	whatNext := NewJob(WithText("Decide what to do based on the state"))
 	whatNext := types.NewJob(
 		types.WithText(innerMonologueTemplate),
 		types.WithReasoningCallback(a.options.reasoningCallback),
 		types.WithResultCallback(a.options.resultCallback),
 	)
-	a.consumeJob(whatNext, SystemRole)
+	a.consumeJob(whatNext, SystemRole, a.options.loopDetectionSteps)
 
 	xlog.Info("STOP -- Periodically run is done", "agent", a.Character.Name)
-
-	// Save results from state
-
-	// a.ResetConversation()
-
-	// doWork := NewJob(WithText("Select the tool to use based on your goal and the current state."))
-	// a.consumeJob(doWork, SystemRole)
-
-	// results := []string{}
-	// for _, v := range doWork.Result.State {
-	// 	results = append(results, v.Result)
-	// }
-
-	// a.ResetConversation()
-
-	// // Here the LLM could decide to do something based on the result of our automatic action
-	// evaluateAction := NewJob(
-	// 	WithText(
-	// 		`Evaluate the current situation and decide if we need to execute other tools (for instance to store results into permanent, or short memory).
-	// 		We have done the following actions:
-	// 		` + strings.Join(results, "\n"),
-	// 	))
-	// a.consumeJob(evaluateAction, SystemRole)
-
-	// a.ResetConversation()
 }
 
 func (a *Agent) Run() error {
-
 	a.startNewConversationsConsumer()
 	xlog.Debug("Agent is now running", "agent", a.Character.Name)
 	// The agent run does two things:
@@ -1142,34 +1355,70 @@ func (a *Agent) Run() error {
 
 	// Expose a REST API to interact with the agent to ask it things
 
-	//todoTimer := time.NewTicker(a.options.periodicRuns)
 	timer := time.NewTimer(a.options.periodicRuns)
+
+	// we fire the periodicalRunner only once.
+	go a.periodicalRunRunner(timer)
+	var errs []error
+	var muErr sync.Mutex
+	var wg sync.WaitGroup
+
+	parallelJobs := a.options.parallelJobs
+	if a.options.parallelJobs == 0 {
+		parallelJobs = 1
+	}
+
+	for i := 0; i < parallelJobs; i++ {
+		xlog.Debug("Starting agent worker", "worker", i)
+		wg.Add(1)
+		go func() {
+			e := a.run(timer)
+			muErr.Lock()
+			errs = append(errs, e)
+			muErr.Unlock()
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+
+	return errors.Join(errs...)
+}
+
+func (a *Agent) run(timer *time.Timer) error {
 	for {
 		xlog.Debug("Agent is now waiting for a new job", "agent", a.Character.Name)
 		select {
 		case job := <-a.jobQueue:
-			a.loop(timer, job)
+			if !timer.Stop() {
+				<-timer.C
+			}
+			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
+			a.consumeJob(job, UserRole, a.options.loopDetectionSteps)
+			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
 			// Agent has been canceled, return error
 			xlog.Warn("Agent has been canceled", "agent", a.Character.Name)
 			return ErrContextCanceled
+		}
+	}
+}
+
+func (a *Agent) periodicalRunRunner(timer *time.Timer) {
+	for {
+		select {
+		case <-a.context.Done():
+			// Agent has been canceled, return error
+			xlog.Warn("periodicalRunner has been canceled", "agent", a.Character.Name)
+			return
 		case <-timer.C:
 			a.periodicallyRun(timer)
 		}
 	}
 }
 
-func (a *Agent) loop(timer *time.Timer, job *types.Job) {
-	// Remember always to reset the timer - if we don't the agent will stop..
-	defer timer.Reset(a.options.periodicRuns)
-	// Consume the job and generate a response
-	// TODO: Give a short-term memory to the agent
-	// stop and drain the timer
-	if !timer.Stop() {
-		<-timer.C
-	}
-	xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
-	a.consumeJob(job, UserRole)
+func (a *Agent) Observer() Observer {
+	return a.observer
 }
 
 // calculateCost calculates the cost of the API call based on the model and token usage

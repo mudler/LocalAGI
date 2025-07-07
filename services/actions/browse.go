@@ -18,7 +18,7 @@ func NewBrowse(config map[string]string) *BrowseAction {
 
 type BrowseAction struct{}
 
-func (a *BrowseAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *BrowseAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		URL string `json:"url"`
 	}{}

@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -74,8 +75,8 @@ func (a ActionDefinitionName) String() string {
 	return string(a)
 }
 
-func (a ActionDefinition) ToFunctionDefinition() openai.FunctionDefinition {
-	return openai.FunctionDefinition{
+func (a ActionDefinition) ToFunctionDefinition() *openai.FunctionDefinition {
+	return &openai.FunctionDefinition{
 		Name:        a.Name.String(),
 		Description: a.Description,
 		Parameters: jsonschema.Definition{
@@ -88,9 +89,63 @@ func (a ActionDefinition) ToFunctionDefinition() openai.FunctionDefinition {
 
 // Actions is something the agent can do
 type Action interface {
-	Run(ctx context.Context, action ActionParams) (ActionResult, error)
+	Run(ctx context.Context, sharedState *AgentSharedState, action ActionParams) (ActionResult, error)
 	Definition() ActionDefinition
 	Plannable() bool
+}
+
+// UserDefinedChecker interface to identify user-defined actions
+type UserDefinedChecker interface {
+	IsUserDefined() bool
+}
+
+// BaseAction provides default implementation for Action interface
+// Embed this in action implementations to get the default IsUserDefined behavior
+type BaseAction struct{}
+
+func (b *BaseAction) IsUserDefined() bool {
+	return false // Regular actions are not user-defined
+}
+
+// IsActionUserDefined checks if an action is user-defined
+func IsActionUserDefined(action Action) bool {
+	if checker, ok := action.(UserDefinedChecker); ok {
+		return checker.IsUserDefined()
+	}
+	return false // Actions without UserDefinedChecker are not user-defined
+}
+
+// UserDefinedAction represents a user-defined function tool
+type UserDefinedAction struct {
+	ActionDef *ActionDefinition
+}
+
+func (u *UserDefinedAction) Run(ctx context.Context, sharedState *AgentSharedState, action ActionParams) (ActionResult, error) {
+	// User-defined actions should not be executed directly
+	return ActionResult{}, fmt.Errorf("user-defined action '%s' cannot be executed by agent", u.ActionDef.Name)
+}
+
+func (u *UserDefinedAction) Definition() ActionDefinition {
+	return *u.ActionDef
+}
+
+func (u *UserDefinedAction) Plannable() bool {
+	return true // User-defined actions are plannable
+}
+
+func (u *UserDefinedAction) IsUserDefined() bool {
+	return true
+}
+
+// CreateUserDefinedActions converts user tools to UserDefinedAction instances
+func CreateUserDefinedActions(userTools []ActionDefinition) []Action {
+	var actions []Action
+	for _, tool := range userTools {
+		actions = append(actions, &UserDefinedAction{
+			ActionDef: &tool,
+		})
+	}
+	return actions
 }
 
 type Actions []Action

@@ -26,6 +26,50 @@ const buildUrl = (endpoint) => {
   }`;
 };
 
+// Helper function to convert ActionDefinition to FormFieldDefinition format
+const convertActionDefinitionToFields = (definition) => {
+  if (!definition || !definition.Properties) {
+    return [];
+  }
+
+  const fields = [];
+  const required = definition.Required || [];
+
+  console.debug('Action definition:', definition);
+
+  Object.entries(definition.Properties).forEach(([name, property]) => {
+    const field = {
+      name,
+      label: name.charAt(0).toUpperCase() + name.slice(1),
+      type: 'text', // Default to text, we'll enhance this later
+      required: required.includes(name),
+      helpText: property.Description || '',
+      defaultValue: property.Default,
+    };
+
+    if (property.enum && property.enum.length > 0) {
+      field.type = 'select';
+      field.options = property.enum;
+    } else {
+      switch (property.type) {
+        case 'integer':
+          field.type = 'number';
+          field.min = property.Minimum;
+          field.max = property.Maximum;
+        break;
+      case 'boolean':
+        field.type = 'checkbox';
+        break;
+    }
+    // TODO: Handle Object and Array types which require nested fields
+  }
+
+    fields.push(field);
+  });
+
+  return fields;
+};
+
 // Agent-related API calls
 export const agentApi = {
   // Get list of all agents
@@ -85,6 +129,7 @@ export const agentApi = {
         groupedMetadata.actions = metadata.Actions;
       }
       groupedMetadata.dynamicPrompts = metadata.DynamicPrompts;
+      groupedMetadata.filters = metadata.Filters;
 
       return groupedMetadata;
     }
@@ -261,6 +306,17 @@ export const actionApi = {
       headers: API_CONFIG.headers,
     });
     return handleResponse(response);
+  },
+
+  // Get action definition
+  getActionDefinition: async (name, config = {}) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.actionDefinition(name)), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(config),
+    });
+    const definition = await handleResponse(response);
+    return convertActionDefinitionToFields(definition);
   },
 
   // Execute an action for an agent

@@ -44,6 +44,7 @@ export const API_CONFIG = {
 
     // Action endpoints
     listActions: "/api/actions",
+    actionDefinition: (name) => `/api/action/${name}/definition`,
     executeAction: (name) => `/api/action/${name}/run`,
 
     // Status endpoint

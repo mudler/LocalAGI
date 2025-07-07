@@ -23,6 +23,7 @@ oauth_config:
       - commands
       - groups:history
       - files:read
+      - files:write
       - im:history
       - im:read
       - im:write
