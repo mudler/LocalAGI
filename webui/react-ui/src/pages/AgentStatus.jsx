@@ -378,6 +378,8 @@ function AgentStatus() {
     );
   }
 
+  const hasStatusHistory = (Array.isArray(statusData?.History) && statusData.History.length > 0)
+
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
@@ -389,10 +391,10 @@ function AgentStatus() {
           />
           
           <div className="header-right">
-            <Link to={`/agents/${id}/settings`} className="action-btn settings-btn">
+            <Link to={`/settings/${id}`} className="action-btn settings-btn">
               <i className="fas fa-cog"></i> Settings
             </Link>
-            <Link to={`/agents/${id}/chat`} className="action-btn chat-btn">
+            <Link to={`/talk/${id}/`} className="action-btn chat-btn">
               <i className="fas fa-comments"></i> Chat
             </Link>
           </div>
@@ -409,19 +411,25 @@ function AgentStatus() {
             {/* Current Status Section */}
             <div className="section-box">
               <div 
-                className="section-header"
-                onClick={() => setShowStatus(prev => !prev)}
+                className={`section-header ${!hasStatusHistory ? 'no-history' : ''}`}
+                onClick={() => hasStatusHistory && setShowStatus(prev => !prev)}
               >
                 <h2>Current Status</h2>
-                <i className={`fas fa-chevron-${showStatus ? 'up' : 'down'}`}></i>
+                {hasStatusHistory && <i className={`fas fa-chevron-${showStatus ? 'up' : 'down'}`}></i>}
               </div>
-              <p className="section-description">
+             {
+              hasStatusHistory 
+              ? <p className="section-description">
                 Summary of the agent's thoughts and actions
               </p>
+              : <p className="section-description">
+                 No status history available.
+              </p>
+             }
               
               {showStatus && (
                 <div className="status-history">
-                  {(Array.isArray(statusData?.History) && statusData.History.length === 0) && (
+                  {!hasStatusHistory && (
                     <div className="no-status-data">No status history available.</div>
                   )}
                   {Array.isArray(statusData?.History) && statusData.History.map((item, idx) => (

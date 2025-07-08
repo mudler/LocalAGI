@@ -37,8 +37,8 @@ const FiltersSection = ({ formData, setFormData, metadata }) => {
 
   return (
     <div className="filters-section">
-      <h3>Filters</h3>
-      <p className="text-muted">
+      <h3 className='section-title'>Filters</h3>
+      <p className="section-description">
         Jobs received by the agent must pass all filters and at least one trigger (if any are specified)
       </p>
 
@@ -49,6 +49,20 @@ const FiltersSection = ({ formData, setFormData, metadata }) => {
         onAdd={handleAddFilter}
         fieldGroups={metadata?.filters || []}
       />
+      
+      <div className="tutorial-link" style={{ marginTop: '1rem' }}>
+        <p>
+          <a 
+            href="https://www.youtube.com/watch?v=d_we-AYksSw" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ color: '#007bff', textDecoration: 'none' }}
+          >
+            Watch this video to learn about filters & triggers
+          </a>
+        </p>
+      </div>
+      
     </div>
   );
 };

@@ -199,6 +199,7 @@ const AgentForm = ({
           >
             <i className="fas fa-shield"></i>
             Filters &amp; Triggers
+            <span className="advanced-tag">Advanced</span>
           </li>
           <li 
             className={`wizard-nav-item ${activeSection === 'actions-section' ? 'active' : ''}`} 

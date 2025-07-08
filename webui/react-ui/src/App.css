@@ -880,7 +880,7 @@ a:hover {
 
 /* Sidebar navigation for wizard */
 .wizard-sidebar {
-  width: 220px;
+  width: 300px;
   background: #f6f8fa;
   border-radius: 12px;
   padding: 18px 0 18px 0;
@@ -924,6 +924,25 @@ a:hover {
   color: var(--primary);
   transform: none;
   box-shadow: none;
+}
+
+/* Advanced tag for wizard navigation items */
+.advanced-tag {
+  margin-left: auto;
+  padding: 0.125rem 0.5rem;
+  background-color: var(--secondary);
+  color: white;
+  font-size: 0.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 9999px;
+  opacity: 0.9;
+  transition: opacity 0.2s ease;
+}
+
+.wizard-nav-item:hover .advanced-tag {
+  opacity: 1;
 }
 
 .form-content-area {
@@ -1829,6 +1848,10 @@ a:hover {
   margin-bottom: 1rem;
 }
 
+.section-header.no-history {
+  cursor: default;
+}
+
 .section-header h2 {
   margin: 0;
   color: var(--text);
@@ -1892,7 +1915,6 @@ a:hover {
 
 .observable-info {
   display: flex;
-  align-items: center;
   gap: 0.75rem;
   flex: 1;
   min-width: 0;
@@ -1992,7 +2014,6 @@ a:hover {
 
 .summary-item {
   display: flex;
-  align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
   line-height: 1.4;
