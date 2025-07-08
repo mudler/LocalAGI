@@ -209,8 +209,8 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 	webapp.Get("/api/meta/agent/config", app.RequireUser(), app.GetAgentConfigMeta())
 
 	webapp.Post("/api/action/:name/run", app.RequireUser(), app.ExecuteAction())
-	webapp.Post("/api/action/:name/definition", app.GetActionDefinition(pool))
-	webapp.Get("/api/actions", app.ListActions())
+	webapp.Post("/api/action/:name/definition", app.RequireUser(), app.GetActionDefinition())
+	webapp.Get("/api/actions", app.RequireUser(), app.ListActions())
 
 	webapp.Post("/api/agent/group/generateProfiles", app.RequireUser(), app.GenerateGroupProfiles())
 	webapp.Post("/api/agent/group/create", app.RequireUser(), app.CreateGroup())
@@ -246,7 +246,6 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 				"",
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -312,7 +311,6 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 				"",
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -366,18 +364,36 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 	// New API route to get usage for the user
 	webapp.Get("/api/usage", app.RequireUser(), app.GetUsage())
-	webapp.Get("/api/agent/:name/observables", func(c *fiber.Ctx) error {
-		name := c.Params("name")
-		agent := pool.GetAgent(name)
-		if agent == nil {
+	webapp.Get("/api/agent/:id/observables", app.RequireUser(), app.RequireActiveAgent(), func(c *fiber.Ctx) error {
+		userID, ok := c.Locals("id").(string)
+		if !ok || userID == "" {
+			return c.SendStatus(fiber.StatusUnauthorized)
+		}
+
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "Agent not found",
 			})
 		}
 
+		pool, ok := app.UserPools[userID]
+		if !ok {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent pool not found",
+			})
+		}
+
+		agentInstance := pool.GetAgent(agent.ID.String())
+		if agentInstance == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "Agent instance not found",
+			})
+		}
+
 		return c.JSON(fiber.Map{
-			"Name":    name,
-			"History": agent.Observer().History(),
+			"Name":    agent.Name,
+			"History": agentInstance.Observer().History(),
 		})
 	})
 }

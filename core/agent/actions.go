@@ -194,7 +194,22 @@ func (m Messages) RemoveIf(f func(msg openai.ChatCompletionMessage) bool) Messag
 func (m Messages) String() string {
 	s := ""
 	for _, cc := range m {
-		s += cc.Role + ": " + cc.Content + "\n"
+		s += cc.Role + ": "
+
+		// Handle messages with tool calls
+		if len(cc.ToolCalls) > 0 {
+			s += "[Tool Calls] "
+			for _, tc := range cc.ToolCalls {
+				s += fmt.Sprintf("%s(%s) ", tc.Function.Name, tc.Function.Arguments)
+			}
+		}
+
+		// Handle tool messages with their ID
+		if cc.Role == openai.ChatMessageRoleTool {
+			s += fmt.Sprintf("[Tool ID: %s] ", cc.ToolCallID)
+		}
+
+		s += cc.Content + "\n"
 	}
 	return s
 }

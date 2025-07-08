@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import CollapsibleRawSections from '../components/CollapsibleRawSections';
+import Header from '../components/Header';
 import hljs from 'highlight.js/lib/core';
 import json from 'highlight.js/lib/languages/json';
 import 'highlight.js/styles/monokai.css';
+import { useAgent } from '../hooks/useAgent';
 
 hljs.registerLanguage('json', json);
 
@@ -114,83 +116,69 @@ function ObservableSummary({ observable }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0 0 0' }}>
+    <div className="observable-summary">
       {/* CREATION */}
       {creationChatMsg && (
-        <div title={creationChatMsg} style={{ display: 'flex', alignItems: 'center', color: '#cfc', fontSize: 14 }}>
-          <i className="fas fa-comment-dots" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{creationChatMsg}</span>
+        <div className="summary-item creation-message" title={creationChatMsg}>
+          <i className="fas fa-comment-dots"></i>
+          <span>{creationChatMsg}</span>
         </div>
       )}
       {creationFunctionDef && (
-        <div title={creationFunctionDef} style={{ display: 'flex', alignItems: 'center', color: '#cfc', fontSize: 14 }}>
-          <i className="fas fa-code" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{creationFunctionDef}</span>
+        <div className="summary-item creation-function" title={creationFunctionDef}>
+          <i className="fas fa-code"></i>
+          <span>{creationFunctionDef}</span>
         </div>
       )}
       {creationFunctionParams && (
-        <div title={creationFunctionParams} style={{ display: 'flex', alignItems: 'center', color: '#fc9', fontSize: 14 }}>
-          <i className="fas fa-sliders-h" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{creationFunctionParams}</span>
+        <div className="summary-item creation-params" title={creationFunctionParams}>
+          <i className="fas fa-sliders-h"></i>
+          <span>{creationFunctionParams}</span>
         </div>
       )}
+      
       {/* COMPLETION */}
       {/* COMPLETION: Tool call summary if present */}
       {completionChatMsg && typeof completionChatMsg === 'object' && completionChatMsg.toolCallSummary && (
-        <div
-          title={completionChatMsg.toolCallSummary}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            color: '#ffd966', // Distinct color for tool calls
-            fontSize: 14,
-            marginTop: 2,
-            whiteSpace: 'pre-line',
-            wordBreak: 'break-all',
-          }}
-        >
-          <i className="fas fa-tools" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ whiteSpace: 'pre-line', display: 'block' }}>{completionChatMsg.toolCallSummary}</span>
+        <div className="summary-item completion-tool-call" title={completionChatMsg.toolCallSummary}>
+          <i className="fas fa-tools"></i>
+          <span>{completionChatMsg.toolCallSummary}</span>
         </div>
       )}
+      
       {/* COMPLETION: Message content if present */}
       {completionChatMsg && ((typeof completionChatMsg === 'object' && completionChatMsg.message) || typeof completionChatMsg === 'string') && (
-        <div
-          title={typeof completionChatMsg === 'object' ? completionChatMsg.message : completionChatMsg}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            color: '#8fc7ff',
-            fontSize: 14,
-            marginTop: 2,
-          }}
-        >
-          <i className="fas fa-robot" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{typeof completionChatMsg === 'object' ? completionChatMsg.message : completionChatMsg}</span>
+        <div className="summary-item completion-message" title={typeof completionChatMsg === 'object' ? completionChatMsg.message : completionChatMsg}>
+          <i className="fas fa-robot"></i>
+          <span>{typeof completionChatMsg === 'object' ? completionChatMsg.message : completionChatMsg}</span>
         </div>
       )}
+      
       {completionActionResult && (
-        <div title={completionActionResult} style={{ display: 'flex', alignItems: 'center', color: '#ffd700', fontSize: 14 }}>
-          <i className="fas fa-bolt" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionActionResult}</span>
+        <div className="summary-item completion-action" title={completionActionResult}>
+          <i className="fas fa-bolt"></i>
+          <span>{completionActionResult}</span>
         </div>
       )}
+      
       {completionAgentState && (
-        <div title={completionAgentState} style={{ display: 'flex', alignItems: 'center', color: '#ffb8b8', fontSize: 14 }}>
-          <i className="fas fa-brain" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionAgentState}</span>
+        <div className="summary-item completion-state" title={completionAgentState}>
+          <i className="fas fa-brain"></i>
+          <span>{completionAgentState}</span>
         </div>
       )}
+      
       {completionError && (
-        <div title={completionError} style={{ display: 'flex', alignItems: 'center', color: '#f66', fontSize: 14 }}>
-          <i className="fas fa-exclamation-triangle" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionError}</span>
+        <div className="summary-item completion-error" title={completionError}>
+          <i className="fas fa-exclamation-triangle"></i>
+          <span>{completionError}</span>
         </div>
       )}
+      
       {completionFilter && (
-        <div title={completionFilter} style={{ display: 'flex', alignItems: 'center', color: '#ffd7', fontSize: 14 }}>
-          <i className="fas fa-shield-alt" style={{ marginRight: 6, flex: '0 0 auto' }}></i>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{completionFilter}</span>
+        <div className="summary-item completion-filter" title={completionFilter}>
+          <i className="fas fa-shield-alt"></i>
+          <span>{completionFilter}</span>
         </div>
       )}
     </div>
@@ -366,171 +354,182 @@ function AgentStatus() {
 
   if (loading) {
     return (
-      <div>
-        <div></div>
-        <p>Loading agent status...</p>
+      <div className="dashboard-container">
+        <div className="main-content-area">
+          <div className="loading">Loading agent status...</div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div>
-        <h2>Error</h2>
-        <p>{error}</p>
-        <Link to="/agents">
-          <i className="fas fa-arrow-left"></i> Back to Agents
-        </Link>
+      <div className="dashboard-container">
+        <div className="main-content-area">
+          <div className="error-container">
+            <h2>Error</h2>
+            <p>{error}</p>
+            <Link to="/agents" className="back-btn">
+              <i className="fas fa-arrow-left"></i> Back to Agents
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <h1>Agent Status: {agent?.name || id}</h1>
-      <div style={{ color: '#aaa', fontSize: 16, marginBottom: 18 }}>
-        See what the agent is doing and thinking
-      </div>
-      {error && (
-        <div>
-          {error}
-        </div>
-      )}
-      {loading && <div>Loading...</div>}
-      {statusData && (
-        <div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-              onClick={() => setShowStatus(prev => !prev)}>
-              <h2 style={{ margin: 0 }}>Current Status</h2>
-              <i
-                className={`fas fa-chevron-${showStatus ? 'up' : 'down'}`}
-                style={{ color: 'var(--primary)', marginLeft: 12 }}
-                title={showStatus ? 'Collapse' : 'Expand'}
-              />
-            </div>
-            <div style={{ color: '#aaa', fontSize: 14, margin: '5px 0 10px 2px' }}>
-              Summary of the agent's thoughts and actions
-            </div>
-            {showStatus && (
-              <div style={{ marginTop: 10 }}>
-                {(Array.isArray(statusData?.History) && statusData.History.length === 0) && (
-                  <div style={{ color: '#aaa' }}>No status history available.</div>
-                )}
-                {Array.isArray(statusData?.History) && statusData.History.map((item, idx) => (
-                  <div key={idx} style={{
-                    background: '#222',
-                    border: '1px solid #444',
-                    borderRadius: 8,
-                    padding: '12px 16px',
-                    marginBottom: 10,
-                    whiteSpace: 'pre-line',
-                    fontFamily: 'inherit',
-                    fontSize: 15,
-                    color: '#eee',
-                  }}>
-                    {/* Replace <br> tags with newlines, then render as pre-line */}
-                    {typeof item === 'string'
-                      ? item.replace(/<br\s*\/?>/gi, '\n')
-                      : JSON.stringify(item)}
-                  </div>
-                ))}
-              </div>
-            )}
+    <div className="dashboard-container">
+      <div className="main-content-area">
+        <div className="header-container">
+          <Header
+            title="Agent Status"
+            description="See what the agent is doing and thinking"
+            name={agent?.name || id}
+          />
+          
+          <div className="header-right">
+            <Link to={`/agents/${id}/settings`} className="action-btn settings-btn">
+              <i className="fas fa-cog"></i> Settings
+            </Link>
+            <Link to={`/agents/${id}/chat`} className="action-btn chat-btn">
+              <i className="fas fa-comments"></i> Chat
+            </Link>
           </div>
-          {observableTree.length > 0 && (
-            <div>
-              <h2>Observable Updates</h2>
-              <div style={{ color: '#aaa', fontSize: 14, margin: '5px 0 10px 2px' }}>
-                Drill down into what the agent is doing and thinking when activated by a connector
+        </div>
+
+        {error && (
+          <div className="error-container">
+            {error}
+          </div>
+        )}
+
+        {statusData && (
+          <>
+            {/* Current Status Section */}
+            <div className="section-box">
+              <div 
+                className="section-header"
+                onClick={() => setShowStatus(prev => !prev)}
+              >
+                <h2>Current Status</h2>
+                <i className={`fas fa-chevron-${showStatus ? 'up' : 'down'}`}></i>
               </div>
-              <div>
-                {observableTree.map((container, idx) => (
-                  <div key={container.id || idx} className='card' style={{ marginBottom: '1em' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              <p className="section-description">
+                Summary of the agent's thoughts and actions
+              </p>
+              
+              {showStatus && (
+                <div className="status-history">
+                  {(Array.isArray(statusData?.History) && statusData.History.length === 0) && (
+                    <div className="no-status-data">No status history available.</div>
+                  )}
+                  {Array.isArray(statusData?.History) && statusData.History.map((item, idx) => (
+                    <div key={idx} className="status-item">
+                      {/* Replace <br> tags with newlines, then render as pre-line */}
+                      {typeof item === 'string'
+                        ? item.replace(/<br\s*\/?>/gi, '\n')
+                        : JSON.stringify(item)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Observable Updates Section */}
+            {observableTree.length > 0 && (
+              <div className="section-box">
+                <h2>Observable Updates</h2>
+                <p className="section-description">
+                  Drill down into what the agent is doing and thinking when activated by a connector
+                </p>
+                
+                <div className="observables-container">
+                  {observableTree.map((container, idx) => (
+                    <div key={container.id || idx} className="observable-card">
+                      <div 
+                        className="observable-header"
                         onClick={() => {
                           const newExpanded = !expandedCards.get(container.id);
                           setExpandedCards(new Map(expandedCards).set(container.id, newExpanded));
                         }}
                       >
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', maxWidth: '90%' }}>
-                          <i className={`fas fa-${container.icon || 'robot'}`} style={{ verticalAlign: '-0.125em' }}></i>
-                          <span style={{ width: '100%' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                              <span>
-                                <span className='stat-label'>{container.name}</span>#<span className='stat-label'>{container.id}</span>
-                              </span>
-                              <ObservableSummary observable={container} />
+                        <div className="observable-info">
+                          <i className={`fas fa-${container.icon || 'robot'}`}></i>
+                          <div className="observable-details">
+                            <div className="observable-name">
+                              <span className="stat-label">{container.name}</span>
+                              <span className="observable-id">#{container.id}</span>
                             </div>
-                          </span>
+                            <ObservableSummary observable={container} />
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <i
-                            className={`fas fa-chevron-${expandedCards.get(container.id) ? 'up' : 'down'}`}
-                            style={{ color: 'var(--primary)' }}
-                            title='Toggle details'
-                          />
+                        
+                        <div className="observable-actions">
+                          <i className={`fas fa-chevron-${expandedCards.get(container.id) ? 'up' : 'down'}`}></i>
                           {!container.completion && (
-                            <div className='spinner' />
+                            <div className="spinner"></div>
                           )}
                         </div>
                       </div>
-                      <div style={{ display: expandedCards.get(container.id) ? 'block' : 'none' }}>
-                        {container.children && container.children.length > 0 && (
-                          <div style={{ marginLeft: '2em', marginTop: '1em' }}>
-                            <h4>Nested Observables</h4>
-                            {container.children.map(child => {
-                              const childKey = `child-${child.id}`;
-                              const isExpanded = expandedCards.get(childKey);
-                              return (
-                                <div key={`${container.id}-child-${child.id}`} className='card' style={{ background: '#222', marginBottom: '0.5em' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'hand', maxWidth: '100%' }}
-                                    onClick={() => {
-                                      const newExpanded = !expandedCards.get(childKey);
-                                      setExpandedCards(new Map(expandedCards).set(childKey, newExpanded));
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', maxWidth: '90%', gap: '10px', alignItems: 'center' }}>
-                                      <i className={`fas fa-${child.icon || 'robot'}`} style={{ verticalAlign: '-0.125em' }}></i>
-                                      <span style={{ width: '100%' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                                          <span>
-                                            <span className='stat-label'>{child.name}</span>#<span className='stat-label'>{child.id}</span>
-                                          </span>
+                      
+                      {expandedCards.get(container.id) && (
+                        <div className="observable-content">
+                          {container.children && container.children.length > 0 && (
+                            <div className="nested-observables">
+                              <h4>Nested Observables</h4>
+                              {container.children.map(child => {
+                                const childKey = `child-${child.id}`;
+                                const isExpanded = expandedCards.get(childKey);
+                                return (
+                                  <div key={`${container.id}-child-${child.id}`} className="nested-observable-card">
+                                    <div 
+                                      className="observable-header"
+                                      onClick={() => {
+                                        const newExpanded = !expandedCards.get(childKey);
+                                        setExpandedCards(new Map(expandedCards).set(childKey, newExpanded));
+                                      }}
+                                    >
+                                      <div className="observable-info">
+                                        <i className={`fas fa-${child.icon || 'robot'}`}></i>
+                                        <div className="observable-details">
+                                          <div className="observable-name">
+                                            <span className="stat-label">{child.name}</span>
+                                            <span className="observable-id">#{child.id}</span>
+                                          </div>
                                           <ObservableSummary observable={child} />
                                         </div>
-                                      </span>
+                                      </div>
+                                      
+                                      <div className="observable-actions">
+                                        <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                                        {!child.completion && (
+                                          <div className="spinner"></div>
+                                        )}
+                                      </div>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <i
-                                        className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}
-                                        style={{ color: 'var(--primary)' }}
-                                        title='Toggle details'
-                                      />
-                                      {!child.completion && (
-                                        <div className='spinner' />
-                                      )}
-                                    </div>
+                                    
+                                    {isExpanded && (
+                                      <div className="observable-content">
+                                        <CollapsibleRawSections container={child} />
+                                      </div>
+                                    )}
                                   </div>
-                                  <div style={{ display: isExpanded ? 'block' : 'none' }}>
-                                    <CollapsibleRawSections container={child} />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        <CollapsibleRawSections container={container} />
-                      </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <CollapsibleRawSections container={container} />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

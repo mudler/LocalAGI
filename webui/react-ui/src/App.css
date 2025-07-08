@@ -1813,3 +1813,309 @@ a:hover {
   background-color: var(--light-bg);
   color: var(--primary);
 }
+
+/* Enhanced Agent Status Page Styles */
+.dashboard-container * {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 1rem;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: var(--text);
+}
+
+.section-header i {
+  color: var(--primary);
+  font-size: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.status-history {
+  margin-top: 1rem;
+}
+
+.status-item {
+  background: var(--medium-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  white-space: pre-line;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.observables-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.observable-card {
+  background: var(--medium-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.observable-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow);
+}
+
+.observable-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.observable-header:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.observable-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.observable-info i {
+  color: var(--primary);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.observable-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.observable-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+}
+
+.observable-id {
+  color: var(--text-light);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.observable-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.observable-actions i {
+  color: var(--primary);
+  font-size: 0.9rem;
+}
+
+.observable-content {
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+.nested-observables {
+  margin-bottom: 1.5rem;
+}
+
+.nested-observables h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.nested-observable-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.nested-observable-card .observable-header {
+  padding: 0.75rem 1rem;
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+.nested-observable-card .observable-content {
+  padding: 0 1rem 1rem;
+  background-color: #fff;
+}
+
+/* Observable Summary Styles */
+.observable-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.summary-item i {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.summary-item span {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  white-space: normal;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Creation summary colors */
+.creation-message {
+  color: #10b981;
+}
+
+.creation-function {
+  color: #10b981;
+}
+
+.creation-params {
+  color: #f59e0b;
+}
+
+/* Completion summary colors */
+.completion-tool-call {
+  color: #8b5cf6;
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+.completion-tool-call span {
+  white-space: pre-line;
+  overflow: visible;
+}
+
+.completion-message {
+  color: #3b82f6;
+}
+
+.completion-action {
+  color: #f59e0b;
+}
+
+.completion-state {
+  color: #ec4899;
+}
+
+.completion-error {
+  color: #ef4444;
+}
+
+.completion-filter {
+  color: #a855f7;
+}
+
+/* Spinner animation */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .observable-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .observable-content {
+    padding: 0 1rem 1rem;
+  }
+  
+  .nested-observable-card .observable-header {
+    padding: 0.625rem 0.75rem;
+  }
+  
+  .nested-observable-card .observable-content {
+    padding: 0 0.75rem 0.75rem;
+  }
+  
+  .observable-name {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .summary-item {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .header-right {
+    justify-content: stretch;
+  }
+  
+  .header-right .action-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

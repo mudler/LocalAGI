@@ -1,7 +1,6 @@
 package stdio
 
 import (
-	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -16,10 +15,6 @@ func TestSTDIOTransport(t *testing.T) {
 var baseURL string
 
 func init() {
-	baseURL = os.Getenv("LOCALAGI_MCPBOX_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
-	}
 }
 
 var _ = AfterSuite(func() {

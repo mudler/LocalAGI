@@ -9,7 +9,6 @@ import (
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/stdio"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -38,7 +37,7 @@ func (a *mcpAction) Plannable() bool {
 	return true
 }
 
-func (m *mcpAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (m *mcpAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	// Convert params to map[string]interface{} for CallTool
 	args := make(map[string]interface{})
 	for k, v := range params {
@@ -106,68 +105,6 @@ type ToolInputSchema struct {
 	Type       string                 `json:"type"`
 	Properties map[string]interface{} `json:"properties,omitempty"`
 	Required   []string               `json:"required,omitempty"`
-}
-
-func (a *Agent) addTools(client *mcp.Client) (types.Actions, error) {
-
-	var generatedActions types.Actions
-	xlog.Debug("Initializing client")
-	// Initialize the client
-	response, e := client.Initialize(a.context)
-	if e != nil {
-		xlog.Error("Failed to initialize client", "error", e.Error())
-		return nil, e
-	}
-
-	xlog.Debug("Client initialized: %v", response.Instructions)
-
-	var cursor *string
-	for {
-		tools, err := client.ListTools(a.context, cursor)
-		if err != nil {
-			xlog.Error("Failed to list tools", "error", err.Error())
-			return nil, err
-		}
-
-		for _, t := range tools.Tools {
-			desc := ""
-			if t.Description != nil {
-				desc = *t.Description
-			}
-
-			xlog.Debug("Tool", "name", t.Name, "description", desc)
-
-			dat, err := json.Marshal(t.InputSchema)
-			if err != nil {
-				xlog.Error("Failed to marshal input schema", "error", err.Error())
-			}
-
-			xlog.Debug("Input schema", "tool", t.Name, "schema", string(dat))
-
-			// XXX: This is a wild guess, to verify (data types might be incompatible)
-			var inputSchema ToolInputSchema
-			err = json.Unmarshal(dat, &inputSchema)
-			if err != nil {
-				xlog.Error("Failed to unmarshal input schema", "error", err.Error())
-			}
-
-			// Create a new action with Client + tool
-			generatedActions = append(generatedActions, &mcpAction{
-				mcpClient:       client,
-				toolName:        t.Name,
-				inputSchema:     inputSchema,
-				toolDescription: desc,
-			})
-		}
-
-		if tools.NextCursor == nil {
-			break // No more pages
-		}
-		cursor = tools.NextCursor
-	}
-
-	return generatedActions, nil
-
 }
 
 func (a *Agent) initMCPActions() error {
@@ -301,15 +238,9 @@ func (a *Agent) initMCPActions() error {
 			}
 			cursor = &tools.NextCursor
 		}
-		generatedActions = append(generatedActions, actions...)
 	}
 
 	a.mcpActions = generatedActions
 
 	return err
-}
-
-func (a *Agent) closeMCPSTDIOServers() {
-	client := stdio.NewClient(a.options.mcpBoxURL)
-	client.StopGroup(a.Character.Name)
 }

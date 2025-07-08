@@ -39,7 +39,6 @@ type AgentPool struct {
 	dynamicPrompt                        func(*AgentConfig) []DynamicPrompt
 	timeout                              string
 	conversationLogs                     string
-	mcpBoxURL                            string
 	filters                              func(*AgentConfig) types.JobFilters
 }
 
@@ -74,7 +73,7 @@ type AgentPoolData map[string]AgentConfig
 // }
 
 func NewAgentPool(
-	userId, defaultModel, defaultMultimodalModel, imageModel, mcpBoxURL string,
+	userId, defaultModel, defaultMultimodalModel, imageModel,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -113,7 +112,6 @@ func NewAgentPool(
 		userId:                 userId,
 		defaultModel:           defaultModel,
 		defaultMultimodalModel: defaultMultimodalModel,
-		mcpBoxURL:              mcpBoxURL,
 		imageModel:             imageModel,
 		localRAGAPI:            LocalRAGAPI,
 		agents:                 make(map[string]*Agent),
@@ -130,7 +128,7 @@ func NewAgentPool(
 }
 
 func NewEmptyAgentPool(
-	userId, defaultModel, defaultMultimodalModel, imageModel, mcpBoxURL string,
+	userId, defaultModel, defaultMultimodalModel, imageModel,
 	localRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -231,10 +229,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 		config.Model = model
 	}
 
-	if config.MCPBoxURL != "" {
-		a.mcpBoxURL = config.MCPBoxURL
-	}
-
 	if config.PeriodicRuns == "" {
 		config.PeriodicRuns = "10m"
 	}
@@ -292,11 +286,8 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 		WithMCPServers(config.MCPServers...),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
-		WithMCPSTDIOServers(config.MCPSTDIOServers...),
-		WithMCPBoxURL(a.mcpBoxURL),
 		WithPrompts(promptBlocks...),
 		WithJobFilters(filters...),
-		WithMCPPrepareScript(config.MCPPrepareScript),
 		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
 			Name: id,
@@ -653,19 +644,22 @@ func (a *AgentPool) CreateAgentWithExistingManager(id string, agentConfig *Agent
 
 	oldAgent := a.agents[id]
 	var o *types.Observable
-	obs := oldAgent.Observer()
-	if obs != nil {
-		o = obs.NewObservable()
-		o.Name = "Restarting Agent"
-		o.Icon = "sync"
-		o.Creation = &types.Creation{}
-		obs.Update(*o)
+	var obs Observer
+	if oldAgent != nil {
+		obs = oldAgent.Observer()
+		if obs != nil {
+			o = obs.NewObservable()
+			o.Name = "Restarting Agent"
+			o.Icon = "sync"
+			o.Creation = &types.Creation{}
+			obs.Update(*o)
+		}
 	}
 
 	// Start agent (this will create a new manager)
 	err := a.startAgentWithConfig(id, agentConfig, obs)
 	if err != nil {
-		if obs != nil {
+		if obs != nil && o != nil {
 			o.Completion = &types.Completion{Error: err.Error()}
 			obs.Update(*o)
 		}
@@ -680,7 +674,7 @@ func (a *AgentPool) CreateAgentWithExistingManager(id string, agentConfig *Agent
 		xlog.Info("Restored existing SSE manager", "id", id)
 	}
 
-	if obs != nil {
+	if obs != nil && o != nil {
 		o.Completion = &types.Completion{}
 		obs.Update(*o)
 	}

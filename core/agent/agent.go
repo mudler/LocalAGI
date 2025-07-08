@@ -280,7 +280,6 @@ func (a *Agent) Stop() {
 	a.Lock()
 	defer a.Unlock()
 	xlog.Debug("Stopping agent", "agent", a.Character.Name)
-	a.closeMCPSTDIOServers()
 	a.context.Cancel()
 }
 
@@ -344,8 +343,6 @@ func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params type
 			}
 
 			result = res
-			actionFound = true
-			break
 		}
 	}
 
@@ -363,15 +360,6 @@ func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params type
 			}
 			return types.ActionResult{}, werr
 		}
-
-		// Preserve automatic tracking fields if not explicitly set
-		if state.NowDoing == "" {
-			state.NowDoing = a.currentState.NowDoing
-		}
-		if len(state.DoneHistory) == 0 {
-			state.DoneHistory = a.currentState.DoneHistory
-		}
-
 		// update the current state with the one we just got from the action
 		a.currentState = &state
 		if obs != nil {
@@ -381,7 +369,7 @@ func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params type
 			a.observer.Update(*obs)
 		}
 
-		// Save state to database
+		// update the state file
 		if err := a.SaveStateToDB(); err != nil {
 			return types.ActionResult{}, err
 		}
@@ -395,53 +383,6 @@ func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params type
 	}
 
 	return result, nil
-}
-
-// updateDoingNext sets intelligent next action suggestions based on current action
-func (a *Agent) updateDoingNext(actionName string) {
-	if a.currentState == nil {
-		return
-	}
-
-	// Set DoingNext based on action patterns
-	switch actionName {
-	case "search_internet":
-		a.currentState.DoingNext = "Analyze search results"
-	case "plan":
-		a.currentState.DoingNext = "Execute planned subtasks"
-	case "reply":
-		a.currentState.DoingNext = "Wait for user response"
-	case "browse":
-		a.currentState.DoingNext = "Extract key information from page"
-	case "wikipedia":
-		a.currentState.DoingNext = "Analyze Wikipedia content"
-	case "scraper":
-		a.currentState.DoingNext = "Process scraped data"
-	case "counter":
-		a.currentState.DoingNext = "Continue with next counting task"
-	case "shell":
-		a.currentState.DoingNext = "Review command output"
-	case "generate_image":
-		a.currentState.DoingNext = "Review generated image"
-	case "send_mail":
-		a.currentState.DoingNext = "Confirm email delivery"
-	default:
-		// Check for GitHub actions
-		if strings.Contains(actionName, "github") {
-			if strings.Contains(actionName, "search") {
-				a.currentState.DoingNext = "Review GitHub search results"
-			} else if strings.Contains(actionName, "read") {
-				a.currentState.DoingNext = "Analyze GitHub content"
-			} else if strings.Contains(actionName, "create") || strings.Contains(actionName, "comment") {
-				a.currentState.DoingNext = "Confirm GitHub action completed"
-			} else {
-				a.currentState.DoingNext = "Continue GitHub workflow"
-			}
-		} else {
-			// For unknown actions, suggest continuing with analysis
-			a.currentState.DoingNext = "Continue with next logical step"
-		}
-	}
 }
 
 func (a *Agent) processPrompts(conversation Messages) Messages {
@@ -644,6 +585,13 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 		xlog.Debug("No filters")
 		return true, nil
 	}
+
+	// Add userID and agentID to job metadata so filters can access them
+	if job.Metadata == nil {
+		job.Metadata = make(map[string]interface{})
+	}
+	job.Metadata["userID"] = a.options.userID.String()
+	job.Metadata["agentID"] = a.options.agentID.String()
 
 	for _, filter := range a.options.jobFilters {
 		name := filter.Name()
@@ -1139,7 +1087,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	// At this point can only be a reply action
 	xlog.Info("Computing reply", "agent", a.Character.Name)
 
-	forceResponsePrompt := "Reply to the user without using any tools or function calls. Just reply with the message."
+	forceResponsePrompt := "Based on the conversation and any tool results above, provide a helpful response to the user. Do not make any new tool calls - just respond with the information you have."
 
 	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {
@@ -1173,6 +1121,13 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", conv))
 	fmt.Printf("DEBUG: Reply CONVOVOVO: %v\n", conv)
+
+	// Additional debugging to check conversation structure
+	for i, msg := range conv {
+		fmt.Printf("DEBUG: Message %d - Role: %s, Content: %s, ToolCalls: %d, ToolCallID: %s\n",
+			i, msg.Role, msg.Content, len(msg.ToolCalls), msg.ToolCallID)
+	}
+
 	msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
 	if err != nil {
 		job.Result.Conversation = conv
@@ -1419,30 +1374,4 @@ func (a *Agent) periodicalRunRunner(timer *time.Timer) {
 
 func (a *Agent) Observer() Observer {
 	return a.observer
-}
-
-// calculateCost calculates the cost of the API call based on the model and token usage
-func calculateCost(usage openai.Usage, model string) float64 {
-	// Default costs per 1K tokens (these should be updated based on actual pricing)
-	var promptCost, completionCost float64
-
-	switch model {
-	case "gpt-4":
-		promptCost = 0.03
-		completionCost = 0.06
-	case "gpt-4-turbo-preview":
-		promptCost = 0.01
-		completionCost = 0.03
-	case "gpt-3.5-turbo":
-		promptCost = 0.0015
-		completionCost = 0.002
-	default:
-		// Default to GPT-3.5-turbo pricing for unknown models
-		promptCost = 0.0015
-		completionCost = 0.002
-	}
-
-	// Calculate total cost
-	totalCost := (float64(usage.PromptTokens)/1000.0)*promptCost + (float64(usage.CompletionTokens)/1000.0)*completionCost
-	return totalCost
 }

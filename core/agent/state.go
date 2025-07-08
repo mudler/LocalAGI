@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/db"
 	models "github.com/mudler/LocalAGI/dbmodels"
@@ -71,7 +70,7 @@ func (c *Character) ToJSONSchema() jsonschema.Definition {
 	}
 }
 
-func (a *Agent) State() action.AgentInternalState {
+func (a *Agent) State() types.AgentInternalState {
 	return *a.currentState
 }
 
@@ -208,7 +207,7 @@ func (a *Agent) LoadStateFromDB() error {
 		json.Unmarshal(dbState.Memories, &memories)
 	}
 
-	a.currentState = &action.AgentInternalState{
+	a.currentState = &types.AgentInternalState{
 		NowDoing:    dbState.NowDoing,
 		DoingNext:   dbState.DoingNext,
 		DoneHistory: doneHistory,
@@ -255,7 +254,7 @@ func (a *Agent) prepareState() error {
 	}
 
 	// No state found, initialize with empty state
-	a.currentState = &action.AgentInternalState{
+	a.currentState = &types.AgentInternalState{
 		NowDoing:    "",
 		DoingNext:   "",
 		DoneHistory: []string{},

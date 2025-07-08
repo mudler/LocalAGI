@@ -3,7 +3,9 @@ package filters
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 
+	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -49,11 +51,15 @@ func NewClassifierFilter(configJSON string, a *state.AgentConfig) (*ClassifierFi
 	if cfg.Description == "" {
 		return nil, fmt.Errorf("%s classifier has no description", cfg.Name)
 	}
-	apiUrl := a.APIURL
+
+	// Get API URL and API key from environment variables like other functions do
+	apiUrl := os.Getenv("LOCALAGI_LLM_API_URL")
 	if cfg.APIURL != "" {
 		apiUrl = cfg.APIURL
 	}
-	client := llm.NewClient(a.APIKey, apiUrl, "1m")
+
+	apiKey := os.Getenv("LOCALAGI_LLM_API_KEY")
+	client := llm.NewClient(apiKey, apiUrl, "1m")
 
 	return &ClassifierFilter{
 		name:         cfg.Name,
@@ -78,7 +84,22 @@ func (f *ClassifierFilter) Apply(job *types.Job) (bool, error) {
 	var result struct {
 		Asserted bool `json:"answer"`
 	}
-	err := llm.GenerateTypedJSONWithGuidance(job.GetContext(), f.client, guidance, f.model, jsonschema.Definition{
+
+	// Extract userID and agentID from job metadata (set by agent before filtering)
+	var userID, agentID uuid.UUID = uuid.Nil, uuid.Nil
+
+	if userIDStr, ok := job.Metadata["userID"].(string); ok {
+		if parsedUserID, err := uuid.Parse(userIDStr); err == nil {
+			userID = parsedUserID
+		}
+	}
+	if agentIDStr, ok := job.Metadata["agentID"].(string); ok {
+		if parsedAgentID, err := uuid.Parse(agentIDStr); err == nil {
+			agentID = parsedAgentID
+		}
+	}
+
+	err := llm.GenerateTypedJSONWithGuidance(job.GetContext(), f.client, guidance, f.model, userID, agentID, jsonschema.Definition{
 		Type: jsonschema.Object,
 		Properties: map[string]jsonschema.Definition{
 			"answer": {

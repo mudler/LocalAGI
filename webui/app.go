@@ -185,7 +185,6 @@ func (a *App) Pause() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -240,7 +239,6 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -367,7 +365,6 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -601,7 +598,6 @@ func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -733,7 +729,6 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -838,8 +833,43 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) GetActionDefinition(pool *state.AgentPool) func(c *fiber.Ctx) error {
+func (a *App) GetActionDefinition() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
+		// 1. Get user ID from context
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		// 2. Get or create user pool
+		var pool *state.AgentPool
+		if p, ok := a.UserPools[userIDStr]; ok {
+			pool = p
+		} else {
+			var err error
+			pool, err = state.NewAgentPool(
+				userIDStr,
+				"", // Always use model from agent config
+				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
+				os.Getenv("LOCALAGI_IMAGE_MODEL"),
+				os.Getenv("LOCALAGI_LOCALRAG_URL"),
+				services.Actions(map[string]string{
+					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
+					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+				}),
+				services.Connectors,
+				services.DynamicPrompts,
+				services.Filters,
+				os.Getenv("LOCALAGI_TIMEOUT"),
+				os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true",
+			)
+			if err != nil {
+				return errorJSONMessage(c, "Failed to create agent pool: "+err.Error())
+			}
+			a.UserPools[userIDStr] = pool
+		}
+
 		payload := struct {
 			Config map[string]string `json:"config"`
 		}{}
@@ -852,13 +882,13 @@ func (a *App) GetActionDefinition(pool *state.AgentPool) func(c *fiber.Ctx) erro
 		actionName := c.Params("name")
 
 		xlog.Debug("Executing action", "action", actionName, "config", payload.Config)
-		a, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
+		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
 		if err != nil {
 			xlog.Error("Error creating action", "error", err)
 			return errorJSONMessage(c, err.Error())
 		}
 
-		return c.JSON(a.Definition())
+		return c.JSON(action.Definition())
 	}
 }
 
@@ -887,7 +917,6 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -1282,7 +1311,6 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
@@ -2470,7 +2498,6 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 				"", // Always use model from agent config
 				os.Getenv("LOCALAGI_MULTIMODAL_MODEL"),
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
-				os.Getenv("LOCALAGI_MCPBOX_URL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
 					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),

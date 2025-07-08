@@ -60,7 +60,7 @@ Focus on identifying the primary objective and any specific requirements or limi
 					Content: prompt,
 				},
 			},
-			conv...), a.options.LLMAPI.Model, schema, &result)
+			conv...), a.options.LLMAPI.Model, a.options.userID, a.options.agentID, schema, &result)
 	if err != nil {
 		return nil, fmt.Errorf("error extracting goal: %w", err)
 	}
@@ -123,7 +123,7 @@ Provide a detailed evaluation with specific gaps if any are found.`,
 				},
 			},
 			conv...),
-		a.options.LLMAPI.Model, schema, &result)
+		a.options.LLMAPI.Model, a.options.userID, a.options.agentID, schema, &result)
 	if err != nil {
 		return nil, fmt.Errorf("error generating evaluation: %w", err)
 	}

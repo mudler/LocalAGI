@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { actionApi } from "../utils/api";
 import Header from "../components/Header";
-import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
 import { actionApi, agentApi } from '../utils/api';
 import FormFieldDefinition from '../components/common/FormFieldDefinition';
 import hljs from 'highlight.js/lib/core';

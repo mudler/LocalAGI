@@ -46,30 +46,6 @@ func (g *GithubIssuesReader) Run(ctx context.Context, sharedState *types.AgentSh
 
 	issue, _, err := g.client.Issues.Get(ctx, result.Owner, result.Repository, result.IssueNumber)
 	if err == nil && issue != nil {
-		// Safe access to potentially nil fields
-		var issueNumber int
-		var repoName string
-		var title string
-		var body string
-
-		if issue.Number != nil {
-			issueNumber = *issue.Number
-		}
-
-		if issue.Repository != nil && issue.Repository.FullName != nil {
-			repoName = *issue.Repository.FullName
-		} else {
-			repoName = fmt.Sprintf("%s/%s", result.Owner, result.Repository)
-		}
-
-		if issue.Title != nil {
-			title = *issue.Title
-		}
-
-		if issue.Body != nil {
-			body = *issue.Body
-		}
-
 		return types.ActionResult{
 			Result: fmt.Sprintf(
 				"Issue %d Repository: %s\nTitle: %s\nBody: %s",
