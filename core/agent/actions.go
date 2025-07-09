@@ -173,7 +173,9 @@ func (a *Agent) decision(
 		return &decisionResult{actionParams: params, actionName: msg.ToolCalls[0].Function.Name, message: msg.Content}, nil
 	}
 
-	return nil, fmt.Errorf("failed to make a decision after %d attempts: %w", maxRetries, lastErr)
+	// Instead of returning an error, return a message explaining the failure
+	failureMessage := fmt.Sprintf("I apologize, but I'm having difficulty making a decision")
+	return &decisionResult{message: failureMessage}, nil
 }
 
 type Messages []openai.ChatCompletionMessage

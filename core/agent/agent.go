@@ -1087,7 +1087,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	// At this point can only be a reply action
 	xlog.Info("Computing reply", "agent", a.Character.Name)
 
-	forceResponsePrompt := "Based on the conversation and any tool results above, provide a helpful response to the user. Do not make any new tool calls - just respond with the information you have."
+	forceResponsePrompt := "Based on the tool results and information above, provide a helpful and informative response to the user. Use the data from any tool calls that were executed to give a complete answer."
 
 	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {
@@ -1120,14 +1120,6 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", conv))
-	fmt.Printf("DEBUG: Reply CONVOVOVO: %v\n", conv)
-
-	// Additional debugging to check conversation structure
-	for i, msg := range conv {
-		fmt.Printf("DEBUG: Message %d - Role: %s, Content: %s, ToolCalls: %d, ToolCallID: %s\n",
-			i, msg.Role, msg.Content, len(msg.ToolCalls), msg.ToolCallID)
-	}
-
 	msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
 	if err != nil {
 		job.Result.Conversation = conv
@@ -1159,7 +1151,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
 	job.Result.Conversation = conv
 	job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
-		a.saveCurrentConversation(conv)
+		// a.saveCurrentConversation(conv)
 	})
 	job.Result.Finish(nil)
 }

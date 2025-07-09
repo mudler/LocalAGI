@@ -76,14 +76,33 @@ func (a ActionDefinitionName) String() string {
 }
 
 func (a ActionDefinition) ToFunctionDefinition() *openai.FunctionDefinition {
-	return &openai.FunctionDefinition{
-		Name:        a.Name.String(),
-		Description: a.Description,
-		Parameters: jsonschema.Definition{
+	// Handle the case where there are no properties
+	var parameters jsonschema.Definition
+	if len(a.Properties) == 0 {
+		// For functions with no parameters, create a minimal valid schema with a dummy property
+		// This ensures the schema is valid for OpenAI's API
+		parameters = jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"_dummy": {
+					Type:        jsonschema.String,
+					Description: "Dummy parameter (not used)",
+				},
+			},
+			Required: []string{},
+		}
+	} else {
+		parameters = jsonschema.Definition{
 			Type:       jsonschema.Object,
 			Properties: a.Properties,
 			Required:   a.Required,
-		},
+		}
+	}
+
+	return &openai.FunctionDefinition{
+		Name:        a.Name.String(),
+		Description: a.Description,
+		Parameters:  parameters,
 	}
 }
 

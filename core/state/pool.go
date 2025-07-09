@@ -16,6 +16,7 @@ import (
 	"github.com/mudler/LocalAGI/db"
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/pkg/utils"
+	"github.com/sashabaranov/go-openai"
 
 	models "github.com/mudler/LocalAGI/dbmodels"
 
@@ -299,6 +300,24 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, id)),
 		WithUserID(uuid.MustParse(a.userId)),
 		WithAgentID(uuid.MustParse(id)),
+		WithNewConversationSubscriber(func(msg openai.ChatCompletionMessage) {
+			// Route reminder and other new conversation messages through SSE
+			messageID := fmt.Sprintf("reminder-%d", time.Now().UnixNano())
+			data := map[string]interface{}{
+				"id":        messageID,
+				"sender":    "agent",
+				"content":   msg.Content,
+				"createdAt": time.Now().Format(time.RFC3339),
+			}
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				xlog.Error("Error marshaling reminder message", "error", err)
+				return
+			}
+			manager.Send(
+				sse.NewMessage(string(jsonData)).WithEvent("json_message"),
+			)
+		}),
 		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",

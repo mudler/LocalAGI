@@ -3,7 +3,10 @@ pre.hljs {
   background-color: var(--medium-bg);
   padding: 1rem;
   border-radius: 8px;
-  overflow-x: auto;
+  overflow-x: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
   font-family: 'JetBrains Mono', monospace;
   line-height: 1.5;
 }
@@ -2013,16 +2016,15 @@ a:hover {
 }
 
 .summary-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1rem 1fr;
   gap: 0.5rem;
   font-size: 0.85rem;
   line-height: 1.4;
 }
 
 .summary-item i {
-  flex-shrink: 0;
-  width: 14px;
-  text-align: center;
+  justify-self: center;
 }
 
 .summary-item span {
