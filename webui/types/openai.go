@@ -2,6 +2,8 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	coreTypes "github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/xlog"
@@ -109,6 +111,24 @@ func (m *Message) IsFunctionCallOutput() bool {
 	return m.Type == "function_call_output"
 }
 
+func (m *Message) IsValidFunctionCallOutput() (bool, error) {
+	var errors []string
+
+	if m.Type != "function_call_output" {
+		errors = append(errors, "Type should be 'function_call_output'")
+	}
+
+	if m.CallId == nil {
+		errors = append(errors, "CallId not found")
+	}
+
+	if m.Output == nil {
+		errors = append(errors, "Output not found")
+	}
+
+	return len(errors) < 1, fmt.Errorf("Invalid function_call_output message: %s", strings.Join(errors, ", "))
+}
+
 // ToInputMessage converts to InputMessage if this is a regular message
 func (m *Message) ToInputMessage() *InputMessage {
 	if m.IsInputMessage() && m.Role != nil && m.Content != nil {
@@ -179,11 +199,15 @@ func (r *RequestBody) ToChatCompletionMessages() []openai.ChatCompletionMessage 
 			}
 
 			if m.IsFunctionCallOutput() {
-				result = append(result, openai.ChatCompletionMessage{
-					Role:       "tool",
-					Content:    *m.Output,
-					ToolCallID: *m.CallId,
-				})
+				if ok, err := m.IsValidFunctionCallOutput(); !ok {
+					xlog.Debug("Error processing input message", "error", err)
+				} else {
+					result = append(result, openai.ChatCompletionMessage{
+						Role:       "tool",
+						Content:    *m.Output,
+						ToolCallID: *m.CallId,
+					})
+				}
 			}
 
 			if !m.IsInputMessage() {
