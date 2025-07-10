@@ -187,9 +187,7 @@ func (a *App) Pause() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -241,9 +239,7 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -367,9 +363,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -600,9 +594,7 @@ func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -731,9 +723,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -854,9 +844,7 @@ func (a *App) GetActionDefinition() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -919,9 +907,7 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -1313,9 +1299,7 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -1517,6 +1501,9 @@ func getAvailableModels() []map[string]interface{} {
 
 	for _, model := range openrouterModels {
 		if model["id"] == "deepseek/deepseek-chat-v3-0324:free" {
+			model["id"] = "gpt-4o"
+			model["name"] = "gpt-4o"
+			model["description"] = "gpt-4o"
 			return []map[string]interface{}{model}
 		}
 	}
@@ -2497,9 +2484,7 @@ func (a *App) GetAgentDetails() func(c *fiber.Ctx) error {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,

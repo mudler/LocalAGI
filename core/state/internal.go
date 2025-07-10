@@ -31,3 +31,7 @@ func (a *AgentPoolInternalAPI) GetConfig(name string) *AgentConfig {
 	}
 	return &agent
 }
+
+func (a *AgentPoolInternalAPI) GetUserID() string {
+	return a.AgentPool.GetUserID()
+}

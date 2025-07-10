@@ -248,9 +248,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,
@@ -313,9 +311,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 				os.Getenv("LOCALAGI_IMAGE_MODEL"),
 				os.Getenv("LOCALAGI_LOCALRAG_URL"),
 				services.Actions(map[string]string{
-					services.ActionConfigBrowserAgentRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigDeepResearchRunner: os.Getenv("LOCALOPERATOR_BASE_URL"),
-					services.ActionConfigSSHBoxURL:          os.Getenv("LOCALAGI_SSHBOX_URL"),
+					services.ActionConfigSSHBoxURL: os.Getenv("LOCALAGI_SSHBOX_URL"),
 				}),
 				services.Connectors,
 				services.DynamicPrompts,

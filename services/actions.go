@@ -16,10 +16,10 @@ import (
 
 const (
 	// Actions
-	ActionSearch                         = "search"
-	ActionCustom                         = "custom"
-	ActionBrowserAgentRunner             = "browser-agent-runner"
-	ActionDeepResearchRunner             = "deep-research-runner"
+	ActionSearch = "search"
+	ActionCustom = "custom"
+	// ActionBrowserAgentRunner             = "browser-agent-runner"
+	// ActionDeepResearchRunner             = "deep-research-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
 	ActionGithubIssueOpener              = "github-issue-opener"
 	ActionGithubIssueEditor              = "github-issue-editor"
@@ -64,8 +64,8 @@ var AvailableActions = []string{
 	ActionGithubGetAllContent,
 	ActionGithubRepositorySearchFiles,
 	ActionGithubRepositoryListFiles,
-	ActionBrowserAgentRunner,
-	ActionDeepResearchRunner,
+	// ActionBrowserAgentRunner,
+	// ActionDeepResearchRunner,
 	ActionGithubRepositoryCreateOrUpdate,
 	ActionGithubIssueReader,
 	ActionGithubIssueCommenter,
@@ -90,9 +90,9 @@ var AvailableActions = []string{
 }
 
 const (
-	ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
-	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
-	ActionConfigSSHBoxURL          = "sshbox-url"
+	// ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
+	// ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
+	ActionConfigSSHBoxURL = "sshbox-url"
 )
 
 func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
@@ -147,10 +147,10 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubIssueCloser(config)
 	case ActionGithubIssueSearcher:
 		a = actions.NewGithubIssueSearch(config)
-	case ActionBrowserAgentRunner:
-		a = actions.NewBrowserAgentRunner(config, actionsConfigs[ActionConfigBrowserAgentRunner])
-	case ActionDeepResearchRunner:
-		a = actions.NewDeepResearchRunner(config, actionsConfigs[ActionConfigDeepResearchRunner])
+	// case ActionBrowserAgentRunner:
+	// 	a = actions.NewBrowserAgentRunner(config, actionsConfigs[ActionConfigBrowserAgentRunner])
+	// case ActionDeepResearchRunner:
+	// 	a = actions.NewDeepResearchRunner(config, actionsConfigs[ActionConfigDeepResearchRunner])
 	case ActionGithubIssueReader:
 		a = actions.NewGithubIssueReader(config)
 	case ActionGithubPRReader:
@@ -218,16 +218,16 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Label:  "Search",
 			Fields: actions.SearchConfigMeta(),
 		},
-		{
-			Name:   "browser-agent-runner",
-			Label:  "Browser Agent Runner",
-			Fields: actions.BrowserAgentRunnerConfigMeta(),
-		},
-		{
-			Name:   "deep-research-runner",
-			Label:  "Deep Research Runner",
-			Fields: actions.DeepResearchRunnerConfigMeta(),
-		},
+		// {
+		// 	Name:   "browser-agent-runner",
+		// 	Label:  "Browser Agent Runner",
+		// 	Fields: actions.BrowserAgentRunnerConfigMeta(),
+		// },
+		// {
+		// 	Name:   "deep-research-runner",
+		// 	Label:  "Deep Research Runner",
+		// 	Fields: actions.DeepResearchRunnerConfigMeta(),
+		// },
 		{
 			Name:   "generate_image",
 			Label:  "Generate Image",

@@ -624,6 +624,11 @@ func (a *AgentPool) SetManager(id string, manager sse.Manager) {
 	a.managers[id] = manager
 }
 
+// GetUserID returns the user ID for this agent pool
+func (a *AgentPool) GetUserID() string {
+	return a.userId
+}
+
 // RemoveAgentOnly removes only the agent instance without touching the manager or other data
 func (a *AgentPool) RemoveAgentOnly(id string) {
 	a.Lock()

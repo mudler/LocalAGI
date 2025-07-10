@@ -571,19 +571,19 @@ func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Me
 	return conv
 }
 
-func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
+func (a *Agent) filterJob(job *types.Job) (ok bool, failedBy string, err error) {
 	hasTriggers := false
 	triggeredBy := ""
-	failedBy := ""
+	failedByFilter := ""
 
 	if job.DoneFilter {
-		return true, nil
+		return true, "", nil
 	}
 	job.DoneFilter = true
 
 	if len(a.options.jobFilters) < 1 {
 		xlog.Debug("No filters")
-		return true, nil
+		return true, "", nil
 	}
 
 	// Add userID and agentID to job metadata so filters can access them
@@ -602,7 +602,7 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 		ok, err = filter.Apply(job)
 		if err != nil {
 			xlog.Error("Error in job filter", "filter", name, "error", err)
-			failedBy = name
+			failedByFilter = name
 			break
 		}
 
@@ -613,7 +613,7 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 				xlog.Info("Job triggered by filter", "filter", name)
 			}
 		} else if !ok {
-			failedBy = name
+			failedByFilter = name
 			xlog.Info("Job failed filter", "filter", name)
 			break
 		} else {
@@ -631,7 +631,7 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 				FilterResult: &types.FilterResult{
 					HasTriggers: hasTriggers,
 					TriggeredBy: triggeredBy,
-					FailedBy:    failedBy,
+					FailedBy:    failedByFilter,
 				},
 			}
 		} else {
@@ -642,7 +642,7 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 		a.Observer().Update(*obs)
 	}
 
-	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
+	return failedByFilter == "" && (!hasTriggers || triggeredBy != ""), failedByFilter, nil
 }
 
 // validateBuiltinTools checks that builtin tools specified by the user can be matched to available actions
@@ -759,10 +759,13 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	}
 
 	conv = a.processPrompts(conv)
-	if ok, err := a.filterJob(job); !ok || err != nil {
+	if ok, failedBy, err := a.filterJob(job); !ok || err != nil {
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("Error in job filter: %w", err))
 		} else {
+			// Send filter failure as a chat message instead of an error
+			filterMessage := fmt.Sprintf("Sorry, your request was blocked by the [%s] filter. Please modify your request and try again.", failedBy)
+			job.Result.SetResponse(filterMessage)
 			job.Result.Finish(nil)
 		}
 		return
