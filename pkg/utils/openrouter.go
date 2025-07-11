@@ -59,6 +59,8 @@ type OpenRouterResponse struct {
 
 func GetOpenRouterUsage(generationID string) OpenRouterUsage {
 	// If no generation ID is provided, return empty usage
+
+	xlog.Info("generationID", generationID)
 	if generationID == "" {
 		return OpenRouterUsage{}
 	}

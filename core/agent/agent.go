@@ -26,7 +26,7 @@ const (
 	UserRole      = "user"
 	AssistantRole = "assistant"
 	SystemRole    = "system"
-	maxRetries    = 5
+	maxRetries    = 2
 )
 
 type Agent struct {
@@ -920,7 +920,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 				count++
 			}
 		}
-		if count > a.options.loopDetectionSteps {
+		if count >= a.options.loopDetectionSteps {
 			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
 			a.reply(job, role, conv, actionParams, chosenAction, reasoning)
 			return
@@ -1039,6 +1039,13 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
 		job.ConversationHistory = conv
 
+		// Check if we've exceeded the loop detection steps before recursing
+		if a.options.loopDetectionSteps > 0 && len(job.GetPastActions()) >= a.options.loopDetectionSteps {
+			xlog.Info("Loop detection: Maximum actions reached, stopping recursion", "agent", a.Character.Name, "actions_count", len(job.GetPastActions()))
+			a.reply(job, role, conv, actionParams, chosenAction, "Reached maximum action limit")
+			return
+		}
+
 		// We need to do another action (?)
 		// The agent decided to do another action
 		// call ourselves again
@@ -1056,6 +1063,13 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	}
 
 	if !satisfied {
+		// Check if we've exceeded evaluation loop limit before recursing
+		if a.options.loopDetectionSteps > 0 && job.GetEvaluationLoop() >= a.options.loopDetectionSteps {
+			xlog.Info("Loop detection: Maximum evaluation loops reached, stopping", "agent", a.Character.Name, "evaluation_loops", job.GetEvaluationLoop())
+			a.reply(job, role, conv, actionParams, chosenAction, "Reached maximum evaluation limit")
+			return
+		}
+
 		// If not satisfied, continue with the conversation
 		job.ConversationHistory = conv
 		job.IncrementEvaluationLoop()

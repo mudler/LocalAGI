@@ -48,16 +48,12 @@ function CreateAgent() {
       };
 
       // Process all field sections to extract default values
-      // const sections = [
-      //   'BasicInfoSection',
-      //   'ModelSettingsSection', 
-      //   'MemorySettingsSection',
-      //   'PromptsGoalsSection',
-      //   'AdvancedSettingsSection'
-      // ];
-
       const sections = [
+        'BasicInfoSection',
         'ModelSettingsSection', 
+        'MemorySettingsSection',
+        'PromptsGoalsSection',
+        'AdvancedSettingsSection'
       ];
 
       sections.forEach((sectionKey) => {

@@ -54,6 +54,7 @@ export function useAgent(agentId) {
 
       try {
         await agentApi.updateAgentConfig(agentId, config);
+        showToast && showToast("Agent updated successfully!", "success");
         // Refresh agent data after update
         await fetchAgent();
         return true;

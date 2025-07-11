@@ -251,7 +251,7 @@ func NewAgentConfigMeta(
 				Name:         "loop_detection_steps",
 				Label:        "Max Loop Detection Steps",
 				Type:         "number",
-				DefaultValue: 5,
+				DefaultValue: 1,
 				Min:          1,
 				Step:         1,
 				Tags:         config.Tags{Section: "AdvancedSettings"},

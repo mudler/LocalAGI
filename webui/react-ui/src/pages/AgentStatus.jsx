@@ -449,7 +449,7 @@ function AgentStatus() {
               <div className="section-box">
                 <h2>Observable Updates</h2>
                 <p className="section-description">
-                  Drill down into what the agent is doing and thinking when activated by a connector
+                  Drill down into what the agent is doing and thinking
                 </p>
                 
                 <div className="observables-container">

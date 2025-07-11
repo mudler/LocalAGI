@@ -425,7 +425,11 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 	}
 
 	if config.EnableKnowledgeBase {
-		opts = append(opts, EnableKnowledgeBase)
+		if config.KnowledgeBaseResults > 0 {
+			opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
+		} else {
+			opts = append(opts, EnableKnowledgeBase)
+		}
 	}
 
 	if config.EnableReasoning {
@@ -434,10 +438,6 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 
 	if config.StripThinkingTags {
 		opts = append(opts, EnableStripThinkingTags)
-	}
-
-	if config.KnowledgeBaseResults > 0 {
-		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
 
 	if config.LoopDetectionSteps > 0 {
