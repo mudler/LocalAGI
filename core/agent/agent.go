@@ -236,7 +236,7 @@ func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletion
 		// } else {
 		// 	fmt.Println("LLM Response", "response", string(prettyJSON))
 		// }
-		if err == nil && len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
+		if err == nil && len(resp.Choices) == 1 && (resp.Choices[0].Message.Content != "" || len(resp.Choices[0].Message.ToolCalls) > 0) {
 			// Track usage after successful API call
 			usage := utils.GetOpenRouterUsage(resp.ID)
 			llmUsage := &models.LLMUsage{

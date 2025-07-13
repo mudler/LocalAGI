@@ -92,7 +92,7 @@ func (a *Agent) decision(
 			continue
 		}
 
-		if len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
+		if len(resp.Choices) == 1 && (resp.Choices[0].Message.Content != "" || len(resp.Choices[0].Message.ToolCalls) > 0) {
 			// Track usage after successful API call
 			usage := utils.GetOpenRouterUsage(resp.ID)
 			llmUsage := &models.LLMUsage{
