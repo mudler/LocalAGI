@@ -24,11 +24,14 @@ import (
 const parameterReasoningPrompt = `You are tasked with generating the optimal parameters for the action "%s". The action requires the following parameters:
 %s
 
+Current Date and Time: %s
+
 Your task is to:
 1. Generate the best possible values for each required parameter
 2. If the parameter requires code, provide complete, working code
 3. If the parameter requires text or documentation, provide comprehensive, well-structured content
 4. Ensure all parameters are complete and ready to be used
+5. When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 
 Focus on quality and completeness. Do not explain your reasoning or analyze the action's purpose - just provide the best possible parameter values.`
 
@@ -56,14 +59,17 @@ func (a *Agent) decision(
 	// Add guidance for single tool call preference when no specific tool is chosen
 	enhancedConversation := conversation
 	if toolchoice == "" && !a.options.forceReasoning {
-		singleToolGuidance := `IMPORTANT: When responding to user requests, prefer using a SINGLE tool call that can handle the entire request when possible.
+		singleToolGuidance := fmt.Sprintf(`IMPORTANT: When responding to user requests, prefer using a SINGLE tool call that can handle the entire request when possible.
+
+Current Date and Time: %s
 
 Examples:
 - For "weather in Paris and Boston" → use one search like "current weather in Paris and Boston"
 - For "tell me about X and Y" → use one search like "information about X and Y"
 - For multiple related items → combine them into one comprehensive query
+- When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 
-Choose the most appropriate single tool call to fulfill the user's complete request.`
+Choose the most appropriate single tool call to fulfill the user's complete request.`, time.Now().Format(time.RFC3339))
 
 		enhancedConversation = append([]openai.ChatCompletionMessage{
 			{
@@ -330,7 +336,8 @@ func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act type
 		// First, get the LLM to reason about optimal parameter usage
 		parameterReasoningPrompt := fmt.Sprintf(parameterReasoningPrompt,
 			act.Definition().Name,
-			formatProperties(act.Definition().Properties))
+			formatProperties(act.Definition().Properties),
+			time.Now().Format(time.RFC3339))
 
 		// Get initial reasoning about parameters using askLLM
 		paramReasoningMsg, err := a.askLLM(job.GetContext(),
@@ -691,7 +698,24 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 
 	if actionChoice.Tool == "" || actionChoice.Tool == "reply" {
 		xlog.Debug("[pickAction] no action found, replying")
-		return nil, nil, "", nil
+
+		// When forceReasoning is enabled and agent chooses "reply",
+		// we need to generate the actual reply content, not just return the reasoning
+		replyPrompt := "Based on the conversation and your reasoning, provide the actual response that should be given to the user. Do not explain your reasoning - just provide the direct answer that addresses the user's request."
+
+		replyMsg, err := a.askLLM(job.GetContext(),
+			append(c, openai.ChatCompletionMessage{
+				Role:    "system",
+				Content: replyPrompt,
+			}),
+			maxRetries)
+		if err != nil {
+			xlog.Warn("Failed to generate reply content, falling back to reasoning", "error", err)
+			return nil, nil, originalReasoning, nil
+		}
+
+		// Return the actual reply content instead of the meta-reasoning
+		return nil, nil, replyMsg.Content, nil
 	}
 
 	chosenAction := a.availableActions().Find(actionChoice.Tool)

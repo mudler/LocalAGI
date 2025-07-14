@@ -5,7 +5,7 @@ import { actionApi, agentApi } from '../utils/api';
 import FormFieldDefinition from '../components/common/FormFieldDefinition';
 import hljs from 'highlight.js/lib/core';
 import json from 'highlight.js/lib/languages/json';
-import 'highlight.js/styles/monokai.css';
+import 'highlight.js/styles/atom-one-dark.css';
 hljs.registerLanguage('json', json);
 
 function ActionsPlayground() {
@@ -232,137 +232,6 @@ function ActionsPlayground() {
                 </select>
               </div>
             </div>
-
-            {selectedAction && (
-              <div
-                className="section-box"
-                style={{
-                  marginBottom: 32,
-                  width: "100%",
-                  maxWidth: "none",
-                  marginLeft: 0,
-                  marginRight: 0,
-                }}
-              >
-                <h2
-                  className="section-title"
-                  style={{ fontSize: "1.2rem", marginBottom: 18 }}
-                >
-                  Action Configuration
-                </h2>
-                <form onSubmit={handleExecuteAction} autoComplete="off">
-                  <div className="form-group mb-4">
-                    <label htmlFor="config-json">Configuration (JSON):</label>
-                    <textarea
-                      id="config-json"
-                      value={configJson}
-                      onChange={handleConfigChange}
-                      className="form-control"
-                      rows={4}
-                      placeholder='{"key": "value"}'
-                      spellCheck={false}
-                    />
-                    <small className="form-text text-muted">
-                      Enter JSON configuration for the action
-                    </small>
-                  </div>
-                  <div className="form-group mb-4">
-                    <label htmlFor="params-json">Parameters (JSON):</label>
-                    <textarea
-                      id="params-json"
-                      value={paramsJson}
-                      onChange={handleParamsChange}
-                      className="form-control"
-                      rows={4}
-                      placeholder='{"key": "value"}'
-                      spellCheck={false}
-                    />
-                    <small className="form-text text-muted">
-                      Enter JSON parameters for the action
-                    </small>
-                  </div>
-                  <div className="form-actions">
-                    <button
-                      type="submit"
-                      className="action-btn"
-                      disabled={loading}
-                      aria-label="Execute Action"
-                    >
-                      {loading ? (
-                        <>
-                          <i className="fas fa-spinner fa-spin"></i>{" "}
-                          Executing...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fas fa-play"></i> Execute Action
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-          </div>
-
-          {/* Right column: Results */}
-          <div>
-            {result && (
-              <div
-                className="section-box"
-                style={{
-                  minWidth: 420,
-                  minHeight: 220,
-                  width: "100%",
-                  maxWidth: "none",
-                  marginLeft: 0,
-                  marginRight: 0,
-                }}
-              >
-                <h2
-                  className="section-title"
-                  style={{ fontSize: "1.2rem", marginBottom: 18 }}
-                >
-                  Action Results
-                </h2>
-                <div
-                  className="result-container"
-                  style={{
-                    maxHeight: 400,
-                    overflow: "auto",
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    padding: 14,
-                    background: "#f9fafb",
-                    fontFamily: "Menlo, Monaco, Consolas, monospace",
-                    fontSize: 15,
-                    color: "#1f2937",
-                  }}
-                >
-                  {typeof result === "object" ? (
-                    <pre
-                      style={{
-                        margin: 0,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {JSON.stringify(result, null, 2)}
-                    </pre>
-                  ) : (
-                    <pre
-                      style={{
-                        margin: 0,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {result}
-                    </pre>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
         
@@ -418,17 +287,33 @@ function ActionsPlayground() {
             <div className="result-container" style={{ 
               maxHeight: '400px', 
               overflow: 'auto', 
-              border: '1px solid rgba(94, 0, 255, 0.2)',
-              borderRadius: '4px',
-              padding: '10px',
-              backgroundColor: 'rgba(30, 30, 30, 0.7)'
+              border: '1px solid rgba(94, 0, 255, 0.3)',
+              borderRadius: '8px',
+              padding: '16px',
+              backgroundColor: 'rgba(8, 12, 25, 0.95)',
+              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace'
             }}>
               {typeof result === 'object' ? (
-                <pre className="hljs"><code>
-                  <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(result, null, 2), { language: 'json' }).value }}></div>
-                </code></pre>
+                <pre className="hljs" style={{ 
+                  margin: 0, 
+                  backgroundColor: 'transparent',
+                  color: '#e6e6e6',
+                  fontSize: '14px',
+                  lineHeight: '1.5'
+                }}>
+                  <code>
+                    <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(result, null, 2), { language: 'json' }).value }}></div>
+                  </code>
+                </pre>
               ) : (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                <pre style={{ 
+                  margin: 0, 
+                  whiteSpace: 'pre-wrap', 
+                  wordBreak: 'break-word',
+                  color: '#e6e6e6',
+                  fontSize: '14px',
+                  lineHeight: '1.5'
+                }}>
                   {result}
                 </pre>
               )}

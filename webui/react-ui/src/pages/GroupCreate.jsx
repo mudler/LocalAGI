@@ -439,8 +439,8 @@ function GroupCreate() {
                         </div>
                       </div>
                     ) : (
-                      <div className="loading">
-                        Loading group configuration...
+                      <div className="loading-container">
+                        <div className="spinner"></div>
                       </div>
                     )}
                   </form>

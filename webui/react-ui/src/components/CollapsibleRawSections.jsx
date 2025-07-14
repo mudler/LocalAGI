@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import hljs from 'highlight.js/lib/core';
 import json from 'highlight.js/lib/languages/json';
-import 'highlight.js/styles/monokai.css';
+import 'highlight.js/styles/atom-one-dark.css';
 
 hljs.registerLanguage('json', json);
 
@@ -39,9 +39,21 @@ export default function CollapsibleRawSections({ container }) {
             </button>
           </h4>
           {showCreation && (
-            <pre className="hljs"><code>
-              <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.creation || {}, null, 2), { language: 'json' }).value }} />
-            </code></pre>
+            <pre className="hljs" style={{ 
+              margin: 0, 
+              backgroundColor: 'rgba(8, 12, 25, 0.95)',
+              color: '#e6e6e6',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '1px solid rgba(94, 0, 255, 0.3)',
+              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace'
+            }}>
+              <code>
+                <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.creation || {}, null, 2), { language: 'json' }).value }} />
+              </code>
+            </pre>
           )}
         </div>
       )}
@@ -65,9 +77,21 @@ export default function CollapsibleRawSections({ container }) {
             </button>
           </h4>
           {showProgress && (
-            <pre className="hljs"><code>
-              <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.progress || {}, null, 2), { language: 'json' }).value }} />
-            </code></pre>
+            <pre className="hljs" style={{ 
+              margin: 0, 
+              backgroundColor: 'rgba(8, 12, 25, 0.95)',
+              color: '#e6e6e6',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '1px solid rgba(94, 0, 255, 0.3)',
+              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace'
+            }}>
+              <code>
+                <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.progress || {}, null, 2), { language: 'json' }).value }} />
+              </code>
+            </pre>
           )}
         </div>
       )}
@@ -91,9 +115,21 @@ export default function CollapsibleRawSections({ container }) {
             </button>
           </h4>
           {showCompletion && (
-            <pre className="hljs"><code>
-              <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.completion || {}, null, 2), { language: 'json' }).value }} />
-            </code></pre>
+            <pre className="hljs" style={{ 
+              margin: 0, 
+              backgroundColor: 'rgba(8, 12, 25, 0.95)',
+              color: '#e6e6e6',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '1px solid rgba(94, 0, 255, 0.3)',
+              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace'
+            }}>
+              <code>
+                <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(container.completion || {}, null, 2), { language: 'json' }).value }} />
+              </code>
+            </pre>
           )}
         </div>
       )}

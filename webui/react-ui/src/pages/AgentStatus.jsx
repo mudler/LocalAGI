@@ -4,7 +4,7 @@ import CollapsibleRawSections from '../components/CollapsibleRawSections';
 import Header from '../components/Header';
 import hljs from 'highlight.js/lib/core';
 import json from 'highlight.js/lib/languages/json';
-import 'highlight.js/styles/monokai.css';
+import 'highlight.js/styles/atom-one-dark.css';
 import { useAgent } from '../hooks/useAgent';
 
 hljs.registerLanguage('json', json);
@@ -356,7 +356,9 @@ function AgentStatus() {
     return (
       <div className="dashboard-container">
         <div className="main-content-area">
-          <div className="loading">Loading agent status...</div>
+          <div className="loading-container">
+              <div className="spinner"></div>
+          </div>
         </div>
       </div>
     );

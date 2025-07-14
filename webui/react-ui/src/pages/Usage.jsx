@@ -65,7 +65,9 @@ const Usage = () => {
   ];
 
   if (loading) {
-    return <div className="loading">Loading usage data...</div>;
+    return <div className="loading-container">
+              <div className="spinner"></div>
+            </div>;
   }
 
   if (error) {
