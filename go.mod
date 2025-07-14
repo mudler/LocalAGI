@@ -27,7 +27,7 @@ require (
 	github.com/tmc/langchaingo v0.1.13
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.62.0
-	golang.org/x/crypto v0.39.0
+	golang.org/x/crypto v0.40.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
 	maunium.net/go/mautrix v0.17.0
 	mvdan.cc/xurls/v2 v2.6.0
@@ -106,10 +106,10 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/arch v0.16.0 // indirect
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
-	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
-	golang.org/x/tools v0.33.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/tools v0.34.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
