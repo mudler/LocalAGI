@@ -53,9 +53,29 @@ func (a *Agent) decision(
 		}
 	}
 
+	// Add guidance for single tool call preference when no specific tool is chosen
+	enhancedConversation := conversation
+	if toolchoice == "" && !a.options.forceReasoning {
+		singleToolGuidance := `IMPORTANT: When responding to user requests, prefer using a SINGLE tool call that can handle the entire request when possible.
+
+Examples:
+- For "weather in Paris and Boston" → use one search like "current weather in Paris and Boston"
+- For "tell me about X and Y" → use one search like "information about X and Y"
+- For multiple related items → combine them into one comprehensive query
+
+Choose the most appropriate single tool call to fulfill the user's complete request.`
+
+		enhancedConversation = append([]openai.ChatCompletionMessage{
+			{
+				Role:    "system",
+				Content: singleToolGuidance,
+			},
+		}, conversation...)
+	}
+
 	decision := openai.ChatCompletionRequest{
 		Model:    a.options.LLMAPI.Model,
-		Messages: conversation,
+		Messages: enhancedConversation,
 		Tools:    tools,
 	}
 

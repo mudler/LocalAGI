@@ -93,8 +93,8 @@ func (a *BrowseAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 	}
 
 	// Truncate very long content to prevent overwhelming the LLM
-	if len(rendered) > 8000 {
-		rendered = rendered[:8000] + "\n\n[Content truncated to prevent overwhelming response...]"
+	if len(rendered) > 32000 {
+		rendered = rendered[:32000] + "\n\n[Content truncated to prevent overwhelming response...]"
 	}
 
 	return types.ActionResult{Result: fmt.Sprintf("Successfully browsed '%s':\n\n%s", result.URL, rendered)}, nil

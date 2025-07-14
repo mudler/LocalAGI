@@ -26,7 +26,7 @@ const (
 	UserRole      = "user"
 	AssistantRole = "assistant"
 	SystemRole    = "system"
-	maxRetries    = 2
+	maxRetries    = 3
 )
 
 type Agent struct {
