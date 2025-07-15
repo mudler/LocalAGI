@@ -150,7 +150,7 @@ func (a *RemoveReminderAction) Plannable() bool {
 func (a *ReminderAction) Definition() types.ActionDefinition {
 	return types.ActionDefinition{
 		Name:        ReminderActionName,
-		Description: "Set a reminder for the agent to wake up and perform a task based on a cron schedule. Examples: '0 0 * * *' (daily at midnight), '0 */2 * * *' (every 2 hours), '0 0 * * 1' (every Monday at midnight)",
+		Description: "Set a reminder for the agent to wake up and perform a task based on a cron schedule. Uses 6-field format: 'second minute hour day month weekday'. Examples: '0 0 0 * * *' (daily at midnight), '0 0 */2 * * *' (every 2 hours), '0 0 0 * * 1' (every Monday at midnight), '0 */5 * * * *' (every 5 minutes)",
 		Properties: map[string]jsonschema.Definition{
 			"message": {
 				Type:        jsonschema.String,
@@ -158,7 +158,7 @@ func (a *ReminderAction) Definition() types.ActionDefinition {
 			},
 			"cron_expr": {
 				Type:        jsonschema.String,
-				Description: "Cron expression for scheduling (e.g. '0 0 * * *' for daily at midnight). Format: 'second minute hour day month weekday'",
+				Description: "Cron expression for scheduling using 6-field format: 'second minute hour day month weekday'. Examples: '0 0 0 * * *' (daily at midnight), '0 */10 * * * *' (every 10 minutes), '0 30 14 * * *' (daily at 2:30 PM). For delays like 'in 2 minutes', calculate the target time and use absolute values.",
 			},
 			"is_recurring": {
 				Type:        jsonschema.Boolean,

@@ -147,8 +147,9 @@ function AgentSettings() {
               id={id}
             />
           ) : (
-            <div style={{ color: "var(--text-light)", padding: 24 }}>
-              Loading agent configuration...
+            <div className="centered-loading">
+              <div className="spinner-primary"></div>
+              <p className="loading-text">Loading agent configuration</p>
             </div>
           )}
         </div>

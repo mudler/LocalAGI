@@ -75,7 +75,9 @@ function Chat() {
     return (
       <div className="dashboard-container">
         <div className="main-content-area">
-          <p>Loading agent configuration...</p>
+          <div className="loading-container">
+            <div className="spinner"></div>
+          </div>
         </div>
       </div>
     );

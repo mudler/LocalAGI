@@ -2111,6 +2111,32 @@ a:hover {
   100% { transform: rotate(360deg); }
 }
 
+/* Centered loading components */
+.centered-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+}
+
+.spinner-primary {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(30, 84, 191, 0.2);
+  border-top: 4px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: var(--text-light);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .observable-header {

@@ -8,8 +8,8 @@ function ImportAgent() {
   const { showToast } = useOutletContext();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
-  // Update document title
   useEffect(() => {
     document.title = "Import Agent - LocalAGI";
     return () => {
@@ -17,11 +17,38 @@ function ImportAgent() {
     };
   }, []);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (selectedFile) => {
+    if (selectedFile && selectedFile.type === "application/json") {
+      setFile(selectedFile);
+    } else {
+      showToast("Please select a valid JSON file", "error");
+    }
+  };
+
+  const handleInputChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      setFile(selectedFile);
+      handleFileChange(selectedFile);
     }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      handleFileChange(droppedFile);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
   };
 
   const handleImport = async () => {
@@ -45,7 +72,6 @@ function ImportAgent() {
     }
   };
 
-  // Back button for the header
   const backButton = (
     <button
       className="action-btn pause-resume-btn"
@@ -67,7 +93,6 @@ function ImportAgent() {
           <div className="header-right">{backButton}</div>
         </div>
 
-        {/* Import Form */}
         <div className="section-box" style={{ maxWidth: 720 }}>
           <form
             onSubmit={(e) => {
@@ -76,23 +101,112 @@ function ImportAgent() {
             }}
             style={{ display: "flex", flexDirection: "column", gap: 24 }}
           >
-            <label htmlFor="import-file" style={{ fontWeight: 500 }}>
+            <label style={{ fontWeight: 500, marginBottom: 8 }}>
               Select agent file (.json)
             </label>
-            <input
-              id="import-file"
-              type="file"
-              accept=".json"
-              onChange={handleFileChange}
-              disabled={loading}
+            
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => document.getElementById('file-input').click()}
               style={{
-                padding: 10,
-                border: "1px solid var(--border-color)",
-                borderRadius: 5,
-                fontSize: "1rem",
-                background: "#fff",
+                border: `2px dashed ${dragOver ? 'var(--primary)' : 'var(--border)'}`,
+                borderRadius: 12,
+                padding: '2rem',
+                textAlign: 'center',
+                cursor: 'pointer',
+                backgroundColor: dragOver ? 'rgba(30, 84, 191, 0.05)' : '#f9fafb',
+                transition: 'all 0.2s ease',
+                position: 'relative',
+                minHeight: 160,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 16
               }}
-            />
+            >
+              <img 
+                src="/app/features/dashed-upload.svg" 
+                alt="Upload" 
+                style={{ 
+                  width: 48, 
+                  height: 48, 
+                  opacity: dragOver ? 0.9 : 0.7,
+                  transition: 'opacity 0.2s ease'
+                }} 
+              />
+              
+              {file ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <div style={{ 
+                    fontSize: '1rem', 
+                    fontWeight: 500, 
+                    color: 'var(--primary)' 
+                  }}>
+                    <i className="fas fa-file-check" style={{ marginRight: 8 }}></i>
+                    {file.name}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.875rem', 
+                    color: 'var(--text-light)' 
+                  }}>
+                    {(file.size / 1024).toFixed(1)} KB
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFile(null);
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--danger)',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      marginTop: 4
+                    }}
+                  >
+                    <i className="fas fa-times"></i> Remove
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <div style={{ 
+                    fontSize: '1.1rem', 
+                    fontWeight: 500, 
+                    color: dragOver ? 'var(--primary)' : 'var(--text)' 
+                  }}>
+                    {dragOver ? 'Drop your file here' : 'Drag and drop your agent file'}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.9rem', 
+                    color: 'var(--text-light)' 
+                  }}>
+                    or click to browse
+                  </div>
+                  <div style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-lighter)',
+                    marginTop: 4
+                  }}>
+                    Supports JSON files only
+                  </div>
+                </div>
+              )}
+              
+              <input
+                id="file-input"
+                type="file"
+                accept=".json"
+                onChange={handleInputChange}
+                disabled={loading}
+                style={{ display: 'none' }}
+              />
+            </div>
+
             <div
               style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
             >
