@@ -278,7 +278,7 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 
 	fmt.Printf("DEBUG: Creating agent with config - RandomIdentity: %v, IdentityGuidance: '%s'\n", config.RandomIdentity, config.IdentityGuidance)
 	if obs == nil {
-		obs = NewSSEObserver(id, manager)
+		obs = NewSSEObserverWithIDs(id, uuid.MustParse(a.userId), uuid.MustParse(id), manager)
 	}
 
 	opts := []Option{

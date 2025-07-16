@@ -3,6 +3,7 @@ package webui
 import (
 	"crypto/subtle"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -373,23 +374,79 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 			})
 		}
 
-		pool, ok := app.UserPools[userID]
-		if !ok {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Agent pool not found",
+		userUUID, err := uuid.Parse(userID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid user ID",
 			})
 		}
 
-		agentInstance := pool.GetAgent(agent.ID.String())
-		if agentInstance == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Agent instance not found",
-			})
+		var history []types.Observable
+
+		// Try to get observables from in-memory agent first (if running)
+		if pool, ok := app.UserPools[userID]; ok {
+			if agentInstance := pool.GetAgent(agent.ID.String()); agentInstance != nil {
+				// Agent is running in memory, use observer
+				history = agentInstance.Observer().History()
+			}
+		}
+
+		// If no in-memory observables or agent not running, fetch from database
+		if len(history) == 0 {
+			var dbObservables []models.Observable
+			err := db.DB.Where("UserID = ? AND AgentID = ?", userUUID, agent.ID).
+				Order("CreatedAt ASC").
+				Find(&dbObservables).Error
+
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to fetch observables from database: " + err.Error(),
+				})
+			}
+
+			// Convert database observables to types.Observable
+			history = make([]types.Observable, len(dbObservables))
+			for i, dbObs := range dbObservables {
+				obs := types.Observable{
+					ID:    dbObs.ID.String(),
+					Agent: dbObs.Agent,
+					Name:  dbObs.Name,
+					Icon:  dbObs.Icon,
+				}
+
+				if dbObs.ParentID != nil {
+					obs.ParentID = dbObs.ParentID.String()
+				}
+
+				// Unmarshal JSON fields
+				if len(dbObs.Creation) > 0 && string(dbObs.Creation) != "null" {
+					var creation types.Creation
+					if err := json.Unmarshal(dbObs.Creation, &creation); err == nil {
+						obs.Creation = &creation
+					}
+				}
+
+				if len(dbObs.Progress) > 0 && string(dbObs.Progress) != "null" {
+					var progress []types.Progress
+					if err := json.Unmarshal(dbObs.Progress, &progress); err == nil {
+						obs.Progress = progress
+					}
+				}
+
+				if len(dbObs.Completion) > 0 && string(dbObs.Completion) != "null" {
+					var completion types.Completion
+					if err := json.Unmarshal(dbObs.Completion, &completion); err == nil {
+						obs.Completion = &completion
+					}
+				}
+
+				history[i] = obs
+			}
 		}
 
 		return c.JSON(fiber.Map{
 			"Name":    agent.Name,
-			"History": agentInstance.Observer().History(),
+			"History": history,
 		})
 	})
 }

@@ -25,12 +25,12 @@ type Completion struct {
 	Conversation           []openai.ChatCompletionMessage `json:"conversation,omitempty"`
 	ActionResult           string                         `json:"action_result,omitempty"`
 	AgentState             *AgentInternalState            `json:"agent_state,omitempty"`
-	FilterResult 					 *FilterResult 									`json:"filter_result,omitempty"`
+	FilterResult           *FilterResult                  `json:"filter_result,omitempty"`
 }
 
 type Observable struct {
-	ID       int32  `json:"id"`
-	ParentID int32  `json:"parent_id,omitempty"`
+	ID       string `json:"id"`
+	ParentID string `json:"parent_id,omitempty"`
 	Agent    string `json:"agent"`
 	Name     string `json:"name"`
 	Icon     string `json:"icon"`
