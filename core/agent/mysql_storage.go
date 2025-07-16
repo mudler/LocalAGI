@@ -196,22 +196,14 @@ func (m *MySQLStorage) Count() int {
 	return int(count)
 }
 
-// GetLastMessages retrieves the most recent messages for the agent up to the specified limit
-func (m *MySQLStorage) GetLastMessages(limit int) ([]MemoryResult, error) {
-	return m.GetLastMessagesExcludingRecent(limit, 30*time.Second)
-}
-
-// GetLastMessagesExcludingRecent retrieves the most recent messages but excludes very recent ones
-func (m *MySQLStorage) GetLastMessagesExcludingRecent(limit int, excludeWithin time.Duration) ([]MemoryResult, error) {
+func (m *MySQLStorage) GetLastMessagesExcludingCount(limit int, excludeCount int) ([]MemoryResult, error) {
 	var messages []models.AgentMessage
 
-	fmt.Printf("DEBUG: Getting last %d messages (excluding messages within %v)\n", limit, excludeWithin)
+	fmt.Printf("DEBUG: Getting last %d messages (excluding %d most recent messages)\n", limit, excludeCount)
 
-	// Calculate cutoff time
-	cutoffTime := time.Now().Add(-excludeWithin)
-
-	err := db.DB.Where("AgentID = ? AND CreatedAt < ?", m.agentID, cutoffTime).
+	err := db.DB.Where("AgentID = ?", m.agentID).
 		Order("CreatedAt desc").
+		Offset(excludeCount).
 		Limit(limit).
 		Find(&messages).Error
 
@@ -219,12 +211,11 @@ func (m *MySQLStorage) GetLastMessagesExcludingRecent(limit int, excludeWithin t
 		return nil, err
 	}
 
-	fmt.Printf("DEBUG: Retrieved %d recent messages (excluded messages after %v)\n", len(messages), cutoffTime)
+	fmt.Printf("DEBUG: Retrieved %d messages (skipped %d most recent)\n", len(messages), excludeCount)
 	for i, message := range messages {
 		fmt.Printf("DEBUG: Message %d: %s: %s (created: %v)\n", i+1, message.Sender, message.Content, message.CreatedAt)
 	}
 
-	// Convert to MemoryResult with structured data
 	results := make([]MemoryResult, len(messages))
 	for i, message := range messages {
 		results[i] = MemoryResult{
