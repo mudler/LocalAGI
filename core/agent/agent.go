@@ -84,7 +84,7 @@ func New(opts ...Option) (*Agent, error) {
 		context:                types.NewActionContext(ctx, cancel),
 		newConversations:       make(chan openai.ChatCompletionMessage),
 		newMessagesSubscribers: options.newConversationsSubscribers,
-		sharedState:            types.NewAgentSharedState(options.lastMessageDuration),
+		sharedState:            types.NewAgentSharedStateWithIDs(options.lastMessageDuration, options.userID, options.agentID),
 	}
 
 	// Initialize observer if provided
@@ -134,6 +134,23 @@ func (a *Agent) startNewConversationsConsumer() {
 
 			case msg := <-a.newConversations:
 				xlog.Debug("New conversation", "agent", a.Character.Name, "message", msg.Content)
+
+				// Store the message in the database
+				agentMessage := models.AgentMessage{
+					ID:        uuid.New(),
+					AgentID:   a.options.agentID,
+					Sender:    "agent",
+					Content:   msg.Content,
+					CreatedAt: time.Now(),
+				}
+
+				if err := db.DB.Create(&agentMessage).Error; err != nil {
+					xlog.Error("Failed to store new conversation message in database", "error", err, "agent", a.Character.Name)
+				} else {
+					xlog.Debug("Stored new conversation message in database", "agent", a.Character.Name, "messageId", agentMessage.ID)
+				}
+
+				// Forward to subscribers as before
 				a.subscriberMutex.Lock()
 				subs := a.newMessagesSubscribers
 				a.subscriberMutex.Unlock()
@@ -1208,35 +1225,47 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 
 	// Check for reminders that need to be triggered
 	now := time.Now()
-	var triggeredReminders []types.ReminderActionResponse
-	var remainingReminders []types.ReminderActionResponse
+	var triggeredReminders []models.Reminder
 
-	for _, reminder := range a.sharedState.Reminders {
+	// Load active reminders from database
+	var dbReminders []models.Reminder
+	err := db.DB.Where("UserID = ? AND AgentID = ? AND Active = ? AND NextRun <= ?",
+		a.sharedState.UserID, a.sharedState.AgentID, true, now).Find(&dbReminders).Error
+	if err != nil {
+		xlog.Error("Failed to load reminders from database", "error", err)
+		return
+	}
+
+	xlog.Debug("Loaded reminders from database", "reminders", dbReminders)
+
+	for _, reminder := range dbReminders {
 		xlog.Debug("Checking reminder", "reminder", reminder)
-		if now.After(reminder.NextRun) {
-			triggeredReminders = append(triggeredReminders, reminder)
-			xlog.Debug("Reminder triggered", "reminder", reminder)
-			// Calculate next run time for recurring reminders
-			if reminder.IsRecurring {
-				xlog.Debug("Reminder is recurring", "reminder", reminder)
-				parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-				schedule, err := parser.Parse(reminder.CronExpr)
-				if err == nil {
-					nextRun := schedule.Next(now)
-					xlog.Debug("Next run time", "reminder", reminder, "nextRun", nextRun)
-					reminder.LastRun = now
-					reminder.NextRun = nextRun
-					remainingReminders = append(remainingReminders, reminder)
+		triggeredReminders = append(triggeredReminders, reminder)
+		xlog.Debug("Reminder triggered", "reminder", reminder)
+
+		// Update the reminder based on whether it's recurring or not
+		if reminder.IsRecurring {
+			xlog.Debug("Reminder is recurring", "reminder", reminder)
+			parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+			schedule, err := parser.Parse(reminder.CronExpr)
+			if err == nil {
+				nextRun := schedule.Next(now)
+				xlog.Debug("Next run time", "reminder", reminder, "nextRun", nextRun)
+				reminder.LastRun = &now
+				reminder.NextRun = nextRun
+				// Update the recurring reminder in database
+				if err := db.DB.Save(&reminder).Error; err != nil {
+					xlog.Error("Failed to update recurring reminder", "error", err)
 				}
 			}
 		} else {
-			xlog.Debug("Reminder not triggered", "reminder", reminder)
-			remainingReminders = append(remainingReminders, reminder)
+			// Mark non-recurring reminders as inactive
+			reminder.Active = false
+			if err := db.DB.Save(&reminder).Error; err != nil {
+				xlog.Error("Failed to deactivate one-time reminder", "error", err)
+			}
 		}
 	}
-
-	// Update the reminders list
-	a.sharedState.Reminders = remainingReminders
 
 	// Handle triggered reminders
 	for _, reminder := range triggeredReminders {
@@ -1273,7 +1302,7 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 				// Send the reminder response to the user
 				msg := openai.ChatCompletionMessage{
 					Role:    "assistant",
-					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, lastAssistantMsg.Content),
+					Content: fmt.Sprintf("Reminder Update: %s", reminder.Message),
 				}
 
 				go func(agent *Agent) {

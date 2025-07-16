@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/conversations"
 )
 
@@ -40,6 +41,8 @@ type ReminderActionResponse struct {
 type AgentSharedState struct {
 	ConversationTracker *conversations.ConversationTracker[string] `json:"conversation_tracker"`
 	Reminders           []ReminderActionResponse                   `json:"reminders"`
+	UserID              uuid.UUID                                  `json:"user_id"`
+	AgentID             uuid.UUID                                  `json:"agent_id"`
 }
 
 func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
@@ -49,6 +52,18 @@ func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
 	return &AgentSharedState{
 		ConversationTracker: conversations.NewConversationTracker[string](lastMessageDuration),
 		Reminders:           make([]ReminderActionResponse, 0),
+	}
+}
+
+func NewAgentSharedStateWithIDs(lastMessageDuration time.Duration, userID, agentID uuid.UUID) *AgentSharedState {
+	if lastMessageDuration == 0 {
+		lastMessageDuration = DefaultLastMessageDuration
+	}
+	return &AgentSharedState{
+		ConversationTracker: conversations.NewConversationTracker[string](lastMessageDuration),
+		Reminders:           make([]ReminderActionResponse, 0),
+		UserID:              userID,
+		AgentID:             agentID,
 	}
 }
 
