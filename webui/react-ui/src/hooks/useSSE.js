@@ -70,6 +70,26 @@ export function useSSE(agentId) {
       }
     });
     
+    // Handle 'json_status' event for thinking status updates
+    eventSource.addEventListener('json_status', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const timestamp = data.timestamp || new Date().toISOString();
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `json-status-${Date.now()}`,
+            type: "json_status",
+            content: data,
+            timestamp,
+          },
+        ]);
+      } catch (error) {
+        console.error("Error parsing status update:", error);
+      }
+    });
+
     // Handle 'json_message_status' event
     eventSource.addEventListener('json_message_status', (event) => {
       try {

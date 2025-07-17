@@ -395,7 +395,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 		if len(history) == 0 {
 			var dbObservables []models.Observable
 			err := db.DB.Where("UserID = ? AND AgentID = ?", userUUID, agent.ID).
-				Order("CreatedAt ASC").
+				Order("CreatedAt DESC").
 				Find(&dbObservables).Error
 
 			if err != nil {
@@ -446,7 +446,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 		return c.JSON(fiber.Map{
 			"Name":    agent.Name,
-			"History": history,
+			"History": Reverse(history),
 		})
 	})
 }

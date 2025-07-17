@@ -28,8 +28,8 @@ type Observable struct {
 	// Foreign key relationships
 	User       User         `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
 	AgentModel Agent        `gorm:"foreignKey:AgentID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
-	Parent     *Observable  `gorm:"foreignKey:ParentID;references:ID;constraint:OnDelete:SET NULL" json:"-"`
-	Children   []Observable `gorm:"foreignKey:ParentID;references:ID" json:"-"`
+	Parent     *Observable  `gorm:"foreignKey:ParentID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
+	Children   []Observable `gorm:"foreignKey:ParentID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
 func (o *Observable) BeforeCreate(tx *gorm.DB) (err error) {

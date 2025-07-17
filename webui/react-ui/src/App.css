@@ -442,6 +442,15 @@ a:hover {
   }
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Dashboard Layout */
 .dashboard-container {
   display: flex;

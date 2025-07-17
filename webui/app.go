@@ -1500,7 +1500,7 @@ func getAvailableModels() []map[string]interface{} {
 	openrouterModels := getOpenRouterModels()
 
 	for _, model := range openrouterModels {
-		if model["id"] == "openai/gpt-4o" {
+		if model["id"] == "openai/gpt-4-turbo" {
 			return []map[string]interface{}{model}
 		}
 	}

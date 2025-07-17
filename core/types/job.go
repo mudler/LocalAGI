@@ -20,7 +20,7 @@ type Job struct {
 	UUID                string
 	Metadata            map[string]interface{}
 	DoneFilter          bool
-	
+
 	// Tools available for this job
 	BuiltinTools []ActionDefinition // Built-in tools like web search
 	UserTools    []ActionDefinition // User-defined function tools
