@@ -773,9 +773,29 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				sse.NewMessage(string(statusData)).WithEvent("json_message_status"))
 		}
 
-		// 8. Ask agent asynchronously
+		// 8. Ask agent asynchronously with streaming support
 		go func() {
-			response := pool.GetAgent(agentId).Ask(coreTypes.WithText(message))
+			var fullContent strings.Builder
+			agentMessageID := messageID + "-agent"
+
+			// Stream callback to send partial responses
+			streamCallback := func(chunk string) {
+				fullContent.WriteString(chunk)
+
+				// Send streaming chunk via SSE
+				send("json_message_chunk", map[string]interface{}{
+					"id":        agentMessageID,
+					"sender":    "agent",
+					"chunk":     chunk,
+					"content":   fullContent.String(), // Send accumulated content
+					"createdAt": time.Now().Format(time.RFC3339),
+				})
+			}
+
+			response := pool.GetAgent(agentId).Ask(
+				coreTypes.WithText(message),
+				coreTypes.WithStreamCallback(streamCallback),
+			)
 
 			if response.Error != nil {
 				send("json_error", map[string]interface{}{
@@ -785,11 +805,13 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				return
 			}
 
+			// Send final complete message
 			send("json_message", map[string]interface{}{
-				"id":        messageID + "-agent",
+				"id":        agentMessageID,
 				"sender":    "agent",
 				"content":   response.Response,
 				"createdAt": time.Now().Format(time.RFC3339),
+				"final":     true, // Mark as final message
 			})
 
 			// Save agent reply to DB

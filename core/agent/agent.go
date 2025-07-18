@@ -12,6 +12,8 @@ import (
 	"github.com/mudler/LocalAGI/pkg/utils"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 
+	"io"
+
 	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
@@ -289,6 +291,82 @@ func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletion
 	}
 
 	return resp.Choices[0].Message, nil
+}
+
+// askLLMStream creates a streaming chat completion and sends chunks via the callback
+func (a *Agent) askLLMStream(ctx context.Context, conversation []openai.ChatCompletionMessage, streamCallback func(string), maxRetries int) (openai.ChatCompletionMessage, error) {
+	var resp *openai.ChatCompletionStream
+	var err error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		resp, err = a.client.CreateChatCompletionStream(ctx,
+			openai.ChatCompletionRequest{
+				Model:    a.options.LLMAPI.Model,
+				Messages: conversation,
+				Stream:   true,
+			},
+		)
+		if err == nil {
+			break
+		}
+		xlog.Warn("Error creating LLM stream, retrying", "attempt", attempt+1, "error", err)
+		if attempt < maxRetries {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if err != nil {
+		return openai.ChatCompletionMessage{}, err
+	}
+	defer resp.Close()
+
+	var fullContent strings.Builder
+	var lastResponse openai.ChatCompletionStreamResponse
+
+	for {
+		response, err := resp.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return openai.ChatCompletionMessage{}, fmt.Errorf("error reading stream: %w", err)
+		}
+
+		lastResponse = response
+		if len(response.Choices) > 0 && response.Choices[0].Delta.Content != "" {
+			content := response.Choices[0].Delta.Content
+			fullContent.WriteString(content)
+			if streamCallback != nil {
+				streamCallback(content)
+			}
+		}
+	}
+
+	// Track usage if available in the last response
+	if lastResponse.ID != "" {
+		usage := utils.GetOpenRouterUsage(lastResponse.ID)
+		llmUsage := &models.LLMUsage{
+			ID:               uuid.New(),
+			UserID:           a.options.userID,
+			AgentID:          a.options.agentID,
+			Model:            a.options.LLMAPI.Model,
+			PromptTokens:     usage.PromptTokens,
+			CompletionTokens: usage.CompletionTokens,
+			TotalTokens:      usage.TotalTokens,
+			Cost:             usage.Cost,
+			RequestType:      "chat_stream",
+			GenID:            lastResponse.ID,
+			CreatedAt:        time.Now(),
+		}
+		if err := db.DB.Create(llmUsage).Error; err != nil {
+			xlog.Error("Error tracking LLM usage for stream", "error", err)
+		}
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:    "assistant",
+		Content: fullContent.String(),
+	}, nil
 }
 
 var ErrContextCanceled = fmt.Errorf("context canceled")
@@ -1154,6 +1232,13 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 
 	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
 	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", conv))
+
+	// Check if streaming is enabled and there's a stream callback
+	if job.StreamCallback != nil {
+		a.replyWithStream(job, conv, actionParams, chosenAction)
+		return
+	}
+
 	msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
 	if err != nil {
 		job.Result.Conversation = conv
@@ -1183,6 +1268,45 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	conv = append(conv, msg)
 	job.Result.SetResponse(msg.Content)
 	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
+	job.Result.Conversation = conv
+	job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
+		// a.saveCurrentConversation(conv)
+	})
+	job.Result.Finish(nil)
+}
+
+// replyWithStream handles streaming replies by sending partial responses via the stream callback
+func (a *Agent) replyWithStream(job *types.Job, conv Messages, actionParams types.ActionParams, chosenAction types.Action) {
+	xlog.Info("Computing streaming reply", "agent", a.Character.Name)
+
+	msg, err := a.askLLMStream(job.GetContext(), conv, job.StreamCallback, maxRetries)
+	if err != nil {
+		job.Result.Conversation = conv
+		job.Result.Finish(err)
+		xlog.Error("Error asking LLM for streaming reply", "error", err)
+		return
+	}
+
+	msg.Content = a.cleanupLLMResponse(msg.Content)
+
+	if msg.Content == "" {
+		// If we didn't got any message, we can use the response from the action (it should be a reply)
+		replyResponse := action.ReplyResponse{}
+		if err := actionParams.Unmarshal(&replyResponse); err != nil {
+			job.Result.Conversation = conv
+			job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
+			return
+		}
+
+		if chosenAction.Definition().Name.Is(action.ReplyActionName) && replyResponse.Message != "" {
+			xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
+			msg.Content = a.cleanupLLMResponse(replyResponse.Message)
+		}
+	}
+
+	conv = append(conv, msg)
+	job.Result.SetResponse(msg.Content)
+	xlog.Info("Streaming response from LLM completed", "response", msg.Content, "agent", a.Character.Name)
 	job.Result.Conversation = conv
 	job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
 		// a.saveCurrentConversation(conv)

@@ -194,15 +194,28 @@ func (manager *broadcastManager) startWorkers() {
 				manager.clients.Range(func(key, value any) bool {
 					client, ok := value.(Listener)
 					if !ok {
-						return true // Continue iteration
+						return true
 					}
-					select {
-					case client.Chan() <- message:
-						manager.messageHistory.Add(message)
-					default:
-						// If the client's channel is full, drop the message
-					}
-					return true // Continue iteration
+
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+
+								if clientID, ok := key.(string); ok {
+									manager.unregister(clientID)
+								}
+							}
+						}()
+
+						select {
+						case client.Chan() <- message:
+							manager.messageHistory.Add(message)
+						default:
+
+						}
+					}()
+
+					return true
 				})
 			}
 		}()

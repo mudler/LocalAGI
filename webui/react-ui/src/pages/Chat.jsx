@@ -315,6 +315,7 @@ function Chat() {
                             maxWidth: "70%",
                             fontSize: "1rem",
                             alignSelf: "flex-start",
+                            position: "relative",
                           }}
                         >
                           <div className="markdown-content">

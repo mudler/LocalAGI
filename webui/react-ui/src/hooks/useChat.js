@@ -14,6 +14,7 @@ export function useChat(agentId, model) {
   const [error, setError] = useState(null);
   const processedMessageIds = useRef(new Set());
   const localMessageContents = useRef(new Set()); // Track locally added message contents
+  const eventSourceRef = useRef(null);
 
   // Fetch initial chat history on mount or when agentId changes
   useEffect(() => {
@@ -50,7 +51,85 @@ export function useChat(agentId, model) {
     isConnected,
   } = useSSE(model && typeof model === "string" ? agentId : null);
 
-  // Process SSE messages
+  // Set up additional SSE connection for streaming messages
+  useEffect(() => {
+    if (!agentId) return;
+
+    // Close existing connection if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    const sseUrl = `/sse/${agentId}`;
+    const eventSource = new EventSource(sseUrl);
+    eventSourceRef.current = eventSource;
+
+    // Handle streaming message chunks
+    eventSource.addEventListener("json_message_chunk", (event) => {
+      const data = JSON.parse(event.data);
+      
+      setMessages((prevMessages) => {
+        const existingIndex = prevMessages.findIndex(msg => msg.id === data.id);
+        
+        if (existingIndex >= 0) {
+          // Update existing streaming message
+          const updated = [...prevMessages];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            content: data.content, // Use accumulated content
+            streaming: true,
+            loading: false,
+          };
+          return updated;
+        } else {
+          // Create new streaming message (remove any loading message first)
+          const withoutLoading = prevMessages.filter(
+            (msg) => !(msg.sender === "assistant" && msg.loading)
+          );
+          
+          return [...withoutLoading, {
+            id: data.id,
+            sender: data.sender,
+            content: data.content,
+            timestamp: data.createdAt,
+            loading: false,
+            streaming: true,
+          }];
+        }
+      });
+    });
+
+    // Handle final message completion
+    eventSource.addEventListener("json_message", (event) => {
+      const data = JSON.parse(event.data);
+      
+      // Only handle final messages (with final: true flag)
+      if (data.final) {
+        setMessages((prevMessages) => {
+          return prevMessages.map((msg) =>
+            msg.id === data.id
+              ? { ...msg, content: data.content, loading: false, streaming: false }
+              : msg
+          );
+        });
+        
+        // Mark as processed to avoid duplicate from regular SSE
+        processedMessageIds.current.add(data.id);
+      }
+    });
+
+    eventSource.onerror = (err) => {
+      console.error("Streaming SSE connection error:", err);
+    };
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [agentId]);
+
+  // Process SSE messages (keep existing functionality)
   useEffect(() => {
     if (!sseMessages || sseMessages.length === 0) return;
     const latestMessage = sseMessages[sseMessages.length - 1];

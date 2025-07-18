@@ -16,6 +16,7 @@ type Job struct {
 	Result              *JobResult
 	ReasoningCallback   func(ActionCurrentState) bool
 	ResultCallback      func(ActionState)
+	StreamCallback      func(string) // Callback for streaming partial responses
 	ConversationHistory []openai.ChatCompletionMessage
 	UUID                string
 	Metadata            map[string]interface{}
@@ -77,6 +78,12 @@ func WithReasoningCallback(f func(ActionCurrentState) bool) JobOption {
 func WithResultCallback(f func(ActionState)) JobOption {
 	return func(r *Job) {
 		r.ResultCallback = f
+	}
+}
+
+func WithStreamCallback(f func(string)) JobOption {
+	return func(r *Job) {
+		r.StreamCallback = f
 	}
 }
 
