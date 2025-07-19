@@ -757,6 +757,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			AgentID:   agent.ID,
 			Sender:    "user",
 			Content:   message,
+			Type:      "message",
 			CreatedAt: time.Now(),
 		})
 
@@ -810,6 +811,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				"id":        agentMessageID,
 				"sender":    "agent",
 				"content":   response.Response,
+				"type":      "message",
 				"createdAt": time.Now().Format(time.RFC3339),
 				"final":     true, // Mark as final message
 			})
@@ -820,6 +822,7 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				AgentID:   agent.ID,
 				Sender:    "agent",
 				Content:   response.Response,
+				Type:      "message",
 				CreatedAt: time.Now(),
 			})
 
@@ -1521,14 +1524,26 @@ func getOpenRouterModels() []map[string]interface{} {
 func getAvailableModels() []map[string]interface{} {
 	openrouterModels := getOpenRouterModels()
 
+	// Prioritize gpt-4o as the first option
+	var gpt4oModel map[string]interface{}
+	var otherModels []map[string]interface{}
+
 	for _, model := range openrouterModels {
-		if model["id"] == "openai/gpt-4o" {
-			return []map[string]interface{}{model}
+		if model["id"].(string) == "openai/gpt-4o" {
+			gpt4oModel = model
+		} else {
+			otherModels = append(otherModels, model)
 		}
 	}
 
-	// Return empty slice if model not found
-	return []map[string]interface{}{}
+	// Return with gpt-4o first if it exists
+	var reorderedModels []map[string]interface{}
+	if gpt4oModel != nil {
+		reorderedModels = append(reorderedModels, gpt4oModel)
+	}
+	reorderedModels = append(reorderedModels, otherModels...)
+
+	return reorderedModels
 }
 
 // validateModel checks if the provided model is valid and available
@@ -2166,6 +2181,7 @@ func (a *App) ProxyOpenRouterChat() func(c *fiber.Ctx) error {
 				AgentID:   uuid.MustParse(agentId),
 				Sender:    "user",
 				Content:   userContent,
+				Type:      "message",
 				CreatedAt: time.Now(),
 			})
 		}
@@ -2206,6 +2222,7 @@ func (a *App) ProxyOpenRouterChat() func(c *fiber.Ctx) error {
 				AgentID:   uuid.MustParse(agentId),
 				Sender:    "agent",
 				Content:   agentContent,
+				Type:      "message",
 				CreatedAt: time.Now(),
 			})
 		}
@@ -2554,18 +2571,18 @@ func (a *App) GetChatHistory() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Failed to fetch messages: "+err.Error())
 		}
 
-		// 3. Format for frontend
-		formatted := make([]fiber.Map, 0, len(messages))
-		for _, msg := range messages {
-			formatted = append(formatted, fiber.Map{
-				"sender":    msg.Sender,
-				"content":   msg.Content,
-				"createdAt": msg.CreatedAt,
-			})
-		}
+		// // 3. Format for frontend
+		// formatted := make([]fiber.Map, 0, len(messages))
+		// for _, msg := range messages {
+		// 	formatted = append(formatted, fiber.Map{
+		// 		"sender":    msg.Sender,
+		// 		"content":   msg.Content,
+		// 		"createdAt": msg.CreatedAt,
+		// 	})
+		// }
 
 		return c.JSON(fiber.Map{
-			"messages": formatted,
+			"messages": messages,
 		})
 	}
 }

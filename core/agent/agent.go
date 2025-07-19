@@ -127,6 +127,24 @@ func (a *Agent) SharedState() *types.AgentSharedState {
 	return a.sharedState
 }
 
+// storeErrorMessage stores an error message as an AgentMessage record in the database
+func (a *Agent) storeErrorMessage(errorMsg string) {
+	agentMessage := models.AgentMessage{
+		ID:        uuid.New(),
+		AgentID:   a.options.agentID,
+		Sender:    "agent",
+		Content:   fmt.Sprintf("Error: %s", errorMsg),
+		Type:      "error",
+		CreatedAt: time.Now(),
+	}
+
+	if err := db.DB.Create(&agentMessage).Error; err != nil {
+		xlog.Error("Failed to store error message in database", "error", err, "agent", a.Character.Name, "originalError", errorMsg)
+	} else {
+		xlog.Debug("Stored error message in database", "agent", a.Character.Name, "messageId", agentMessage.ID, "errorMsg", errorMsg)
+	}
+}
+
 func (a *Agent) startNewConversationsConsumer() {
 	go func() {
 		for {
@@ -143,6 +161,7 @@ func (a *Agent) startNewConversationsConsumer() {
 					AgentID:   a.options.agentID,
 					Sender:    "agent",
 					Content:   msg.Content,
+					Type:      "message",
 					CreatedAt: time.Now(),
 				}
 
@@ -283,11 +302,15 @@ func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletion
 	}
 
 	if err != nil {
+		// Store the error message in the database before returning
+		a.storeErrorMessage(err.Error())
 		return openai.ChatCompletionMessage{}, err
 	}
 
 	if len(resp.Choices) != 1 {
-		return openai.ChatCompletionMessage{}, fmt.Errorf("not enough choices: %w", err)
+		notEnoughChoicesErr := fmt.Errorf("not enough choices: %w", err)
+		a.storeErrorMessage(notEnoughChoicesErr.Error())
+		return openai.ChatCompletionMessage{}, notEnoughChoicesErr
 	}
 
 	return resp.Choices[0].Message, nil
@@ -316,6 +339,8 @@ func (a *Agent) askLLMStream(ctx context.Context, conversation []openai.ChatComp
 	}
 
 	if err != nil {
+		// Store the error message in the database before returning
+		a.storeErrorMessage(err.Error())
 		return openai.ChatCompletionMessage{}, err
 	}
 	defer resp.Close()
@@ -329,7 +354,9 @@ func (a *Agent) askLLMStream(ctx context.Context, conversation []openai.ChatComp
 			break
 		}
 		if err != nil {
-			return openai.ChatCompletionMessage{}, fmt.Errorf("error reading stream: %w", err)
+			streamErr := fmt.Errorf("error reading stream: %w", err)
+			a.storeErrorMessage(streamErr.Error())
+			return openai.ChatCompletionMessage{}, streamErr
 		}
 
 		lastResponse = response
@@ -860,6 +887,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		} else {
 			// Send filter failure as a chat message instead of an error
 			filterMessage := fmt.Sprintf("Sorry, your request was blocked by the [%s] filter. Please modify your request and try again.", failedBy)
+
 			job.Result.SetResponse(filterMessage)
 			job.Result.Finish(nil)
 		}
@@ -925,20 +953,39 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		xlog.Info("No action to do, just reply", "agent", a.Character.Name, "reasoning", reasoning)
 
 		if reasoning != "" {
+			// When we have reasoning but no action, we still need to check for streaming
+
+			println("NoReasoning")
+
 			conv = append(conv, openai.ChatCompletionMessage{
 				Role:    "assistant",
 				Content: a.cleanupLLMResponse(reasoning),
 			})
 		} else {
 			xlog.Info("No reasoning, just reply", "agent", a.Character.Name)
-			msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
-			if err != nil {
-				job.Result.Finish(fmt.Errorf("error asking LLM for a reply: %w", err))
-				return
+
+			// Check if streaming is enabled and there's a stream callback
+			if job.StreamCallback != nil {
+				msg, err := a.askLLMStream(job.GetContext(), conv, job.StreamCallback, maxRetries)
+				fmt.Println("streaming test")
+				if err != nil {
+					job.Result.Finish(fmt.Errorf("error asking LLM for a streaming reply: %w", err))
+					return
+				}
+				msg.Content = a.cleanupLLMResponse(msg.Content)
+				conv = append(conv, msg)
+				reasoning = msg.Content
+			} else {
+				msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
+				fmt.Println("nonstreaming test")
+				if err != nil {
+					job.Result.Finish(fmt.Errorf("error asking LLM for a reply: %w", err))
+					return
+				}
+				msg.Content = a.cleanupLLMResponse(msg.Content)
+				conv = append(conv, msg)
+				reasoning = msg.Content
 			}
-			msg.Content = a.cleanupLLMResponse(msg.Content)
-			conv = append(conv, msg)
-			reasoning = msg.Content
 		}
 
 		var satisfied bool
@@ -1199,7 +1246,22 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	// At this point can only be a reply action
 	xlog.Info("Computing reply", "agent", a.Character.Name)
 
-	forceResponsePrompt := "Based on the tool results and information above, provide a helpful and informative response to the user. Use the data from any tool calls that were executed to give a complete answer."
+	forceResponsePrompt := `Based on the tool results and information above, provide a helpful and informative response to the user. Use the data from any tool calls that were executed to give a complete answer.
+
+CRITICAL TABLE FORMATTING RULES:
+1. When you receive data in ASCII table format (with +---+ borders and | separators), ALWAYS extract and reformat it into clean markdown tables
+2. Parse through messy ASCII tables to identify: headers, company names, descriptions, funding info, etc.
+3. Create proper markdown tables using | Column | Column | syntax with clear headers
+4. Example format:
+   | Company | Description | Funding | Year |
+   |---------|-------------|---------|------|
+   | CompanyA | AI platform | $1M | 2024 |
+   
+5. Do NOT just provide bullet points or refer users to external links when tabular data is available
+6. Extract at least 5-10 entries from large datasets to provide meaningful information
+7. Focus on the most relevant columns: Company Name, Description, Founding Year, Funding, Business Model
+8. If data is incomplete, use "N/A" or "–" for missing values
+9. Always prioritize creating actual tables over text descriptions when tabular data exists`
 
 	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {
@@ -1244,6 +1306,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 		job.Result.Conversation = conv
 		job.Result.Finish(err)
 		xlog.Error("Error asking LLM for a reply", "error", err)
+		// Error message is already stored by askLLM function
 		return
 	}
 
@@ -1284,6 +1347,7 @@ func (a *Agent) replyWithStream(job *types.Job, conv Messages, actionParams type
 		job.Result.Conversation = conv
 		job.Result.Finish(err)
 		xlog.Error("Error asking LLM for streaming reply", "error", err)
+		// Error message is already stored by askLLMStream function
 		return
 	}
 

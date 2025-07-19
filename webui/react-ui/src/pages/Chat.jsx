@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import { agentApi } from "../utils/api";
 import TypingIndicator from "../components/TypingIndicator";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 function Chat() {
   const { id } = useParams();
@@ -24,7 +25,7 @@ function Chat() {
     
     // Check for errors first
     if (observable.completion?.error) {
-      return 'Error occurred';
+      return 'Error while processing. Please try again.';
     }
     
     const name = observable.name?.toLowerCase() || '';
@@ -140,7 +141,7 @@ function Chat() {
       if (data.completion) {
         // Observable is completed
         if (data.completion.error) {
-          setCurrentStatus({ message: 'Error', isError: true });
+          setCurrentStatus({ message: 'Error while processing. Please try again.', isError: true });
         } else {
           if(data.name.toLowerCase() === 'decision') {
             const statusMessage = getStatusMessage(data);
@@ -303,25 +304,47 @@ function Chat() {
                           }}
                         >
                           <div className="markdown-content">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                           </div>
                         </div>
                       ) : (
-                        <div
-                          style={{
-                            background: "transparent",
-                            color: "#222",
-                            padding: "12px 0",
-                            maxWidth: "70%",
-                            fontSize: "1rem",
-                            alignSelf: "flex-start",
-                            position: "relative",
-                          }}
-                        >
-                          <div className="markdown-content">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        // Check if this is an error message
+                        msg.type === "error" ? (
+                          <div
+                            style={{
+                              color: "#991b1b",
+                              padding: "12px 0",
+                              maxWidth: "70%",
+                              fontSize: "1rem",
+                              alignSelf: "flex-start",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                            }}
+                          >
+                            <span style={{ fontSize: "16px", fontWeight: 400 }}>
+                              <div className="markdown-content">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>Error while processing. Please try again.</ReactMarkdown>
+                              </div>
+                            </span>
                           </div>
-                        </div>
+                        ) : (
+                          <div
+                            style={{
+                              background: "transparent",
+                              color: "#222",
+                              padding: "12px 0",
+                              maxWidth: "70%",
+                              fontSize: "1rem",
+                              alignSelf: "flex-start",
+                              position: "relative",
+                            }}
+                          >
+                            <div className="markdown-content">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                            </div>
+                          </div>
+                        )
                       )
                     }
                   </div>
@@ -351,16 +374,7 @@ function Chat() {
                   }}
                 >
                   {currentStatus.isError ? (
-                    <i 
-                      className="fas fa-exclamation-triangle"
-                      style={{
-                        width: "16px",
-                        height: "16px",
-                        fontSize: "16px",
-                        color: "#991b1b",
-                        flexShrink: 0,
-                      }}
-                    />
+                    null
                   ) : (
                     <div
                       style={{
@@ -374,7 +388,7 @@ function Chat() {
                       }}
                     />
                   )}
-                  <span style={{ fontSize: "16px", fontWeight: 500 }}>{currentStatus.message}</span>
+                  <span style={{ fontSize: "16px", fontWeight: currentStatus.isError ? 400 : 500 }}>{currentStatus.message}</span>
                 </div>
               </div>
             )}

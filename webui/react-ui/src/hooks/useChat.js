@@ -27,6 +27,7 @@ export function useChat(agentId, model) {
             id: msg.id || `${index}-${msg.sender}`, // fallback id
             sender: msg.sender,
             content: msg.content,
+            type: msg.type,
             timestamp: msg.timestamp || new Date().toISOString(),
           }));
           setMessages(formatted);
@@ -102,15 +103,29 @@ export function useChat(agentId, model) {
     // Handle final message completion
     eventSource.addEventListener("json_message", (event) => {
       const data = JSON.parse(event.data);
-      
       // Only handle final messages (with final: true flag)
       if (data.final) {
         setMessages((prevMessages) => {
-          return prevMessages.map((msg) =>
-            msg.id === data.id
-              ? { ...msg, content: data.content, loading: false, streaming: false }
-              : msg
-          );
+          const existingIndex = prevMessages.findIndex(msg => msg.id === data.id);
+          
+          if (existingIndex >= 0) {
+            // Update existing message
+            return prevMessages.map((msg) =>
+              msg.id === data.id
+                ? { ...msg, content: data.content, loading: false, streaming: false }
+                : msg
+            );
+          } else {
+            // Add new message if no match found
+            return [...prevMessages, {
+              id: data.id,
+              sender: data.sender,
+              content: data.content,
+              timestamp: data.createdAt || data.timestamp || new Date().toISOString(),
+              loading: false,
+              streaming: false,
+            }];
+          }
         });
         
         // Mark as processed to avoid duplicate from regular SSE

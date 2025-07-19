@@ -58,18 +58,32 @@ func extractKeywords(query string) []string {
 	return keywords
 }
 
-func (m *MySQLStorage) Search(query string, similarEntries int) ([]MemoryResult, error) {
-	return m.SearchExcludingRecent(query, similarEntries, 30*time.Second) // Exclude messages from last 30 seconds
+func (m *MySQLStorage) Search(query string, similarEntries int, excludeCount int) ([]MemoryResult, error) {
+	return m.SearchExcludingRecentCount(query, similarEntries, excludeCount) // Exclude most recent messages by count
 }
 
-// SearchExcludingRecent searches for messages but excludes very recent ones to avoid circular references
-func (m *MySQLStorage) SearchExcludingRecent(query string, similarEntries int, excludeWithin time.Duration) ([]MemoryResult, error) {
+// SearchExcludingRecentCount searches for messages but excludes the most recent ones by count to avoid circular references
+func (m *MySQLStorage) SearchExcludingRecentCount(query string, similarEntries int, excludeCount int) ([]MemoryResult, error) {
 	var summaries []models.AgentMessage
 
-	fmt.Printf("DEBUG: Searching for query: '%s' (excluding messages within %v)\n", query, excludeWithin)
+	fmt.Printf("DEBUG: Searching for query: '%s' (excluding %d most recent messages)\n", query, excludeCount)
 
-	// Calculate cutoff time
-	cutoffTime := time.Now().Add(-excludeWithin)
+	// Get IDs of the most recent messages to exclude
+	var recentMessageIDs []uuid.UUID
+	if excludeCount > 0 {
+		var recentMessages []models.AgentMessage
+		err := db.DB.Where("AgentID = ? AND Type = ?", m.agentID, "message").
+			Order("CreatedAt desc").
+			Limit(excludeCount).
+			Find(&recentMessages).Error
+		if err != nil {
+			return nil, err
+		}
+
+		for _, msg := range recentMessages {
+			recentMessageIDs = append(recentMessageIDs, msg.ID)
+		}
+	}
 
 	// Extract keywords from the query
 	keywords := extractKeywords(query)
@@ -78,9 +92,15 @@ func (m *MySQLStorage) SearchExcludingRecent(query string, similarEntries int, e
 	if len(keywords) == 0 {
 		// Fallback to original LIKE search if no keywords, but exclude recent messages
 		searchTerm := "%" + strings.ToLower(query) + "%"
-		err := db.DB.Where("AgentID = ? AND LOWER(Content) LIKE ? AND CreatedAt < ?",
-			m.agentID, searchTerm, cutoffTime).
-			Order("CreatedAt desc").
+		query := db.DB.Where("AgentID = ? AND LOWER(Content) LIKE ? AND Type = ?",
+			m.agentID, searchTerm, "message")
+
+		// Exclude recent messages by ID if any
+		if len(recentMessageIDs) > 0 {
+			query = query.Where("ID NOT IN ?", recentMessageIDs)
+		}
+
+		err := query.Order("CreatedAt desc").
 			Limit(similarEntries).
 			Find(&summaries).Error
 
@@ -97,10 +117,15 @@ func (m *MySQLStorage) SearchExcludingRecent(query string, similarEntries int, e
 			var ftResults []models.AgentMessage
 
 			// Try MATCH AGAINST for full-text search
-			err := db.DB.Where("AgentID = ? AND MATCH(Content) AGAINST(? IN NATURAL LANGUAGE MODE) AND CreatedAt < ?",
-				m.agentID, searchPhrase, cutoffTime).
-				Order("CreatedAt desc").
-				Find(&ftResults).Error
+			query := db.DB.Where("AgentID = ? AND MATCH(Content) AGAINST(? IN NATURAL LANGUAGE MODE) AND Type = ?",
+				m.agentID, searchPhrase, "message")
+
+			// Exclude recent messages by ID if any
+			if len(recentMessageIDs) > 0 {
+				query = query.Where("ID NOT IN ?", recentMessageIDs)
+			}
+
+			err := query.Order("CreatedAt desc").Find(&ftResults).Error
 
 			if err == nil && len(ftResults) > 0 {
 				fmt.Printf("DEBUG: Full-text search found %d results\n", len(ftResults))
@@ -116,10 +141,15 @@ func (m *MySQLStorage) SearchExcludingRecent(query string, similarEntries int, e
 		for _, keyword := range keywords {
 			var wordResults []models.AgentMessage
 			searchTerm := "%" + keyword + "%"
-			err := db.DB.Where("AgentID = ? AND LOWER(Content) LIKE ? AND CreatedAt < ?",
-				m.agentID, searchTerm, cutoffTime).
-				Order("CreatedAt desc").
-				Find(&wordResults).Error
+			query := db.DB.Where("AgentID = ? AND LOWER(Content) LIKE ? AND Type = ?",
+				m.agentID, searchTerm, "message")
+
+			// Exclude recent messages by ID if any
+			if len(recentMessageIDs) > 0 {
+				query = query.Where("ID NOT IN ?", recentMessageIDs)
+			}
+
+			err := query.Order("CreatedAt desc").Find(&wordResults).Error
 
 			if err == nil {
 				fmt.Printf("DEBUG: Word search for '%s' found %d results\n", keyword, len(wordResults))
@@ -135,10 +165,15 @@ func (m *MySQLStorage) SearchExcludingRecent(query string, similarEntries int, e
 				phrase := keywords[i] + " " + keywords[i+1]
 				var phraseResults []models.AgentMessage
 				searchTerm := "%" + phrase + "%"
-				err := db.DB.Where("AgentID = ? AND LOWER(Content) LIKE ? AND CreatedAt < ?",
-					m.agentID, searchTerm, cutoffTime).
-					Order("CreatedAt desc").
-					Find(&phraseResults).Error
+				query := db.DB.Where("AgentID = ? AND LOWER(Content) LIKE ? AND Type = ?",
+					m.agentID, searchTerm, "message")
+
+				// Exclude recent messages by ID if any
+				if len(recentMessageIDs) > 0 {
+					query = query.Where("ID NOT IN ?", recentMessageIDs)
+				}
+
+				err := query.Order("CreatedAt desc").Find(&phraseResults).Error
 
 				if err == nil {
 					fmt.Printf("DEBUG: Phrase search for '%s' found %d results\n", phrase, len(phraseResults))
@@ -171,7 +206,7 @@ func (m *MySQLStorage) SearchExcludingRecent(query string, similarEntries int, e
 		}
 	}
 
-	fmt.Printf("DEBUG: Final search results count: %d (excluded messages after %v)\n", len(summaries), cutoffTime)
+	fmt.Printf("DEBUG: Final search results count: %d (excluded %d most recent messages)\n", len(summaries), excludeCount)
 	for i, summary := range summaries {
 		fmt.Printf("DEBUG: Result %d: %s: %s (created: %v)\n", i+1, summary.Sender, summary.Content, summary.CreatedAt)
 	}
@@ -201,7 +236,7 @@ func (m *MySQLStorage) GetLastMessagesExcludingCount(limit int, excludeCount int
 
 	fmt.Printf("DEBUG: Getting last %d messages (excluding %d most recent messages)\n", limit, excludeCount)
 
-	err := db.DB.Where("AgentID = ?", m.agentID).
+	err := db.DB.Where("AgentID = ? AND Type = ?", m.agentID, "message").
 		Order("CreatedAt desc").
 		Offset(excludeCount).
 		Limit(limit).

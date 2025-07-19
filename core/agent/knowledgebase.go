@@ -47,11 +47,12 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 
 	if a.options.useMySQLForSummaries && a.options.enableKB {
 		mysqlStorage := NewMySQLStorage(a.options.agentID, a.options.userID)
+		excludeCount := 1
 		if a.options.enableSummaryMemory {
-			results, err = mysqlStorage.Search(userMessage, a.options.kbResults)
+			fmt.Printf("DEBUG: Using search with count-based exclusion (excluding %d most recent messages)\n", excludeCount)
+			results, err = mysqlStorage.Search(userMessage, a.options.kbResults, excludeCount)
 			fmt.Printf("DEBUG: MySQL search results: %d memories found\n", len(results))
 		} else {
-			excludeCount := 1
 			fmt.Printf("DEBUG: Using count-based exclusion (excluding %d most recent messages)\n", excludeCount)
 			results, err = mysqlStorage.GetLastMessagesExcludingCount(a.options.kbResults, excludeCount)
 			fmt.Printf("DEBUG: MySQL get last messages results: %d memories found\n", len(results))
