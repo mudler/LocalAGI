@@ -16,7 +16,7 @@ func NewScraper(config map[string]string) *ScraperAction {
 
 type ScraperAction struct{}
 
-func (a *ScraperAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *ScraperAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		URL string `json:"url"`
 	}{}

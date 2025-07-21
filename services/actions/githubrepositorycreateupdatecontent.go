@@ -30,7 +30,7 @@ func NewGithubRepositoryCreateOrUpdateContent(config map[string]string) *GithubR
 	}
 }
 
-func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Path          string `json:"path"`
 		Repository    string `json:"repository"`
@@ -88,7 +88,7 @@ func (g *GithubRepositoryCreateOrUpdateContent) Run(ctx context.Context, params 
 }
 
 func (g *GithubRepositoryCreateOrUpdateContent) Definition() types.ActionDefinition {
-	actionName := "github_repository_create_or_update_content"
+	actionName := "github_repository_update_content"
 	actionDescription := "Create or update a file in a GitHub repository"
 	if g.customActionName != "" {
 		actionName = g.customActionName
@@ -175,6 +175,18 @@ func GithubRepositoryCreateOrUpdateContentConfigMeta() []config.Field {
 			Label:    "Custom Action Name",
 			Type:     config.FieldTypeText,
 			HelpText: "Custom name for this action",
+		},
+		{
+			Name:     "commitAuthor",
+			Label:    "Commit Author Name",
+			Type:     config.FieldTypeText,
+			HelpText: "Name to use for commit author",
+		},
+		{
+			Name:     "commitMail",
+			Label:    "Commit Author Email",
+			Type:     config.FieldTypeText,
+			HelpText: "Email to use for commit author",
 		},
 	}
 }

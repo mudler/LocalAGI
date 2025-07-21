@@ -46,10 +46,14 @@ function Home() {
     };
 
     fetchData();
-  }, [showToast]);
+  }, []);
 
   if (loading) {
-    return <div className="loading">Loading dashboard data...</div>;
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+      </div>
+    );
   }
 
   if (error) {
@@ -121,34 +125,36 @@ function Home() {
             <h2>Your Agents</h2>
             <div className="agents-grid">
               {stats.agents.map((agent) => (
-                <div key={agent} className="agent-card">
+                <div key={agent.id} className="agent-card">
                   <div className="agent-header">
                     <h3>
-                      <i className="fas fa-robot"></i> {agent}
+                      <i className="fas fa-robot"></i> {agent.name}
                     </h3>
                     <div
                       className={`status-badge ${
-                        stats.status[agent] ? "status-active" : "status-paused"
+                        stats.status[agent.id]
+                          ? "status-active"
+                          : "status-paused"
                       }`}
                     >
-                      {stats.status[agent] ? "Active" : "Paused"}
+                      {stats.status[agent.id] ? "Active" : "Paused"}
                     </div>
                   </div>
                   <div className="agent-actions">
                     <Link
-                      to={`/talk/${agent}`}
+                      to={`/talk/${agent.id}`}
                       className="agent-action-btn chat-btn"
                     >
                       <i className="fas fa-comment"></i> Chat
                     </Link>
                     <Link
-                      to={`/settings/${agent}`}
+                      to={`/settings/${agent.id}`}
                       className="agent-action-btn settings-btn"
                     >
                       <i className="fas fa-cog"></i> Settings
                     </Link>
                     <Link
-                      to={`/status/${agent}`}
+                      to={`/status/${agent.id}`}
                       className="agent-action-btn status-btn"
                     >
                       <i className="fas fa-chart-line"></i> Status

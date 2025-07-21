@@ -27,7 +27,7 @@ func NewGithubIssueReader(config map[string]string) *GithubIssuesReader {
 	}
 }
 
-func (g *GithubIssuesReader) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubIssuesReader) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository  string `json:"repository"`
 		Owner       string `json:"owner"`
@@ -49,7 +49,8 @@ func (g *GithubIssuesReader) Run(ctx context.Context, params types.ActionParams)
 		return types.ActionResult{
 			Result: fmt.Sprintf(
 				"Issue %d Repository: %s\nTitle: %s\nBody: %s",
-				*issue.Number, *issue.Repository.FullName, *issue.Title, *issue.Body)}, nil
+				issue.GetNumber(), issue.GetRepository().GetFullName(), issue.GetTitle(), issue.GetBody()),
+		}, nil
 	}
 	if err != nil {
 		return types.ActionResult{Result: fmt.Sprintf("Error fetching issue: %s", err.Error())}, err
@@ -82,11 +83,11 @@ func (g *GithubIssuesReader) Definition() types.ActionDefinition {
 		Properties: map[string]jsonschema.Definition{
 			"issue_number": {
 				Type:        jsonschema.Number,
-				Description: "The number of the issue to add the label to.",
+				Description: "The number of the issue to read.",
 			},
 			"repository": {
 				Type:        jsonschema.String,
-				Description: "The repository to add the label to.",
+				Description: "The repository to read the issue from.",
 			},
 			"owner": {
 				Type:        jsonschema.String,

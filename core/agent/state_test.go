@@ -25,6 +25,7 @@ var _ = Describe("Agent test", func() {
 			agent, err = New(
 				WithLLMAPIURL(apiURL),
 				WithModel(testModel),
+				WithTimeout("10m"),
 				WithRandomIdentity(),
 			)
 			Expect(err).ToNot(HaveOccurred())

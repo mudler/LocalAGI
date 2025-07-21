@@ -3,49 +3,54 @@
  */
 
 // Get the base URL from Vite's environment variables or default to '/app/'
-export const BASE_URL = import.meta.env.BASE_URL || '/app/';
+export const BASE_URL = import.meta.env.BASE_URL || "/app/";
 
 // API endpoints configuration
 export const API_CONFIG = {
   // Base URL for API requests
-  baseUrl: '/',  // API endpoints are at the root, not under /app/
-  
+  baseUrl: "/", // API endpoints are at the root, not under /app/
+
   // Default headers for API requests
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
-  
+
   // Endpoints
   endpoints: {
     // Agent endpoints
-    agents: '/api/agents',
+    agents: "/api/agents",
     agentConfig: (name) => `/api/agent/${name}/config`,
-    agentConfigMetadata: '/api/meta/agent/config',
-    createAgent: '/api/agent/create',
+    agentConfigMetadata: "/api/meta/agent/config",
+    createAgent: "/api/agent/create",
     deleteAgent: (name) => `/api/agent/${name}`,
     pauseAgent: (name) => `/api/agent/${name}/pause`,
     startAgent: (name) => `/api/agent/${name}/start`,
-    
+
     exportAgent: (name) => `/settings/export/${name}`,
-    importAgent: '/settings/import',
-    
+    importAgent: "/settings/import",
+
     // Group endpoints
-    generateGroupProfiles: '/api/agent/group/generateProfiles',
-    createGroup: '/api/agent/group/create',
-    
+    generateGroupProfiles: "/api/agent/group/generateProfiles",
+    createGroup: "/api/agent/group/create",
+
     // Chat endpoints
-    chat: (name) => `/api/chat/${name}`, 
+    chat: (name) => `/api/chat/${name}`,
     notify: (name) => `/notify/${name}`,
-    responses: '/v1/responses',
-    
+    responses: "/v1/responses",
+    chatHistory: (id) => `/api/agent/${id}/chat`,
+
     // SSE endpoint
     sse: (name) => `/sse/${name}`,
-    
+
     // Action endpoints
-    listActions: '/api/actions',
+    listActions: "/api/actions",
+    actionDefinition: (name) => `/api/action/${name}/definition`,
     executeAction: (name) => `/api/action/${name}/run`,
-    
+
     // Status endpoint
     status: (name) => `/status/${name}`,
-  }
+
+    // Usage endpoint
+    usage: "/api/usage",
+  },
 };

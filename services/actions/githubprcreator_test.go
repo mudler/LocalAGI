@@ -54,7 +54,7 @@ var _ = Describe("GithubPRCreator", func() {
 				},
 			}
 
-			result, err := action.Run(ctx, params)
+			result, err := action.Run(ctx, nil, params)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Result).To(ContainSubstring("pull request #"))
 		})
@@ -65,7 +65,7 @@ var _ = Describe("GithubPRCreator", func() {
 				"body":  "This is a test pull request",
 			}
 
-			_, err := action.Run(ctx, params)
+			_, err := action.Run(ctx, nil, params)
 			Expect(err).To(HaveOccurred())
 		})
 	})

@@ -3,11 +3,13 @@ package actions
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -28,11 +30,35 @@ func NewGithubRepositoryGetAllContent(config map[string]string) *GithubRepositor
 	}
 }
 
-func (g *GithubRepositoryGetAllContent) getContentRecursively(ctx context.Context, path string) (string, error) {
+// isTextFile checks if a file is likely to be a text file based on its extension
+func isTextFile(path string) bool {
+	// List of common text/code file extensions
+	textExtensions := map[string]bool{
+		".txt": true, ".md": true, ".go": true, ".py": true, ".js": true,
+		".ts": true, ".jsx": true, ".tsx": true, ".html": true, ".css": true,
+		".json": true, ".yaml": true, ".yml": true, ".xml": true, ".sql": true,
+		".sh": true, ".bash": true, ".zsh": true, ".rb": true, ".php": true,
+		".java": true, ".c": true, ".cpp": true, ".h": true, ".hpp": true,
+		".rs": true, ".swift": true, ".kt": true, ".scala": true, ".lua": true,
+		".pl": true, ".r": true, ".m": true, ".mm": true, ".f": true,
+		".f90": true, ".f95": true, ".f03": true, ".f08": true, ".f15": true,
+		".hs": true, ".lhs": true, ".erl": true, ".hrl": true, ".ex": true,
+		".exs": true, ".eex": true, ".leex": true, ".heex": true, ".config": true,
+		".toml": true, ".ini": true, ".conf": true, ".env": true, ".gitignore": true,
+		".dockerignore": true, ".editorconfig": true, ".prettierrc": true, ".eslintrc": true,
+		".babelrc": true, ".npmrc": true, ".yarnrc": true, ".lock": true,
+	}
+
+	// Get the file extension
+	ext := strings.ToLower(filepath.Ext(path))
+	return textExtensions[ext]
+}
+
+func (g *GithubRepositoryGetAllContent) getContentRecursively(ctx context.Context, path string, owner string, repository string) (string, error) {
 	var result strings.Builder
 
 	// Get content at the current path
-	_, directoryContent, _, err := g.client.Repositories.GetContents(ctx, g.owner, g.repository, path, nil)
+	_, directoryContent, _, err := g.client.Repositories.GetContents(ctx, owner, repository, path, nil)
 	if err != nil {
 		return "", fmt.Errorf("error getting content at path %s: %w", path, err)
 	}
@@ -41,14 +67,21 @@ func (g *GithubRepositoryGetAllContent) getContentRecursively(ctx context.Contex
 	for _, item := range directoryContent {
 		if item.GetType() == "dir" {
 			// Recursively get content for subdirectories
-			subContent, err := g.getContentRecursively(ctx, item.GetPath())
+			subContent, err := g.getContentRecursively(ctx, item.GetPath(), owner, repository)
 			if err != nil {
 				return "", err
 			}
 			result.WriteString(subContent)
 		} else if item.GetType() == "file" {
+			// Skip binary/image files
+			if !isTextFile(item.GetPath()) {
+				xlog.Warn("Skipping non-text file: ", "file", item.GetPath())
+				result.WriteString(fmt.Sprintf("Skipping non-text file: %s\n", item.GetPath()))
+				continue
+			}
+
 			// Get file content
-			fileContent, _, _, err := g.client.Repositories.GetContents(ctx, g.owner, g.repository, item.GetPath(), nil)
+			fileContent, _, _, err := g.client.Repositories.GetContents(ctx, owner, repository, item.GetPath(), nil)
 			if err != nil {
 				return "", fmt.Errorf("error getting file content for %s: %w", item.GetPath(), err)
 			}
@@ -68,7 +101,7 @@ func (g *GithubRepositoryGetAllContent) getContentRecursively(ctx context.Contex
 	return result.String(), nil
 }
 
-func (g *GithubRepositoryGetAllContent) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (g *GithubRepositoryGetAllContent) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Repository string `json:"repository"`
 		Owner      string `json:"owner"`
@@ -89,7 +122,7 @@ func (g *GithubRepositoryGetAllContent) Run(ctx context.Context, params types.Ac
 		result.Path = "."
 	}
 
-	content, err := g.getContentRecursively(ctx, result.Path)
+	content, err := g.getContentRecursively(ctx, result.Path, result.Owner, result.Repository)
 	if err != nil {
 		return types.ActionResult{}, err
 	}

@@ -1,0 +1,46 @@
+# Final stage
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    tzdata \
+    docker.io \
+    bash \
+    wget \
+    curl \
+    openssh-server \
+    sudo
+
+# Configure SSH
+RUN mkdir /var/run/sshd
+RUN echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+if [ -n "$SSH_USER" ]; then\n\
+    if [ "$SSH_USER" = "root" ]; then\n\
+        echo "PermitRootLogin yes" >> /etc/ssh/sshd_config\n\
+        if [ -n "$SSH_PASSWORD" ]; then\n\
+            echo "root:$SSH_PASSWORD" | chpasswd\n\
+        fi\n\
+    else\n\
+        echo "PermitRootLogin no" >> /etc/ssh/sshd_config\n\
+        useradd -m -s /bin/bash $SSH_USER\n\
+        if [ -n "$SSH_PASSWORD" ]; then\n\
+            echo "$SSH_USER:$SSH_PASSWORD" | chpasswd\n\
+        fi\n\
+        if [ -n "$SUDO_ACCESS" ] && [ "$SUDO_ACCESS" = "true" ]; then\n\
+            echo "$SSH_USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$SSH_USER\n\
+        fi\n\
+    fi\n\
+fi\n\
+/usr/sbin/sshd -D' > /start.sh
+
+RUN chmod +x /start.sh
+
+EXPOSE 22
+
+CMD ["/start.sh"]

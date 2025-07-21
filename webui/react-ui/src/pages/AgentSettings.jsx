@@ -7,25 +7,25 @@ import Header from "../components/Header";
 import { AgentStatus, AgentActionButtons } from "../components/AgentComponents";
 
 function AgentSettings() {
-  const { name } = useParams();
+  const { id } = useParams();
   const { showToast } = useOutletContext();
   const navigate = useNavigate();
   const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({});
 
+  // Use our custom agent hook
+  const { agent, loading, updateAgent, deleteAgent, setAgent } =
+    useAgent(id);
+
   // Update document title
   useEffect(() => {
-    if (name) {
-      document.title = `Agent Settings: ${name} - LocalAGI`;
+    if (agent) {
+      document.title = `Agent Settings: ${agent.name} - LocalAGI`;
     }
     return () => {
       document.title = "LocalAGI";
     };
-  }, [name]);
-
-  // Use our custom agent hook
-  const { agent, loading, updateAgent, toggleAgentStatus, deleteAgent } =
-    useAgent(name);
+  }, [agent]);
 
   // Fetch metadata on component mount
   useEffect(() => {
@@ -39,7 +39,7 @@ function AgentSettings() {
       }
     };
     fetchMetadata();
-  }, [showToast]);
+  }, []);
 
   useEffect(() => {
     if (agent) {
@@ -47,11 +47,48 @@ function AgentSettings() {
     }
   }, [agent]);
 
-  // Header action handlers
-  const handlePauseResume = async () => {
+  const toggleAgentStatus = async (id, name, isActive) => {
     try {
-      await toggleAgentStatus();
-      showToast(agent?.active ? "Agent paused" : "Agent resumed", "success");
+      const endpoint = isActive
+        ? `/api/agent/${id}/pause`
+        : `/api/agent/${id}/start`;
+      const response = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setAgent((prevAgent) => ({
+          ...prevAgent,
+          active: !isActive,
+        }));
+
+        // Show success toast
+        const action = isActive ? "paused" : "started";
+        
+        showToast(`Agent "${name}" ${action} successfully`, "success");
+
+      } else {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error || `Server responded with status: ${response.status}`
+        );
+      }
+    } catch (err) {
+      console.error(`Error toggling agent status:`, err);
+      showToast(`Failed to update agent status: ${err.message}`, "error");
+    }
+  };
+
+  // Header action handlers
+  const handlePauseResume = async (isActive) => {
+    try {
+      const success = await toggleAgentStatus(id, agent.name, isActive);
+      if (success) {
+        showToast(`Agent "${agent.name}" ${isActive ? "resumed" : "paused"}`, "success");
+      }
     } catch (err) {
       console.error("Error toggling agent status:", err);
       showToast("Failed to update agent status", "error");
@@ -70,6 +107,10 @@ function AgentSettings() {
     }
   };
 
+  if (!agent) {
+    return <div></div>;
+  }
+
   return (
     <div className="dashboard-container">
       <div className="main-content-area">
@@ -77,7 +118,7 @@ function AgentSettings() {
           <Header
             title="Agent Settings"
             description="Configure and manage the agent's settings, connectors, and capabilities."
-            name={name}
+            name={agent.name}
           />
 
           <div className="header-right">
@@ -101,10 +142,12 @@ function AgentSettings() {
               loading={loading}
               submitButtonText="Save Changes"
               metadata={metadata}
+              id={id}
             />
           ) : (
-            <div style={{ color: "var(--text-light)", padding: 24 }}>
-              Loading agent configuration...
+            <div className="centered-loading">
+              <div className="spinner-primary"></div>
+              <p className="loading-text">Loading agent configuration</p>
             </div>
           )}
         </div>

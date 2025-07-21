@@ -24,7 +24,7 @@ func NewCounter(config map[string]string) *CounterAction {
 }
 
 // Run executes the counter action
-func (a *CounterAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *CounterAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	// Parse parameters
 	request := struct {
 		Name       string `json:"name"`

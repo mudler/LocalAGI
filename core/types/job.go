@@ -16,9 +16,16 @@ type Job struct {
 	Result              *JobResult
 	ReasoningCallback   func(ActionCurrentState) bool
 	ResultCallback      func(ActionState)
+	StreamCallback      func(string) // Callback for streaming partial responses
 	ConversationHistory []openai.ChatCompletionMessage
 	UUID                string
 	Metadata            map[string]interface{}
+	DoneFilter          bool
+
+	// Tools available for this job
+	BuiltinTools []ActionDefinition // Built-in tools like web search
+	UserTools    []ActionDefinition // User-defined function tools
+	ToolChoice   string
 
 	pastActions         []*ActionRequest
 	nextAction          *Action
@@ -27,6 +34,8 @@ type Job struct {
 
 	context context.Context
 	cancel  context.CancelFunc
+
+	Obs *Observable
 }
 
 type ActionRequest struct {
@@ -42,6 +51,24 @@ func WithConversationHistory(history []openai.ChatCompletionMessage) JobOption {
 	}
 }
 
+func WithBuiltinTools(tools []ActionDefinition) JobOption {
+	return func(j *Job) {
+		j.BuiltinTools = tools
+	}
+}
+
+func WithUserTools(tools []ActionDefinition) JobOption {
+	return func(j *Job) {
+		j.UserTools = tools
+	}
+}
+
+func WithToolChoice(choice string) JobOption {
+	return func(j *Job) {
+		j.ToolChoice = choice
+	}
+}
+
 func WithReasoningCallback(f func(ActionCurrentState) bool) JobOption {
 	return func(r *Job) {
 		r.ReasoningCallback = f
@@ -51,6 +78,12 @@ func WithReasoningCallback(f func(ActionCurrentState) bool) JobOption {
 func WithResultCallback(f func(ActionState)) JobOption {
 	return func(r *Job) {
 		r.ResultCallback = f
+	}
+}
+
+func WithStreamCallback(f func(string)) JobOption {
+	return func(r *Job) {
+		r.StreamCallback = f
 	}
 }
 
@@ -159,23 +192,23 @@ func newUUID() string {
 // To wait for a Job result, use JobResult.WaitResult()
 func NewJob(opts ...JobOption) *Job {
 	j := &Job{
-		Result: NewJobResult(),
-		UUID:   newUUID(),
-	}
-	for _, o := range opts {
-		o(j)
-	}
-
-	var ctx context.Context
-	if j.context == nil {
-		ctx = context.Background()
-	} else {
-		ctx = j.context
+		Result:              NewJobResult(),
+		UUID:                uuid.New().String(),
+		Metadata:            make(map[string]interface{}),
+		context:             context.Background(),
+		ConversationHistory: []openai.ChatCompletionMessage{},
 	}
 
-	context, cancel := context.WithCancel(ctx)
-	j.context = context
+	for _, opt := range opts {
+		opt(j)
+	}
+
+	// Store the original request if it exists in the conversation history
+
+	ctx, cancel := context.WithCancel(j.context)
+	j.context = ctx
 	j.cancel = cancel
+
 	return j
 }
 
@@ -197,4 +230,48 @@ func (j *Job) Cancel() {
 
 func (j *Job) GetContext() context.Context {
 	return j.context
+}
+
+func WithObservable(obs *Observable) JobOption {
+	return func(j *Job) {
+		j.Obs = obs
+	}
+}
+
+// GetEvaluationLoop returns the current evaluation loop count
+func (j *Job) GetEvaluationLoop() int {
+	if j.Metadata == nil {
+		j.Metadata = make(map[string]interface{})
+	}
+	if loop, ok := j.Metadata["evaluation_loop"].(int); ok {
+		return loop
+	}
+	return 0
+}
+
+// IncrementEvaluationLoop increments the evaluation loop count
+func (j *Job) IncrementEvaluationLoop() {
+	if j.Metadata == nil {
+		j.Metadata = make(map[string]interface{})
+	}
+	currentLoop := j.GetEvaluationLoop()
+	j.Metadata["evaluation_loop"] = currentLoop + 1
+}
+
+// GetBuiltinTools returns the builtin tools for this job
+func (j *Job) GetBuiltinTools() []ActionDefinition {
+	return j.BuiltinTools
+}
+
+// GetUserTools returns the user tools for this job
+func (j *Job) GetUserTools() []ActionDefinition {
+	return j.UserTools
+}
+
+// GetAllTools returns all tools (builtin + user) for this job
+func (j *Job) GetAllTools() []ActionDefinition {
+	allTools := make([]ActionDefinition, 0, len(j.BuiltinTools)+len(j.UserTools))
+	allTools = append(allTools, j.BuiltinTools...)
+	allTools = append(allTools, j.UserTools...)
+	return allTools
 }

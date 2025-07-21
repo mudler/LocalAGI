@@ -8,3 +8,5 @@ LocalAGI
 **/.env
 .vscode
 volumes/
+tmp/
+app

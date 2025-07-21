@@ -21,7 +21,7 @@ type GoalResponse struct {
 	Achieved bool   `json:"achieved"`
 }
 
-func (a *GoalAction) Run(context.Context, types.ActionParams) (types.ActionResult, error) {
+func (a *GoalAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	return types.ActionResult{}, nil
 }
 

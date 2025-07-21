@@ -36,7 +36,7 @@ const ActionsSection = ({ formData, setFormData, metadata }) => {
 
   return (
     <div className="actions-section">
-      <h3>Actions</h3>
+      <h3 className="section-title">Actions</h3>
       <p className="section-description">
         Configure actions that the agent can perform.
       </p>

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai"
 )
@@ -24,21 +25,28 @@ type options struct {
 	randomIdentityGuidance                                                                       string
 	randomIdentity                                                                               bool
 	userActions                                                                                  types.Actions
+	jobFilters                                                                                   types.JobFilters
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
+	stripThinkingTags                                                                            bool
 
 	canStopItself         bool
 	initiateConversations bool
 	loopDetectionSteps    int
 	forceReasoning        bool
 	canPlan               bool
-	characterfile         string
-	statefile             string
 	context               context.Context
 	permanentGoal         string
 	timeout               string
 	periodicRuns          time.Duration
 	kbResults             int
 	ragdb                 RAGDB
+	userID                uuid.UUID
+	agentID               uuid.UUID
+	useMySQLForSummaries  bool
+
+	// Evaluation settings
+	maxEvaluationLoops int
+	enableEvaluation   bool
 
 	prompts []DynamicPrompt
 
@@ -50,9 +58,13 @@ type options struct {
 
 	conversationsPath string
 
-	mcpServers []MCPServer
-
+	mcpServers                  []MCPServer
 	newConversationsSubscribers []func(openai.ChatCompletionMessage)
+
+	observer     Observer
+	parallelJobs int
+
+	lastMessageDuration time.Duration
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -61,7 +73,11 @@ func (o *options) SeparatedMultimodalModel() bool {
 
 func defaultOptions() *options {
 	return &options{
-		periodicRuns: 15 * time.Minute,
+		parallelJobs:       1,
+		periodicRuns:       15 * time.Minute,
+		loopDetectionSteps: 10,
+		maxEvaluationLoops: 2,
+		enableEvaluation:   false,
 		LLMAPI: llmOptions{
 			APIURL: "http://localhost:8080",
 			Model:  "gpt-4",
@@ -136,6 +152,24 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 	}
 }
 
+func WithLastMessageDuration(duration string) Option {
+	return func(o *options) error {
+		d, err := time.ParseDuration(duration)
+		if err != nil {
+			d = types.DefaultLastMessageDuration
+		}
+		o.lastMessageDuration = d
+		return nil
+	}
+}
+
+func WithParallelJobs(jobs int) Option {
+	return func(o *options) error {
+		o.parallelJobs = jobs
+		return nil
+	}
+}
+
 func WithNewConversationSubscriber(sub func(openai.ChatCompletionMessage)) Option {
 	return func(o *options) error {
 		o.newConversationsSubscribers = append(o.newConversationsSubscribers, sub)
@@ -203,20 +237,6 @@ func WithLLMAPIURL(url string) Option {
 	}
 }
 
-func WithStateFile(path string) Option {
-	return func(o *options) error {
-		o.statefile = path
-		return nil
-	}
-}
-
-func WithCharacterFile(path string) Option {
-	return func(o *options) error {
-		o.characterfile = path
-		return nil
-	}
-}
-
 // WithPrompts adds additional block prompts to the agent
 // to be rendered internally in the conversation
 // when processing the conversation to the LLM
@@ -246,6 +266,13 @@ func WithPrompts(prompts ...DynamicPrompt) Option {
 func WithLLMAPIKey(key string) Option {
 	return func(o *options) error {
 		o.LLMAPI.APIKey = key
+		return nil
+	}
+}
+
+func WithMySQLForSummaries() Option {
+	return func(o *options) error {
+		o.useMySQLForSummaries = true
 		return nil
 	}
 }
@@ -310,17 +337,6 @@ func WithCharacter(c Character) Option {
 	}
 }
 
-func FromFile(path string) Option {
-	return func(o *options) error {
-		c, err := Load(path)
-		if err != nil {
-			return err
-		}
-		o.character = *c
-		return nil
-	}
-}
-
 func WithRandomIdentity(guidance ...string) Option {
 	return func(o *options) error {
 		o.randomIdentityGuidance = strings.Join(guidance, "")
@@ -333,6 +349,53 @@ func WithRandomIdentity(guidance ...string) Option {
 func WithActions(actions ...types.Action) Option {
 	return func(o *options) error {
 		o.userActions = actions
+		return nil
+	}
+}
+
+func WithUserID(id uuid.UUID) Option {
+	return func(o *options) error {
+		o.userID = id
+		return nil
+	}
+}
+
+func WithJobFilters(filters ...types.JobFilter) Option {
+	return func(o *options) error {
+		o.jobFilters = filters
+		return nil
+	}
+}
+
+func WithAgentID(id uuid.UUID) Option {
+	return func(o *options) error {
+		o.agentID = id
+		return nil
+	}
+}
+
+func WithObserver(observer Observer) Option {
+	return func(o *options) error {
+		o.observer = observer
+		return nil
+	}
+}
+
+var EnableStripThinkingTags = func(o *options) error {
+	o.stripThinkingTags = true
+	return nil
+}
+
+func WithMaxEvaluationLoops(loops int) Option {
+	return func(o *options) error {
+		o.maxEvaluationLoops = loops
+		return nil
+	}
+}
+
+func EnableEvaluation() Option {
+	return func(o *options) error {
+		o.enableEvaluation = true
 		return nil
 	}
 }

@@ -28,7 +28,7 @@ const FormFieldDefinition = ({
             name={field.name}
             label={field.label}
             type={field.type}
-            value={safeValues[field.name] !== undefined ? safeValues[field.name] : field.defaultValue}
+            value={safeValues[field.name] != null ? safeValues[field.name] : field.defaultValue}
             onChange={onChange}
             placeholder={field.placeholder || ''}
             helpText={field.helpText || ''}

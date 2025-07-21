@@ -22,7 +22,7 @@ type PostTweetAction struct {
 	noCharacterLimit bool
 }
 
-func (a *PostTweetAction) Run(ctx context.Context, params types.ActionParams) (types.ActionResult, error) {
+func (a *PostTweetAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
 		Text string `json:"text"`
 	}{}

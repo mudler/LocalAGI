@@ -29,18 +29,22 @@ func (d DynamicPromptsConfig) ToMap() map[string]string {
 	return config
 }
 
+type FiltersConfig struct {
+	Type   string `json:"type"`
+	Config string `json:"config"`
+}
+
 type AgentConfig struct {
 	Connector      []ConnectorConfig      `json:"connectors" form:"connectors" `
 	Actions        []ActionsConfig        `json:"actions" form:"actions"`
 	DynamicPrompts []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
 	MCPServers     []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
+	Filters        []FiltersConfig        `json:"filters" form:"filters"`
 
 	Description string `json:"description" form:"description"`
 
 	Model           string `json:"model" form:"model"`
 	MultimodalModel string `json:"multimodal_model" form:"multimodal_model"`
-	APIURL          string `json:"api_url" form:"api_url"`
-	APIKey          string `json:"api_key" form:"api_key"`
 	LocalRAGURL     string `json:"local_rag_url" form:"local_rag_url"`
 	LocalRAGAPIKey  string `json:"local_rag_api_key" form:"local_rag_api_key"`
 
@@ -61,9 +65,14 @@ type AgentConfig struct {
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
 	LongTermMemory        bool   `json:"long_term_memory" form:"long_term_memory"`
 	SummaryLongTermMemory bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
+	ParallelJobs          int    `json:"parallel_jobs" form:"parallel_jobs"`
+	StripThinkingTags     bool   `json:"strip_thinking_tags" form:"strip_thinking_tags"`
+	EnableEvaluation      bool   `json:"enable_evaluation" form:"enable_evaluation"`
+	MaxEvaluationLoops    int    `json:"max_evaluation_loops" form:"max_evaluation_loops"`
 }
 
 type AgentConfigMeta struct {
+	Filters        []config.FieldGroup
 	Fields         []config.Field
 	Connectors     []config.FieldGroup
 	Actions        []config.FieldGroup
@@ -75,6 +84,7 @@ func NewAgentConfigMeta(
 	actionsConfig []config.FieldGroup,
 	connectorsConfig []config.FieldGroup,
 	dynamicPromptsConfig []config.FieldGroup,
+	filtersConfig []config.FieldGroup,
 ) AgentConfigMeta {
 	return AgentConfigMeta{
 		Fields: []config.Field{
@@ -125,20 +135,6 @@ func NewAgentConfigMeta(
 				Name:         "multimodal_model",
 				Label:        "Multimodal Model",
 				Type:         "text",
-				DefaultValue: "",
-				Tags:         config.Tags{Section: "ModelSettings"},
-			},
-			{
-				Name:         "api_url",
-				Label:        "API URL",
-				Type:         "text",
-				DefaultValue: "",
-				Tags:         config.Tags{Section: "ModelSettings"},
-			},
-			{
-				Name:         "api_key",
-				Label:        "API Key",
-				Type:         "password",
 				DefaultValue: "",
 				Tags:         config.Tags{Section: "ModelSettings"},
 			},
@@ -247,7 +243,7 @@ func NewAgentConfigMeta(
 				Name:         "enable_reasoning",
 				Label:        "Enable Reasoning",
 				Type:         "checkbox",
-				DefaultValue: false,
+				DefaultValue: true,
 				HelpText:     "Enable agent to explain its reasoning process",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
@@ -260,6 +256,50 @@ func NewAgentConfigMeta(
 				Step:         1,
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
+			{
+				Name:         "parallel_jobs",
+				Label:        "Parallel Jobs",
+				Type:         "number",
+				DefaultValue: 5,
+				Min:          1,
+				Step:         1,
+				HelpText:     "Number of concurrent tasks that can run in parallel",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "strip_thinking_tags",
+				Label:        "Strip Thinking Tags",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Remove content between <thinking></thinking> and <think></think> tags from agent responses",
+				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "enable_evaluation",
+				Label:        "Enable Evaluation",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Enable automatic evaluation of agent responses to ensure they meet user requirements",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "max_evaluation_loops",
+				Label:        "Max Evaluation Loops",
+				Type:         "number",
+				DefaultValue: 2,
+				Min:          1,
+				Step:         1,
+				HelpText:     "Maximum number of evaluation loops to perform when addressing gaps in responses",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "last_message_duration",
+				Label:        "Last Message Duration",
+				Type:         "text",
+				DefaultValue: "5m",
+				HelpText:     "Duration for the last message to be considered in the conversation",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
 		},
 		MCPServers: []config.Field{
 			{
@@ -268,16 +308,11 @@ func NewAgentConfigMeta(
 				Type:     config.FieldTypeText,
 				Required: true,
 			},
-			{
-				Name:     "token",
-				Label:    "API Key",
-				Type:     config.FieldTypeText,
-				Required: true,
-			},
 		},
 		DynamicPrompts: dynamicPromptsConfig,
 		Connectors:     connectorsConfig,
 		Actions:        actionsConfig,
+		Filters:        filtersConfig,
 	}
 }
 
