@@ -2223,3 +2223,8 @@ a:hover {
     justify-content: center;
   }
 }
+
+/* Hide the close button */
+button[aria-label="close modal"] {
+  display: none !important;
+}

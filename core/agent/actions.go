@@ -103,6 +103,50 @@ Choose the most appropriate single tool call to fulfill the user's complete requ
 
 	var lastErr error
 	for attempts := 0; attempts < maxRetries; attempts++ {
+		// If toolChoice is "reply" and we have a stream callback, use streaming
+		if (toolchoice == "" && len(tools) == 0) && !a.options.forceReasoning && job.StreamCallback != nil {
+			msg, err := a.askLLMStream(job.GetContext(), enhancedConversation, job.StreamCallback, maxRetries)
+			if err != nil {
+				lastErr = err
+				xlog.Warn("Attempt to make a streaming decision failed", "attempt", attempts+1, "error", err)
+
+				if obs != nil {
+					obs.Progress = append(obs.Progress, types.Progress{
+						Error: err.Error(),
+					})
+					a.observer.Update(*obs)
+				}
+
+				continue
+			}
+
+			if obs != nil {
+				// Create a response structure for consistency with observer
+				resp := openai.ChatCompletionResponse{
+					Choices: []openai.ChatCompletionChoice{
+						{
+							Message: msg,
+						},
+					},
+				}
+				obs.AddProgress(types.Progress{
+					ChatCompletionResponse: &resp,
+				})
+			}
+
+			if err := a.saveConversation(append(conversation, msg), "decision"); err != nil {
+				xlog.Error("Error saving conversation", "error", err)
+			}
+
+			if obs != nil {
+				obs.MakeLastProgressCompletion()
+				a.observer.Update(*obs)
+			}
+
+			return &decisionResult{message: msg.Content}, nil
+		}
+
+		// Regular non-streaming completion
 		resp, err := a.client.CreateChatCompletion(job.GetContext(), decision)
 		if err != nil {
 			lastErr = err
@@ -703,12 +747,27 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		// we need to generate the actual reply content, not just return the reasoning
 		replyPrompt := "Based on the conversation and your reasoning, provide the actual response that should be given to the user. Do not explain your reasoning - just provide the direct answer that addresses the user's request."
 
-		replyMsg, err := a.askLLM(job.GetContext(),
-			append(c, openai.ChatCompletionMessage{
-				Role:    "system",
-				Content: replyPrompt,
-			}),
-			maxRetries)
+		var replyMsg openai.ChatCompletionMessage
+		var err error
+
+		// Check if streaming is enabled and there's a stream callback
+		if job.StreamCallback != nil {
+			replyMsg, err = a.askLLMStream(job.GetContext(),
+				append(c, openai.ChatCompletionMessage{
+					Role:    "system",
+					Content: replyPrompt,
+				}),
+				job.StreamCallback,
+				maxRetries)
+		} else {
+			replyMsg, err = a.askLLM(job.GetContext(),
+				append(c, openai.ChatCompletionMessage{
+					Role:    "system",
+					Content: replyPrompt,
+				}),
+				maxRetries)
+		}
+
 		if err != nil {
 			xlog.Warn("Failed to generate reply content, falling back to reasoning", "error", err)
 			return nil, nil, originalReasoning, nil
