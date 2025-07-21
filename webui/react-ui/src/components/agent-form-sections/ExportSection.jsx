@@ -1,10 +1,6 @@
 import React, { useEffect } from "react";
 
 const ExportSection = ({ id }) => {
-  useEffect(() => {
-    console.log("ExportSection rendered with id:", id);
-  }, [id]);
-
   return (
     <div className="">
       <div className="section-title">

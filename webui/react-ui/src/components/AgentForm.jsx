@@ -56,7 +56,6 @@ const AgentForm = ({
 
   // Handle form submission
   const handleSubmit = async (e) => {
-    console.log(formData);
     e.preventDefault();
     if (onSubmit) {
       onSubmit(formData);

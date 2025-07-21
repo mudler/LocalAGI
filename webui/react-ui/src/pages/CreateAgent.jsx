@@ -81,7 +81,6 @@ function CreateAgent() {
 
   // Handle form submission
   const handleSubmit = async (data) => {
-    console.log("[CreateAgent] Submitting agent with full data:", data); // DEBUG LOG
     setLoading(true);
     try {
       await agentApi.createAgent(data);

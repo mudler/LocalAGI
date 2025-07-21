@@ -807,14 +807,14 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 			}
 
 			// Send final complete message
-			send("json_message", map[string]interface{}{
-				"id":        agentMessageID,
-				"sender":    "agent",
-				"content":   response.Response,
-				"type":      "message",
-				"createdAt": time.Now().Format(time.RFC3339),
-				"final":     true, // Mark as final message
-			})
+			// send("json_message", map[string]interface{}{
+			// 	"id":        agentMessageID,
+			// 	"sender":    "agent",
+			// 	"content":   response.Response,
+			// 	"type":      "message",
+			// 	"createdAt": time.Now().Format(time.RFC3339),
+			// 	"final":     true, // Mark as final message
+			// })
 
 			// Save agent reply to DB
 			_ = db.DB.Create(&models.AgentMessage{

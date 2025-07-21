@@ -67,10 +67,8 @@ function AgentSettings() {
 
         // Show success toast
         const action = isActive ? "paused" : "started";
-        console.log('response.ok', action);
         
         showToast(`Agent "${name}" ${action} successfully`, "success");
-        console.log('agent', `Agent "${name}" ${action} successfully`);
 
       } else {
         const errorData = await response.json().catch(() => null);

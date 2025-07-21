@@ -249,8 +249,6 @@ export function useChat(agentId, model) {
         setMessages((prev) =>
           prev.filter((msg) => msg.id !== loadingMessageId)
         );
-      } finally {
-        setSending(false);
       }
     },
     [agentId, model]

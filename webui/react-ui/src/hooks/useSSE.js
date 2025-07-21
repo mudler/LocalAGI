@@ -15,7 +15,6 @@ export function useSSE(agentId) {
 
   // Connect to SSE endpoint
   const connect = useCallback(() => {
-    console.log("AGENT ID", agentId);
     if (!agentId) return;
 
     // Close existing connection if any
@@ -33,7 +32,6 @@ export function useSSE(agentId) {
 
     // Handle connection open
     eventSource.onopen = () => {
-      console.log("SSE connection opened");
       setIsConnected(true);
     };
 

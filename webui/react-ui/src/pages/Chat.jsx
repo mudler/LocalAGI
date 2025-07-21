@@ -12,13 +12,12 @@ function Chat() {
   const { showToast } = useOutletContext();
   const [message, setMessage] = useState("");
   const [agentConfig, setAgentConfig] = useState(null);
-  const [isOpenRouter, setIsOpenRouter] = useState(false);
   const messagesEndRef = useRef(null);
   
   // Observable status tracking
   const [currentStatus, setCurrentStatus] = useState(null);
   const [eventSource, setEventSource] = useState(null);
-
+  
   // Helper function to map observable data to user-friendly status messages
   const getStatusMessage = (observable) => {
     if (!observable) return null;
@@ -118,7 +117,7 @@ function Chat() {
       try {
         const config = await agentApi.getAgentConfig(id);
         setAgentConfig(config);
-        setIsOpenRouter(config.model.split("/")[0] === "openrouter");
+        // setIsOpenRouter(config.model.split("/")[0] === "openrouter");
       } catch (error) {
         console.error("Failed to load agent config", error);
         showToast && showToast(error?.message || String(error), "error");
@@ -193,9 +192,7 @@ function Chat() {
     }
   }, [messages]);
 
-  const isAssistantStreaming = messages.length > 0 && 
-    ((messages[messages.length - 1].sender === 'assistant' && messages[messages.length - 1].loading) ||
-    (messages[messages.length - 1].sender === 'agent' && messages[messages.length - 1].streaming))
+
 
   useEffect(() => {
     if (agentConfig) {
@@ -411,11 +408,11 @@ function Chat() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={
-                isOpenRouter || isConnected
+                isConnected
                   ? "Type your message..."
                   : "Connecting..."
               }
-              disabled={sending || (!isOpenRouter && !isConnected) || isAssistantStreaming}
+              disabled={sending || !isConnected}
               style={{
                 flex: 1,
                 padding: "12px 16px",
@@ -423,7 +420,7 @@ function Chat() {
                 borderRadius: 8,
                 fontSize: "1rem",
                 background:
-                  sending || (!isOpenRouter && !isConnected) || isAssistantStreaming
+                  sending || !isConnected
                     ? "#f3f4f6"
                     : "#fff",
                 color: "#222",
@@ -436,10 +433,7 @@ function Chat() {
               className="action-btn"
               style={{ minWidth: 120 }}
               disabled={
-                sending ||
-                (!isOpenRouter && !isConnected) ||
-                message.trim() === "" ||
-                isAssistantStreaming
+                sending || !isConnected
               }
             >
               <i className="fas fa-paper-plane"></i> Send

@@ -45,7 +45,6 @@ function ObservableSummary({ observable }) {
     chatCompletion = { choices: completion.conversation.map(m => {
       return { message: m }
     }) }
-    console.log("converted conversation to choices", chatCompletion)
   }
 
   if (
@@ -280,7 +279,6 @@ function AgentStatus() {
 
     sse.addEventListener('observable_update', (event) => {
       const data = JSON.parse(event.data);
-      console.log(data);
       setObservableMap(prevMap => {
         const prev = prevMap[data.id] || {};
         const updated = {

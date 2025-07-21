@@ -19,7 +19,6 @@ const Usage = () => {
     const fetchUsage = async () => {
       try {
         const data = await usageApi.getUsage();
-        console.log(data);
         setUsage(data);
       } catch (error) {
         console.error('Error fetching usage:', error);
