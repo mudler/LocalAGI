@@ -6,9 +6,10 @@ import { useSSE } from "./useSSE";
  * Custom hook for chat functionality
  * @param {string} agentId - Id of the agent to chat with
  * @param {Object} model - Model object (should include id)
+ * @param {Function} onStatusCompleted - Optional callback called when status is completed
  * @returns {Object} - Chat state and functions
  */
-export function useChat(agentId, model) {
+export function useChat(agentId, model, onStatusCompleted) {
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -191,6 +192,10 @@ export function useChat(agentId, model) {
           setSending(true);
         } else if (statusData.status === "completed") {
           setSending(false);
+          // Call the completion callback if provided
+          if (onStatusCompleted) {
+            onStatusCompleted();
+          }
         }
       } catch (err) {
         console.error("Error processing status update:", err);

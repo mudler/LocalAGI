@@ -778,9 +778,11 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 		go func() {
 			var fullContent strings.Builder
 			agentMessageID := messageID + "-agent"
+			wasStreamed := false
 
 			// Stream callback to send partial responses
 			streamCallback := func(chunk string) {
+				wasStreamed = true
 				fullContent.WriteString(chunk)
 
 				// Send streaming chunk via SSE
@@ -806,15 +808,17 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				return
 			}
 
-			// Send final complete message
-			// send("json_message", map[string]interface{}{
-			// 	"id":        agentMessageID,
-			// 	"sender":    "agent",
-			// 	"content":   response.Response,
-			// 	"type":      "message",
-			// 	"createdAt": time.Now().Format(time.RFC3339),
-			// 	"final":     true, // Mark as final message
-			// })
+			// Only send final complete message if response was not streamed
+			if !wasStreamed {
+				send("json_message", map[string]interface{}{
+					"id":        agentMessageID,
+					"sender":    "agent",
+					"content":   response.Response,
+					"type":      "message",
+					"createdAt": time.Now().Format(time.RFC3339),
+					"final":     true, // Mark as final message
+				})
+			}
 
 			// Save agent reply to DB
 			_ = db.DB.Create(&models.AgentMessage{

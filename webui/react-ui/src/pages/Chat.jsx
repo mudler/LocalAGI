@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useOutletContext } from "react-router-dom";
 import { useChat } from "../hooks/useChat";
 import Header from "../components/Header";
@@ -169,6 +169,11 @@ function Chat() {
     };
   }, [id]);
 
+  // Callback to clear status when chat processing is completed
+  const handleStatusCompleted = useCallback(() => {
+    setCurrentStatus(null);
+  }, []);
+
   // Use our custom chat hook with model from agent config
   const {
     messages,
@@ -178,7 +183,7 @@ function Chat() {
     sendMessage,
     clearChat,
     clearError,
-  } = useChat(id, agentConfig?.model);
+  } = useChat(id, agentConfig?.model, handleStatusCompleted);
 
 
 
