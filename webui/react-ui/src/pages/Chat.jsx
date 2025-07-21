@@ -193,6 +193,10 @@ function Chat() {
     }
   }, [messages]);
 
+  const isAssistantStreaming = messages.length > 0 && 
+    ((messages[messages.length - 1].sender === 'assistant' && messages[messages.length - 1].loading) ||
+    (messages[messages.length - 1].sender === 'agent' && messages[messages.length - 1].streaming))
+
   useEffect(() => {
     if (agentConfig) {
       document.title = `Chat with ${agentConfig.name} - LocalAGI`;
@@ -411,7 +415,7 @@ function Chat() {
                   ? "Type your message..."
                   : "Connecting..."
               }
-              disabled={sending || (!isOpenRouter && !isConnected)}
+              disabled={sending || (!isOpenRouter && !isConnected) || isAssistantStreaming}
               style={{
                 flex: 1,
                 padding: "12px 16px",
@@ -419,7 +423,7 @@ function Chat() {
                 borderRadius: 8,
                 fontSize: "1rem",
                 background:
-                  sending || (!isOpenRouter && !isConnected)
+                  sending || (!isOpenRouter && !isConnected) || isAssistantStreaming
                     ? "#f3f4f6"
                     : "#fff",
                 color: "#222",
@@ -434,7 +438,8 @@ function Chat() {
               disabled={
                 sending ||
                 (!isOpenRouter && !isConnected) ||
-                message.trim() === ""
+                message.trim() === "" ||
+                isAssistantStreaming
               }
             >
               <i className="fas fa-paper-plane"></i> Send
