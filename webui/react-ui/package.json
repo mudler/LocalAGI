@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@privy-io/react-auth": "^2.13.2",
+    "@wagmi/core": "^2.18.0",
     "date-fns": "^4.1.0",
     "highlight.js": "^11.11.1",
     "jwt-decode": "^4.0.0",
