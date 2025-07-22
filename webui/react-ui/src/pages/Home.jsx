@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useOutletContext } from "react-router-dom";
-import { usePrivy, useLogin } from "@privy-io/react-auth";
+import { usePrivy, useLogin, useLogout } from "@privy-io/react-auth";
 import { agentApi } from "../utils/api";
 import Header from "../components/Header";
 import FeatureCard from "../components/FeatureCard";
@@ -28,6 +28,19 @@ function Home() {
       document.title = "LocalAGI"; // Reset title when component unmounts
     };
   }, []);
+
+
+  useLogout({
+    onSuccess: () => {
+      setStats({
+        agents: [],
+        agentCount: 0,
+        actions: 32,
+        connectors: 9,
+        status: {},
+      })
+    }
+  });
 
   // Fetch dashboard data
   useEffect(() => {
