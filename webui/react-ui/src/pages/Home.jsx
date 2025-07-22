@@ -1,15 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link, useOutletContext } from "react-router-dom";
+import { usePrivy, useLogin } from "@privy-io/react-auth";
 import { agentApi } from "../utils/api";
 import Header from "../components/Header";
+import FeatureCard from "../components/FeatureCard";
 
 function Home() {
+  const { ready, authenticated } = usePrivy();
+
+  const { login } = useLogin();
+
   const { showToast } = useOutletContext();
   const [stats, setStats] = useState({
     agents: [],
     agentCount: 0,
-    actions: 0,
-    connectors: 0,
+    actions: 32,
+    connectors: 9,
     status: {},
   });
   const [loading, setLoading] = useState(true);
@@ -25,6 +31,11 @@ function Home() {
 
   // Fetch dashboard data
   useEffect(() => {
+    if (!ready || !authenticated) {
+      setLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -32,8 +43,8 @@ function Home() {
         setStats({
           agents: agents.agents || [],
           agentCount: agents.agentCount || 0,
-          actions: agents.actions || 0,
-          connectors: agents.connectors || 0,
+          actions: agents.actions || 32,
+          connectors: agents.connectors || 9,
           status: agents.statuses || {},
         });
       } catch (err) {
@@ -46,9 +57,9 @@ function Home() {
     };
 
     fetchData();
-  }, []);
+  }, [ready, authenticated, showToast]);
 
-  if (loading) {
+  if (!ready || loading) {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
@@ -86,9 +97,9 @@ function Home() {
       </div>
 
       <div className="main-content-area">
-        <div className="header-container">
+        {/* <div className="header-container">
           <Header title="Welcome back" description={currentDate} />
-        </div>
+        </div> */}
 
         {/* Dashboard Stats */}
         <div className="dashboard-stats">
@@ -174,49 +185,45 @@ function Home() {
               </p>
             </div>
             <div className="features-grid">
-              {/* Card for Create Agent */}
-              <Link to="/create" className="feature-card">
-                <img
-                  src="/app/features/duplicate-plus.svg"
-                  alt="Duplicate Plus"
-                />
-                <div className="feature-content">
-                  <h3>Create Agent</h3>
-                  <p>Agent with custom behaviors, connectors, and actions.</p>
-                </div>
-              </Link>
+              <FeatureCard
+                to="/create"
+                imageSrc="/app/features/duplicate-plus.svg"
+                imageAlt="Duplicate Plus"
+                title="Create Agent"
+                description="Agent with custom behaviors, connectors, and actions."
+                authenticated={authenticated}
+                onLogin={login}
+              />
 
-              {/* Card for Create Group */}
-              <Link to="/group-create" className="feature-card">
-                <img src="/app/features/user-group.svg" alt="User Group" />
-                <div className="feature-content">
-                  <h3>Create Group</h3>
-                  <p>Group agents with shared configs and behaviors.</p>
-                </div>
-              </Link>
+              <FeatureCard
+                to="/group-create"
+                imageSrc="/app/features/user-group.svg"
+                imageAlt="User Group"
+                title="Create Group"
+                description="Group agents with shared configs and behaviors."
+                authenticated={authenticated}
+                onLogin={login}
+              />
 
-              {/* Card for Import Agent */}
-              <Link to="/import" className="feature-card">
-                <img
-                  src="/app/features/dashed-upload.svg"
-                  alt="Dashed Upload"
-                />
-                <div className="feature-content">
-                  <h3>Import Agent</h3>
-                  <p>Import an existing agent configuration from a file.</p>
-                </div>
-              </Link>
+              <FeatureCard
+                to="/import"
+                imageSrc="/app/features/dashed-upload.svg"
+                imageAlt="Dashed Upload"
+                title="Import Agent"
+                description="Import an existing agent configuration from a file."
+                authenticated={authenticated}
+                onLogin={login}
+              />
 
-              {/* Card for Agent List */}
-              <Link to="/agents" className="feature-card">
-                <img src="/app/features/robot.svg" alt="Robot" />
-                <div className="feature-content">
-                  <h3>Agent List</h3>
-                  <p>
-                    Manage agents, including detailed profiles and statistics.
-                  </p>
-                </div>
-              </Link>
+              <FeatureCard
+                to="/agents"
+                imageSrc="/app/features/robot.svg"
+                imageAlt="Robot"
+                title="Agent List"
+                description="Manage agents, including detailed profiles and statistics."
+                authenticated={authenticated}
+                onLogin={login}
+              />
             </div>
           </>
         )}

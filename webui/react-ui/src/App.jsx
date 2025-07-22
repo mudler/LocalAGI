@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useLogin, useLogout } from "@privy-io/react-auth";
+import NavItem from "./components/NavItem";
 
 function App() {
   const [toast, setToast] = useState({
@@ -50,38 +51,53 @@ function App() {
     setMobileMenuOpen(!mobileMenuOpen);
   };
 
-  // Check if a path is active
-  const isActive = (path) => {
-    return location.pathname === path;
-  };
-
-  const { ready, authenticated, logout } = usePrivy();
+  const { ready, authenticated } = usePrivy();
+  const { login } = useLogin();
+  const { logout } = useLogout({
+    onSuccess: () => {
+      showToast("Logged out successfully.", "success");
+    }
+  });
 
   const isAuthLoading = !ready;
-
   const isAuthenticated = ready && authenticated;
 
-  // Redirect to /app if authenticated and not already on /app
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated && location.pathname !== '/app') {
-      navigate('/');
+  const navItems = [
+    {
+      to: "/",
+      icon: "/app/nav/house.svg",
+      label: "Home",
+      requiresAuth: false
+    },
+    {
+      to: "/agents",
+      icon: "/app/nav/robot.svg", 
+      label: "Agent List",
+      requiresAuth: true
+    },
+    {
+      to: "/actions-playground",
+      icon: "/app/nav/bolt.svg",
+      label: "Action Playground", 
+      requiresAuth: true
+    },
+    {
+      to: "/group-create",
+      icon: "/app/nav/user-group.svg",
+      label: "Create Group Agent",
+      requiresAuth: true
+    },
+    {
+      to: "/usage", 
+      icon: "/app/nav/chart.svg",
+      label: "Usage",
+      requiresAuth: true
     }
-  }, [isAuthenticated, location.pathname, navigate, isAuthLoading]);
+  ];
 
   if (isAuthLoading) {
     return <div></div>;
   }
-
-  
-
-  if (!isAuthenticated) {
-    return (
-      <main className="main-content">
-        <Outlet context={{ showToast }} />
-      </main>
-    );
-  }
-
 
   return (
     <div className="app-container">
@@ -98,78 +114,54 @@ function App() {
           </div>
 
           <div className="nav-links">
-            <Link
-              to="/"
-              className={`nav-link ${isActive("/") ? "active" : ""}`}
-            >
-              <img src="/app/nav/house.svg" alt="House" className="nav-icon" />
-              Home
-            </Link>
-            <>
-              <Link
-                to="/agents"
-                className={`nav-link ${isActive("/agents") ? "active" : ""}`}
-              >
-                <img
-                  src="/app/nav/robot.svg"
-                  alt="Robot"
-                  className="nav-icon"
-                />{" "}
-                Agent List
-              </Link>
-              <Link
-                to="/actions-playground"
-                className={`nav-link ${
-                  isActive("/actions-playground") ? "active" : ""
-                }`}
-              >
-                <img src="/app/nav/bolt.svg" alt="Bolt" className="nav-icon" />
-                Action Playground
-              </Link>
-              <Link
-                to="/group-create"
-                className={`nav-link ${
-                  isActive("/group-create") ? "active" : ""
-                }`}
-              >
-                <img
-                  src="/app/nav/user-group.svg"
-                  alt="User Group"
-                  className="nav-icon"
-                />
-                Create Group Agent
-              </Link>
-              <Link
-                to="/usage"
-                className={`nav-link ${isActive("/usage") ? "active" : ""}`}
-              >
-                <img
-                  src="/app/nav/chart.svg"
-                  alt="Chart"
-                  className="nav-icon"
-                />
-                Usage
-              </Link>
-            </>
+            {navItems.map((item) => (
+              <NavItem
+                key={item.to}
+                to={item.to}
+                icon={item.icon}
+                label={item.label}
+                authenticated={authenticated}
+                onLogin={login}
+                requiresAuth={item.requiresAuth}
+                isMobile={false}
+              />
+            ))}
           </div>
 
           <div className="user-actions">
-            <button 
-              onClick={logout}
-              className="logout-btn"
-              title="Logout"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                <polyline points="16,17 21,12 16,7"/>
-                <line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-              Logout
-            </button>
+            {authenticated ? (
+              <button 
+                onClick={logout}
+                className="logout-btn"
+                title="Logout"
+              >
+                Logout
+              </button>
+            ) : (
+              <button 
+                onClick={login}
+                className="login-btn"
+                title="Login"
+              >
+                Log in
+              </button>
+            )}
           </div>
-
-          <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-            <i className="fas fa-bars"></i>
+          <div className="nav-right-container mobile-only">
+           {
+            !authenticated && (
+              <button 
+                onClick={login}
+                className="login-btn"
+                title="Login"
+              >
+                Log in
+              </button>
+            )
+           }
+            <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+              <i className="fas fa-bars"></i>
+            </div>
           </div>
         </div>
       </nav>
@@ -178,78 +170,22 @@ function App() {
       {mobileMenuOpen && (
         <div className="mobile-menu">
           <ul className="mobile-nav-links">
+            {navItems.map((item) => (
+              <li key={item.to}>
+                <NavItem
+                  to={item.to}
+                  icon={item.icon}
+                  label={item.label}
+                  authenticated={authenticated}
+                  onLogin={login}
+                  requiresAuth={item.requiresAuth}
+                  isMobile={true}
+                  onClick={() => setMobileMenuOpen(false)}
+                />
+              </li>
+            ))}
             <li>
-              <Link
-                to="/"
-                className="mobile-nav-link"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <img
-                  src="/app/nav/house.svg"
-                  alt="House"
-                  className="nav-icon"
-                />{" "}
-                Home
-              </Link>
-            </li>
-            <>
-              <li>
-                <Link
-                  to="/agents"
-                  className="mobile-nav-link"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <img
-                    src="/app/nav/robot.svg"
-                    alt="Robot"
-                    className="nav-icon"
-                  />{" "}
-                  Agent List
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/actions-playground"
-                  className="mobile-nav-link"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <img
-                    src="/app/nav/bolt.svg"
-                    alt="Bolt"
-                    className="nav-icon"
-                  />{" "}
-                  Action Playground
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/group-create"
-                  className="mobile-nav-link"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <img
-                    src="/app/nav/user-group.svg"
-                    alt="User Group"
-                    className="nav-icon"
-                  />{" "}
-                  Create Group Agent
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/usage"
-                  className="mobile-nav-link"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <img
-                    src="/app/nav/chart.svg"
-                    alt="Chart"
-                    className="nav-icon"
-                  />{" "}
-                  Usage
-                </Link>
-              </li>
-              <li>
+              {authenticated ? (
                 <button 
                   onClick={() => {
                     setMobileMenuOpen(false);
@@ -264,8 +200,10 @@ function App() {
                   </svg>
                   Logout
                 </button>
-              </li>
-            </>
+              ) : (
+                null
+              )}
+            </li>
           </ul>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import App from "./App";
-import ConditionalHome from "./pages/ConditionalHome";
+import Home from "./pages/Home";
 import AgentSettings from "./pages/AgentSettings";
 import AgentsList from "./pages/AgentsList";
 import CreateAgent from "./pages/CreateAgent";
@@ -10,6 +10,7 @@ import GroupCreate from "./pages/GroupCreate";
 import AgentStatus from "./pages/AgentStatus";
 import ImportAgent from "./pages/ImportAgent";
 import Usage from "./pages/Usage";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const BASE_URL = import.meta.env.BASE_URL || "/app";
 
@@ -21,43 +22,79 @@ export const router = createBrowserRouter(
       children: [
         {
           index: true,
-          element: <ConditionalHome />,
+          element: <Home />,
         },
         {
           path: "agents",
-          element: <AgentsList />,
+          element: (
+            <ProtectedRoute>
+              <AgentsList />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "create",
-          element: <CreateAgent />,
+          element: (
+            <ProtectedRoute>
+              <CreateAgent />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "settings/:id",
-          element: <AgentSettings />,
+          element: (
+            <ProtectedRoute>
+              <AgentSettings />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "talk/:id",
-          element: <Chat />,
+          element: (
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "actions-playground",
-          element: <ActionsPlayground />,
+          element: (
+            <ProtectedRoute>
+              <ActionsPlayground />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "group-create",
-          element: <GroupCreate />,
+          element: (
+            <ProtectedRoute>
+              <GroupCreate />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "import",
-          element: <ImportAgent />,
+          element: (
+            <ProtectedRoute>
+              <ImportAgent />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "status/:id",
-          element: <AgentStatus />,
+          element: (
+            <ProtectedRoute>
+              <AgentStatus />
+            </ProtectedRoute>
+          ),
         },
         {
           path: "usage",
-          element: <Usage />,
+          element: (
+            <ProtectedRoute>
+              <Usage />
+            </ProtectedRoute>
+          ),
         },
       ],
     },
