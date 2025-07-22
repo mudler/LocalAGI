@@ -146,11 +146,9 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 	// Cancel any active job for this chat before starting a new one
 	t.cancelActiveJobForChat(update.Message.Chat.ID)
 
-	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("telegram:%d", update.Message.Chat.ID))
-
 	// Clean up the message by removing bot mentions
 	message := strings.ReplaceAll(update.Message.Text, "@"+botInfo.Username, "")
-	message = strings.TrimSpace(message)
+	update.Message.Text = strings.TrimSpace(message)
 
 	// Send initial placeholder message
 	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
@@ -187,6 +185,8 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 		fmt.Sprintf("telegram:%d", update.Message.Chat.ID),
 		chatMessage,
 	)
+
+	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("telegram:%d", update.Message.Chat.ID))
 
 	// Create a new job with the conversation history and metadata
 	job := types.NewJob(
