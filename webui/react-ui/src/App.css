@@ -279,11 +279,12 @@ a:hover {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 9999px;
   color: white;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   text-decoration: none;
+  font-family: inherit;
 }
 
 .logout-btn:hover {
@@ -309,11 +310,65 @@ a:hover {
   display: flex!important;
   justify-content: flex-start;
   align-items: center;
+  font-family: inherit;
 }
 
 .logout-mobile:hover {
   background-color: rgba(255, 255, 255, 0.1) !important;
   border-left-color: white !important;
+}
+
+/* login button */
+.login-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  border-radius: 9999px;
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  border: 1px solid #fff;
+  font-family: inherit;
+}
+
+.login-btn:hover {
+  background: #fafafa;
+  transform: translateY(-1px);
+}
+
+.login-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Mobile login button */
+.login-mobile {
+  background: none !important;
+  border: none !important;
+  width: 100% !important;
+  text-align: left !important;
+  border-radius: 0 !important;
+  display: flex!important;
+  justify-content: flex-start;
+  align-items: center;
+  font-family: inherit;
+}
+
+.login-mobile:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border-left-color: white !important;
+}
+
+.nav-right-container{
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 /* Mobile menu toggle */
@@ -557,6 +612,7 @@ a:hover {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
+  margin-top: 2.5rem;
   margin-bottom: 2.5rem;
 }
 
@@ -807,6 +863,11 @@ a:hover {
   color: var(--danger);
 }
 
+/* Mobile-only visibility */
+.mobile-only {
+  display: none;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .features-grid {
@@ -845,6 +906,10 @@ a:hover {
 
   .user-actions {
     display: none;
+  }
+
+  .mobile-only {
+    display: flex;
   }
 }
 
@@ -2222,9 +2287,4 @@ a:hover {
     flex: 1;
     justify-content: center;
   }
-}
-
-/* Hide the close button */
-button[aria-label="close modal"] {
-  display: none !important;
 }
