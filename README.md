@@ -53,10 +53,8 @@ Now you can access and manage your agents at [http://localhost:3000](http://loca
 
 ## 🏆 Why Choose LocalAGI?
 
-- **✓ Ultimate Privacy**: No data ever leaves your hardware.
-- **✓ Flexible Model Integration**: Supports GGUF, GGML, and more thanks to [LocalAI](https://github.com/mudler/LocalAI).
 - **✓ Developer-Friendly**: Rich APIs and intuitive interfaces.
-- **✓ Effortless Setup**: Simple Docker compose setups and pre-built binaries.
+- **✓ Effortless Setup**: Simple setup and pre-built binaries.
 - **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, LocalAGI has it all.
 
 ## 🌟 Screenshots
@@ -94,11 +92,11 @@ Now you can access and manage your agents at [http://localhost:3000](http://loca
 ### Connectors Ready-to-Go
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/4171072f-e4bf-4485-982b-55d55086f8fc" alt="Telegram" width="60"/>
-  <img src="https://github.com/user-attachments/assets/9235da84-0187-4f26-8482-32dcc55702ef" alt="Discord" width="220"/>
-  <img src="https://github.com/user-attachments/assets/a88c3d88-a387-4fb5-b513-22bdd5da7413" alt="Slack" width="220"/>
-  <img src="https://github.com/user-attachments/assets/d249cdf5-ab34-4ab1-afdf-b99e2db182d2" alt="IRC" width="220"/>
-  <img src="https://github.com/user-attachments/assets/52c852b0-4b50-4926-9fa0-aa50613ac622" alt="GitHub" width="220"/>
+  <img src="https://github.com/user-attachments/assets/014dce65-7b93-490c-98e5-732cec92dda6" alt="Telegram" width="100"/>
+  <img src="https://github.com/user-attachments/assets/d055abd2-61c8-447d-b0dd-69c181bdd705" alt="Discord" width="100"/>
+  <img src="https://github.com/user-attachments/assets/4a9172c0-2d9a-446f-affd-b21dedf0b073" alt="Slack" width="100"/>
+  <img src="https://github.com/user-attachments/assets/e7c13dff-8e27-48cb-901c-0c11fd6d5f05" alt="IRC" width="50"/>
+  <img src="https://github.com/user-attachments/assets/bc0f3dd3-9595-4099-88cf-f0265add9986" alt="GitHub" width="100"/>
 </p>
 
 ## 📖 Full Documentation
