@@ -69,6 +69,7 @@ func main() {
 			services.ActionConfigBrowserAgentRunner: localOperatorBaseURL,
 			services.ActionConfigDeepResearchRunner: localOperatorBaseURL,
 			services.ActionConfigSSHBoxURL:          sshBoxURL,
+			services.ActionConfigStateDir:           stateDir,
 		}),
 		services.Connectors,
 		services.DynamicPrompts,
