@@ -16,6 +16,14 @@ function ObservableSummary({ observable }) {
       creationChatMsg = lastMsg?.content || '';
     }
   }
+
+  // TODO:: Probably we have an array of two objects: [{type:"text", ...}, {type:"image_url", image_url: {url:"..."}}] 
+  //        We could display the image and text along with multimedia icon
+  if (typeof creationChatMsg === 'object') {
+    console.log("Multimedia message?", creationChatMsg);
+    creationChatMsg = 'Multimedia message';
+  }
+
   // FunctionDefinition summary
   let creationFunctionDef = '';
   if (creation?.function_definition?.name) {
@@ -37,7 +45,6 @@ function ObservableSummary({ observable }) {
     chatCompletion = { choices: completion.conversation.map(m => {
       return { message: m }
     }) }
-    console.log("converted conversation to choices", chatCompletion)
   }
 
   if (
@@ -106,7 +113,7 @@ function ObservableSummary({ observable }) {
       !completionAgentState && !completionError && !completionFilter) {
     return null;
   }
-
+  
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0 0 0' }}>
       {/* CREATION */}
@@ -282,7 +289,6 @@ function AgentStatus() {
 
     sse.addEventListener('observable_update', (event) => {
       const data = JSON.parse(event.data);
-      console.log(data);
       setObservableMap(prevMap => {
         const prev = prevMap[data.id] || {};
         const updated = {
