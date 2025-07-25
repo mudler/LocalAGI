@@ -31,7 +31,7 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 🎛 **No-Code Agents**: Easy-to-configure multiple agents via Web UI.
 - 🖥 **Web-Based Interface**: Simple and intuitive agent management.
 - 🤖 **Advanced Agent Teaming**: Instantly create cooperative agent teams from a single prompt.
-- 📡 **Connectors Galore**: Built-in integrations with Discord, Slack, Telegram, GitHub Issues, and IRC.
+- 📡 **Connectors**: Built-in integrations with Discord, Slack, Telegram, GitHub Issues, and IRC.
 - 🛠 **Comprehensive REST API**: Seamless integration into your workflows. Every agent created will support OpenAI Responses API out of the box.
 - 📚 **Short & Long-Term Memory**: Powered by [LocalRecall](https://github.com/mudler/LocalRecall).
 - 🧠 **Planning & Reasoning**: Agents intelligently plan, reason, and adapt.
