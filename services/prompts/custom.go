@@ -11,14 +11,14 @@ import (
 	"github.com/traefik/yaegi/stdlib"
 )
 
-type DynamicPrompt struct {
+type DynamicCustomPrompt struct {
 	config    map[string]string
 	goPkgPath string
 	i         *interp.Interpreter
 }
 
-func NewDynamicPrompt(config map[string]string, goPkgPath string) (*DynamicPrompt, error) {
-	a := &DynamicPrompt{
+func NewDynamicCustomPrompt(config map[string]string, goPkgPath string) (*DynamicCustomPrompt, error) {
+	a := &DynamicCustomPrompt{
 		config:    config,
 		goPkgPath: goPkgPath,
 	}
@@ -34,7 +34,7 @@ func NewDynamicPrompt(config map[string]string, goPkgPath string) (*DynamicPromp
 	return a, nil
 }
 
-func (a *DynamicPrompt) callInit() error {
+func (a *DynamicCustomPrompt) callInit() error {
 	if a.i == nil {
 		return nil
 	}
@@ -81,7 +81,7 @@ func NewDynamicPromptConfigMeta() config.FieldGroup {
 	}
 }
 
-func (a *DynamicPrompt) initializeInterpreter() error {
+func (a *DynamicCustomPrompt) initializeInterpreter() error {
 	if _, exists := a.config["code"]; exists && a.i == nil {
 		unsafe := strings.ToLower(a.config["unsafe"]) == "true"
 		i := interp.New(interp.Options{
@@ -107,7 +107,7 @@ func (a *DynamicPrompt) initializeInterpreter() error {
 	return nil
 }
 
-func (a *DynamicPrompt) Render(c *agent.Agent) (string, error) {
+func (a *DynamicCustomPrompt) Render(c *agent.Agent) (string, error) {
 	v, err := a.i.Eval(fmt.Sprintf("%s.Render", a.config["name"]))
 	if err != nil {
 		return "", err
@@ -118,7 +118,7 @@ func (a *DynamicPrompt) Render(c *agent.Agent) (string, error) {
 	return run()
 }
 
-func (a *DynamicPrompt) Role() string {
+func (a *DynamicCustomPrompt) Role() string {
 	v, err := a.i.Eval(fmt.Sprintf("%s.Role", a.config["name"]))
 	if err != nil {
 		return "system"

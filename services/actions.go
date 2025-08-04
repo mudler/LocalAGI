@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/state"
@@ -100,7 +99,7 @@ const (
 	ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
 	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
 	ActionConfigSSHBoxURL          = "sshbox-url"
-	ActionConfigStateDir           = "state-dir"
+	ConfigStateDir                 = "state-dir"
 )
 
 func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
@@ -138,17 +137,7 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		config = map[string]string{}
 	}
 
-	// Compose memory file path based on stateDir and agentName, using a subdirectory
-	memoryFilePath := "memory.json"
-	if actionsConfigs != nil {
-		if stateDir, ok := actionsConfigs[ActionConfigStateDir]; ok && stateDir != "" {
-			memoryDir := fmt.Sprintf("%s/memory", stateDir)
-			_ = os.MkdirAll(memoryDir, 0755) // ensure the directory exists
-			memoryFilePath = fmt.Sprintf("%s/%s.json", memoryDir, agentName)
-		} else {
-			memoryFilePath = fmt.Sprintf("%s.memory.json", agentName)
-		}
-	}
+	memoryFilePath := memoryPath(agentName, actionsConfigs)
 
 	switch name {
 	case ActionCustom:
