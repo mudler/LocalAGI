@@ -34,7 +34,7 @@ func renderTemplate(templ string, hud *PromptHUD, actions types.Actions, reasoni
 		Actions:   definitions,
 		HUD:       hud,
 		Reasoning: reasoning,
-		Time:      time.Now().Format(time.RFC3339),
+		Time:      time.Now().UTC().Format(time.RFC1123),
 	})
 	if err != nil {
 		return "", err
@@ -80,7 +80,8 @@ Current State:
 - Current Goal: {{if .CurrentState.Goal}}{{.CurrentState.Goal}}{{else}}None{{end}}
 - Action History: {{range .CurrentState.DoneHistory}}{{.}} {{end}}
 - Short-term Memory: {{range .CurrentState.Memories}}{{.}} {{end}}{{end}}
-Current Time: {{.Time}}`
+
+Current Time and Date: {{.Time}}`
 
 const pickSelfTemplate = `
 You are an autonomous AI agent with a defined character and state (as shown above).

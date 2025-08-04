@@ -37,7 +37,7 @@ type AgentPool struct {
 	imageModel, localRAGAPI, localRAGKey, apiKey string
 	availableActions                             func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                   func(*AgentConfig) []Connector
-	dynamicPrompt                                func(*AgentConfig) []DynamicPrompt
+	dynamicPrompt                                func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
 	filters                                      func(*AgentConfig) types.JobFilters
 	timeout                                      string
 	conversationLogs                             string
@@ -78,7 +78,7 @@ func NewAgentPool(
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
-	promptBlocks func(*AgentConfig) []DynamicPrompt,
+	promptBlocks func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt,
 	filters func(*AgentConfig) types.JobFilters,
 	timeout string,
 	withLogs bool,
@@ -375,7 +375,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 	}
 
 	connectors := a.connectors(config)
-	promptBlocks := a.dynamicPrompt(config)
+	promptBlocks := a.dynamicPrompt(config)(ctx, a)
 	actions := a.availableActions(config)(ctx, a)
 	filters := a.filters(config)
 	stateFile, characterFile := a.stateFiles(name)

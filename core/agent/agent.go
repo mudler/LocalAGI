@@ -462,7 +462,7 @@ func extractAllImageContent(message openai.ChatCompletionMessage) (images []stri
 	return
 }
 
-func (a *Agent) processUserInputs(job *types.Job, role string, conv Messages) Messages {
+func (a *Agent) processUserInputs(conv Messages) Messages {
 
 	// walk conversation history, and check if any message contains images.
 	// If they do, we need to describe the images first with a model that supports image understanding (if the current model doesn't support it)
@@ -663,7 +663,7 @@ func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMe
 			{
 				Type: openai.ToolTypeFunction,
 				Function: openai.FunctionCall{
-					Name: chosenAction.Definition().ToFunctionDefinition().Name,
+					Name:      chosenAction.Definition().ToFunctionDefinition().Name,
 					Arguments: params.String(),
 				},
 			},
@@ -725,7 +725,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		}
 		return
 	}
-	conv = a.processUserInputs(job, role, conv)
+	conv = a.processUserInputs(conv)
 
 	// RAG
 	conv = a.knowledgeBaseLookup(job, conv)
