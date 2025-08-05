@@ -30,9 +30,10 @@ func NewActionContext(ctx context.Context, cancel context.CancelFunc) *ActionCon
 type ActionParams map[string]interface{}
 
 type ActionResult struct {
-	Job      *Job
-	Result   string
-	Metadata map[string]interface{}
+	Job               *Job
+	Result            string
+	ImageBase64Result string
+	Metadata          map[string]interface{}
 }
 
 func (ap ActionParams) Read(s string) error {
@@ -141,9 +142,9 @@ func (u *UserDefinedAction) IsUserDefined() bool {
 func CreateUserDefinedActions(userTools []ActionDefinition) []Action {
 	var actions []Action
 	for _, tool := range userTools {
-			actions = append(actions, &UserDefinedAction{
-				ActionDef: &tool,
-			})
+		actions = append(actions, &UserDefinedAction{
+			ActionDef: &tool,
+		})
 	}
 	return actions
 }

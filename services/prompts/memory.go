@@ -30,13 +30,15 @@ func NewMemoryPromptConfigMeta() config.FieldGroup {
 	}
 }
 
-func (a *MemoryPrompt) Render(c *agent.Agent) (string, error) {
+func (a *MemoryPrompt) Render(c *agent.Agent) (types.PromptResult, error) {
 	result, err := a.memory.Run(c.Context(), c.SharedState(), types.ActionParams{})
 	if err != nil {
-		return "", err
+		return types.PromptResult{}, err
 	}
 
-	return result.Result, nil
+	return types.PromptResult{
+		Content: result.Result,
+	}, nil
 }
 
 func (a *MemoryPrompt) Role() string {
