@@ -99,28 +99,28 @@ const AgentForm = ({
   const handleAddDynamicPrompt = () => {
     setFormData({
       ...formData,
-      dynamicPrompts: [
-        ...(formData.dynamicPrompts || []),
+      dynamic_prompts: [
+        ...(formData.dynamic_prompts || []),
         { type: '', config: '{}' }
       ]
     });
   };
 
   const handleRemoveDynamicPrompt = (index) => {
-    const updatedDynamicPrompts = [...formData.dynamicPrompts];
+    const updatedDynamicPrompts = [...formData.dynamic_prompts];
     updatedDynamicPrompts.splice(index, 1);
     setFormData({
       ...formData,
-      dynamicPrompts: updatedDynamicPrompts,
+      dynamic_prompts: updatedDynamicPrompts,
     });
   };
   
   const handleDynamicPromptChange = (index, updatedPrompt) => {
-    const updatedPrompts = [...formData.dynamicPrompts];
+    const updatedPrompts = [...formData.dynamic_prompts];
     updatedPrompts[index] = updatedPrompt;
     setFormData({
       ...formData,
-      dynamicPrompts: updatedPrompts
+      dynamic_prompts: updatedPrompts
     });
   };
 

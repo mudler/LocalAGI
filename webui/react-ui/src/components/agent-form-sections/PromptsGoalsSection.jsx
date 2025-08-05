@@ -67,7 +67,7 @@ const PromptsGoalsSection = ({
       />
 
       <DynamicPromptForm
-        prompts={formData.dynamicPrompts || []}
+        prompts={formData.dynamic_prompts || []}
         onAddPrompt={onAddPrompt}
         onRemovePrompt={onRemovePrompt}
         onChange={handleDynamicPromptChange}
