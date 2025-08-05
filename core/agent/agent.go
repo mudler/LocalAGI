@@ -1114,7 +1114,7 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	job.Result.Finish(nil)
 }
 
-func (a *Agent) addFunctionResultToConversation(chosenAction types.Action, actionParams types.ActionParams, result types.ActionResult, conv Messages) Messages {
+func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenAction types.Action, actionParams types.ActionParams, result types.ActionResult, conv Messages) Messages {
 	// calling the function
 	conv = append(conv, openai.ChatCompletionMessage{
 		Role: "assistant",
@@ -1130,6 +1130,46 @@ func (a *Agent) addFunctionResultToConversation(chosenAction types.Action, actio
 	})
 
 	// result of calling the function
+
+	// If it contains an image, we need to put it in the conversation (if supported by the model)
+	if result.ImageBase64Result != "" {
+		// iF model support both images and text, process it as a single multicontent message and return
+		if !a.options.SeparatedMultimodalModel() {
+			conv = append(conv, openai.ChatCompletionMessage{
+				Role: openai.ChatMessageRoleTool,
+				MultiContent: []openai.ChatMessagePart{
+					{
+						Type: openai.ChatMessagePartTypeText,
+						Text: result.Result,
+					},
+					{
+						Type: openai.ChatMessagePartTypeImageURL,
+						ImageURL: &openai.ChatMessageImageURL{
+							URL: result.ImageBase64Result,
+						},
+					},
+				},
+				Name:       chosenAction.Definition().Name.String(),
+				ToolCallID: chosenAction.Definition().Name.String(),
+			})
+
+			return conv
+		} else {
+			// We need to describe the image first, and we will process the text separately (we do not return here)
+			imageDescription, err := a.describeImage(ctx, a.options.LLMAPI.MultimodalModel, result.ImageBase64Result)
+			if err != nil {
+				xlog.Error("Error describing image", "error", err)
+			} else {
+				conv = append(conv, openai.ChatCompletionMessage{
+					Role:       openai.ChatMessageRoleTool,
+					Content:    fmt.Sprintf("Tool generated an image, the description of the image is: %s", imageDescription),
+					Name:       chosenAction.Definition().Name.String(),
+					ToolCallID: chosenAction.Definition().Name.String(),
+				})
+			}
+		}
+	}
+
 	conv = append(conv, openai.ChatCompletionMessage{
 		Role:       openai.ChatMessageRoleTool,
 		Content:    result.Result,
