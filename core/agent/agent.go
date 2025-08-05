@@ -379,7 +379,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			xlog.Error("Error rendering prompt", "error", err)
 			continue
 		}
-		if message.Content == "" || message.ImageBase64 == "" {
+		if message.Content == "" && message.ImageBase64 == "" {
 			xlog.Debug("Prompt is empty, skipping", "agent", a.Character.Name)
 			continue
 		}
@@ -388,7 +388,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			// iF model support both images and text, process it as a single multicontent message and return
 			if !a.options.SeparatedMultimodalModel() {
 				conversation = append([]openai.ChatCompletionMessage{
-					openai.ChatCompletionMessage{
+					{
 						Role: prompt.Role(),
 						MultiContent: []openai.ChatMessagePart{
 							{
@@ -1197,16 +1197,24 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 					Name:       chosenAction.Definition().Name.String(),
 					ToolCallID: chosenAction.Definition().Name.String(),
 				})
+				if result.Result != "" {
+					conv = append(conv, openai.ChatCompletionMessage{
+						Role:       openai.ChatMessageRoleTool,
+						Content:    result.Result,
+						Name:       chosenAction.Definition().Name.String(),
+						ToolCallID: chosenAction.Definition().Name.String(),
+					})
+				}
 			}
 		}
+	} else {
+		conv = append(conv, openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    result.Result,
+			Name:       chosenAction.Definition().Name.String(),
+			ToolCallID: chosenAction.Definition().Name.String(),
+		})
 	}
-
-	conv = append(conv, openai.ChatCompletionMessage{
-		Role:       openai.ChatMessageRoleTool,
-		Content:    result.Result,
-		Name:       chosenAction.Definition().Name.String(),
-		ToolCallID: chosenAction.Definition().Name.String(),
-	})
 
 	return conv
 }
