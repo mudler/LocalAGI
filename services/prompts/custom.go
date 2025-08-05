@@ -114,14 +114,15 @@ func (a *DynamicCustomPrompt) Render(c *agent.Agent) (types.PromptResult, error)
 		return types.PromptResult{}, err
 	}
 
-	run := v.Interface().(func() (string, error))
-	content, err := run()
+	run := v.Interface().(func() (string, string, error))
+	content, image, err := run()
 	if err != nil {
 		return types.PromptResult{}, err
 	}
 
 	return types.PromptResult{
-		Content: content,
+		Content:     content,
+		ImageBase64: image,
 	}, nil
 }
 
