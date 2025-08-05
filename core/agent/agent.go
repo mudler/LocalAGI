@@ -371,10 +371,7 @@ func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params type
 	return result, nil
 }
 
-func (a *Agent) processPrompts(conversation Messages) Messages {
-	//if job.Image != "" {
-	// TODO: Use llava to explain the image content
-	//}
+func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messages {
 	// Add custom prompts
 	for _, prompt := range a.options.prompts {
 		message, err := prompt.Render(a)
@@ -382,15 +379,49 @@ func (a *Agent) processPrompts(conversation Messages) Messages {
 			xlog.Error("Error rendering prompt", "error", err)
 			continue
 		}
-		if message == "" {
+		if message.Content == "" || message.ImageBase64 == "" {
 			xlog.Debug("Prompt is empty, skipping", "agent", a.Character.Name)
 			continue
 		}
-		if !conversation.Exist(a.options.systemPrompt) {
+
+		if message.ImageBase64 != "" {
+			// iF model support both images and text, process it as a single multicontent message and return
+			if !a.options.SeparatedMultimodalModel() {
+				conversation = append([]openai.ChatCompletionMessage{
+					openai.ChatCompletionMessage{
+						Role: prompt.Role(),
+						MultiContent: []openai.ChatMessagePart{
+							{
+								Type: openai.ChatMessagePartTypeText,
+								Text: message.Content,
+							},
+							{
+								Type: openai.ChatMessagePartTypeImageURL,
+								ImageURL: &openai.ChatMessageImageURL{
+									URL: message.ImageBase64,
+								},
+							},
+						},
+					}}, conversation...)
+
+			} else {
+				// We need to describe the image first, and we will process the text separately (we do not return here)
+				imageDescription, err := a.describeImage(ctx, a.options.LLMAPI.MultimodalModel, message.ImageBase64)
+				if err != nil {
+					xlog.Error("Error describing image", "error", err)
+				} else {
+					conversation = append([]openai.ChatCompletionMessage{
+						{
+							Role:    prompt.Role(),
+							Content: fmt.Sprintf("%s\n\nImage description: %s", message.Content, imageDescription),
+						}}, conversation...)
+				}
+			}
+		} else {
 			conversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    prompt.Role(),
-					Content: message,
+					Content: message.Content,
 				}}, conversation...)
 		}
 	}
@@ -716,7 +747,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		}()
 	}
 
-	conv = a.processPrompts(conv)
+	conv = a.processPrompts(job.GetContext(), conv)
 	if ok, err := a.filterJob(job); !ok || err != nil {
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("Error in job filter: %w", err))
@@ -976,7 +1007,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		job.CallbackWithResult(stateResult)
 		xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
 
-		conv = a.addFunctionResultToConversation(chosenAction, actionParams, result, conv)
+		conv = a.addFunctionResultToConversation(job.GetContext(), chosenAction, actionParams, result, conv)
 	}
 
 	// given the result, we can now re-evaluate the conversation

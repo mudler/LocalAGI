@@ -421,7 +421,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 		job.Result.SetResult(stateResult)
 		job.CallbackWithResult(stateResult)
 		xlog.Debug("[subtask] Action executed", "agent", a.Character.Name, "action", subTaskAction.Definition().Name, "result", result)
-		conv = a.addFunctionResultToConversation(subTaskAction, actionParams, result, conv)
+		conv = a.addFunctionResultToConversation(job.GetContext(), subTaskAction, actionParams, result, conv)
 	}
 
 	return conv, nil
@@ -431,7 +431,7 @@ func (a *Agent) handlePlanning(ctx context.Context, job *types.Job, chosenAction
 func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 	// Start with regular available actions
 	baseActions := a.availableActions()
-	
+
 	// Add user-defined actions from the job
 	userTools := job.GetUserTools()
 	if len(userTools) > 0 {
@@ -439,7 +439,7 @@ func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 		baseActions = append(baseActions, userDefinedActions...)
 		xlog.Debug("Added user-defined actions", "definitions", userTools)
 	}
-	
+
 	return baseActions
 }
 

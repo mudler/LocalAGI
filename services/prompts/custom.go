@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/traefik/yaegi/interp"
@@ -107,15 +108,21 @@ func (a *DynamicCustomPrompt) initializeInterpreter() error {
 	return nil
 }
 
-func (a *DynamicCustomPrompt) Render(c *agent.Agent) (string, error) {
+func (a *DynamicCustomPrompt) Render(c *agent.Agent) (types.PromptResult, error) {
 	v, err := a.i.Eval(fmt.Sprintf("%s.Render", a.config["name"]))
 	if err != nil {
-		return "", err
+		return types.PromptResult{}, err
 	}
 
 	run := v.Interface().(func() (string, error))
+	content, err := run()
+	if err != nil {
+		return types.PromptResult{}, err
+	}
 
-	return run()
+	return types.PromptResult{
+		Content: content,
+	}, nil
 }
 
 func (a *DynamicCustomPrompt) Role() string {
