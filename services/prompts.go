@@ -36,11 +36,6 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 
 			memoryFilePath := memoryPath(a.Name, dynamicConfig)
 			promptblocks := []agent.DynamicPrompt{}
-			_, memory, err := actions.NewMemoryActions(memoryFilePath, dynamicConfig)
-			if err != nil {
-				xlog.Error("Error creating memory actions", "error", err)
-				return promptblocks
-			}
 
 			for _, c := range a.DynamicPrompts {
 				var config map[string]string
@@ -57,6 +52,8 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 					}
 					promptblocks = append(promptblocks, prompt)
 				case DynamicPromptMemory:
+					_, memory, _ := actions.NewMemoryActions(memoryFilePath, dynamicConfig)
+
 					promptblocks = append(promptblocks,
 						prompts.NewMemoryPrompt(config, memory),
 					)
