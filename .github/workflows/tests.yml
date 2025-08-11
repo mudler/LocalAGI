@@ -48,7 +48,11 @@ jobs:
 
     - name: Run tests
       run: |
-        make tests
+        if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+          make tests-mock
+        else
+          make tests
+        fi
     #sudo mv coverage/coverage.txt coverage.txt
     #sudo chmod 777 coverage.txt
 
