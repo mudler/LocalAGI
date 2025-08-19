@@ -1,6 +1,6 @@
 module github.com/mudler/LocalAGI
 
-go 1.24
+go 1.24.0
 
 toolchain go1.24.2
 
@@ -27,13 +27,16 @@ require (
 	github.com/tmc/langchaingo v0.1.13
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.62.0
-	golang.org/x/crypto v0.40.0
+	golang.org/x/crypto v0.41.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
-	maunium.net/go/mautrix v0.17.0
+	maunium.net/go/mautrix v0.25.0
 	mvdan.cc/xurls/v2 v2.6.0
 )
 
-require github.com/JohannesKaufmann/dom v0.2.0 // indirect
+require (
+	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/JohannesKaufmann/dom v0.2.0 // indirect
+)
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.3
@@ -89,7 +92,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkoukk/tiktoken-go v0.1.7 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rs/zerolog v1.31.0 // indirect
+	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
@@ -101,17 +104,16 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
-	go.mau.fi/util v0.3.0 // indirect
+	go.mau.fi/util v0.9.0 // indirect
 	go.starlark.net v0.0.0-20250417143717-f57e51f710eb // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/arch v0.16.0 // indirect
-	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
-	golang.org/x/tools v0.34.0 // indirect
+	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6 // indirect
+	golang.org/x/net v0.43.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/tools v0.36.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	maunium.net/go/maulogger/v2 v2.4.1 // indirect
 )
