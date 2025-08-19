@@ -6,7 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
-	github.com/chasefleming/elem-go v0.30.0
+	github.com/chasefleming/elem-go v0.31.0
 	github.com/dave-gray101/v2keyauth v0.0.0-20240624150259-c45d584d25e2
 	github.com/donseba/go-htmx v1.12.0
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
