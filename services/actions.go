@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/state"
@@ -102,7 +104,7 @@ const (
 	ConfigStateDir                 = "state-dir"
 )
 
-func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 		return func(ctx context.Context, pool *state.AgentPool) []types.Action {
 			allActions := []types.Action{}
@@ -121,6 +123,36 @@ func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(c
 					continue
 				}
 				allActions = append(allActions, a)
+			}
+
+			// Now we will scan a directory for custom actions
+			if customActionsDir != "" {
+				files, err := os.ReadDir(customActionsDir)
+				if err != nil {
+					xlog.Error("Error reading custom actions directory", "error", err)
+					return allActions
+				}
+
+				for _, file := range files {
+					if filepath.Ext(file.Name()) != ".go" {
+						continue
+					}
+
+					content, err := os.ReadFile(filepath.Join(customActionsDir, file.Name()))
+					if err != nil {
+						xlog.Error("Error reading custom action file", "error", err, "file", file.Name())
+						continue
+					}
+
+					a, err := Action(ActionCustom, agentName, map[string]string{
+						"content": string(content),
+					}, pool, actionsConfigs)
+					if err != nil {
+						xlog.Error("Error creating custom action", "error", err, "file", file.Name())
+						continue
+					}
+					allActions = append(allActions, a)
+				}
 			}
 
 			return allActions
