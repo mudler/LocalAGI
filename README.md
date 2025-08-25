@@ -173,6 +173,9 @@ MODEL_NAME=gemma-3-12b-it \
 MULTIMODAL_MODEL=moondream2-20250414 \
 IMAGE_MODEL=sd-1.5-ggml \
 docker compose -f docker-compose.intel.yaml up
+
+# With custom actions directory
+LOCALAGI_CUSTOM_ACTIONS_DIR=/app/custom-actions docker compose up
 ```
 
 If no models are specified, it will use the defaults:
@@ -237,6 +240,7 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
+| `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
 
 ## Installation Options
 
@@ -424,6 +428,30 @@ LocalAGI provides two powerful ways to extend its functionality with custom acti
 ### 1. Custom Actions (Go Code)
 
 LocalAGI supports custom actions written in Go that can be defined inline when creating an agent. These actions are interpreted at runtime, so no compilation is required.
+
+#### Automatic Custom Actions Loading
+
+You can also place custom Go action files in a directory and have LocalAGI automatically load them. Set the `LOCALAGI_CUSTOM_ACTIONS_DIR` environment variable to point to a directory containing your custom action files. Each `.go` file in this directory will be automatically loaded and made available to all agents.
+
+**Example setup:**
+```bash
+# Set the environment variable
+export LOCALAGI_CUSTOM_ACTIONS_DIR="/path/to/custom/actions"
+
+# Or in docker-compose.yaml
+environment:
+  - LOCALAGI_CUSTOM_ACTIONS_DIR=/app/custom-actions
+```
+
+**Directory structure:**
+```
+custom-actions/
+├── weather_action.go
+├── file_processor.go
+└── database_query.go
+```
+
+Each file should contain the three required functions (`Run`, `Definition`, `RequiredFields`) as described below.
 
 #### How Custom Actions Work
 
@@ -985,6 +1013,7 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_MCPBOX_URL` | LocalAGI MCPBox URL, e.g. http://mcpbox:8080 |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
+| `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
 </details>
 
 ## LICENSE
