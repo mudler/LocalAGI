@@ -92,6 +92,7 @@ func main() {
 		webui.WithLLMAPIUrl(apiURL),
 		webui.WithLLMAPIKey(apiKey),
 		webui.WithLLMModel(baseModel),
+		webui.WithCustomActionsDir(customActionsDir),
 		webui.WithStateDir(stateDir),
 	)
 
