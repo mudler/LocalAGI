@@ -492,7 +492,7 @@ func (a *App) ListActions() func(c *fiber.Ctx) error {
 func (a *App) createToolCallResponse(id, agentName string, actionState coreTypes.ActionState, conv []openai.ChatCompletionMessage) types.ResponseBody {
 	// Create tool call ID
 	toolCallID := fmt.Sprintf("call_%d", time.Now().UnixNano())
-	
+
 	// Get function name and arguments
 	functionName := actionState.Action.Definition().Name.String()
 	argumentsJSON, err := json.Marshal(actionState.Params)
@@ -501,7 +501,7 @@ func (a *App) createToolCallResponse(id, agentName string, actionState coreTypes
 		// Fallback to empty arguments
 		argumentsJSON = []byte("{}")
 	}
-	
+
 	// Create message object with reasoning
 	messageObj := types.ResponseMessage{
 		Type:   "message",
@@ -515,7 +515,7 @@ func (a *App) createToolCallResponse(id, agentName string, actionState coreTypes
 			},
 		},
 	}
-	
+
 	// Create function tool call object
 	functionToolCall := types.FunctionToolCall{
 		Arguments: string(argumentsJSON),
@@ -525,7 +525,7 @@ func (a *App) createToolCallResponse(id, agentName string, actionState coreTypes
 		ID:        fmt.Sprintf("tool_%d", time.Now().UnixNano()),
 		Status:    "completed",
 	}
-	
+
 	// Create response with both message and tool call in output array
 	return types.ResponseBody{
 		ID:        id,
@@ -612,7 +612,7 @@ func (a *App) Responses(pool *state.AgentPool, tracker *conversations.Conversati
 			lastAction := res.State[len(res.State)-1]
 			if coreTypes.IsActionUserDefined(lastAction.Action) {
 				xlog.Debug("Detected user-defined action, creating tool call response", "action", lastAction.Action.Definition().Name)
-				
+
 				// Generate tool call response
 				response := a.createToolCallResponse(id, agentName, lastAction, conv)
 				tracker.SetConversation(id, conv) // Save conversation without adding assistant message
@@ -737,11 +737,11 @@ func (a *App) CreateGroup(pool *state.AgentPool) func(c *fiber.Ctx) error {
 }
 
 // GetAgentConfigMeta returns the metadata for agent configuration fields
-func (a *App) GetAgentConfigMeta() func(c *fiber.Ctx) error {
+func (a *App) GetAgentConfigMeta(customDirectory string) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		// Create a new instance of AgentConfigMeta
 		configMeta := state.NewAgentConfigMeta(
-			services.ActionsConfigMeta(),
+			services.ActionsConfigMeta(customDirectory),
 			services.ConnectorsConfigMeta(),
 			services.DynamicPromptsConfigMeta(),
 			services.FiltersConfigMeta(),

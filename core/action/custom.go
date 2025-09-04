@@ -24,7 +24,7 @@ func NewCustom(config map[string]string, goPkgPath string) (*CustomAction, error
 	}
 
 	if err := a.callInit(); err != nil {
-		xlog.Error("Error calling custom action init", "error", err)
+		xlog.Warn("No init function found for custom action", "error", err, "action", a.config["name"])
 	}
 
 	return a, nil
@@ -46,7 +46,10 @@ func (a *CustomAction) callInit() error {
 		return err
 	}
 
-	run := v.Interface().(func() error)
+	run, ok := v.Interface().(func() error)
+	if !ok {
+		return nil
+	}
 
 	return run()
 }
@@ -106,6 +109,21 @@ func (a *CustomAction) Definition() types.ActionDefinition {
 		return types.ActionDefinition{}
 	}
 
+	description := ""
+	desc, err := a.i.Eval(fmt.Sprintf("%s.Description", a.config["name"]))
+	if err != nil {
+		xlog.Warn("No description found for custom action", "error", err, "action", a.config["name"])
+	} else {
+		d, ok := desc.Interface().(func() string)
+		if ok {
+			description = d()
+		}
+	}
+
+	if a.config["description"] != "" {
+		description = a.config["description"]
+	}
+
 	properties := v.Interface().(func() map[string][]string)
 
 	v, err = a.i.Eval(fmt.Sprintf("%s.RequiredFields", a.config["name"]))
@@ -130,7 +148,7 @@ func (a *CustomAction) Definition() types.ActionDefinition {
 	}
 	return types.ActionDefinition{
 		Name:        types.ActionDefinitionName(a.config["name"]),
-		Description: a.config["description"],
+		Description: description,
 		Properties:  prop,
 		Required:    requiredFields(),
 	}
