@@ -59,6 +59,11 @@ const (
 	ActionRemoveFromMemory               = "remove_from_memory"
 )
 
+const (
+	nameField        = "name"
+	descriptionField = "description"
+)
+
 var AvailableActions = []string{
 	ActionSearch,
 	ActionCustom,
@@ -294,7 +299,7 @@ const (
 	ConfigStateDir                 = "state-dir"
 )
 
-func CustomActions(customActionsDir string) (allActions []types.Action) {
+func CustomActions(customActionsDir string, existingActionConfigs map[string]map[string]string) (allActions []types.Action) {
 	files, err := os.ReadDir(customActionsDir)
 	if err != nil {
 		xlog.Error("Error reading custom actions directory", "error", err)
@@ -311,11 +316,21 @@ func CustomActions(customActionsDir string) (allActions []types.Action) {
 			xlog.Error("Error reading custom action file", "error", err, "file", file.Name())
 			continue
 		}
-		a, err := Action(ActionCustom, "", map[string]string{
-			"name":   strings.TrimSuffix(file.Name(), ".go"),
-			"code":   string(content),
-			"unsafe": "false",
-		}, nil, map[string]string{})
+		actionName := strings.TrimSuffix(file.Name(), ".go")
+
+		actionConfig := map[string]string{
+			"name":        actionName,
+			"description": "",
+			"code":        string(content),
+			"unsafe":      "false",
+		}
+
+		if c, exists := existingActionConfigs[actionName]; exists {
+			// We allow the user to customize name and description
+			actionConfig[descriptionField] = c[descriptionField]
+			actionConfig[nameField] = c[nameField]
+		}
+		a, err := Action(ActionCustom, "", actionConfig, nil, map[string]string{})
 		if err != nil {
 			xlog.Error("Error creating custom action", "error", err, "file", file.Name())
 			continue
@@ -332,12 +347,15 @@ func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *
 
 			agentName := a.Name
 
+			existingActionConfigs := map[string]map[string]string{}
 			for _, a := range a.Actions {
 				var config map[string]string
 				if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
 					xlog.Error("Error unmarshalling action config", "error", err)
 					continue
 				}
+
+				existingActionConfigs[a.Name] = config
 
 				a, err := Action(a.Name, agentName, config, pool, actionsConfigs)
 				if err != nil {
@@ -348,7 +366,7 @@ func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *
 
 			// Now we will scan a directory for custom actions
 			if customActionsDir != "" {
-				allActions = append(allActions, CustomActions(customActionsDir)...)
+				allActions = append(allActions, CustomActions(customActionsDir, existingActionConfigs)...)
 			}
 
 			return allActions
@@ -458,7 +476,7 @@ func ActionsConfigMeta(customActionDir string) []config.FieldGroup {
 	all := slices.Clone(DefaultActions)
 
 	if customActionDir != "" {
-		actions := CustomActions(customActionDir)
+		actions := CustomActions(customActionDir, map[string]map[string]string{})
 
 		for _, a := range actions {
 			all = append(all, config.FieldGroup{
@@ -466,13 +484,13 @@ func ActionsConfigMeta(customActionDir string) []config.FieldGroup {
 				Label: a.Definition().Name.String(),
 				Fields: []config.Field{
 					{
-						Name:     "name",
+						Name:     nameField,
 						Label:    "Name",
 						Type:     config.FieldTypeText,
 						HelpText: "Name of the custom action",
 					},
 					{
-						Name:     "description",
+						Name:     descriptionField,
 						Label:    "Description",
 						Type:     config.FieldTypeTextarea,
 						HelpText: "Description of the custom action",

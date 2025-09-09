@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/mudler/LocalAGI/core/types"
@@ -67,6 +68,15 @@ func (a *CustomAction) initializeInterpreter() error {
 
 		if _, exists := a.config["name"]; !exists {
 			a.config["name"] = "custom"
+		}
+
+		// let's find first if there is already a package declarated in the code
+		// the user might want to specify it to not break syntax with IDEs
+		re := regexp.MustCompile("package (\\w+)")
+		packageName := re.FindStringSubmatch(a.config["code"])
+		if len(packageName) > 1 {
+			// remove it from the code, normalize to `name`
+			a.config["code"] = re.ReplaceAllString(a.config["code"], "")
 		}
 
 		_, err := i.Eval(fmt.Sprintf("package %s\n%s", a.config["name"], a.config["code"]))
