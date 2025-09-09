@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/mudler/LocalAGI/core/types"
@@ -24,7 +25,7 @@ func NewCustom(config map[string]string, goPkgPath string) (*CustomAction, error
 	}
 
 	if err := a.callInit(); err != nil {
-		xlog.Error("Error calling custom action init", "error", err)
+		xlog.Warn("No init function found for custom action", "error", err, "action", a.config["name"])
 	}
 
 	return a, nil
@@ -46,7 +47,10 @@ func (a *CustomAction) callInit() error {
 		return err
 	}
 
-	run := v.Interface().(func() error)
+	run, ok := v.Interface().(func() error)
+	if !ok {
+		return nil
+	}
 
 	return run()
 }
@@ -64,6 +68,15 @@ func (a *CustomAction) initializeInterpreter() error {
 
 		if _, exists := a.config["name"]; !exists {
 			a.config["name"] = "custom"
+		}
+
+		// let's find first if there is already a package declarated in the code
+		// the user might want to specify it to not break syntax with IDEs
+		re := regexp.MustCompile("package (\\w+)")
+		packageName := re.FindStringSubmatch(a.config["code"])
+		if len(packageName) > 1 {
+			// remove it from the code, normalize to `name`
+			a.config["code"] = re.ReplaceAllString(a.config["code"], "")
 		}
 
 		_, err := i.Eval(fmt.Sprintf("package %s\n%s", a.config["name"], a.config["code"]))
@@ -106,6 +119,21 @@ func (a *CustomAction) Definition() types.ActionDefinition {
 		return types.ActionDefinition{}
 	}
 
+	description := ""
+	desc, err := a.i.Eval(fmt.Sprintf("%s.Description", a.config["name"]))
+	if err != nil {
+		xlog.Warn("No description found for custom action", "error", err, "action", a.config["name"])
+	} else {
+		d, ok := desc.Interface().(func() string)
+		if ok {
+			description = d()
+		}
+	}
+
+	if a.config["description"] != "" {
+		description = a.config["description"]
+	}
+
 	properties := v.Interface().(func() map[string][]string)
 
 	v, err = a.i.Eval(fmt.Sprintf("%s.RequiredFields", a.config["name"]))
@@ -130,7 +158,7 @@ func (a *CustomAction) Definition() types.ActionDefinition {
 	}
 	return types.ActionDefinition{
 		Name:        types.ActionDefinitionName(a.config["name"]),
-		Description: a.config["description"],
+		Description: description,
 		Properties:  prop,
 		Required:    requiredFields(),
 	}

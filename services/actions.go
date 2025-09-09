@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/state"
@@ -57,6 +59,11 @@ const (
 	ActionRemoveFromMemory               = "remove_from_memory"
 )
 
+const (
+	nameField        = "name"
+	descriptionField = "description"
+)
+
 var AvailableActions = []string{
 	ActionSearch,
 	ActionCustom,
@@ -97,12 +104,241 @@ var AvailableActions = []string{
 	ActionRemoveFromMemory,
 }
 
+var DefaultActions = []config.FieldGroup{
+	{
+		Name:   "search",
+		Label:  "Search",
+		Fields: actions.SearchConfigMeta(),
+	},
+	{
+		Name:   "browser-agent-runner",
+		Label:  "Browser Agent Runner",
+		Fields: actions.BrowserAgentRunnerConfigMeta(),
+	},
+	{
+		Name:   "deep-research-runner",
+		Label:  "Deep Research Runner",
+		Fields: actions.DeepResearchRunnerConfigMeta(),
+	},
+	{
+		Name:   "generate_image",
+		Label:  "Generate Image",
+		Fields: actions.GenImageConfigMeta(),
+	},
+	{
+		Name:   "add_to_memory",
+		Label:  "Add to Memory",
+		Fields: actions.AddToMemoryConfigMeta(),
+	},
+	{
+		Name:   "list_memory",
+		Label:  "List Memory",
+		Fields: actions.ListMemoryConfigMeta(),
+	},
+	{
+		Name:   "remove_from_memory",
+		Label:  "Remove from Memory",
+		Fields: actions.RemoveFromMemoryConfigMeta(),
+	},
+	{
+		Name:   "github-issue-labeler",
+		Label:  "GitHub Issue Labeler",
+		Fields: actions.GithubIssueLabelerConfigMeta(),
+	},
+	{
+		Name:   "github-issue-opener",
+		Label:  "GitHub Issue Opener",
+		Fields: actions.GithubIssueOpenerConfigMeta(),
+	},
+	{
+		Name:   "github-issue-editor",
+		Label:  "GitHub Issue Editor",
+		Fields: actions.GithubIssueEditorConfigMeta(),
+	},
+	{
+		Name:   "github-issue-closer",
+		Label:  "GitHub Issue Closer",
+		Fields: actions.GithubIssueCloserConfigMeta(),
+	},
+	{
+		Name:   "github-issue-commenter",
+		Label:  "GitHub Issue Commenter",
+		Fields: actions.GithubIssueCommenterConfigMeta(),
+	},
+	{
+		Name:   "github-issue-reader",
+		Label:  "GitHub Issue Reader",
+		Fields: actions.GithubIssueReaderConfigMeta(),
+	},
+	{
+		Name:   "github-issue-searcher",
+		Label:  "GitHub Issue Search",
+		Fields: actions.GithubIssueSearchConfigMeta(),
+	},
+	{
+		Name:   "github-repository-get-content",
+		Label:  "GitHub Repository Get Content",
+		Fields: actions.GithubRepositoryGetContentConfigMeta(),
+	},
+	{
+		Name:   "github-get-all-repository-content",
+		Label:  "GitHub Get All Repository Content",
+		Fields: actions.GithubRepositoryGetAllContentConfigMeta(),
+	},
+	{
+		Name:   "github-repository-search-files",
+		Label:  "GitHub Repository Search Files",
+		Fields: actions.GithubRepositorySearchFilesConfigMeta(),
+	},
+	{
+		Name:   "github-repository-list-files",
+		Label:  "GitHub Repository List Files",
+		Fields: actions.GithubRepositoryListFilesConfigMeta(),
+	},
+	{
+		Name:   "github-repository-create-or-update-content",
+		Label:  "GitHub Repository Create/Update Content",
+		Fields: actions.GithubRepositoryCreateOrUpdateContentConfigMeta(),
+	},
+	{
+		Name:   "github-readme",
+		Label:  "GitHub Repository README",
+		Fields: actions.GithubRepositoryREADMEConfigMeta(),
+	},
+	{
+		Name:   "github-pr-reader",
+		Label:  "GitHub PR Reader",
+		Fields: actions.GithubPRReaderConfigMeta(),
+	},
+	{
+		Name:   "github-pr-commenter",
+		Label:  "GitHub PR Commenter",
+		Fields: actions.GithubPRCommenterConfigMeta(),
+	},
+	{
+		Name:   "github-pr-reviewer",
+		Label:  "GitHub PR Reviewer",
+		Fields: actions.GithubPRReviewerConfigMeta(),
+	},
+	{
+		Name:   "github-pr-creator",
+		Label:  "GitHub PR Creator",
+		Fields: actions.GithubPRCreatorConfigMeta(),
+	},
+	{
+		Name:   "twitter-post",
+		Label:  "Twitter Post",
+		Fields: actions.TwitterPostConfigMeta(),
+	},
+	{
+		Name:   "send-mail",
+		Label:  "Send Mail",
+		Fields: actions.SendMailConfigMeta(),
+	},
+	{
+		Name:   "shell-command",
+		Label:  "Shell Command",
+		Fields: actions.ShellConfigMeta(),
+	},
+	{
+		Name:   "custom",
+		Label:  "Custom",
+		Fields: action.CustomConfigMeta(),
+	},
+	{
+		Name:   "scraper",
+		Label:  "Scraper",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "wikipedia",
+		Label:  "Wikipedia",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "browse",
+		Label:  "Browse",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "counter",
+		Label:  "Counter",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "call_agents",
+		Label:  "Call Agents",
+		Fields: actions.CallAgentConfigMeta(),
+	},
+	{
+		Name:   "send-telegram-message",
+		Label:  "Send Telegram Message",
+		Fields: actions.SendTelegramMessageConfigMeta(),
+	},
+	{
+		Name:   "set_reminder",
+		Label:  "Set Reminder",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "list_reminders",
+		Label:  "List Reminders",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "remove_reminder",
+		Label:  "Remove Reminder",
+		Fields: []config.Field{},
+	},
+}
+
 const (
 	ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
 	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
 	ActionConfigSSHBoxURL          = "sshbox-url"
 	ConfigStateDir                 = "state-dir"
 )
+
+func CustomActions(customActionsDir string, existingActionConfigs map[string]map[string]string) (allActions []types.Action) {
+	files, err := os.ReadDir(customActionsDir)
+	if err != nil {
+		xlog.Error("Error reading custom actions directory", "error", err)
+		return allActions
+	}
+
+	for _, file := range files {
+		if filepath.Ext(file.Name()) != ".go" {
+			continue
+		}
+
+		content, err := os.ReadFile(filepath.Join(customActionsDir, file.Name()))
+		if err != nil {
+			xlog.Error("Error reading custom action file", "error", err, "file", file.Name())
+			continue
+		}
+		actionName := strings.TrimSuffix(file.Name(), ".go")
+
+		actionConfig := map[string]string{
+			"name":        actionName,
+			"description": "",
+			"code":        string(content),
+			"unsafe":      "false",
+		}
+
+		if c, exists := existingActionConfigs[actionName]; exists {
+			// We allow the user to customize name and description
+			actionConfig[descriptionField] = c[descriptionField]
+			actionConfig[nameField] = c[nameField]
+		}
+		a, err := Action(ActionCustom, "", actionConfig, nil, map[string]string{})
+		if err != nil {
+			xlog.Error("Error creating custom action", "error", err, "file", file.Name())
+			continue
+		}
+		allActions = append(allActions, a)
+	}
+	return
+}
 
 func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
@@ -111,12 +347,15 @@ func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *
 
 			agentName := a.Name
 
+			existingActionConfigs := map[string]map[string]string{}
 			for _, a := range a.Actions {
 				var config map[string]string
 				if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
 					xlog.Error("Error unmarshalling action config", "error", err)
 					continue
 				}
+
+				existingActionConfigs[a.Name] = config
 
 				a, err := Action(a.Name, agentName, config, pool, actionsConfigs)
 				if err != nil {
@@ -127,32 +366,7 @@ func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *
 
 			// Now we will scan a directory for custom actions
 			if customActionsDir != "" {
-				files, err := os.ReadDir(customActionsDir)
-				if err != nil {
-					xlog.Error("Error reading custom actions directory", "error", err)
-					return allActions
-				}
-
-				for _, file := range files {
-					if filepath.Ext(file.Name()) != ".go" {
-						continue
-					}
-
-					content, err := os.ReadFile(filepath.Join(customActionsDir, file.Name()))
-					if err != nil {
-						xlog.Error("Error reading custom action file", "error", err, "file", file.Name())
-						continue
-					}
-
-					a, err := Action(ActionCustom, agentName, map[string]string{
-						"content": string(content),
-					}, pool, actionsConfigs)
-					if err != nil {
-						xlog.Error("Error creating custom action", "error", err, "file", file.Name())
-						continue
-					}
-					allActions = append(allActions, a)
-				}
+				allActions = append(allActions, CustomActions(customActionsDir, existingActionConfigs)...)
 			}
 
 			return allActions
@@ -258,192 +472,32 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	return a, nil
 }
 
-func ActionsConfigMeta() []config.FieldGroup {
-	return []config.FieldGroup{
-		{
-			Name:   "search",
-			Label:  "Search",
-			Fields: actions.SearchConfigMeta(),
-		},
-		{
-			Name:   "browser-agent-runner",
-			Label:  "Browser Agent Runner",
-			Fields: actions.BrowserAgentRunnerConfigMeta(),
-		},
-		{
-			Name:   "deep-research-runner",
-			Label:  "Deep Research Runner",
-			Fields: actions.DeepResearchRunnerConfigMeta(),
-		},
-		{
-			Name:   "generate_image",
-			Label:  "Generate Image",
-			Fields: actions.GenImageConfigMeta(),
-		},
-		{
-			Name:   "add_to_memory",
-			Label:  "Add to Memory",
-			Fields: actions.AddToMemoryConfigMeta(),
-		},
-		{
-			Name:   "list_memory",
-			Label:  "List Memory",
-			Fields: actions.ListMemoryConfigMeta(),
-		},
-		{
-			Name:   "remove_from_memory",
-			Label:  "Remove from Memory",
-			Fields: actions.RemoveFromMemoryConfigMeta(),
-		},
-		{
-			Name:   "github-issue-labeler",
-			Label:  "GitHub Issue Labeler",
-			Fields: actions.GithubIssueLabelerConfigMeta(),
-		},
-		{
-			Name:   "github-issue-opener",
-			Label:  "GitHub Issue Opener",
-			Fields: actions.GithubIssueOpenerConfigMeta(),
-		},
-		{
-			Name:   "github-issue-editor",
-			Label:  "GitHub Issue Editor",
-			Fields: actions.GithubIssueEditorConfigMeta(),
-		},
-		{
-			Name:   "github-issue-closer",
-			Label:  "GitHub Issue Closer",
-			Fields: actions.GithubIssueCloserConfigMeta(),
-		},
-		{
-			Name:   "github-issue-commenter",
-			Label:  "GitHub Issue Commenter",
-			Fields: actions.GithubIssueCommenterConfigMeta(),
-		},
-		{
-			Name:   "github-issue-reader",
-			Label:  "GitHub Issue Reader",
-			Fields: actions.GithubIssueReaderConfigMeta(),
-		},
-		{
-			Name:   "github-issue-searcher",
-			Label:  "GitHub Issue Search",
-			Fields: actions.GithubIssueSearchConfigMeta(),
-		},
-		{
-			Name:   "github-repository-get-content",
-			Label:  "GitHub Repository Get Content",
-			Fields: actions.GithubRepositoryGetContentConfigMeta(),
-		},
-		{
-			Name:   "github-get-all-repository-content",
-			Label:  "GitHub Get All Repository Content",
-			Fields: actions.GithubRepositoryGetAllContentConfigMeta(),
-		},
-		{
-			Name:   "github-repository-search-files",
-			Label:  "GitHub Repository Search Files",
-			Fields: actions.GithubRepositorySearchFilesConfigMeta(),
-		},
-		{
-			Name:   "github-repository-list-files",
-			Label:  "GitHub Repository List Files",
-			Fields: actions.GithubRepositoryListFilesConfigMeta(),
-		},
-		{
-			Name:   "github-repository-create-or-update-content",
-			Label:  "GitHub Repository Create/Update Content",
-			Fields: actions.GithubRepositoryCreateOrUpdateContentConfigMeta(),
-		},
-		{
-			Name:   "github-readme",
-			Label:  "GitHub Repository README",
-			Fields: actions.GithubRepositoryREADMEConfigMeta(),
-		},
-		{
-			Name:   "github-pr-reader",
-			Label:  "GitHub PR Reader",
-			Fields: actions.GithubPRReaderConfigMeta(),
-		},
-		{
-			Name:   "github-pr-commenter",
-			Label:  "GitHub PR Commenter",
-			Fields: actions.GithubPRCommenterConfigMeta(),
-		},
-		{
-			Name:   "github-pr-reviewer",
-			Label:  "GitHub PR Reviewer",
-			Fields: actions.GithubPRReviewerConfigMeta(),
-		},
-		{
-			Name:   "github-pr-creator",
-			Label:  "GitHub PR Creator",
-			Fields: actions.GithubPRCreatorConfigMeta(),
-		},
-		{
-			Name:   "twitter-post",
-			Label:  "Twitter Post",
-			Fields: actions.TwitterPostConfigMeta(),
-		},
-		{
-			Name:   "send-mail",
-			Label:  "Send Mail",
-			Fields: actions.SendMailConfigMeta(),
-		},
-		{
-			Name:   "shell-command",
-			Label:  "Shell Command",
-			Fields: actions.ShellConfigMeta(),
-		},
-		{
-			Name:   "custom",
-			Label:  "Custom",
-			Fields: action.CustomConfigMeta(),
-		},
-		{
-			Name:   "scraper",
-			Label:  "Scraper",
-			Fields: []config.Field{},
-		},
-		{
-			Name:   "wikipedia",
-			Label:  "Wikipedia",
-			Fields: []config.Field{},
-		},
-		{
-			Name:   "browse",
-			Label:  "Browse",
-			Fields: []config.Field{},
-		},
-		{
-			Name:   "counter",
-			Label:  "Counter",
-			Fields: []config.Field{},
-		},
-		{
-			Name:   "call_agents",
-			Label:  "Call Agents",
-			Fields: actions.CallAgentConfigMeta(),
-		},
-		{
-			Name:   "send-telegram-message",
-			Label:  "Send Telegram Message",
-			Fields: actions.SendTelegramMessageConfigMeta(),
-		},
-		{
-			Name:   "set_reminder",
-			Label:  "Set Reminder",
-			Fields: []config.Field{},
-		},
-		{
-			Name:   "list_reminders",
-			Label:  "List Reminders",
-			Fields: []config.Field{},
-		},
-		{
-			Name:   "remove_reminder",
-			Label:  "Remove Reminder",
-			Fields: []config.Field{},
-		},
+func ActionsConfigMeta(customActionDir string) []config.FieldGroup {
+	all := slices.Clone(DefaultActions)
+
+	if customActionDir != "" {
+		actions := CustomActions(customActionDir, map[string]map[string]string{})
+
+		for _, a := range actions {
+			all = append(all, config.FieldGroup{
+				Name:  a.Definition().Name.String(),
+				Label: a.Definition().Name.String(),
+				Fields: []config.Field{
+					{
+						Name:     nameField,
+						Label:    "Name",
+						Type:     config.FieldTypeText,
+						HelpText: "Name of the custom action",
+					},
+					{
+						Name:     descriptionField,
+						Label:    "Description",
+						Type:     config.FieldTypeTextarea,
+						HelpText: "Description of the custom action",
+					},
+				},
+			})
+		}
 	}
+	return all
 }

@@ -14,6 +14,7 @@ type Config struct {
 	LLMAPIKey                 string
 	LLMModel                  string
 	StateDir                  string
+	CustomActionsDir          string
 	ConversationStoreDuration time.Duration
 }
 
@@ -56,6 +57,12 @@ func WithLLMAPIUrl(url string) Option {
 func WithLLMAPIKey(key string) Option {
 	return func(c *Config) {
 		c.LLMAPIKey = key
+	}
+}
+
+func WithCustomActionsDir(dir string) Option {
+	return func(c *Config) {
+		c.CustomActionsDir = dir
 	}
 }
 
