@@ -743,7 +743,7 @@ func (a *App) GetAgentConfigMeta(customDirectory string) func(c *fiber.Ctx) erro
 		configMeta := state.NewAgentConfigMeta(
 			services.ActionsConfigMeta(customDirectory),
 			services.ConnectorsConfigMeta(),
-			services.DynamicPromptsConfigMeta(),
+			services.DynamicPromptsConfigMeta(customDirectory),
 			services.FiltersConfigMeta(),
 		)
 		return c.JSON(configMeta)

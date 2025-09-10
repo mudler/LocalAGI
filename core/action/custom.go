@@ -44,7 +44,8 @@ func (a *CustomAction) callInit() error {
 
 	v, err := a.i.Eval(fmt.Sprintf("%s.Init", a.config["name"]))
 	if err != nil {
-		return err
+		xlog.Warn("No init function found for custom action", "error", err, "action", a.config["name"])
+		return nil
 	}
 
 	run, ok := v.Interface().(func() error)
