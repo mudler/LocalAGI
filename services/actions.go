@@ -297,9 +297,10 @@ const (
 	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
 	ActionConfigSSHBoxURL          = "sshbox-url"
 	ConfigStateDir                 = "state-dir"
+	CustomActionsDir               = "custom-actions-dir"
 )
 
-func CustomActions(customActionsDir string, existingActionConfigs map[string]map[string]string) (allActions []types.Action) {
+func customActions(customActionsDir string, existingActionConfigs map[string]map[string]string) (allActions []types.Action) {
 	files, err := os.ReadDir(customActionsDir)
 	if err != nil {
 		xlog.Error("Error reading custom actions directory", "error", err)
@@ -340,7 +341,7 @@ func CustomActions(customActionsDir string, existingActionConfigs map[string]map
 	return
 }
 
-func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 		return func(ctx context.Context, pool *state.AgentPool) []types.Action {
 			allActions := []types.Action{}
@@ -365,8 +366,8 @@ func Actions(actionsConfigs map[string]string, customActionsDir string) func(a *
 			}
 
 			// Now we will scan a directory for custom actions
-			if customActionsDir != "" {
-				allActions = append(allActions, CustomActions(customActionsDir, existingActionConfigs)...)
+			if actionsConfigs[CustomActionsDir] != "" {
+				allActions = append(allActions, customActions(actionsConfigs[CustomActionsDir], existingActionConfigs)...)
 			}
 
 			return allActions
@@ -476,7 +477,7 @@ func ActionsConfigMeta(customActionDir string) []config.FieldGroup {
 	all := slices.Clone(DefaultActions)
 
 	if customActionDir != "" {
-		actions := CustomActions(customActionDir, map[string]map[string]string{})
+		actions := customActions(customActionDir, map[string]map[string]string{})
 
 		for _, a := range actions {
 			all = append(all, config.FieldGroup{

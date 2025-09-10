@@ -3,6 +3,9 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/xlog"
@@ -23,16 +26,78 @@ var AvailableBlockPrompts = []string{
 	DynamicPromptMemory,
 }
 
-func DynamicPromptsConfigMeta() []config.FieldGroup {
-	return []config.FieldGroup{
+type dynamicPrompt struct {
+	agent.DynamicPrompt
+	Name string
+}
+
+func dynamicPrompts(customDirectory string) (allPrompts []dynamicPrompt) {
+	files, err := os.ReadDir(customDirectory)
+	if err != nil {
+		xlog.Error("Error reading custom actions directory", "error", err)
+		return
+	}
+
+	for _, file := range files {
+		if filepath.Ext(file.Name()) != ".go" {
+			continue
+		}
+
+		content, err := os.ReadFile(filepath.Join(customDirectory, file.Name()))
+		if err != nil {
+			xlog.Error("Error reading custom action file", "error", err, "file", file.Name())
+			continue
+		}
+		dynamicPromptName := strings.TrimSuffix(file.Name(), ".go")
+
+		dynamicPromptConfig := map[string]string{
+			"name": dynamicPromptName,
+			"code": string(content),
+		}
+
+		a, err := prompts.NewDynamicCustomPrompt(dynamicPromptConfig, "")
+		if err != nil {
+			xlog.Error("Error creating custom dynamic prompt", "error", err, "file", file.Name())
+			continue
+		}
+
+		if !a.CanRender() {
+			continue
+		}
+
+		allPrompts = append(allPrompts, dynamicPrompt{
+			DynamicPrompt: a,
+			Name:          dynamicPromptName,
+		})
+	}
+	return
+}
+
+func DynamicPromptsConfigMeta(customDirectory string) []config.FieldGroup {
+	defaultDynamicPrompts := []config.FieldGroup{
 		prompts.NewDynamicPromptConfigMeta(),
 		prompts.NewMemoryPromptConfigMeta(),
 	}
+
+	if customDirectory != "" {
+		prompts := dynamicPrompts(customDirectory)
+		for _, p := range prompts {
+			defaultDynamicPrompts = append(defaultDynamicPrompts, config.FieldGroup{
+				Name:  p.Name,
+				Label: p.Name,
+			})
+		}
+	}
+
+	return defaultDynamicPrompts
 }
 
 func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []agent.DynamicPrompt {
 	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []agent.DynamicPrompt {
 		return func(ctx context.Context, pool *state.AgentPool) []agent.DynamicPrompt {
+			customDirectory := dynamicConfig[CustomActionsDir]
+
+			dynamicPromptsFound := dynamicPrompts(customDirectory)
 
 			memoryFilePath := memoryPath(a.Name, dynamicConfig)
 			promptblocks := []agent.DynamicPrompt{}
@@ -43,6 +108,7 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 					xlog.Info("Error unmarshalling connector config", err)
 					continue
 				}
+
 				switch c.Type {
 				case DynamicPromptCustom:
 					prompt, err := prompts.NewDynamicCustomPrompt(config, "")
@@ -57,6 +123,13 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 					promptblocks = append(promptblocks,
 						prompts.NewMemoryPrompt(config, memory),
 					)
+				default:
+					// Check if any dynamic prompt found matches the type
+					for _, p := range dynamicPromptsFound {
+						if p.Name == c.Type {
+							promptblocks = append(promptblocks, p.DynamicPrompt)
+						}
+					}
 				}
 			}
 			return promptblocks

@@ -2,6 +2,7 @@ package prompts
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/mudler/LocalAGI/core/agent"
@@ -42,7 +43,8 @@ func (a *DynamicCustomPrompt) callInit() error {
 
 	v, err := a.i.Eval(fmt.Sprintf("%s.Init", a.config["name"]))
 	if err != nil {
-		return err
+		xlog.Warn("No init function found for custom prompt", "error", err, "action", a.config["name"])
+		return nil
 	}
 
 	run := v.Interface().(func() error)
@@ -97,6 +99,15 @@ func (a *DynamicCustomPrompt) initializeInterpreter() error {
 			a.config["name"] = "custom"
 		}
 
+		// let's find first if there is already a package declarated in the code
+		// the user might want to specify it to not break syntax with IDEs
+		re := regexp.MustCompile("package (\\w+)")
+		packageName := re.FindStringSubmatch(a.config["code"])
+		if len(packageName) > 1 {
+			// remove it from the code, normalize to `name`
+			a.config["code"] = re.ReplaceAllString(a.config["code"], "")
+		}
+
 		_, err := i.Eval(fmt.Sprintf("package %s\n%s", a.config["name"], a.config["code"]))
 		if err != nil {
 			return err
@@ -106,6 +117,15 @@ func (a *DynamicCustomPrompt) initializeInterpreter() error {
 	}
 
 	return nil
+}
+
+func (a *DynamicCustomPrompt) CanRender() bool {
+	_, err := a.i.Eval(fmt.Sprintf("%s.Render", a.config["name"]))
+	if err != nil {
+		return false
+	}
+
+	return true
 }
 
 func (a *DynamicCustomPrompt) Render(c *agent.Agent) (types.PromptResult, error) {
