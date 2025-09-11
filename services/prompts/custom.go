@@ -2,6 +2,7 @@ package prompts
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -90,6 +91,7 @@ func (a *DynamicCustomPrompt) initializeInterpreter() error {
 		i := interp.New(interp.Options{
 			GoPath:       a.goPkgPath,
 			Unrestricted: unsafe,
+			Env:          os.Environ(),
 		})
 		if err := i.Use(stdlib.Symbols); err != nil {
 			return err
