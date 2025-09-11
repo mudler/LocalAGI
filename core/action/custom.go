@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
@@ -60,6 +61,7 @@ func (a *CustomAction) initializeInterpreter() error {
 	if _, exists := a.config["code"]; exists && a.i == nil {
 		unsafe := strings.ToLower(a.config["unsafe"]) == "true"
 		i := interp.New(interp.Options{
+			Env:          os.Environ(),
 			GoPath:       a.goPkgPath,
 			Unrestricted: unsafe,
 		})
