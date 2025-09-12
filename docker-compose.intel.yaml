@@ -6,7 +6,7 @@ services:
     environment:
       - LOCALAI_SINGLE_ACTIVE_BACKEND=true
       - DEBUG=true
-    image: localai/localai:master-gpu-intel-f32
+    image: localai/localai:master-gpu-intel
     devices:
       # On a system with integrated GPU and an Arc 770, this is the Arc 770
       - /dev/dri/card1
