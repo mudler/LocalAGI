@@ -57,6 +57,7 @@ const (
 	ActionAddToMemory                    = "add_to_memory"
 	ActionListMemory                     = "list_memory"
 	ActionRemoveFromMemory               = "remove_from_memory"
+	ActionPiKVMPowerControl              = "pikvm_power_control"
 )
 
 const (
@@ -103,6 +104,7 @@ var AvailableActions = []string{
 	ActionAddToMemory,
 	ActionListMemory,
 	ActionRemoveFromMemory,
+	ActionPiKVMPowerControl,
 }
 
 var DefaultActions = []config.FieldGroup{
@@ -291,6 +293,11 @@ var DefaultActions = []config.FieldGroup{
 		Label:  "Remove Reminder",
 		Fields: []config.Field{},
 	},
+	{
+		Name:   "pikvm_power_control",
+		Label:  "PiKVM Power Control",
+		Fields: actions.PiKVMConfigMeta(),
+	},
 }
 
 const (
@@ -463,6 +470,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		_, a, _ = actions.NewMemoryActions(memoryFilePath, config)
 	case ActionRemoveFromMemory:
 		_, _, a = actions.NewMemoryActions(memoryFilePath, config)
+	case ActionPiKVMPowerControl:
+		a = actions.NewPiKVMAction(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
