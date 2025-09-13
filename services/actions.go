@@ -60,8 +60,9 @@ const (
 )
 
 const (
-	nameField        = "name"
-	descriptionField = "description"
+	nameField          = "name"
+	descriptionField   = "description"
+	configurationField = "configuration"
 )
 
 var AvailableActions = []string{
@@ -330,6 +331,7 @@ func customActions(customActionsDir string, existingActionConfigs map[string]map
 			// We allow the user to customize name and description
 			actionConfig[descriptionField] = c[descriptionField]
 			actionConfig[nameField] = c[nameField]
+			actionConfig[configurationField] = c[configurationField]
 		}
 		a, err := Action(ActionCustom, "", actionConfig, nil, map[string]string{})
 		if err != nil {
@@ -495,6 +497,12 @@ func ActionsConfigMeta(customActionDir string) []config.FieldGroup {
 						Label:    "Description",
 						Type:     config.FieldTypeTextarea,
 						HelpText: "Description of the custom action",
+					},
+					{
+						Name:     configurationField,
+						Label:    "Configuration",
+						Type:     config.FieldTypeTextarea,
+						HelpText: "Configuration of the custom action",
 					},
 				},
 			})

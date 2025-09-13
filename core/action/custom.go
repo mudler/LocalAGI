@@ -49,12 +49,12 @@ func (a *CustomAction) callInit() error {
 		return nil
 	}
 
-	run, ok := v.Interface().(func() error)
+	run, ok := v.Interface().(func(string) error)
 	if !ok {
 		return nil
 	}
 
-	return run()
+	return run(a.config["configuration"])
 }
 
 func (a *CustomAction) initializeInterpreter() error {
@@ -194,6 +194,12 @@ func CustomConfigMeta() []config.Field {
 			Label:    "Unsafe",
 			Type:     config.FieldTypeCheckbox,
 			HelpText: "Allow unsafe code execution",
+		},
+		{
+			Name:     "configuration",
+			Label:    "Configuration",
+			Type:     config.FieldTypeTextarea,
+			HelpText: "Configuration for the custom action",
 		},
 	}
 }

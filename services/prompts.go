@@ -31,7 +31,7 @@ type dynamicPrompt struct {
 	Name string
 }
 
-func dynamicPrompts(customDirectory string) (allPrompts []dynamicPrompt) {
+func dynamicPrompts(customDirectory string, existingConfigs map[string]map[string]string) (allPrompts []dynamicPrompt) {
 	files, err := os.ReadDir(customDirectory)
 	if err != nil {
 		xlog.Error("Error reading custom actions directory", "error", err)
@@ -53,6 +53,10 @@ func dynamicPrompts(customDirectory string) (allPrompts []dynamicPrompt) {
 		dynamicPromptConfig := map[string]string{
 			"name": dynamicPromptName,
 			"code": string(content),
+		}
+
+		if c, exists := existingConfigs[dynamicPromptName]; exists {
+			dynamicPromptConfig["configuration"] = c["configuration"]
 		}
 
 		a, err := prompts.NewDynamicCustomPrompt(dynamicPromptConfig, "")
@@ -80,11 +84,19 @@ func DynamicPromptsConfigMeta(customDirectory string) []config.FieldGroup {
 	}
 
 	if customDirectory != "" {
-		prompts := dynamicPrompts(customDirectory)
+		prompts := dynamicPrompts(customDirectory, map[string]map[string]string{})
 		for _, p := range prompts {
 			defaultDynamicPrompts = append(defaultDynamicPrompts, config.FieldGroup{
 				Name:  p.Name,
 				Label: p.Name,
+				Fields: []config.Field{
+					{
+						Name:     "configuration",
+						Label:    "Configuration",
+						Type:     config.FieldTypeTextarea,
+						HelpText: "Configuration for the custom prompt",
+					},
+				},
 			})
 		}
 	}
@@ -97,11 +109,7 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 		return func(ctx context.Context, pool *state.AgentPool) []agent.DynamicPrompt {
 			customDirectory := dynamicConfig[CustomActionsDir]
 
-			dynamicPromptsFound := dynamicPrompts(customDirectory)
-
-			memoryFilePath := memoryPath(a.Name, dynamicConfig)
-			promptblocks := []agent.DynamicPrompt{}
-
+			existingDynamicPromptsConfigs := map[string]map[string]string{}
 			for _, c := range a.DynamicPrompts {
 				var config map[string]string
 				if err := json.Unmarshal([]byte(c.Config), &config); err != nil {
@@ -109,7 +117,18 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 					continue
 				}
 
-				switch c.Type {
+				existingDynamicPromptsConfigs[c.Name] = config
+			}
+
+			dynamicPromptsFound := dynamicPrompts(customDirectory, existingDynamicPromptsConfigs)
+
+			memoryFilePath := memoryPath(a.Name, dynamicConfig)
+			promptblocks := []agent.DynamicPrompt{}
+
+			for _, c := range a.DynamicPrompts {
+				config := existingDynamicPromptsConfigs[c.Name]
+
+				switch c.Name {
 				case DynamicPromptCustom:
 					prompt, err := prompts.NewDynamicCustomPrompt(config, "")
 					if err != nil {
@@ -124,9 +143,9 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 						prompts.NewMemoryPrompt(config, memory),
 					)
 				default:
-					// Check if any dynamic prompt found matches the type
+					// Check if we have configured a custom dynamic prompt coming from a directory
 					for _, p := range dynamicPromptsFound {
-						if p.Name == c.Type {
+						if p.Name == c.Name {
 							promptblocks = append(promptblocks, p.DynamicPrompt)
 						}
 					}

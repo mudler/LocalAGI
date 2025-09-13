@@ -48,9 +48,9 @@ func (a *DynamicCustomPrompt) callInit() error {
 		return nil
 	}
 
-	run := v.Interface().(func() error)
+	run := v.Interface().(func(string) error)
 
-	return run()
+	return run(a.config["configuration"])
 }
 
 func NewDynamicPromptConfigMeta() config.FieldGroup {
@@ -80,6 +80,12 @@ func NewDynamicPromptConfigMeta() config.FieldGroup {
 				Type:     config.FieldTypeCheckbox,
 				Required: false,
 				HelpText: "Enable if the code needs to use unsafe Go features",
+			},
+			{
+				Name:     "configuration",
+				Label:    "Configuration",
+				Type:     config.FieldTypeTextarea,
+				HelpText: "Configuration for the custom prompt",
 			},
 		},
 	}
