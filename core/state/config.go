@@ -21,7 +21,7 @@ type ActionsConfig struct {
 }
 
 type DynamicPromptsConfig struct {
-	Name   string `json:"name"`
+	Type   string `json:"type"`
 	Config string `json:"config"`
 }
 
