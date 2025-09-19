@@ -27,7 +27,7 @@ require (
 	github.com/tmc/langchaingo v0.1.13
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.62.0
-	golang.org/x/crypto v0.40.0
+	golang.org/x/crypto v0.41.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
 	maunium.net/go/mautrix v0.17.0
 	mvdan.cc/xurls/v2 v2.6.0
@@ -36,7 +36,7 @@ require (
 require github.com/JohannesKaufmann/dom v0.2.0 // indirect
 
 require (
-	github.com/JohannesKaufmann/html-to-markdown/v2 v2.3.3
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.4.0
 	github.com/PuerkitoBio/goquery v1.10.3 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
@@ -106,10 +106,10 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/arch v0.16.0 // indirect
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
-	golang.org/x/tools v0.34.0 // indirect
+	golang.org/x/net v0.43.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/tools v0.35.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
