@@ -1,3 +1,6 @@
+// Package actions contains action implementations used by LocalAGI.
+// This file implements the "webhook" action which can send an HTTP request
+// to an external service with a configurable method, content type, and payload.
 package actions
 
 import (
@@ -13,7 +16,12 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-// NewWebhook constructs a WebhookAction using provided configuration values.
+// NewWebhook constructs a WebhookAction using provided configuration values:
+//   - url: Destination endpoint for the HTTP request (required).
+//   - method: HTTP method to use (GET, POST, PUT, DELETE, ...). Defaults to POST.
+//   - contentType: Value for the Content-Type header (e.g., application/json).
+//   - payloadTemplate: Optional template for the request body; the runtime parameter
+//     "payload" (if provided) will replace the "{{payload}}" placeholder inside this template.
 func NewWebhook(cfg map[string]string) *WebhookAction {
 	wa := &WebhookAction{
 		url:             strings.TrimSpace(cfg["url"]),
@@ -27,6 +35,18 @@ func NewWebhook(cfg map[string]string) *WebhookAction {
 	return wa
 }
 
+// WebhookAction holds the static configuration for the webhook.
+// These values come from the action configuration (UI/agent config),
+// while the runtime parameter only carries the dynamic payload.
+//   - url: Target endpoint for the request.
+//   - method: HTTP method to use. Defaults to POST if not provided.
+//   - contentType: Sets the Content-Type header when a body is sent.
+//   - payloadTemplate: Optional template used to build the request body; occurrences
+//     of "{{payload}}" get replaced with the runtime payload string.
+//     If no placeholder is present, the template is used as-is.
+//     For GET requests the body is omitted regardless of payload.
+//
+// Note: This action does not follow redirects!
 type WebhookAction struct {
 	url             string
 	method          string
@@ -34,6 +54,11 @@ type WebhookAction struct {
 	payloadTemplate string
 }
 
+// Run executes the webhook call.
+// It reads the runtime parameter "payload" (optional), merges it into the
+// configured payloadTemplate (if any), constructs an HTTP request using the
+// configured URL, method and content type, and then returns a summary with the
+// response status and body (truncated to 4KiB for safety).
 func (a *WebhookAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	// Runtime parameters: only payload
 	type input struct {
@@ -44,13 +69,21 @@ func (a *WebhookAction) Run(ctx context.Context, sharedState *types.AgentSharedS
 		return types.ActionResult{}, err
 	}
 
+	// Validate essential configuration. The URL must be provided via the
+	// action configuration (not via runtime parameters).
 	if a.url == "" {
 		return types.ActionResult{}, fmt.Errorf("configuration.url is required")
 	}
 
 	method := a.method
 
-	// Build the request body based on template and payload
+	// Build the request body based on template and payload:
+	// - If a payloadTemplate is provided, replace occurrences of "{{payload}}"
+	//   with the runtime payload value.
+	// - If the template does not contain the placeholder but is provided, we use
+	//   the template as-is (common for static JSON bodies prepared at config time).
+	// - If no template is configured, we send the runtime payload as-is.
+	// - For GET requests the body is omitted regardless of payload.
 	var payload string
 	if a.payloadTemplate != "" {
 		payload = strings.ReplaceAll(a.payloadTemplate, "{{payload}}", in.Payload)
@@ -67,15 +100,21 @@ func (a *WebhookAction) Run(ctx context.Context, sharedState *types.AgentSharedS
 		body = bytes.NewBufferString(payload)
 	}
 
+	// Create the HTTP request bound to the provided context so that cancellation
+	// or timeouts from the caller propagate to the outbound call.
 	req, err := http.NewRequestWithContext(ctx, method, a.url, body)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 
+	// Set Content-Type header if configured. For GET requests this header is
+	// typically ignored by servers as there is no body.
 	if a.contentType != "" {
 		req.Header.Set("Content-Type", a.contentType)
 	}
 
+	// Use a new http.Client with default settings. Consider configuring timeouts
+	// at the caller level via the context, or wiring a custom client if needed.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -83,6 +122,9 @@ func (a *WebhookAction) Run(ctx context.Context, sharedState *types.AgentSharedS
 	}
 	defer resp.Body.Close()
 
+	// Read and safely truncate the response body to avoid flooding the agent's
+	// context with very large payloads. Errors on ReadAll are ignored here as
+	// we already have the status code.
 	respBytes, _ := io.ReadAll(resp.Body)
 	respBody := string(respBytes)
 	if len(respBody) > 4096 {
@@ -105,6 +147,9 @@ func (a *WebhookAction) Run(ctx context.Context, sharedState *types.AgentSharedS
 	}, nil
 }
 
+// Definition returns the action schema exposed to the planner/runtime.
+// Only the runtime parameter "payload" is accepted; all connection details
+// are configured statically via the action configuration UI.
 func (a *WebhookAction) Definition() types.ActionDefinition {
 	return types.ActionDefinition{
 		Name:        "webhook",
@@ -118,9 +163,17 @@ func (a *WebhookAction) Definition() types.ActionDefinition {
 	}
 }
 
+// Plannable indicates the action can be suggested/used by planners without
+// requiring hidden context; inputs are straightforward and safe.
 func (a *WebhookAction) Plannable() bool { return true }
 
-// WebhookConfigMeta returns the metadata for Webhook action configuration fields
+// WebhookConfigMeta returns the metadata for Webhook action configuration fields:
+//   - url: The endpoint to send requests to (required).
+//   - method: One of GET/POST/PUT/DELETE. Defaults to POST.
+//   - contentType: Common content types selectable from a dropdown.
+//   - payloadTemplate: Optional body template. At runtime, "{{payload}}" is
+//     replaced by the provided payload parameter. If missing, the template is used
+//     as-is; for GET, no body is sent regardless.
 func WebhookConfigMeta() []config.Field {
 	return []config.Field{
 		{
