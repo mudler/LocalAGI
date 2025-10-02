@@ -58,6 +58,7 @@ const (
 	ActionListMemory                     = "list_memory"
 	ActionRemoveFromMemory               = "remove_from_memory"
 	ActionPiKVMPowerControl              = "pikvm_power_control"
+	ActionWebhook                        = "webhook"
 )
 
 const (
@@ -105,6 +106,7 @@ var AvailableActions = []string{
 	ActionListMemory,
 	ActionRemoveFromMemory,
 	ActionPiKVMPowerControl,
+	ActionWebhook,
 }
 
 var DefaultActions = []config.FieldGroup{
@@ -298,6 +300,11 @@ var DefaultActions = []config.FieldGroup{
 		Label:  "PiKVM Power Control",
 		Fields: actions.PiKVMConfigMeta(),
 	},
+	{
+		Name:   "webhook",
+		Label:  "Webhook",
+		Fields: actions.WebhookConfigMeta(),
+	},
 }
 
 const (
@@ -448,6 +455,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewBrowse(config)
 	case ActionSendMail:
 		a = actions.NewSendMail(config)
+	case ActionWebhook:
+		a = actions.NewWebhook(config)
 	case ActionTwitterPost:
 		a = actions.NewPostTweet(config)
 	case ActionCounter:
