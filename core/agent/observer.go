@@ -14,6 +14,7 @@ type Observer interface {
 	NewObservable() *types.Observable
 	Update(types.Observable)
 	History() []types.Observable
+	ClearHistory()
 }
 
 type SSEObserver struct {
@@ -21,8 +22,8 @@ type SSEObserver struct {
 	maxID   int32
 	manager sse.Manager
 
-	mutex sync.Mutex
-	history []types.Observable
+	mutex       sync.Mutex
+	history     []types.Observable
 	historyLast int
 }
 
@@ -36,8 +37,8 @@ func NewSSEObserver(agent string, manager sse.Manager) *SSEObserver {
 }
 
 func (s *SSEObserver) NewObservable() *types.Observable {
-	id  := atomic.AddInt32(&s.maxID, 1)
-	
+	id := atomic.AddInt32(&s.maxID, 1)
+
 	return &types.Observable{
 		ID:    id - 1,
 		Agent: s.agent,
@@ -85,4 +86,12 @@ func (s *SSEObserver) History() []types.Observable {
 	}
 
 	return h
+}
+
+func (s *SSEObserver) ClearHistory() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.history = make([]types.Observable, 100)
+	s.historyLast = 0
 }

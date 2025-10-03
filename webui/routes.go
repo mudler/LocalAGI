@@ -258,6 +258,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		})
 	})
 
+	// API endpoint to retrieve agent observables
 	webapp.Get("/api/agent/:name/observables", func(c *fiber.Ctx) error {
 		name := c.Params("name")
 		agent := pool.GetAgent(name)
@@ -271,6 +272,17 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 			"Name":    name,
 			"History": agent.Observer().History(),
 		})
+	})
+
+	// API endpoint to clear agent observables
+	webapp.Delete("/api/agent/:name/observables", func(c *fiber.Ctx) error {
+		name := c.Params("name")
+		agent := pool.GetAgent(name)
+		if agent == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Agent not found"})
+		}
+		agent.Observer().ClearHistory()
+		return c.JSON(fiber.Map{"Name": name, "cleared": true})
 	})
 
 	webapp.Post("/settings/import", app.ImportAgent(pool))
