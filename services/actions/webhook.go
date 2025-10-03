@@ -29,6 +29,12 @@ func NewWebhook(cfg map[string]string) *WebhookAction {
 		contentType:     strings.TrimSpace(cfg["contentType"]),
 		payloadTemplate: cfg["payloadTemplate"],
 	}
+	// Optional custom overrides
+	if cfg != nil {
+		wa.customName = cfg["custom_name"]
+		wa.customDescription = cfg["custom_description"]
+		wa.customPayloadDescription = cfg["custom_payload_description"]
+	}
 	if wa.method == "" {
 		wa.method = http.MethodPost
 	}
@@ -48,10 +54,13 @@ func NewWebhook(cfg map[string]string) *WebhookAction {
 //
 // Note: This action does not follow redirects!
 type WebhookAction struct {
-	url             string
-	method          string
-	contentType     string
-	payloadTemplate string
+	url                      string
+	method                   string
+	contentType              string
+	payloadTemplate          string
+	customName               string
+	customDescription        string
+	customPayloadDescription string
 }
 
 // Run executes the webhook call.
@@ -151,13 +160,25 @@ func (a *WebhookAction) Run(ctx context.Context, sharedState *types.AgentSharedS
 // Only the runtime parameter "payload" is accepted; all connection details
 // are configured statically via the action configuration UI.
 func (a *WebhookAction) Definition() types.ActionDefinition {
+	name := "webhook"
+	description := "Send an HTTP request to a configured URL/method/content-type. Accepts a runtime payload parameter optionally inserted into the configured payload template."
+	if a.customName != "" {
+		name = a.customName
+	}
+	if a.customDescription != "" {
+		description = a.customDescription
+	}
+	payloadDesc := "Payload/body to send with the request at runtime. If a payloadTemplate is configured, '{{payload}}' will be replaced by this value."
+	if a.customPayloadDescription != "" {
+		payloadDesc = a.customPayloadDescription
+	}
 	return types.ActionDefinition{
-		Name:        "webhook",
-		Description: "Send an HTTP request to a configured URL/method/content-type. Accepts a runtime payload parameter optionally inserted into the configured payload template.",
+		Name:        types.ActionDefinitionName(name),
+		Description: description,
 		Properties: map[string]jsonschema.Definition{
 			"payload": {
 				Type:        jsonschema.String,
-				Description: "Payload/body to send with the request at runtime. If a payloadTemplate is configured, '{{payload}}' will be replaced by this value.",
+				Description: payloadDesc,
 			},
 		},
 	}
@@ -176,6 +197,27 @@ func (a *WebhookAction) Plannable() bool { return true }
 //     as-is; for GET, no body is sent regardless.
 func WebhookConfigMeta() []config.Field {
 	return []config.Field{
+		{
+			Name:     "custom_name",
+			Label:    "Custom Name",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Custom name for the action (optional, defaults to 'webhook')",
+		},
+		{
+			Name:     "custom_description",
+			Label:    "Custom Description",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Custom description for the action (optional)",
+		},
+		{
+			Name:     "custom_payload_description",
+			Label:    "Custom Payload Description",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Override the payload parameter description shown in the UI/schema (optional).",
+		},
 		{
 			Name:     "url",
 			Label:    "URL",
