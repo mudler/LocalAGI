@@ -216,6 +216,7 @@ function AgentStatus() {
   const [observableMap, setObservableMap] = useState({});
   const [observableTree, setObservableTree] = useState([]);
   const [expandedCards, setExpandedCards] = useState(new Map());
+  const [clearLoading, setClearLoading] = useState(false);
 
   // Update document title
   useEffect(() => {
@@ -342,6 +343,26 @@ function AgentStatus() {
     };
   }, [name]);
 
+  const handleClearObservables = async () => {
+    if (clearLoading) return;
+    setClearLoading(true);
+    try {
+      const resp = await fetch(`/api/agent/${name}/observables`, { method: 'DELETE' });
+      if (!resp.ok) {
+        console.error('Failed to clear observables, status:', resp.status);
+      } else {
+        // Clear local state immediately
+        setObservableMap({});
+        setObservableTree([]);
+        setExpandedCards(new Map());
+      }
+    } catch (e) {
+      console.error('Error clearing observables:', e);
+    } finally {
+      setClearLoading(false);
+    }
+  };
+
   // Helper function to safely convert any value to a displayable string
   const formatValue = (value) => {
     if (value === null || value === undefined) {
@@ -435,7 +456,17 @@ function AgentStatus() {
           </div>
           {observableTree.length > 0 && (
             <div>
-              <h2>Observable Updates</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ margin: 0 }}>Observable Updates</h2>
+                <button
+                  className="action-btn delete-btn"
+                  onClick={handleClearObservables}
+                  disabled={clearLoading}
+                  title="Clear observable history"
+                >
+                  {clearLoading ? 'Clearing…' : 'Clear history'}
+                </button>
+              </div>
               <div style={{ color: '#aaa', fontSize: 14, margin: '5px 0 10px 2px' }}>
                 Drill down into what the agent is doing and thinking when activated by a connector
               </div>
