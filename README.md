@@ -703,15 +703,40 @@ The development workflow is similar to the source build, but with additional ste
 git clone https://github.com/mudler/LocalAGI.git
 cd LocalAGI
 
-# Install dependencies and start frontend development server
-cd webui/react-ui && bun i && bun run dev
+cd webui/react-ui
+
+# Install dependencies
+bun i
+
+# Compile frontend (the build directory needs to exist for the backend to start)
+bun run build
+
+# Start frontend development server
+bun run dev
 ```
 
 Then in separate terminal:
 
 ```bash
+cd LocalAGI
+
+# Create a "pool" directory for agent state
+mkdir pool
+
+# Set required environment variables
+export LOCALAGI_MODEL=gemma-3-4b-it-qat
+export LOCALAGI_MULTIMODAL_MODEL=moondream2-20250414
+export LOCALAGI_IMAGE_MODEL=sd-1.5-ggml
+export LOCALAGI_LLM_API_URL=http://localai:8080
+export LOCALAGI_LOCALRAG_URL=http://localrecall:8080
+export LOCALAGI_STATE_DIR=./pool
+export LOCALAGI_TIMEOUT=5m
+export LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
+export LOCALAGI_MCPBOX_URL=http://mcpbox:8080
+export LOCALAGI_SSHBOX_URL=root:root@sshbox:22
+
 # Start development server
-cd ../.. && go run main.go
+go run main.go
 ```
 
 > Note: see webui/react-ui/.vite.config.js for env vars that can be used to configure the backend URL
