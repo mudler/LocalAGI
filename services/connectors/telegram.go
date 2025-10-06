@@ -56,14 +56,24 @@ func (t *Telegram) isBotMentioned(message string, botUsername string) bool {
 }
 
 func (t *Telegram) chatFromMessage(update *models.Update) (openai.ChatCompletionMessage, error) {
-
-	if len(update.Message.Photo) == 0 {
-		return openai.ChatCompletionMessage{
-			Content: update.Message.Text,
-			Role:    "user",
-		}, nil
+	// Handle audio messages
+	if update.Message.Voice != nil || update.Message.Audio != nil {
+		return t.handleAudioMessage(update)
 	}
 
+	// Handle photo messages
+	if len(update.Message.Photo) > 0 {
+		return t.handlePhotoMessage(update)
+	}
+
+	// Handle text messages
+	return openai.ChatCompletionMessage{
+		Content: update.Message.Text,
+		Role:    "user",
+	}, nil
+}
+
+func (t *Telegram) handlePhotoMessage(update *models.Update) (openai.ChatCompletionMessage, error) {
 	xlog.Debug("Image", "found image")
 	// Get the largest photo
 	photo := update.Message.Photo[len(update.Message.Photo)-1]
@@ -77,44 +87,122 @@ func (t *Telegram) chatFromMessage(update *models.Update) (openai.ChatCompletion
 	})
 	if err != nil {
 		xlog.Error("Error getting file", "error", err)
-	} else {
-		// Construct the full URL for downloading the file
-		fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", t.Token, file.FilePath)
-
-		// Download the file content
-		resp, err := http.Get(fileURL)
-		if err != nil {
-			xlog.Error("Error downloading file", "error", err)
-		} else {
-			defer resp.Body.Close()
-			imageBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				xlog.Error("Error reading image", "error", err)
-			} else {
-				// Encode to base64
-				imgBase64 := base64.StdEncoding.EncodeToString(imageBytes)
-				xlog.Debug("Image", "sending encoded image")
-				// Add to conversation as multi-content message
-				return openai.ChatCompletionMessage{
-					Role: "user",
-					MultiContent: []openai.ChatMessagePart{
-						{
-							Text: update.Message.Caption,
-							Type: openai.ChatMessagePartTypeText,
-						},
-						{
-							Type: openai.ChatMessagePartTypeImageURL,
-							ImageURL: &openai.ChatMessageImageURL{
-								URL: fmt.Sprintf("data:image/jpeg;base64,%s", imgBase64),
-							},
-						},
-					},
-				}, nil
-			}
-		}
+		return openai.ChatCompletionMessage{}, err
 	}
 
-	return openai.ChatCompletionMessage{}, errors.New("no image found")
+	// Construct the full URL for downloading the file
+	fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", t.Token, file.FilePath)
+
+	// Download the file content
+	resp, err := http.Get(fileURL)
+	if err != nil {
+		xlog.Error("Error downloading file", "error", err)
+		return openai.ChatCompletionMessage{}, err
+	}
+	defer resp.Body.Close()
+
+	imageBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		xlog.Error("Error reading image", "error", err)
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	// Encode to base64
+	imgBase64 := base64.StdEncoding.EncodeToString(imageBytes)
+	xlog.Debug("Image", "sending encoded image")
+	// Add to conversation as multi-content message
+	return openai.ChatCompletionMessage{
+		Role: "user",
+		MultiContent: []openai.ChatMessagePart{
+			{
+				Text: update.Message.Caption,
+				Type: openai.ChatMessagePartTypeText,
+			},
+			{
+				Type: openai.ChatMessagePartTypeImageURL,
+				ImageURL: &openai.ChatMessageImageURL{
+					URL: fmt.Sprintf("data:image/jpeg;base64,%s", imgBase64),
+				},
+			},
+		},
+	}, nil
+}
+
+func (t *Telegram) handleAudioMessage(update *models.Update) (openai.ChatCompletionMessage, error) {
+	var fileID string
+	var audioType string
+
+	if update.Message.Voice != nil {
+		fileID = update.Message.Voice.FileID
+		audioType = "voice"
+	} else if update.Message.Audio != nil {
+		fileID = update.Message.Audio.FileID
+		audioType = "audio"
+	}
+
+	xlog.Debug("Audio message received", "type", audioType, "fileID", fileID)
+
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Download the audio file
+	file, err := t.bot.GetFile(ctx, &bot.GetFileParams{
+		FileID: fileID,
+	})
+	if err != nil {
+		xlog.Error("Error getting audio file", "error", err)
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	// Construct the full URL for downloading the file
+	fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", t.Token, file.FilePath)
+
+	// Download the file content
+	resp, err := http.Get(fileURL)
+	if err != nil {
+		xlog.Error("Error downloading audio file", "error", err)
+		return openai.ChatCompletionMessage{}, err
+	}
+	defer resp.Body.Close()
+
+	audioBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		xlog.Error("Error reading audio file", "error", err)
+		return openai.ChatCompletionMessage{}, err
+	}
+
+	// Create a temporary file for transcription
+	tempFile, err := os.CreateTemp("", "telegram_audio_*.ogg")
+	if err != nil {
+		xlog.Error("Error creating temp file", "error", err)
+		return openai.ChatCompletionMessage{}, err
+	}
+	defer os.Remove(tempFile.Name())
+
+	// Write audio data to temp file
+	if _, err := tempFile.Write(audioBytes); err != nil {
+		tempFile.Close()
+		xlog.Error("Error writing audio to temp file", "error", err)
+		return openai.ChatCompletionMessage{}, err
+	}
+	tempFile.Close()
+
+	// Transcribe the audio using the agent's Transcribe method
+	transcription, err := t.agent.Transcribe(ctx, tempFile.Name())
+	if err != nil {
+		xlog.Error("Error transcribing audio", "error", err)
+		return openai.ChatCompletionMessage{
+			Content: fmt.Sprintf("I received an audio message but couldn't transcribe it: %v", err),
+			Role:    "user",
+		}, nil
+	}
+
+	xlog.Debug("Audio transcribed successfully", "transcription", transcription)
+	return openai.ChatCompletionMessage{
+		Content: transcription,
+		Role:    "user",
+	}, nil
 }
 
 // handleGroupMessage handles messages in group chats
@@ -174,6 +262,11 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 	// Add chat ID to metadata for tracking
 	metadata := map[string]interface{}{
 		"chatID": update.Message.Chat.ID,
+	}
+
+	// Track if the original message was audio for TTS response
+	if update.Message.Voice != nil || update.Message.Audio != nil {
+		metadata["originalMessageType"] = "audio"
 	}
 
 	chatMessage, err := t.chatFromMessage(update)
@@ -249,6 +342,34 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 	urls, err := t.handleMultimediaContent(ctx, update.Message.Chat.ID, res)
 	if err != nil {
 		xlog.Error("Error handling multimedia content", "error", err)
+	}
+
+	// Check if original message was audio and generate TTS response
+	if metadata["originalMessageType"] == "audio" && res.Response != "" {
+
+		xlog.Debug("Original message was audio, generating TTS response")
+		audioData, err := t.agent.TTS(ctx, res.Response)
+		if err != nil {
+			xlog.Error("Error generating TTS", "error", err)
+		} else {
+			// Send audio response
+			err = sendAudioToTelegram(ctx, t.bot, update.Message.Chat.ID, audioData, res.Response)
+			if err != nil {
+				xlog.Error("Error sending audio response", "error", err)
+			} else {
+				xlog.Debug("Audio response sent successfully")
+				// Remove the thinking placeholder message before returning
+				_, err := t.bot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+					ChatID:    update.Message.Chat.ID,
+					MessageID: msg.ID,
+				})
+				if err != nil {
+					xlog.Error("Error deleting thinking placeholder", "error", err)
+				}
+				// Don't send text response if audio was sent successfully
+				return
+			}
+		}
 	}
 
 	// Update the message with the final response
@@ -391,6 +512,24 @@ func sendImageToTelegram(ctx context.Context, b *bot.Bot, chatID int64, url stri
 	})
 	if err != nil {
 		return fmt.Errorf("error sending photo: %w", err)
+	}
+
+	return nil
+}
+
+// sendAudioToTelegram sends audio data to Telegram
+func sendAudioToTelegram(ctx context.Context, b *bot.Bot, chatID int64, audioData []byte, caption string) error {
+	// Send audio with caption
+	_, err := b.SendVoice(ctx, &bot.SendVoiceParams{
+		ChatID: chatID,
+		Voice: &models.InputFileUpload{
+			Filename: "response.mp3",
+			Data:     bytes.NewReader(audioData),
+		},
+		Caption: caption,
+	})
+	if err != nil {
+		return fmt.Errorf("error sending audio: %w", err)
 	}
 
 	return nil
@@ -540,6 +679,11 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		"chatID": update.Message.Chat.ID,
 	}
 
+	// Track if the original message was audio for TTS response
+	if update.Message.Voice != nil || update.Message.Audio != nil {
+		metadata["originalMessageType"] = "audio"
+	}
+
 	// Create a new job with the conversation history and metadata
 	job := types.NewJob(
 		types.WithConversationHistory(currentConv),
@@ -601,6 +745,33 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 	urls, err := t.handleMultimediaContent(ctx, update.Message.Chat.ID, res)
 	if err != nil {
 		xlog.Error("Error handling multimedia content", "error", err)
+	}
+
+	// Check if original message was audio and generate TTS response
+	if metadata["originalMessageType"] == "audio" && res.Response != "" {
+		xlog.Debug("Original message was audio, generating TTS response")
+		audioData, err := t.agent.TTS(ctx, res.Response)
+		if err != nil {
+			xlog.Error("Error generating TTS", "error", err)
+		} else {
+			// Send audio response
+			err = sendAudioToTelegram(ctx, t.bot, update.Message.Chat.ID, audioData, res.Response)
+			if err != nil {
+				xlog.Error("Error sending audio response", "error", err)
+			} else {
+				xlog.Debug("Audio response sent successfully")
+				// Remove the thinking placeholder message before returning
+				_, err := t.bot.DeleteMessage(ctx, &bot.DeleteMessageParams{
+					ChatID:    update.Message.Chat.ID,
+					MessageID: msg.ID,
+				})
+				if err != nil {
+					xlog.Error("Error deleting thinking placeholder", "error", err)
+				}
+				// Don't send text response if audio was sent successfully
+				return
+			}
+		}
 	}
 
 	// Update the message with the final response

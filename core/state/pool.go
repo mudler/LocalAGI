@@ -26,21 +26,21 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	file                                         string
-	pooldir                                      string
-	pool                                         AgentPoolData
-	agents                                       map[string]*Agent
-	managers                                     map[string]sse.Manager
-	agentStatus                                  map[string]*Status
-	apiURL, defaultModel, defaultMultimodalModel string
-	mcpBoxURL                                    string
-	imageModel, localRAGAPI, localRAGKey, apiKey string
-	availableActions                             func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
-	connectors                                   func(*AgentConfig) []Connector
-	dynamicPrompt                                func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
-	filters                                      func(*AgentConfig) types.JobFilters
-	timeout                                      string
-	conversationLogs                             string
+	file                                                               string
+	pooldir                                                            string
+	pool                                                               AgentPoolData
+	agents                                                             map[string]*Agent
+	managers                                                           map[string]sse.Manager
+	agentStatus                                                        map[string]*Status
+	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel      string
+	mcpBoxURL, defaultTranscriptionModel, defaultTranscriptionLanguage string
+	imageModel, localRAGAPI, localRAGKey, apiKey                       string
+	availableActions                                                   func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
+	connectors                                                         func(*AgentConfig) []Connector
+	dynamicPrompt                                                      func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
+	filters                                                            func(*AgentConfig) types.JobFilters
+	timeout                                                            string
+	conversationLogs                                                   string
 }
 
 type Status struct {
@@ -74,7 +74,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	defaultModel, defaultMultimodalModel, imageModel, apiURL, apiKey, directory, mcpBoxURL string,
+	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, imageModel, apiURL, apiKey, directory, mcpBoxURL string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -96,25 +96,28 @@ func NewAgentPool(
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
-			file:                   poolfile,
-			pooldir:                directory,
-			apiURL:                 apiURL,
-			defaultModel:           defaultModel,
-			defaultMultimodalModel: defaultMultimodalModel,
-			mcpBoxURL:              mcpBoxURL,
-			imageModel:             imageModel,
-			localRAGAPI:            LocalRAGAPI,
-			apiKey:                 apiKey,
-			agents:                 make(map[string]*Agent),
-			pool:                   make(map[string]AgentConfig),
-			agentStatus:            make(map[string]*Status),
-			managers:               make(map[string]sse.Manager),
-			connectors:             connectors,
-			availableActions:       availableActions,
-			dynamicPrompt:          promptBlocks,
-			filters:                filters,
-			timeout:                timeout,
-			conversationLogs:       conversationPath,
+			file:                         poolfile,
+			pooldir:                      directory,
+			apiURL:                       apiURL,
+			defaultModel:                 defaultModel,
+			defaultMultimodalModel:       defaultMultimodalModel,
+			defaultTranscriptionModel:    defaultTranscriptionModel,
+			defaultTranscriptionLanguage: defaultTranscriptionLanguage,
+			defaultTTSModel:              defaultTTSModel,
+			mcpBoxURL:                    mcpBoxURL,
+			imageModel:                   imageModel,
+			localRAGAPI:                  LocalRAGAPI,
+			apiKey:                       apiKey,
+			agents:                       make(map[string]*Agent),
+			pool:                         make(map[string]AgentConfig),
+			agentStatus:                  make(map[string]*Status),
+			managers:                     make(map[string]sse.Manager),
+			connectors:                   connectors,
+			availableActions:             availableActions,
+			dynamicPrompt:                promptBlocks,
+			filters:                      filters,
+			timeout:                      timeout,
+			conversationLogs:             conversationPath,
 		}, nil
 	}
 
@@ -123,25 +126,28 @@ func NewAgentPool(
 		return nil, err
 	}
 	return &AgentPool{
-		file:                   poolfile,
-		apiURL:                 apiURL,
-		pooldir:                directory,
-		defaultModel:           defaultModel,
-		defaultMultimodalModel: defaultMultimodalModel,
-		mcpBoxURL:              mcpBoxURL,
-		imageModel:             imageModel,
-		apiKey:                 apiKey,
-		agents:                 make(map[string]*Agent),
-		managers:               make(map[string]sse.Manager),
-		agentStatus:            map[string]*Status{},
-		pool:                   *poolData,
-		connectors:             connectors,
-		localRAGAPI:            LocalRAGAPI,
-		dynamicPrompt:          promptBlocks,
-		filters:                filters,
-		availableActions:       availableActions,
-		timeout:                timeout,
-		conversationLogs:       conversationPath,
+		file:                         poolfile,
+		apiURL:                       apiURL,
+		pooldir:                      directory,
+		defaultModel:                 defaultModel,
+		defaultMultimodalModel:       defaultMultimodalModel,
+		defaultTranscriptionModel:    defaultTranscriptionModel,
+		defaultTranscriptionLanguage: defaultTranscriptionLanguage,
+		defaultTTSModel:              defaultTTSModel,
+		mcpBoxURL:                    mcpBoxURL,
+		imageModel:                   imageModel,
+		apiKey:                       apiKey,
+		agents:                       make(map[string]*Agent),
+		managers:                     make(map[string]sse.Manager),
+		agentStatus:                  map[string]*Status{},
+		pool:                         *poolData,
+		connectors:                   connectors,
+		localRAGAPI:                  LocalRAGAPI,
+		dynamicPrompt:                promptBlocks,
+		filters:                      filters,
+		availableActions:             availableActions,
+		timeout:                      timeout,
+		conversationLogs:             conversationPath,
 	}, nil
 }
 
@@ -334,9 +340,23 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 	ctx := context.Background()
 	model := a.defaultModel
 	multimodalModel := a.defaultMultimodalModel
+	transcriptionModel := a.defaultTranscriptionModel
+	transcriptionLanguage := a.defaultTranscriptionLanguage
+	ttsModel := a.defaultTTSModel
 
 	if config.MultimodalModel != "" {
 		multimodalModel = config.MultimodalModel
+	}
+
+	if config.TranscriptionModel != "" {
+		transcriptionModel = config.TranscriptionModel
+	}
+
+	if config.TranscriptionLanguage != "" {
+		transcriptionLanguage = config.TranscriptionLanguage
+	}
+	if config.TTSModel != "" {
+		ttsModel = config.TTSModel
 	}
 
 	if config.Model != "" {
@@ -419,6 +439,9 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		WithLLMAPIURL(a.apiURL),
 		WithContext(ctx),
 		WithMCPServers(config.MCPServers...),
+		WithTranscriptionModel(transcriptionModel),
+		WithTranscriptionLanguage(transcriptionLanguage),
+		WithTTSModel(ttsModel),
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
 		WithMCPSTDIOServers(config.MCPSTDIOServers...),
