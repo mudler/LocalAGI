@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useOutletContext, useNavigate, useSearchParams } from 'react-router-dom';
 import { actionApi, agentApi } from '../utils/api';
 import FormFieldDefinition from '../components/common/FormFieldDefinition';
 import hljs from 'highlight.js/lib/core';
@@ -10,6 +10,7 @@ hljs.registerLanguage('json', json);
 function ActionsPlayground() {
   const { showToast } = useOutletContext();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [actions, setActions] = useState([]);
   const [selectedAction, setSelectedAction] = useState('');
   const [configJson, setConfigJson] = useState('{}');
@@ -46,6 +47,29 @@ function ActionsPlayground() {
 
     fetchActions();
   }, []);
+
+  // If query param 'action' is present, pre-select it once actions are loaded
+  useEffect(() => {
+    if (loadingActions) return;
+    const queryAction = searchParams.get('action');
+    if (!queryAction) return;
+    if (!selectedAction && actions.includes(queryAction)) {
+      setSelectedAction(queryAction);
+    }
+  }, [loadingActions, actions, searchParams, selectedAction]);
+
+  // If query param 'config' is present, pre-fill the configuration JSON
+  useEffect(() => {
+    const queryConfig = searchParams.get('config');
+    if (!queryConfig) return;
+    try {
+      const parsed = JSON.parse(queryConfig);
+      setConfigJson(JSON.stringify(parsed, null, 2));
+    } catch (err) {
+      console.error('Invalid config query parameter:', err);
+      showToast('Invalid config query parameter. Expected JSON.', 'error');
+    }
+  }, [searchParams, showToast]);
 
   // Fetch agent metadata on mount
   useEffect(() => {

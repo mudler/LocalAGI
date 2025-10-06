@@ -35,6 +35,18 @@ const ActionsSection = ({ formData, setFormData, metadata }) => {
     });
   };
 
+  // Handle the play button and open the action playground
+  const handleActionPlay = (index) => {
+    const action = formData.actions[index];
+    const searchParams = new URLSearchParams({
+      action: action.name,
+      config: action.config
+    });
+
+    // Open in new tab while staying in React Router context
+    window.open(`/app/actions-playground?${searchParams.toString()}`, '_blank');
+  };
+
   return (
     <div className="actions-section">
       <h3>Actions</h3>
@@ -47,6 +59,7 @@ const ActionsSection = ({ formData, setFormData, metadata }) => {
         onChange={handleActionChange}
         onRemove={handleActionRemove}
         onAdd={handleAddAction}
+        onPlay={handleActionPlay}
         fieldGroups={metadata?.actions || []}
       />
     </div>
