@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	mcp "github.com/metoro-io/mcp-golang"
-	"github.com/metoro-io/mcp-golang/transport/stdio"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -199,33 +198,25 @@ var _ = Describe("Client", func() {
 			Expect(read).NotTo(BeNil())
 			Expect(writer).NotTo(BeNil())
 
-			transport := stdio.NewStdioServerTransportWithIO(read, writer)
+			transport, err := NewStdioTransport(client, process.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(transport).NotTo(BeNil())
+
+			client := mcp.NewClient(&mcp.Implementation{Name: "LocalAI", Version: "v1.0.0"}, nil)
 
 			// Create a new client
-			mcpClient := mcp.NewClient(transport)
-			// Initialize the client
-			response, e := mcpClient.Initialize(ctx)
-			Expect(e).NotTo(HaveOccurred())
-			Expect(response).NotTo(BeNil())
+			session, err := client.Connect(context.Background(), transport, nil)
+			Expect(err).NotTo(HaveOccurred())
 
-			Expect(mcpClient.Ping(ctx)).To(Succeed())
+			Expect(session.Ping(context.Background(), nil)).To(Succeed())
 
-			xlog.Debug("Client initialized: %v", response.Instructions)
+			alltools := []*mcp.Tool{}
 
-			alltools := []mcp.ToolRetType{}
-			var cursor *string
-			for {
-				tools, err := mcpClient.ListTools(ctx, cursor)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(tools).NotTo(BeNil())
-				Expect(tools.Tools).NotTo(BeEmpty())
-				alltools = append(alltools, tools.Tools...)
-
-				if tools.NextCursor == nil {
-					break // No more pages
-				}
-				cursor = tools.NextCursor
-			}
+			tools, err := session.ListTools(context.Background(), nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(tools).NotTo(BeNil())
+			Expect(tools.Tools).NotTo(BeEmpty())
+			alltools = append(alltools, tools.Tools...)
 
 			for _, tool := range alltools {
 				xlog.Debug("Tool: %v", tool)
