@@ -48,13 +48,16 @@ type AgentConfig struct {
 
 	Description string `json:"description" form:"description"`
 
-	Model               string `json:"model" form:"model"`
-	MultimodalModel     string `json:"multimodal_model" form:"multimodal_model"`
-	APIURL              string `json:"api_url" form:"api_url"`
-	APIKey              string `json:"api_key" form:"api_key"`
-	LocalRAGURL         string `json:"local_rag_url" form:"local_rag_url"`
-	LocalRAGAPIKey      string `json:"local_rag_api_key" form:"local_rag_api_key"`
-	LastMessageDuration string `json:"last_message_duration" form:"last_message_duration"`
+	Model                 string `json:"model" form:"model"`
+	MultimodalModel       string `json:"multimodal_model" form:"multimodal_model"`
+	TranscriptionModel    string `json:"transcription_model" form:"transcription_model"`
+	TranscriptionLanguage string `json:"transcription_language" form:"transcription_language"`
+	TTSModel              string `json:"tts_model" form:"tts_model"`
+	APIURL                string `json:"api_url" form:"api_url"`
+	APIKey                string `json:"api_key" form:"api_key"`
+	LocalRAGURL           string `json:"local_rag_url" form:"local_rag_url"`
+	LocalRAGAPIKey        string `json:"local_rag_api_key" form:"local_rag_api_key"`
+	LastMessageDuration   string `json:"last_message_duration" form:"last_message_duration"`
 
 	Name                  string `json:"name" form:"name"`
 	HUD                   bool   `json:"hud" form:"hud"`
@@ -142,6 +145,27 @@ func NewAgentConfigMeta(
 			{
 				Name:         "multimodal_model",
 				Label:        "Multimodal Model",
+				Type:         "text",
+				DefaultValue: "",
+				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "transcription_model",
+				Label:        "Transcription Model",
+				Type:         "text",
+				DefaultValue: "",
+				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "transcription_language",
+				Label:        "Transcription Language",
+				Type:         "text",
+				DefaultValue: "",
+				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "tts_model",
+				Label:        "TTS Model",
 				Type:         "text",
 				DefaultValue: "",
 				Tags:         config.Tags{Section: "ModelSettings"},

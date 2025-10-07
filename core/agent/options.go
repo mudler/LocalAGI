@@ -12,10 +12,13 @@ import (
 type Option func(*options) error
 
 type llmOptions struct {
-	APIURL          string
-	APIKey          string
-	Model           string
-	MultimodalModel string
+	APIURL                string
+	APIKey                string
+	Model                 string
+	MultimodalModel       string
+	TranscriptionModel    string
+	TranscriptionLanguage string
+	TTSModel              string
 }
 
 type options struct {
@@ -80,8 +83,11 @@ func defaultOptions() *options {
 		maxEvaluationLoops: 2,
 		enableEvaluation:   false,
 		LLMAPI: llmOptions{
-			APIURL: "http://localhost:8080",
-			Model:  "gpt-4",
+			APIURL:                "http://localhost:8080",
+			Model:                 "gpt-4",
+			TranscriptionModel:    "whisper-1",
+			TranscriptionLanguage: "",
+			TTSModel:              "tts-1",
 		},
 		character: Character{
 			Name:       "",
@@ -422,6 +428,27 @@ func WithMaxEvaluationLoops(loops int) Option {
 func EnableEvaluation() Option {
 	return func(o *options) error {
 		o.enableEvaluation = true
+		return nil
+	}
+}
+
+func WithTranscriptionModel(model string) Option {
+	return func(o *options) error {
+		o.LLMAPI.TranscriptionModel = model
+		return nil
+	}
+}
+
+func WithTranscriptionLanguage(language string) Option {
+	return func(o *options) error {
+		o.LLMAPI.TranscriptionLanguage = language
+		return nil
+	}
+}
+
+func WithTTSModel(model string) Option {
+	return func(o *options) error {
+		o.LLMAPI.TTSModel = model
 		return nil
 	}
 }

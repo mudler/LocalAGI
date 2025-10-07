@@ -13,6 +13,9 @@ import (
 
 var baseModel = os.Getenv("LOCALAGI_MODEL")
 var multimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
+var transcriptionModel = os.Getenv("LOCALAGI_TRANSCRIPTION_MODEL")
+var transcriptionLanguage = os.Getenv("LOCALAGI_TRANSCRIPTION_LANGUAGE")
+var ttsModel = os.Getenv("LOCALAGI_TTS_MODEL")
 var apiURL = os.Getenv("LOCALAGI_LLM_API_URL")
 var apiKey = os.Getenv("LOCALAGI_LLM_API_KEY")
 var timeout = os.Getenv("LOCALAGI_TIMEOUT")
@@ -60,6 +63,9 @@ func main() {
 	pool, err := state.NewAgentPool(
 		baseModel,
 		multimodalModel,
+		transcriptionModel,
+		transcriptionLanguage,
+		ttsModel,
 		imageModel,
 		apiURL,
 		apiKey,

@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -218,6 +220,42 @@ func (a *Agent) Enqueue(j *types.Job) {
 	j.ResultCallback = a.options.resultCallback
 
 	a.jobQueue <- j
+}
+
+func (a *Agent) Transcribe(ctx context.Context, file string) (string, error) {
+	resp, err := a.client.CreateTranscription(ctx,
+		openai.AudioRequest{
+			Model:    a.options.LLMAPI.TranscriptionModel,
+			Language: a.options.LLMAPI.TranscriptionLanguage,
+			FilePath: file,
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+	return resp.Text, nil
+}
+
+func (a *Agent) TTS(ctx context.Context, text string) ([]byte, error) {
+	if a.options.LLMAPI.TTSModel == "" {
+		return nil, fmt.Errorf("TTS model is not set")
+	}
+	resp, err := a.client.CreateSpeech(ctx,
+		openai.CreateSpeechRequest{
+			Model:          openai.SpeechModel(a.options.LLMAPI.TTSModel),
+			Input:          text,
+			ResponseFormat: openai.SpeechResponseFormatMp3,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Close()
+
+	buf := bytes.NewBuffer(nil)
+	io.Copy(buf, resp)
+
+	return buf.Bytes(), nil
 }
 
 func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletionMessage, maxRetries int) (openai.ChatCompletionMessage, error) {
