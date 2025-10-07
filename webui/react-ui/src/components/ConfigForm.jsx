@@ -10,6 +10,7 @@ import FormFieldDefinition from './common/FormFieldDefinition';
  * @param {Function} props.onChange - Callback when an item changes
  * @param {Function} props.onRemove - Callback when an item is removed
  * @param {Function} props.onAdd - Callback when a new item is added
+ * @param {Function} props.onPlay - Callback when a play button is clicked
  * @param {String} props.itemType - Type of items being configured ('action', 'connector', etc.)
  * @param {String} props.typeField - The field name that determines the item's type (e.g., 'name' for actions, 'type' for connectors)
  * @param {String} props.addButtonText - Text for the add button
@@ -19,8 +20,9 @@ const ConfigForm = ({
   items = [], 
   fieldGroups = [],
   onChange, 
-  onRemove, 
+  onRemove,
   onAdd,
+  onPlay,
   itemType = 'item',
   typeField = 'type',
   addButtonText = 'Add Item',
@@ -89,15 +91,25 @@ const ConfigForm = ({
     
     return (
       <div key={index} className="config-item mb-4 card">
-        <div className="config-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h4 style={{ margin: 0 }}>{itemTypeLabel} #{index + 1}</h4>
-          <button 
-            type="button" 
-            className="action-btn delete-btn"
-            onClick={() => onRemove(index)}
-          >
-            <i className="fas fa-times"></i>
-          </button>
+        <div className="config-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem' }}>
+          <h4 style={{ margin: 0, flex: 1 }}>{itemTypeLabel} #{index + 1}</h4>
+            {/* Render Play button if onPlay handler is provided */}
+            {onPlay && (
+                <button
+                    type="button"
+                    className="action-btn"
+                    onClick={() => onPlay(index)}
+                >
+                    <i className="fas fa-play"></i>
+                </button>
+            )}
+            <button
+                type="button"
+                className="action-btn delete-btn"
+                onClick={() => onRemove(index)}
+            >
+                <i className="fas fa-times"></i>
+            </button>
         </div>
         
         <div className="config-type mb-3">
