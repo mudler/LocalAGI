@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 
 	"github.com/mudler/LocalAGI/core/action"
@@ -43,7 +44,8 @@ type Agent struct {
 
 	newConversations chan openai.ChatCompletionMessage
 
-	mcpActions types.Actions
+	mcpActions  types.Actions
+	mcpSessions []*mcp.ClientSession
 
 	subscriberMutex        sync.Mutex
 	newMessagesSubscribers []func(openai.ChatCompletionMessage)

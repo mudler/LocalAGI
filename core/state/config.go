@@ -43,7 +43,6 @@ type AgentConfig struct {
 	MCPServers       []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
 	MCPSTDIOServers  []agent.MCPSTDIOServer `json:"mcp_stdio_servers" form:"mcp_stdio_servers"`
 	MCPPrepareScript string                 `json:"mcp_prepare_script" form:"mcp_prepare_script"`
-	MCPBoxURL        string                 `json:"mcp_box_url" form:"mcp_box_url"`
 	Filters          []FiltersConfig        `json:"filters" form:"filters"`
 
 	Description string `json:"description" form:"description"`
@@ -325,7 +324,7 @@ func NewAgentConfigMeta(
 				Label:        "MCP Prepare Script",
 				Type:         "textarea",
 				DefaultValue: "",
-				HelpText:     "Script to prepare the MCP box",
+				HelpText:     "Script to prepare for running MCP servers",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{

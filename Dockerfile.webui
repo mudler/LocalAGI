@@ -44,12 +44,21 @@ COPY --from=ui-builder /app/dist /work/webui/react-ui/dist
 # Build the application
 RUN CGO_ENABLED=0 go build -ldflags="$LDFLAGS" -o localagi ./
 
-FROM scratch
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    tzdata \
+    docker.io \
+    bash \
+    wget \
+    curl
 
 # Copy the webui binary from the builder stage to the final image
 COPY --from=builder /work/localagi /localagi
-COPY --from=builder /etc/ssl/ /etc/ssl/
-COPY --from=builder /tmp /tmp
 
 # Define the command that will be run when the container is started
 ENTRYPOINT ["/localagi"]
