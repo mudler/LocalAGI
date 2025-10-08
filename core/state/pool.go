@@ -26,21 +26,21 @@ import (
 
 type AgentPool struct {
 	sync.Mutex
-	file                                                               string
-	pooldir                                                            string
-	pool                                                               AgentPoolData
-	agents                                                             map[string]*Agent
-	managers                                                           map[string]sse.Manager
-	agentStatus                                                        map[string]*Status
-	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel      string
-	mcpBoxURL, defaultTranscriptionModel, defaultTranscriptionLanguage string
-	imageModel, localRAGAPI, localRAGKey, apiKey                       string
-	availableActions                                                   func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
-	connectors                                                         func(*AgentConfig) []Connector
-	dynamicPrompt                                                      func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
-	filters                                                            func(*AgentConfig) types.JobFilters
-	timeout                                                            string
-	conversationLogs                                                   string
+	file                                                          string
+	pooldir                                                       string
+	pool                                                          AgentPoolData
+	agents                                                        map[string]*Agent
+	managers                                                      map[string]sse.Manager
+	agentStatus                                                   map[string]*Status
+	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel string
+	defaultTranscriptionModel, defaultTranscriptionLanguage       string
+	imageModel, localRAGAPI, localRAGKey, apiKey                  string
+	availableActions                                              func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
+	connectors                                                    func(*AgentConfig) []Connector
+	dynamicPrompt                                                 func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
+	filters                                                       func(*AgentConfig) types.JobFilters
+	timeout                                                       string
+	conversationLogs                                              string
 }
 
 type Status struct {
@@ -74,7 +74,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, imageModel, apiURL, apiKey, directory, mcpBoxURL string,
+	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, imageModel, apiURL, apiKey, directory string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -104,7 +104,6 @@ func NewAgentPool(
 			defaultTranscriptionModel:    defaultTranscriptionModel,
 			defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 			defaultTTSModel:              defaultTTSModel,
-			mcpBoxURL:                    mcpBoxURL,
 			imageModel:                   imageModel,
 			localRAGAPI:                  LocalRAGAPI,
 			apiKey:                       apiKey,
@@ -134,7 +133,6 @@ func NewAgentPool(
 		defaultTranscriptionModel:    defaultTranscriptionModel,
 		defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 		defaultTTSModel:              defaultTTSModel,
-		mcpBoxURL:                    mcpBoxURL,
 		imageModel:                   imageModel,
 		apiKey:                       apiKey,
 		agents:                       make(map[string]*Agent),
@@ -365,10 +363,6 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		config.Model = model
 	}
 
-	if config.MCPBoxURL != "" {
-		a.mcpBoxURL = config.MCPBoxURL
-	}
-
 	if config.PeriodicRuns == "" {
 		config.PeriodicRuns = "10m"
 	}
@@ -445,7 +439,6 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		WithPeriodicRuns(config.PeriodicRuns),
 		WithPermanentGoal(config.PermanentGoal),
 		WithMCPSTDIOServers(config.MCPSTDIOServers...),
-		WithMCPBoxURL(a.mcpBoxURL),
 		WithPrompts(promptBlocks...),
 		WithJobFilters(filters...),
 		WithMCPPrepareScript(config.MCPPrepareScript),

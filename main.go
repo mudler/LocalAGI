@@ -26,7 +26,6 @@ var apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
 var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
 var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
 var localOperatorBaseURL = os.Getenv("LOCALOPERATOR_BASE_URL")
-var mcpboxURL = os.Getenv("LOCALAGI_MCPBOX_URL")
 var customActionsDir = os.Getenv("LOCALAGI_CUSTOM_ACTIONS_DIR")
 var sshBoxURL = os.Getenv("LOCALAGI_SSHBOX_URL")
 
@@ -70,7 +69,6 @@ func main() {
 		apiURL,
 		apiKey,
 		stateDir,
-		mcpboxURL,
 		localRAG,
 		services.Actions(map[string]string{
 			services.ActionConfigBrowserAgentRunner: localOperatorBaseURL,

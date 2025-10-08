@@ -12,11 +12,6 @@ services:
       - /dev/dri/card1
       - /dev/dri/renderD129
 
-  mcpbox:
-    extends:
-      file: docker-compose.yaml
-      service: mcpbox
-
   dind:
     extends:
       file: docker-compose.yaml

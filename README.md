@@ -343,7 +343,6 @@ pool, err := state.NewAgentPool(
     "http://localhost:8080",  // API URL
     "your-api-key",          // API key
     "./state",               // state directory
-    "",                      // MCP box URL (optional)
     "http://localhost:8081", // LocalRAG API URL
     func(config *AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action {
         // Define available actions for agents
@@ -732,7 +731,6 @@ export LOCALAGI_LOCALRAG_URL=http://localrecall:8080
 export LOCALAGI_STATE_DIR=./pool
 export LOCALAGI_TIMEOUT=5m
 export LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
-export LOCALAGI_MCPBOX_URL=http://mcpbox:8080
 export LOCALAGI_SSHBOX_URL=root:root@sshbox:22
 
 # Start development server
@@ -1035,7 +1033,6 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
 | `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
 | `LOCALAGI_SSHBOX_URL` | LocalAGI SSHBox URL, e.g. user:pass@ip:port |
-| `LOCALAGI_MCPBOX_URL` | LocalAGI MCPBox URL, e.g. http://mcpbox:8080 |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |

@@ -61,25 +61,6 @@ services:
       dind:
         condition: service_healthy
 
-  mcpbox:
-    build:
-      context: .
-      dockerfile: Dockerfile.mcpbox
-    ports:
-      - "8080"
-    volumes:
-      - ./volumes/mcpbox:/app/data
-    environment:
-      - DOCKER_HOST=tcp://dind:2375
-    depends_on:
-      dind:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/processes"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   dind:
     image: docker:dind
     privileged: true
@@ -97,7 +78,7 @@ services:
         condition: service_healthy
       localrecall-healthcheck:
         condition: service_completed_successfully
-      mcpbox:
+      dind:
         condition: service_healthy
     build:
       context: .
@@ -115,8 +96,8 @@ services:
       - LOCALAGI_STATE_DIR=/pool
       - LOCALAGI_TIMEOUT=5m
       - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
-      - LOCALAGI_MCPBOX_URL=http://mcpbox:8080
       - LOCALAGI_SSHBOX_URL=root:root@sshbox:22
+      - DOCKER_HOST=tcp://dind:2375
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

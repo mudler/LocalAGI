@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
 	"time"
 
 	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/stdio"
 	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/rs/zerolog/log"
 
@@ -187,6 +188,7 @@ func (a *Agent) initMCPActions() error {
 			xlog.Error("Failed to connect to MCP server", "server", mcpServer, "error", err.Error())
 			continue
 		}
+		a.mcpSessions = append(a.mcpSessions, session)
 
 		xlog.Debug("Adding tools for MCP server", "server", mcpServer)
 		actions, err := a.addTools(session)
@@ -201,34 +203,29 @@ func (a *Agent) initMCPActions() error {
 	a.closeMCPSTDIOServers() // Make sure we stop all previous servers if any is active
 
 	if a.options.mcpPrepareScript != "" {
-		xlog.Debug("Preparing MCP box", "script", a.options.mcpPrepareScript)
-		client := stdio.NewClient(a.options.mcpBoxURL)
-		client.RunProcess(a.context, "/bin/bash", []string{"-c", a.options.mcpPrepareScript}, []string{})
+		xlog.Debug("Preparing MCP", "script", a.options.mcpPrepareScript)
+
+		prepareCmd := exec.Command("/bin/bash", "-c", a.options.mcpPrepareScript)
+		output, err := prepareCmd.CombinedOutput()
+		if err != nil {
+			xlog.Error("Failed with error: '%s' - %s", err.Error(), output)
+		}
+		xlog.Debug("Prepared MCP: \n%s", output)
 	}
 
 	for _, mcpStdioServer := range a.options.mcpStdioServers {
-		stdioclient := stdio.NewClient(a.options.mcpBoxURL)
-		p, err := stdioclient.CreateProcess(a.context,
-			mcpStdioServer.Cmd,
-			mcpStdioServer.Args,
-			mcpStdioServer.Env,
-			a.Character.Name)
-		if err != nil {
-			xlog.Error("Failed to create process", "error", err.Error())
-			continue
-		}
+		command := exec.Command(mcpStdioServer.Cmd, mcpStdioServer.Args...)
+		command.Env = os.Environ()
+		command.Env = append(command.Env, mcpStdioServer.Env...)
 
-		transport, err := stdio.NewStdioTransport(stdioclient, p.ID)
-		if err != nil {
-			xlog.Error("Failed to create stdio transport", "error", err.Error())
-			continue
-		}
 		// Create a new client
-		session, err := client.Connect(a.context, transport, nil)
+		session, err := client.Connect(a.context, &mcp.CommandTransport{
+			Command: command}, nil)
 		if err != nil {
 			xlog.Error("Failed to connect to MCP server", "server", mcpStdioServer, "error", err.Error())
 			continue
 		}
+		a.mcpSessions = append(a.mcpSessions, session)
 
 		xlog.Debug("Adding tools for MCP server (stdio)", "server", mcpStdioServer)
 		actions, err := a.addTools(session)
@@ -244,6 +241,7 @@ func (a *Agent) initMCPActions() error {
 }
 
 func (a *Agent) closeMCPSTDIOServers() {
-	client := stdio.NewClient(a.options.mcpBoxURL)
-	client.StopGroup(a.Character.Name)
+	for _, s := range a.mcpSessions {
+		s.Close()
+	}
 }
