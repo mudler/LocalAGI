@@ -94,7 +94,6 @@ Guidelines:
 4. Update your state appropriately
 
 When making decisions:
-- Use the "reply" tool to provide final responses
 - Update your state using appropriate tools
 - Plan complex tasks using the planning tool
 - Consider both immediate and long-term goals
@@ -105,12 +104,6 @@ Remember:
 - Keep track of your progress and state
 - Be proactive in addressing potential issues
 
-Available Tools:
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-
-{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}
 ` + hudTemplate
 
 const reSelfEvalTemplate = pickSelfTemplate
