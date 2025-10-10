@@ -14,6 +14,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/cogito"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
@@ -258,37 +259,6 @@ func (a *Agent) TTS(ctx context.Context, text string) ([]byte, error) {
 	io.Copy(buf, resp)
 
 	return buf.Bytes(), nil
-}
-
-func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletionMessage, maxRetries int) (openai.ChatCompletionMessage, error) {
-	var resp openai.ChatCompletionResponse
-	var err error
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		resp, err = a.client.CreateChatCompletion(ctx,
-			openai.ChatCompletionRequest{
-				Model:    a.options.LLMAPI.Model,
-				Messages: conversation,
-			},
-		)
-		if err == nil && len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
-			break
-		}
-		xlog.Warn("Error asking LLM, retrying", "attempt", attempt+1, "error", err)
-		if attempt < maxRetries {
-			time.Sleep(2 * time.Second) // Optional: Add a delay between retries
-		}
-	}
-
-	if err != nil {
-		return openai.ChatCompletionMessage{}, err
-	}
-
-	if len(resp.Choices) != 1 {
-		return openai.ChatCompletionMessage{}, fmt.Errorf("not enough choices: %w", err)
-	}
-
-	return resp.Choices[0].Message, nil
 }
 
 var ErrContextCanceled = fmt.Errorf("context canceled")
@@ -804,21 +774,32 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	// Validate builtin tools against available actions
 	a.validateBuiltinTools(job)
 
-	var pickTemplate string
-	var reEvaluationTemplate string
+	fragment := cogito.NewFragment(conv...)
 
 	if selfEvaluation {
-		pickTemplate = pickSelfTemplate
-		reEvaluationTemplate = reSelfEvalTemplate
-	} else {
-		pickTemplate = pickActionTemplate
-		reEvaluationTemplate = reEvalTemplate
+		fragment = fragment.AddStartMessage("system", pickSelfTemplate)
 	}
 
 	// choose an action first
 	var chosenAction types.Action
 	var reasoning string
 	var actionParams types.ActionParams
+
+	availableActions := a.getAvailableActionsForJob(job)
+
+	f, err = cogito.ExecuteTools(
+		defaultLLM, fragment,
+		cogito.WithStatusCallback(func(s string) {
+			fmt.Println("___________________ START STATUS _________________")
+			fmt.Println(s)
+			fmt.Println("___________________ END STATUS _________________")
+		}),
+		cogito.WithTools(
+			&search.SearchTool{},
+		),
+		cogito.EnableToolReEvaluator,
+		cogito.EnableToolReasoner,
+	)
 
 	if job.HasNextAction() {
 		// if we are being re-evaluated, we already have the action
