@@ -676,20 +676,17 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	var err error
 
 	cogitoOpts := []cogito.Option{
-
 		cogito.WithStatusCallback(func(s string) {
 			reasoning = s
 		}),
 		cogito.WithTools(
 			cogitoTools...,
 		),
-
 		cogito.WithToolCallResultCallback(func(t cogito.Tool) {
 			if obs != nil {
 				obs.MakeLastProgressCompletion()
 				a.observer.Update(*obs)
 			}
-
 		}),
 		cogito.WithToolCallBack(
 			func(tc *cogito.ToolChoice) bool {
@@ -801,12 +798,25 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 				return cont
 			},
 		),
-		cogito.EnableToolReEvaluator,
-		cogito.EnableToolReasoner,
 	}
 
 	if a.options.canPlan {
+		cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlan)
+	}
 
+	if a.options.enableEvaluation {
+		cogitoOpts = append(cogitoOpts, cogito.EnableToolReEvaluator)
+	}
+
+	if a.options.forceReasoning {
+		cogitoOpts = append(cogitoOpts, cogito.EnableToolReasoner)
+	}
+
+	if a.options.maxEvaluationLoops > 0 {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithMaxAttempts(a.options.maxEvaluationLoops),
+			cogito.WithIterations(a.options.maxEvaluationLoops),
+		)
 	}
 
 	fragment, err = cogito.ExecuteTools(
@@ -846,9 +856,6 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	})
 	job.Result.SetResponse(result)
 	job.Result.Finish(nil)
-
-	return
-
 }
 
 func stripThinkingTags(content string) string {
