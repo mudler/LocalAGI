@@ -255,21 +255,6 @@ func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 func (a *Agent) availableActions() types.Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
 
-	addPlanAction := func(actions types.Actions) types.Actions {
-		if !a.options.canPlan {
-			return actions
-		}
-		plannablesActions := []string{}
-		for _, a := range actions {
-			if a.Plannable() {
-				plannablesActions = append(plannablesActions, a.Definition().Name.String())
-			}
-		}
-		planAction := action.NewPlan(plannablesActions)
-		actions = append(actions, planAction)
-		return actions
-	}
-
 	defaultActions := append(a.mcpActions, a.options.userActions...)
 
 	if a.options.initiateConversations && a.selfEvaluationInProgress { // && self-evaluation..
@@ -281,7 +266,7 @@ func (a *Agent) availableActions() types.Actions {
 		//		acts = append(acts, action.NewStop())
 		//	}
 
-		return addPlanAction(acts)
+		return acts
 	}
 
 	if a.options.canStopItself {
@@ -289,14 +274,14 @@ func (a *Agent) availableActions() types.Actions {
 		if a.options.enableHUD {
 			acts = append(acts, action.NewState())
 		}
-		return addPlanAction(acts)
+		return acts
 	}
 
 	if a.options.enableHUD {
-		return addPlanAction(append(defaultActions, action.NewState()))
+		return append(defaultActions, action.NewState())
 	}
 
-	return addPlanAction(defaultActions)
+	return defaultActions
 }
 
 func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {

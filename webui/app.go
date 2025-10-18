@@ -25,14 +25,11 @@ import (
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/state"
 
-	"github.com/donseba/go-htmx"
 	fiber "github.com/gofiber/fiber/v2"
-	"github.com/gofiber/template/html/v2"
 )
 
 type (
 	App struct {
-		htmx   *htmx.HTMX
 		config *Config
 		*fiber.App
 		sharedState *internalTypes.AgentSharedState
@@ -41,16 +38,12 @@ type (
 
 func NewApp(opts ...Option) *App {
 	config := NewConfig(opts...)
-	engine := html.NewFileSystem(http.FS(viewsfs), ".html")
 
 	// Initialize a new Fiber app
 	// Pass the engine to the Views
-	webapp := fiber.New(fiber.Config{
-		Views: engine,
-	})
+	webapp := fiber.New(fiber.Config{})
 
 	a := &App{
-		htmx:        htmx.New(),
 		config:      config,
 		App:         webapp,
 		sharedState: internalTypes.NewAgentSharedState(5 * time.Minute),

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/google/uuid"
+	"github.com/mudler/cogito"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -26,10 +27,9 @@ type Job struct {
 	UserTools    []ActionDefinition // User-defined function tools
 	ToolChoice   string
 
-	pastActions []*ActionRequest
-
-	context context.Context
-	cancel  context.CancelFunc
+	context  context.Context
+	fragment *cogito.Fragment
+	cancel   context.CancelFunc
 
 	Obs *Observable
 }
@@ -103,17 +103,6 @@ func (j *Job) CallbackWithResult(stateResult ActionState) {
 		return
 	}
 	j.ResultCallback(stateResult)
-}
-
-func (j *Job) AddPastAction(action Action, params *ActionParams) {
-	j.pastActions = append(j.pastActions, &ActionRequest{
-		Action: action,
-		Params: params,
-	})
-}
-
-func (j *Job) GetPastActions() []*ActionRequest {
-	return j.pastActions
 }
 
 func WithTextImage(text, image string) JobOption {
