@@ -673,6 +673,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	var obs *types.Observable
 
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
+
 	var err error
 
 	cogitoOpts := []cogito.Option{
@@ -794,7 +795,6 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 					job.Result.Finish(nil)
 
 				}
-
 				return cont
 			},
 		),
@@ -828,12 +828,13 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		return
 	}
 
-	toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
-	switch toolToCall {
-	case action.StopActionName:
-
-		job.Result.Finish(nil)
-		return
+	if fragment.LastMessage().Role == "tool" {
+		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
+		switch toolToCall {
+		case action.StopActionName:
+			job.Result.Finish(nil)
+			return
+		}
 	}
 
 	fragment, err = a.llm.Ask(job.GetContext(), fragment)
