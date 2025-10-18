@@ -679,6 +679,21 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	cogitoOpts := []cogito.Option{
 		cogito.WithStatusCallback(func(s string) {
 			reasoning = s
+			if job.Obs != nil {
+				obs = a.observer.NewObservable()
+				obs.Name = "decision"
+				obs.ParentID = job.Obs.ID
+				obs.Icon = "brain"
+				obs.Creation = &types.Creation{
+					ChatCompletionRequest: &openai.ChatCompletionRequest{
+						Model:    a.options.LLMAPI.Model,
+						Messages: conv,
+					},
+				}
+				a.observer.Update(*obs)
+				obs.MakeLastProgressCompletion()
+				a.observer.Update(*obs)
+			}
 		}),
 		cogito.WithTools(
 			cogitoTools...,
