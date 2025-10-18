@@ -694,6 +694,8 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		cogito.WithToolCallBack(
 			func(tc *cogito.ToolChoice) bool {
 
+				chosenAction := availableActions.Find(tc.Name)
+
 				var obs *types.Observable
 				if job.Obs != nil {
 					obs = a.observer.NewObservable()
@@ -702,7 +704,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 					obs.ParentID = job.Obs.ID
 					obs.Creation = &types.Creation{
 						FunctionDefinition: chosenAction.Definition().ToFunctionDefinition(),
-						FunctionParams:     params,
+						FunctionParams:     types.ActionParams(tc.Arguments),
 					}
 					a.observer.Update(*obs)
 				}
@@ -738,8 +740,8 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 				case action.StateActionName:
 					// We need to store the result in the state
 					state := types.AgentInternalState{}
-
-					err = params.Unmarshal(&state)
+					dat, _ := json.Marshal(tc.Arguments)
+					err = json.Unmarshal(dat, &state)
 					if err != nil {
 						werr := fmt.Errorf("error unmarshalling state of the agent: %w", err)
 						if obs != nil {
@@ -747,7 +749,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 								Error: werr.Error(),
 							}
 						}
-						return types.ActionResult{}, werr
+						return false
 					}
 					// update the current state with the one we just got from the action
 					a.currentState = &state
@@ -767,7 +769,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 								}
 							}
 
-							return types.ActionResult{}, err
+							return false
 						}
 					}
 
@@ -776,7 +778,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 				cont := job.Callback(types.ActionCurrentState{
 					Job:       job,
 					Action:    chosenAction,
-					Params:    actionParams,
+					Params:    types.ActionParams(tc.Arguments),
 					Reasoning: reasoning})
 
 				if !cont {
@@ -785,7 +787,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 							ActionCurrentState: types.ActionCurrentState{
 								Job:       job,
 								Action:    chosenAction,
-								Params:    actionParams,
+								Params:    types.ActionParams(tc.Arguments),
 								Reasoning: reasoning,
 							},
 							ActionResult: types.ActionResult{Result: "stopped by callback"},
