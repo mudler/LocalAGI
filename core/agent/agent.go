@@ -559,6 +559,45 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
 }
 
+// replyWithToolCall handles user-defined actions by recording the action state without setting Response
+func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMessage, params types.ActionParams, chosenAction types.Action, reasoning string) {
+	// Record the action state so the webui can detect this is a user-defined action
+	stateResult := types.ActionState{
+		ActionCurrentState: types.ActionCurrentState{
+			Job:       job,
+			Action:    chosenAction,
+			Params:    params,
+			Reasoning: reasoning,
+		},
+		ActionResult: types.ActionResult{
+			Result: reasoning, // The reasoning/message to show to user
+		},
+	}
+
+	// Add the action state to the job result
+	job.Result.SetResult(stateResult)
+
+	// Used by the observer
+	conv = append(conv, openai.ChatCompletionMessage{
+		Role: "assistant",
+		ToolCalls: []openai.ToolCall{
+			{
+				Type: openai.ToolTypeFunction,
+				Function: openai.FunctionCall{
+					Name:      chosenAction.Definition().ToFunctionDefinition().Name,
+					Arguments: params.String(),
+				},
+			},
+		},
+	})
+
+	// Set conversation but leave Response empty
+	// The webui will detect the user-defined action and generate the proper tool call response
+	job.Result.Conversation = conv
+	// job.Result.Response remains empty - this signals to webui that it should check State
+	job.Result.Finish(nil)
+}
+
 // validateBuiltinTools checks that builtin tools specified by the user can be matched to available actions
 func (a *Agent) validateBuiltinTools(job *types.Job) {
 	builtinTools := job.GetBuiltinTools()
@@ -592,6 +631,80 @@ func (a *Agent) validateBuiltinTools(job *types.Job) {
 				"agent", a.Character.Name)
 		}
 	}
+}
+
+func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenAction types.Action, actionParams types.ActionParams, result types.ActionResult, conv Messages) Messages {
+	// calling the function
+	conv = append(conv, openai.ChatCompletionMessage{
+		Role: "assistant",
+		ToolCalls: []openai.ToolCall{
+			{
+				Type: openai.ToolTypeFunction,
+				Function: openai.FunctionCall{
+					Name:      chosenAction.Definition().Name.String(),
+					Arguments: actionParams.String(),
+				},
+			},
+		},
+	})
+
+	// result of calling the function
+
+	// If it contains an image, we need to put it in the conversation (if supported by the model)
+	if result.ImageBase64Result != "" {
+		// iF model support both images and text, process it as a single multicontent message and return
+		if !a.options.SeparatedMultimodalModel() {
+			conv = append(conv, openai.ChatCompletionMessage{
+				Role: openai.ChatMessageRoleTool,
+				MultiContent: []openai.ChatMessagePart{
+					{
+						Type: openai.ChatMessagePartTypeText,
+						Text: result.Result,
+					},
+					{
+						Type: openai.ChatMessagePartTypeImageURL,
+						ImageURL: &openai.ChatMessageImageURL{
+							URL: result.ImageBase64Result,
+						},
+					},
+				},
+				Name:       chosenAction.Definition().Name.String(),
+				ToolCallID: chosenAction.Definition().Name.String(),
+			})
+
+			return conv
+		} else {
+			// We need to describe the image first, and we will process the text separately (we do not return here)
+			imageDescription, err := a.describeImage(ctx, a.options.LLMAPI.MultimodalModel, result.ImageBase64Result)
+			if err != nil {
+				xlog.Error("Error describing image", "error", err)
+			} else {
+				conv = append(conv, openai.ChatCompletionMessage{
+					Role:       openai.ChatMessageRoleTool,
+					Content:    fmt.Sprintf("Tool generated an image, the description of the image is: %s", imageDescription),
+					Name:       chosenAction.Definition().Name.String(),
+					ToolCallID: chosenAction.Definition().Name.String(),
+				})
+				if result.Result != "" {
+					conv = append(conv, openai.ChatCompletionMessage{
+						Role:       openai.ChatMessageRoleTool,
+						Content:    result.Result,
+						Name:       chosenAction.Definition().Name.String(),
+						ToolCallID: chosenAction.Definition().Name.String(),
+					})
+				}
+			}
+		}
+	} else {
+		conv = append(conv, openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    result.Result,
+			Name:       chosenAction.Definition().Name.String(),
+			ToolCallID: chosenAction.Definition().Name.String(),
+		})
+	}
+
+	return conv
 }
 
 func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
@@ -721,9 +834,30 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 				obs.MakeLastProgressCompletion()
 				a.observer.Update(*obs)
 			}
+			aa := availableActions.Find(t.Name)
+			state := types.ActionState{
+				ActionCurrentState: types.ActionCurrentState{
+					Job:       job,
+					Action:    aa,
+					Params:    types.ActionParams(t.ToolArguments.Arguments),
+					Reasoning: reasoning,
+				},
+				ActionResult: types.ActionResult{Result: t.Result},
+			}
+			job.Result.SetResult(state)
+			job.CallbackWithResult(state)
+			conv = a.addFunctionResultToConversation(job.GetContext(), aa, types.ActionParams(t.ToolArguments.Arguments), types.ActionResult{Result: t.Result}, conv)
 		}),
 		cogito.WithToolCallBack(
 			func(tc *cogito.ToolChoice) bool {
+
+				// Check if this is a user-defined action
+				aa := availableActions.Find(tc.Name)
+				if aa != nil && types.IsActionUserDefined(aa) {
+					xlog.Debug("User-defined action chosen, returning tool call", "action", aa.Definition().Name)
+					a.replyWithToolCall(job, conv, tc.Arguments, aa, reasoning)
+					return false
+				}
 
 				chosenAction := availableActions.Find(tc.Name)
 
