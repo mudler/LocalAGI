@@ -6,6 +6,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
+	"golang.org/x/exp/slices"
 
 	"github.com/mudler/LocalAGI/pkg/xlog"
 
@@ -109,7 +110,7 @@ func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 func (a *Agent) availableActions() types.Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
 
-	defaultActions := append(a.mcpActions, a.options.userActions...)
+	defaultActions := slices.Clone(a.options.userActions)
 
 	if a.options.initiateConversations && a.selfEvaluationInProgress { // && self-evaluation..
 		acts := append(defaultActions, action.NewConversation())

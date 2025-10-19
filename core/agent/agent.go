@@ -46,7 +46,6 @@ type Agent struct {
 
 	newConversations chan openai.ChatCompletionMessage
 
-	mcpActions  types.Actions
 	mcpSessions []*mcp.ClientSession
 
 	subscriberMutex        sync.Mutex
@@ -568,7 +567,7 @@ func (a *Agent) validateBuiltinTools(job *types.Job) {
 	}
 
 	// Get available actions
-	availableActions := a.mcpActions
+	availableActions := a.availableActions()
 
 	for _, tool := range builtinTools {
 		functionName := tool.Name
@@ -677,6 +676,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 	var err error
 
 	cogitoOpts := []cogito.Option{
+		cogito.WithMCPs(a.mcpSessions...),
 		cogito.WithStatusCallback(func(s string) {
 			reasoning = s
 			if job.Obs != nil {
