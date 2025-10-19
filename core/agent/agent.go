@@ -690,6 +690,20 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 						Messages: conv,
 					},
 				}
+				obs.AddProgress(
+					types.Progress{
+						ChatCompletionResponse: &openai.ChatCompletionResponse{
+							Choices: []openai.ChatCompletionChoice{
+								{
+									Message: openai.ChatCompletionMessage{
+										Role:    "assistant",
+										Content: reasoning,
+									},
+								},
+							},
+						},
+					})
+
 				a.observer.Update(*obs)
 				obs.MakeLastProgressCompletion()
 				a.observer.Update(*obs)
@@ -843,6 +857,11 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		cogitoOpts...,
 	)
 	if err != nil && !errors.Is(err, cogito.ErrNoToolSelected) {
+		if obs != nil {
+			obs.Completion = &types.Completion{
+				Error: err.Error(),
+			}
+		}
 		job.Result.Finish(err)
 		return
 	}
