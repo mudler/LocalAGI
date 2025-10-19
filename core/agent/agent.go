@@ -698,8 +698,12 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		cogito.WithTools(
 			cogitoTools...,
 		),
-		cogito.WithToolCallResultCallback(func(t cogito.Tool) {
+		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
 			if obs != nil {
+				obs.Progress = append(obs.Progress, types.Progress{
+					ActionResult: t.Result,
+				})
+
 				obs.MakeLastProgressCompletion()
 				a.observer.Update(*obs)
 			}
