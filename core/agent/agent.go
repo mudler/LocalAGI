@@ -818,8 +818,6 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 					})
 
 				a.observer.Update(*obs)
-				obs.MakeLastProgressCompletion()
-				a.observer.Update(*obs)
 			}
 		}),
 		cogito.WithTools(
