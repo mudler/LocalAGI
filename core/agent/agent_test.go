@@ -241,7 +241,7 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 
 			result := agent.Ask(
-				types.WithText("Use the plan tool to do two actions in sequence: search for the weather in boston and search for the weather in milan"),
+				types.WithText("Create a plan for my trip from Boston to milan"),
 			)
 			Expect(len(result.State)).To(BeNumerically(">", 1))
 
