@@ -3,6 +3,7 @@ package types
 import (
 	"sync"
 
+	"github.com/mudler/cogito"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -11,6 +12,7 @@ type JobResult struct {
 	sync.Mutex
 	// The result of a job
 	State        []ActionState
+	Plans        []cogito.PlanStatus
 	Conversation []openai.ChatCompletionMessage
 
 	Finalizers []func([]openai.ChatCompletionMessage)

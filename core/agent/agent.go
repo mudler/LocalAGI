@@ -1022,6 +1022,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		Content: result,
 	})
 
+	job.Result.Plans = fragment.Status.Plans
 	job.Result.Conversation = conv
 	job.ConversationHistory = conv
 	job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {

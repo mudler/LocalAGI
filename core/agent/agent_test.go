@@ -247,13 +247,14 @@ var _ = Describe("Agent test", func() {
 
 			actionsExecuted := []string{}
 			actionResults := []string{}
+
 			for _, r := range result.State {
 				xlog.Info(r.Result)
 				actionsExecuted = append(actionsExecuted, r.Action.Definition().Name.String())
 				actionResults = append(actionResults, r.ActionResult.Result)
 			}
 			Expect(actionsExecuted).To(ContainElement("get_weather"), fmt.Sprint(result))
-			Expect(actionsExecuted).To(ContainElement("plan"), fmt.Sprint(result))
+			Expect(len(result.Plans)).To(BeNumerically(">", 1), fmt.Sprintf("%+v", result))
 			Expect(actionResults).To(ContainElement(testActionResult), fmt.Sprint(result))
 			Expect(actionResults).To(ContainElement(testActionResult2), fmt.Sprint(result))
 		})
