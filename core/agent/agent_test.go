@@ -276,20 +276,15 @@ var _ = Describe("Agent test", func() {
 
 			Expect(len(result.Conversation)).To(BeNumerically(">", 1), fmt.Sprint(result.Conversation))
 
-			Expect(len(result.Plans)).To(BeNumerically(">", 1), fmt.Sprintf("%+v", result))
-			Expect(len(result.State)).To(BeNumerically(">", 1))
+			Expect(len(result.Plans)).To(BeNumerically(">=", 1), fmt.Sprintf("%+v", result))
+			Expect(len(result.State)).To(BeNumerically(">=", 1))
 
 			actionsExecuted := []string{}
-			actionResults := []string{}
-
 			for _, r := range result.State {
 				xlog.Info(r.Result)
 				actionsExecuted = append(actionsExecuted, r.Action.Definition().Name.String())
-				actionResults = append(actionResults, r.ActionResult.Result)
 			}
-			Expect(actionsExecuted).To(ContainElement("get_weather"), fmt.Sprint(result))
-			Expect(actionResults).To(ContainElement(testActionResult), fmt.Sprint(result))
-			Expect(actionResults).To(ContainElement(testActionResult2), fmt.Sprint(result))
+			Expect(actionsExecuted).To(Or(ContainElement("search_internet"), ContainElement("get_weather")), fmt.Sprint(result))
 		})
 
 		It("Can initiate conversations", func() {

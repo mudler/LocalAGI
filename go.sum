@@ -202,6 +202,12 @@ github.com/mudler/cogito v0.3.3-0.20251021180018-921ed81d33e7 h1:Lm+KFRq1ghI7WHj
 github.com/mudler/cogito v0.3.3-0.20251021180018-921ed81d33e7/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
 github.com/mudler/cogito v0.3.3-0.20251021201604-550aad0fa074 h1:6Qs9sRadiW5SS6tbZvhw/GnWnHi7RXWrF732eihaFRU=
 github.com/mudler/cogito v0.3.3-0.20251021201604-550aad0fa074/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
+github.com/mudler/cogito v0.3.4-0.20251021203110-1f801b935405 h1:RkqVi/FS0K4zThO61GbyEJW4dGjZ2CDAw//KtzOgZhM=
+github.com/mudler/cogito v0.3.4-0.20251021203110-1f801b935405/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
+github.com/mudler/cogito v0.3.4-0.20251021205807-8b24a604fc4f h1:C+cRbVD8qDTgfOjQIs0kAWmlgteODxhx308Z+CGOO4I=
+github.com/mudler/cogito v0.3.4-0.20251021205807-8b24a604fc4f/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
+github.com/mudler/cogito v0.3.4-0.20251022151954-5f46a5b9e3c4 h1:VwEEePUqeL+Lwu0nxMc2oRxlMx4dm5MZ48CyorpiYEA=
+github.com/mudler/cogito v0.3.4-0.20251022151954-5f46a5b9e3c4/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/onsi/ginkgo/v2 v2.25.3 h1:Ty8+Yi/ayDAGtk4XxmmfUy4GabvM+MegeB4cDLRi6nw=
