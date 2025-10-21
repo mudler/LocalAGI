@@ -1002,7 +1002,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		return
 	}
 
-	if (err == nil || err != nil && !errors.Is(err, cogito.ErrNoToolSelected)) &&
+	if len(fragment.Messages) > 0 &&
 		fragment.LastMessage().Role == "tool" {
 		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
 		switch toolToCall {
@@ -1012,15 +1012,15 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		}
 	}
 
-	fragment, err = a.llm.Ask(job.GetContext(), fragment)
+	responseFragment, err := a.llm.Ask(job.GetContext(), fragment)
 	if err != nil {
 		job.Result.Finish(err)
 		return
 	}
 
-	result := a.cleanupLLMResponse(fragment.LastMessage().Content)
+	result := a.cleanupLLMResponse(responseFragment.LastMessage().Content)
 
-	conv = append(fragment.Messages[:len(fragment.Messages)-1], openai.ChatCompletionMessage{
+	conv = append(fragment.Messages, openai.ChatCompletionMessage{
 		Role:    "assistant",
 		Content: result,
 	})
