@@ -990,13 +990,14 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		a.llm, fragment,
 		cogitoOpts...,
 	)
-	if err != nil && !errors.Is(err, cogito.ErrNoToolSelected) {
+	if err != nil && !errors.Is(err, cogito.ErrNoToolSelected) && !errors.Is(err, cogito.ErrGoalNotAchieved) {
 		if obs != nil {
 			obs.Completion = &types.Completion{
 				Error: err.Error(),
 			}
 			a.observer.Update(*obs)
 		}
+		xlog.Error("Error executing cogito", "error", err)
 		job.Result.Finish(err)
 		return
 	}

@@ -159,6 +159,9 @@ var _ = Describe("Agent test", func() {
 			}
 			Expect(reasons).To(ContainElement(testActionResult), fmt.Sprint(res))
 			Expect(reasons).To(ContainElement(testActionResult2), fmt.Sprint(res))
+
+			Expect(len(res.Conversation)).To(BeNumerically(">", 1), fmt.Sprint(res.Conversation))
+
 			reasons = []string{}
 
 			res = agent.Ask(
@@ -231,6 +234,7 @@ var _ = Describe("Agent test", func() {
 				WithModel(testModel),
 				WithLLMAPIKey(apiKeyURL),
 				WithTimeout("10m"),
+				WithMaxEvaluationLoops(1),
 				WithActions(
 					&TestAction{
 						response: map[string]string{
@@ -270,6 +274,9 @@ var _ = Describe("Agent test", func() {
 			result := agent.Ask(
 				types.WithText("Create a plan for my 4-day trip from Boston to milan in April of this year (2025)"),
 			)
+
+			Expect(len(result.Conversation)).To(BeNumerically(">", 1), fmt.Sprint(result.Conversation))
+
 			Expect(len(result.Plans)).To(BeNumerically(">", 1), fmt.Sprintf("%+v", result))
 			Expect(len(result.State)).To(BeNumerically(">", 1))
 
