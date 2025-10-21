@@ -911,6 +911,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 							obs.Completion = &types.Completion{
 								Error: werr.Error(),
 							}
+							a.observer.Update(*obs)
 						}
 						return false
 					}
@@ -930,6 +931,7 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 								obs.Completion = &types.Completion{
 									Error: err.Error(),
 								}
+								a.observer.Update(*obs)
 							}
 
 							return false
@@ -993,12 +995,14 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 			obs.Completion = &types.Completion{
 				Error: err.Error(),
 			}
+			a.observer.Update(*obs)
 		}
 		job.Result.Finish(err)
 		return
 	}
 
-	if fragment.LastMessage().Role == "tool" {
+	if (err == nil || err != nil && !errors.Is(err, cogito.ErrNoToolSelected)) &&
+		fragment.LastMessage().Role == "tool" {
 		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
 		switch toolToCall {
 		case action.StopActionName:

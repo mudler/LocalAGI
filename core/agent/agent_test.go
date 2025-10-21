@@ -37,7 +37,8 @@ var debugOptions = []types.JobOption{
 }
 
 type TestAction struct {
-	response map[string]string
+	response   map[string]string
+	definition *types.ActionDefinition
 }
 
 func (a *TestAction) Plannable() bool {
@@ -55,7 +56,7 @@ func (a *TestAction) Run(c context.Context, sharedState *types.AgentSharedState,
 }
 
 func (a *TestAction) Definition() types.ActionDefinition {
-	return types.ActionDefinition{
+	def := types.ActionDefinition{
 		Name:        "get_weather",
 		Description: "get current weather",
 		Properties: map[string]jsonschema.Definition{
@@ -71,6 +72,11 @@ func (a *TestAction) Definition() types.ActionDefinition {
 
 		Required: []string{"location"},
 	}
+
+	if a.definition != nil {
+		def = *a.definition
+	}
+	return def
 }
 
 type FakeStoreResultAction struct {
@@ -226,10 +232,31 @@ var _ = Describe("Agent test", func() {
 				WithLLMAPIKey(apiKeyURL),
 				WithTimeout("10m"),
 				WithActions(
-					&TestAction{response: map[string]string{
-						"boston": testActionResult,
-						"milan":  testActionResult2,
-					}},
+					&TestAction{
+						response: map[string]string{
+							"boston": testActionResult,
+							"milan":  testActionResult2,
+						},
+					},
+					&TestAction{
+						response: map[string]string{
+							"flight": "Flight options from Boston to Milan (April 22-26, 2025):\n• Outbound: Boston Logan (BOS) → Milan Malpensa (MXP), April 22, 2025\n  - Economy: $450-650 (Alitalia, Delta, Lufthansa)\n  - Business: $1,200-1,800\n  - Flight time: 8h 15m (1 stop) or 9h 45m (direct)\n• Return: Milan Malpensa (MXP) → Boston Logan (BOS), April 26, 2025\n  - Economy: $420-580\n  - Business: $1,100-1,600\n• Total estimated cost: $870-1,230 per person\n• Best booking window: 2-3 months in advance for optimal prices",
+							"hotel":  "Hotel recommendations in Milan for April 22-26, 2025:\n• Luxury (4-5 stars): $200-400/night\n  - Hotel Principe di Savoia: $380/night (central location)\n  - Mandarin Oriental: $420/night (luxury amenities)\n• Mid-range (3-4 stars): $120-200/night\n  - Hotel Spadari al Duomo: $160/night (near cathedral)\n  - Hotel Milano Scala: $140/night (theater district)\n• Budget (2-3 stars): $80-120/night\n  - Hotel Bernina: $95/night (near train station)\n• Total 4-night stay: $320-1,680 depending on category\n• Booking tip: Reserve early for spring season discounts",
+							"car":    "Car rental options in Milan for April 22-26, 2025:\n• Economy cars: $35-50/day (Fiat 500, VW Polo)\n• Compact cars: $45-65/day (Ford Focus, Opel Astra)\n• Mid-size cars: $60-85/day (BMW 3 Series, Audi A4)\n• SUV/Luxury: $90-150/day (BMW X3, Mercedes E-Class)\n• Total 4-day rental: $140-600\n• Pickup locations: Milan Malpensa Airport, Milan Central Station, city center\n• Insurance: $15-25/day additional\n• Fuel: ~$60-80 for 4 days of city driving\n• Parking: $20-40/day in city center hotels",
+							"food":   "Dining budget and recommendations for Milan (April 22-26, 2025):\n• Fine dining: $80-150/person (Michelin-starred restaurants)\n  - Cracco: $120/person (2 Michelin stars)\n  - Trussardi alla Scala: $100/person\n• Mid-range restaurants: $40-80/person\n  - Luini: $15/person (famous panzerotti)\n  - Piz: $25/person (authentic pizza)\n• Casual dining: $20-40/person\n  - Aperitivo bars: $15-25/person\n  - Street food: $8-15/person\n• Daily food budget: $60-120/person\n• Total 4-day food cost: $240-480/person\n• Must-try: Risotto alla Milanese, Osso Buco, Panettone",
+						},
+						definition: &types.ActionDefinition{
+							Name:        "search_internet",
+							Description: "search the internet for information",
+							Properties: map[string]jsonschema.Definition{
+								"query": {
+									Type:        jsonschema.String,
+									Description: "The query to search for",
+								},
+							},
+							Required: []string{"query"},
+						},
+					},
 				),
 				EnablePlanning,
 				EnableForceReasoning,
@@ -241,8 +268,9 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 
 			result := agent.Ask(
-				types.WithText("Create a plan for my trip from Boston to milan"),
+				types.WithText("Create a plan for my 4-day trip from Boston to milan in April of this year (2025)"),
 			)
+			Expect(len(result.Plans)).To(BeNumerically(">", 1), fmt.Sprintf("%+v", result))
 			Expect(len(result.State)).To(BeNumerically(">", 1))
 
 			actionsExecuted := []string{}
@@ -254,7 +282,6 @@ var _ = Describe("Agent test", func() {
 				actionResults = append(actionResults, r.ActionResult.Result)
 			}
 			Expect(actionsExecuted).To(ContainElement("get_weather"), fmt.Sprint(result))
-			Expect(len(result.Plans)).To(BeNumerically(">", 1), fmt.Sprintf("%+v", result))
 			Expect(actionResults).To(ContainElement(testActionResult), fmt.Sprint(result))
 			Expect(actionResults).To(ContainElement(testActionResult2), fmt.Sprint(result))
 		})
