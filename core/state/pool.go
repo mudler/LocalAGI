@@ -570,10 +570,6 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
 
-	if config.LoopDetectionSteps > 0 {
-		opts = append(opts, WithLoopDetectionSteps(config.LoopDetectionSteps))
-	}
-
 	if config.ParallelJobs > 0 {
 		opts = append(opts, WithParallelJobs(config.ParallelJobs))
 	}

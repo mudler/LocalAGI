@@ -33,7 +33,6 @@ type options struct {
 
 	canStopItself         bool
 	initiateConversations bool
-	loopDetectionSteps    int
 	forceReasoning        bool
 	canPlan               bool
 	characterfile         string
@@ -78,7 +77,6 @@ func defaultOptions() *options {
 	return &options{
 		parallelJobs:       1,
 		periodicRuns:       15 * time.Minute,
-		loopDetectionSteps: 10,
 		maxEvaluationLoops: 2,
 		enableEvaluation:   false,
 		LLMAPI: llmOptions{
@@ -132,13 +130,6 @@ var CanStopItself = func(o *options) error {
 func WithTimeout(timeout string) Option {
 	return func(o *options) error {
 		o.timeout = timeout
-		return nil
-	}
-}
-
-func WithLoopDetectionSteps(steps int) Option {
-	return func(o *options) error {
-		o.loopDetectionSteps = steps
 		return nil
 	}
 }

@@ -707,14 +707,9 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 	return conv
 }
 
-func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
+func (a *Agent) consumeJob(job *types.Job, role string) {
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
-		return
-	}
-
-	if retries < 1 {
-		job.Result.Finish(fmt.Errorf("Exceeded recursive retries"))
 		return
 	}
 
@@ -1012,6 +1007,11 @@ func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
 		}
 	}
 
+	if len(fragment.Messages) == 0 {
+		job.Result.Finish(fmt.Errorf("no messages in fragment"))
+		return
+	}
+
 	responseFragment, err := a.llm.Ask(job.GetContext(), fragment)
 	if err != nil {
 		job.Result.Finish(err)
@@ -1110,7 +1110,7 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 		}
 
 		// Process the reminder as a normal conversation
-		a.consumeJob(reminderJob, UserRole, a.options.loopDetectionSteps)
+		a.consumeJob(reminderJob, UserRole)
 
 		// After the reminder job is complete, ensure the user is notified
 		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
@@ -1153,7 +1153,7 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 		types.WithReasoningCallback(a.options.reasoningCallback),
 		types.WithResultCallback(a.options.resultCallback),
 	)
-	a.consumeJob(whatNext, SystemRole, a.options.loopDetectionSteps)
+	a.consumeJob(whatNext, SystemRole)
 
 	xlog.Info("STOP -- Periodically run is done", "agent", a.Character.Name)
 }
@@ -1212,7 +1212,7 @@ func (a *Agent) run(timer *time.Timer) error {
 				<-timer.C
 			}
 			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
-			a.consumeJob(job, UserRole, a.options.loopDetectionSteps)
+			a.consumeJob(job, UserRole)
 			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
 			// Agent has been canceled, return error

@@ -134,7 +134,6 @@ var _ = Describe("Agent test", func() {
 				WithModel(testModel),
 				EnableForceReasoning,
 				WithTimeout("10m"),
-				WithLoopDetectionSteps(3),
 				//	WithRandomIdentity(),
 				WithActions(&TestAction{response: map[string]string{
 					"boston": testActionResult,
@@ -272,7 +271,7 @@ var _ = Describe("Agent test", func() {
 			defer agent.Stop()
 
 			result := agent.Ask(
-				types.WithText("Create a plan for my 4-day trip from Boston to milan in April of this year (2025)"),
+				types.WithText("Create a plan for my 4-day trip from Boston to milan in April of this year (2025). I'm not sure about the dates yet, I want you to find out the best dates also according to what you find."),
 			)
 
 			Expect(len(result.Conversation)).To(BeNumerically(">", 1), fmt.Sprint(result.Conversation))
