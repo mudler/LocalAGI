@@ -192,6 +192,8 @@ github.com/mudler/cogito v0.3.2-0.20251020203303-3832318bdfc0 h1:E8pn4QCxcsBNpkk
 github.com/mudler/cogito v0.3.2-0.20251020203303-3832318bdfc0/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
 github.com/mudler/cogito v0.3.2-0.20251020204043-f21710b138ec h1:F3gaZIl7bnMvKQx57qFjOqUydVz73ViQ8ZB76LNodgo=
 github.com/mudler/cogito v0.3.2-0.20251020204043-f21710b138ec/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
+github.com/mudler/cogito v0.3.2-0.20251021104853-9c04ac0b45f1 h1:m5cvRFZhlEypGUy4zgW50Yuep/2+fJNfTcsltoc3k9o=
+github.com/mudler/cogito v0.3.2-0.20251021104853-9c04ac0b45f1/go.mod h1:abMwl+CUjCp87IufA2quZdZt0bbLaHHN79o17HbUKxU=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/onsi/ginkgo/v2 v2.25.3 h1:Ty8+Yi/ayDAGtk4XxmmfUy4GabvM+MegeB4cDLRi6nw=
