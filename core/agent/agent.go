@@ -782,6 +782,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
 
 	var err error
+	var userTool bool
 
 	cogitoOpts := []cogito.Option{
 		cogito.WithMCPs(a.mcpSessions...),
@@ -844,11 +845,17 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		cogito.WithToolCallBack(
 			func(tc *cogito.ToolChoice) bool {
 
+				xlog.Debug("Tool call back", "tool_call", tc)
+
 				// Check if this is a user-defined action
 				aa := availableActions.Find(tc.Name)
+
+				xlog.Debug("Action found", "action", aa)
+
 				if aa != nil && types.IsActionUserDefined(aa) {
 					xlog.Debug("User-defined action chosen, returning tool call", "action", aa.Definition().Name)
 					a.replyWithToolCall(job, conv, tc.Arguments, aa, reasoning)
+					userTool = true
 					return false
 				}
 
@@ -985,7 +992,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		a.llm, fragment,
 		cogitoOpts...,
 	)
-	if err != nil && !errors.Is(err, cogito.ErrNoToolSelected) && !errors.Is(err, cogito.ErrGoalNotAchieved) {
+
+	if err != nil && !errors.Is(err, cogito.ErrNoToolSelected) && !errors.Is(err, cogito.ErrGoalNotAchieved) && !userTool {
 		if obs != nil {
 			obs.Completion = &types.Completion{
 				Error: err.Error(),
@@ -994,6 +1002,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		}
 		xlog.Error("Error executing cogito", "error", err)
 		job.Result.Finish(err)
+		return
+	}
+
+	if userTool {
 		return
 	}
 

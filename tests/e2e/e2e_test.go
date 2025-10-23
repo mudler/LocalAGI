@@ -170,7 +170,7 @@ var _ = Describe("Agent test", func() {
 				msg, err := out.ToMessage()
 				if err == nil && msg.Role == "assistant" {
 					xlog.Info("Agent returned message", "message", msg)
-					Expect(len(result.Output)).To(BeNumerically(">", 1))
+					Expect(len(result.Output)).To(BeNumerically(">", 1), fmt.Sprintf("%+v", result.Output))
 					continue
 				}
 				fnc, err := out.ToFunctionToolCall()
