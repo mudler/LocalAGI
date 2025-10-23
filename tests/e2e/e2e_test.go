@@ -56,7 +56,8 @@ var _ = Describe("Agent test", func() {
 			err := client.DeleteAgent("testagent2")
 			Expect(err).ToNot(HaveOccurred())
 			err = client.CreateAgent(&localagi.AgentConfig{
-				Name: "testagent2",
+				Name:            "testagent2",
+				EnableReasoning: true,
 			})
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -204,7 +205,7 @@ var _ = Describe("Agent test", func() {
 					localagi.InputMessage{
 						Type:    "message",
 						Role:    "user",
-						Content: "Was the appointment created?",
+						Content: "Was the appointment created? Reply using the ChooseAnswer tool.",
 					},
 				},
 				Tools: []localagi.Tool{
@@ -235,7 +236,7 @@ var _ = Describe("Agent test", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(result.Output)).To(BeNumerically(">", 0))
 			fnc, err := result.Output[len(result.Output)-1].ToFunctionToolCall()
-			Expect(err).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred(), fmt.Sprintf("%+v", result))
 			Expect(fnc.Arguments).To(ContainSubstring("true"))
 		})
 

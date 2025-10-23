@@ -47,6 +47,8 @@ type Agent struct {
 	newConversations chan openai.ChatCompletionMessage
 
 	mcpSessions []*mcp.ClientSession
+	// only contains the MCP action definitions for observables
+	mcpActionDefinitions types.Actions
 
 	subscriberMutex        sync.Mutex
 	newMessagesSubscribers []func(openai.ChatCompletionMessage)
@@ -777,9 +779,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	var reasoning string
 
 	availableActions := a.getAvailableActionsForJob(job)
-	var obs *types.Observable
-
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
+	allActions := append(availableActions, a.mcpActionDefinitions...)
+
+	var obs *types.Observable
 
 	var err error
 	var userTool bool
@@ -828,7 +831,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				obs.MakeLastProgressCompletion()
 				a.observer.Update(*obs)
 			}
-			aa := availableActions.Find(t.Name)
+			aa := allActions.Find(t.Name)
 			state := types.ActionState{
 				ActionCurrentState: types.ActionCurrentState{
 					Job:       job,
@@ -848,18 +851,16 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				xlog.Debug("Tool call back", "tool_call", tc)
 
 				// Check if this is a user-defined action
-				aa := availableActions.Find(tc.Name)
+				chosenAction := allActions.Find(tc.Name)
 
-				xlog.Debug("Action found", "action", aa)
+				xlog.Debug("Action found", "action", chosenAction)
 
-				if aa != nil && types.IsActionUserDefined(aa) {
-					xlog.Debug("User-defined action chosen, returning tool call", "action", aa.Definition().Name)
-					a.replyWithToolCall(job, conv, tc.Arguments, aa, reasoning)
+				if chosenAction != nil && types.IsActionUserDefined(chosenAction) {
+					xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
+					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, reasoning)
 					userTool = true
 					return false
 				}
-
-				chosenAction := availableActions.Find(tc.Name)
 
 				var obs *types.Observable
 				if job.Obs != nil {
@@ -971,14 +972,14 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	if a.options.canPlan {
 		cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlan)
-	}
-
-	if a.options.enableEvaluation {
-		cogitoOpts = append(cogitoOpts, cogito.EnableToolReEvaluator)
+		if a.options.enableEvaluation {
+			cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlanReEvaluator)
+		}
 	}
 
 	if a.options.forceReasoning {
 		cogitoOpts = append(cogitoOpts, cogito.EnableToolReasoner)
+		cogitoOpts = append(cogitoOpts, cogito.WithForceReasoning())
 	}
 
 	if a.options.maxEvaluationLoops > 0 {
