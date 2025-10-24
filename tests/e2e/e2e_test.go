@@ -15,8 +15,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Agent test", func() {
-	Context("Creates an agent and it answers", func() {
+var _ = Describe("E2E test", func() {
+	Context("Creates an agent and it answers", Label("E2E"), func() {
 		BeforeEach(func() {
 			Eventually(func() error {
 				// test apiURL is working and available
@@ -24,7 +24,7 @@ var _ = Describe("Agent test", func() {
 				return err
 			}, "10m", "10s").ShouldNot(HaveOccurred())
 
-			client := localagi.NewClient(localagiURL, "", time.Minute)
+			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
 			err := client.DeleteAgent("testagent1")
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -44,7 +44,7 @@ var _ = Describe("Agent test", func() {
 		})
 	})
 
-	Context("Can do user defined tool calls", Ordered, func() {
+	Context("Can do user defined tool calls", Ordered, Label("E2E"), func() {
 		BeforeAll(func() {
 			Eventually(func() error {
 				// test apiURL is working and available

@@ -9,7 +9,7 @@ cleanup-tests:
 	docker compose down
 
 tests: prepare-tests
-	LOCALAGI_MODEL="gemma-3-4b-it-qat" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --flake-attempts=5 --fail-fast -v -r ./...
+	LOCALAGI_MODEL="gemma-3-4b-it-qat" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="!E2E" --flake-attempts=5 --fail-fast -v -r ./...
 
 run-nokb:
 	$(MAKE) run KBDISABLEINDEX=true
@@ -30,3 +30,6 @@ build-image:
 
 image-push:
 	docker push $(IMAGE_NAME)
+
+tests-e2e: prepare-tests
+	LOCALAGI_MODEL="gemma-3-4b-it-qat" LOCALAI_API_URL="http://localhost:8081" LOCALAGI_API_URL="http://localhost:8080" $(GOCMD) run github.com/onsi/ginkgo/v2/ginkgo --label-filter="E2E" --flake-attempts=5 --fail-fast -v -r ./tests/e2e/...

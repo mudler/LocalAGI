@@ -1,4 +1,4 @@
-name: Run Integration/Unit Tests
+name: Run E2E Tests
 
 on:
   push:
@@ -46,9 +46,9 @@ jobs:
         docker system prune -af || true
         df -h
 
-    - name: Run tests
+    - name: Run e2e tests
       run: |
-        make tests
+        make tests-e2e
     #sudo mv coverage/coverage.txt coverage.txt
     #sudo chmod 777 coverage.txt
 
