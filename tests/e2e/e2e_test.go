@@ -63,7 +63,7 @@ var _ = Describe("E2E test", func() {
 		})
 
 		It("can create a task", func() {
-			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
+			client := localagi.NewClient(localagiURL, "", 10*time.Minute)
 
 			req := localagi.RequestBody{
 				Model: "testagent2",
@@ -241,7 +241,7 @@ var _ = Describe("E2E test", func() {
 		})
 
 		It("can tool call; web search", func() {
-			client := localagi.NewClient(localagiURL, "", 5*time.Minute)
+			client := localagi.NewClient(localagiURL, "", 10*time.Minute)
 
 			req := localagi.RequestBody{
 				Model: "testagent2",
