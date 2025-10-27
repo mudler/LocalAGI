@@ -28,7 +28,6 @@ const (
 	UserRole      = "user"
 	AssistantRole = "assistant"
 	SystemRole    = "system"
-	maxRetries    = 5
 )
 
 type Agent struct {
@@ -784,6 +783,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	var obs *types.Observable
 
+	defer func() {
+		if obs != nil {
+			obs.MakeLastProgressCompletion()
+			a.observer.Update(*obs)
+		}
+	}()
+
 	var err error
 	var userTool bool
 
@@ -828,7 +834,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					ActionResult: t.Result,
 				})
 
-				obs.MakeLastProgressCompletion()
 				a.observer.Update(*obs)
 			}
 			aa := allActions.Find(t.Name)
