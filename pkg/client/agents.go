@@ -8,13 +8,13 @@ import (
 
 // AgentConfig represents the configuration for an agent
 type AgentConfig struct {
-	Name          string                 `json:"name"`
-	Actions       []string               `json:"actions,omitempty"`
-	Connectors    []string               `json:"connectors,omitempty"`
-	PromptBlocks  []string               `json:"prompt_blocks,omitempty"`
-	InitialPrompt string                 `json:"initial_prompt,omitempty"`
-	Parallel      bool                   `json:"parallel,omitempty"`
-	Config        map[string]interface{} `json:"config,omitempty"`
+	Name            string   `json:"name"`
+	Actions         []string `json:"actions,omitempty"`
+	Connectors      []string `json:"connectors,omitempty"`
+	PromptBlocks    []string `json:"prompt_blocks,omitempty"`
+	InitialPrompt   string   `json:"initial_prompt,omitempty"`
+	Parallel        bool     `json:"parallel,omitempty"`
+	EnableReasoning bool     `json:"enable_reasoning,omitempty"`
 }
 
 // AgentStatus represents the status of an agent

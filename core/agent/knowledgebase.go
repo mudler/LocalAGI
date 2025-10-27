@@ -8,6 +8,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/cogito"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -17,7 +18,7 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
 		return conv
 	}
-	
+
 	var obs *types.Observable
 	if job != nil && job.Obs != nil && a.observer != nil {
 		obs = a.observer.NewObservable()
@@ -90,7 +91,7 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 
 	if obs != nil {
 		obs.Completion = &types.Completion{
-				Conversation: []openai.ChatCompletionMessage{systemMessage},
+			Conversation: []openai.ChatCompletionMessage{systemMessage},
 		}
 		a.observer.Update(*obs)
 	}
@@ -125,13 +126,12 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 	xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(conv))
 
 	if a.options.enableSummaryMemory && len(conv) > 0 {
-		msg, err := a.askLLM(a.context.Context, []openai.ChatCompletionMessage{{
-			Role:    "user",
-			Content: "Summarize the conversation below, keep the highlights as a bullet list:\n" + Messages(conv).String(),
-		}}, maxRetries)
+		fragment := cogito.NewEmptyFragment().AddStartMessage("user", "Summarize the conversation below, keep the highlights as a bullet list:\n"+Messages(conv).String())
+		fragment, err := a.llm.Ask(a.context.Context, fragment)
 		if err != nil {
 			xlog.Error("Error summarizing conversation", "error", err)
 		}
+		msg := fragment.LastMessage()
 
 		if err := a.options.ragdb.Store(msg.Content); err != nil {
 			xlog.Error("Error storing into memory", "error", err)

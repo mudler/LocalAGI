@@ -94,7 +94,6 @@ Guidelines:
 4. Update your state appropriately
 
 When making decisions:
-- Use the "reply" tool to provide final responses
 - Update your state using appropriate tools
 - Plan complex tasks using the planning tool
 - Consider both immediate and long-term goals
@@ -105,43 +104,4 @@ Remember:
 - Keep track of your progress and state
 - Be proactive in addressing potential issues
 
-Available Tools:
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-
-{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}
 ` + hudTemplate
-
-const reSelfEvalTemplate = pickSelfTemplate
-
-const pickActionTemplate = hudTemplate + `
-Your only task is to analyze the conversation and determine a goal and the best tool to use, or just a final response if we have fullfilled the goal.
-
-Guidelines:
-1. Review the current state, what was done already and context
-2. Consider available tools and their purposes
-3. Plan your approach carefully
-4. Explain your reasoning clearly
-
-When choosing actions:
-- Use "reply" or "answer" tools for direct responses
-- Select appropriate tools for specific tasks
-- Consider the impact of each action
-- Plan for potential challenges
-
-Decision Process:
-1. Analyze the situation
-2. Consider available options
-3. Choose the best course of action
-4. Explain your reasoning
-5. Execute the chosen action
-
-Available Tools:
-{{range .Actions -}}
-- {{.Name}}: {{.Description }}
-{{ end }}
-
-{{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}`
-
-const reEvalTemplate = pickActionTemplate

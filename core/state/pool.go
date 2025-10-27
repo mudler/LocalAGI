@@ -570,19 +570,16 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
 
-	if config.LoopDetectionSteps > 0 {
-		opts = append(opts, WithLoopDetectionSteps(config.LoopDetectionSteps))
-	}
-
 	if config.ParallelJobs > 0 {
 		opts = append(opts, WithParallelJobs(config.ParallelJobs))
 	}
 
 	if config.EnableEvaluation {
 		opts = append(opts, EnableEvaluation())
-		if config.MaxEvaluationLoops > 0 {
-			opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
-		}
+	}
+
+	if config.MaxEvaluationLoops > 0 {
+		opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
 	}
 
 	xlog.Info("Starting agent", "name", name, "config", config)

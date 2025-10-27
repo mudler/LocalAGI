@@ -22,12 +22,6 @@ import (
 	"github.com/mudler/LocalAGI/services"
 )
 
-//go:embed old/views/*
-var viewsfs embed.FS
-
-//go:embed old/public/*
-var embeddedFiles embed.FS
-
 //go:embed react-ui/dist/*
 var reactUI embed.FS
 
@@ -38,12 +32,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		Root: http.Dir(filepath.Join(app.config.StateDir, "avatars")),
 		//	PathPrefix: "avatars",
 		Browse: true,
-	}))
-
-	webapp.Use("/old/public", filesystem.New(filesystem.Config{
-		Root:       http.FS(embeddedFiles),
-		PathPrefix: "/old/public",
-		Browse:     true,
 	}))
 
 	if len(app.config.ApiKeys) > 0 {
