@@ -774,17 +774,26 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		fragment = fragment.AddStartMessage("system", prompt)
 	}
 
-	// choose an action first
-	var reasoning string
-
 	availableActions := a.getAvailableActionsForJob(job)
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
 	allActions := append(availableActions, a.mcpActionDefinitions...)
 
-	var obs *types.Observable
+	obs := job.Obs
+	if obs == nil && a.observer != nil && job.Obs != nil {
+		obs = a.observer.NewObservable()
+		obs.Name = "decision"
+		obs.Icon = "brain"
+		obs.ParentID = job.Obs.ID
+		obs.Creation = &types.Creation{
+			ChatCompletionRequest: &openai.ChatCompletionRequest{
+				Model:    a.options.LLMAPI.Model,
+				Messages: conv,
+			},
+		}
+	}
 
 	defer func() {
-		if obs != nil {
+		if obs != nil && a.observer != nil {
 			obs.MakeLastProgressCompletion()
 			a.observer.Update(*obs)
 		}
@@ -793,56 +802,52 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	var err error
 	var userTool bool
 
+	var observables = make(map[string]*types.Observable)
+
 	cogitoOpts := []cogito.Option{
 		cogito.WithMCPs(a.mcpSessions...),
-		cogito.WithStatusCallback(func(s string) {
-			reasoning = s
-			if job.Obs != nil {
-				obs = a.observer.NewObservable()
-				obs.Name = "decision"
-				obs.ParentID = job.Obs.ID
-				obs.Icon = "brain"
-				obs.Creation = &types.Creation{
-					ChatCompletionRequest: &openai.ChatCompletionRequest{
-						Model:    a.options.LLMAPI.Model,
-						Messages: conv,
-					},
-				}
-				obs.AddProgress(
+		cogito.WithReasoningCallback(func(s string) {
+			xlog.Debug("Cogito reasoning callback", "status", s)
+
+			if a.observer != nil && job.Obs != nil {
+				job.Obs.AddProgress(
 					types.Progress{
 						ChatCompletionResponse: &openai.ChatCompletionResponse{
 							Choices: []openai.ChatCompletionChoice{
 								{
 									Message: openai.ChatCompletionMessage{
 										Role:    "assistant",
-										Content: reasoning,
+										Content: s,
 									},
 								},
 							},
 						},
 					})
-
-				a.observer.Update(*obs)
+				a.observer.Update(*job.Obs)
 			}
 		}),
 		cogito.WithTools(
 			cogitoTools...,
 		),
 		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
-			if obs != nil {
+			if a.observer != nil && obs != nil {
+				obs := observables[t.ToolArguments.ID]
 				obs.Progress = append(obs.Progress, types.Progress{
 					ActionResult: t.Result,
 				})
-
+				obs.Name = "action"
+				obs.Icon = "bolt"
+				obs.MakeLastProgressCompletion()
 				a.observer.Update(*obs)
 			}
+
 			aa := allActions.Find(t.Name)
 			state := types.ActionState{
 				ActionCurrentState: types.ActionCurrentState{
 					Job:       job,
 					Action:    aa,
 					Params:    types.ActionParams(t.ToolArguments.Arguments),
-					Reasoning: reasoning,
+					Reasoning: t.ToolArguments.Reasoning,
 				},
 				ActionResult: types.ActionResult{Result: t.Result},
 			}
@@ -862,22 +867,27 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 				if chosenAction != nil && types.IsActionUserDefined(chosenAction) {
 					xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
-					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, reasoning)
+					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, tc.Reasoning)
 					userTool = true
 					return false
 				}
 
-				var obs *types.Observable
-				if job.Obs != nil {
-					obs = a.observer.NewObservable()
-					obs.Name = "action"
-					obs.Icon = "bolt"
+				if a.observer != nil && job.Obs != nil {
+					obs := a.observer.NewObservable()
+					obs.Name = "decision"
 					obs.ParentID = job.Obs.ID
+					obs.Icon = "brain"
 					obs.Creation = &types.Creation{
+						ChatCompletionRequest: &openai.ChatCompletionRequest{
+							Model:    a.options.LLMAPI.Model,
+							Messages: conv,
+						},
 						FunctionDefinition: chosenAction.Definition().ToFunctionDefinition(),
 						FunctionParams:     types.ActionParams(tc.Arguments),
 					}
+
 					a.observer.Update(*obs)
+					observables[tc.ID] = obs
 				}
 
 				switch tc.Name {
@@ -915,7 +925,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					err = json.Unmarshal(dat, &state)
 					if err != nil {
 						werr := fmt.Errorf("error unmarshalling state of the agent: %w", err)
-						if obs != nil {
+						if obs != nil && a.observer != nil {
 							obs.Completion = &types.Completion{
 								Error: werr.Error(),
 							}
@@ -925,7 +935,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					}
 					// update the current state with the one we just got from the action
 					a.currentState = &state
-					if obs != nil {
+					if obs != nil && a.observer != nil {
 						obs.Progress = append(obs.Progress, types.Progress{
 							AgentState: &state,
 						})
@@ -935,7 +945,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					// update the state file
 					if a.options.statefile != "" {
 						if err := a.SaveState(a.options.statefile); err != nil {
-							if obs != nil {
+							if obs != nil && a.observer != nil {
 								obs.Completion = &types.Completion{
 									Error: err.Error(),
 								}
@@ -952,7 +962,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					Job:       job,
 					Action:    chosenAction,
 					Params:    types.ActionParams(tc.Arguments),
-					Reasoning: reasoning})
+					Reasoning: tc.Reasoning})
 
 				if !cont {
 					job.Result.SetResult(
@@ -961,7 +971,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 								Job:       job,
 								Action:    chosenAction,
 								Params:    types.ActionParams(tc.Arguments),
-								Reasoning: reasoning,
+								Reasoning: tc.Reasoning,
 							},
 							ActionResult: types.ActionResult{Result: "stopped by callback"},
 						})
@@ -983,7 +993,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	if a.options.forceReasoning {
-		cogitoOpts = append(cogitoOpts, cogito.EnableToolReasoner)
 		cogitoOpts = append(cogitoOpts, cogito.WithForceReasoning())
 	}
 
