@@ -1,8 +1,6 @@
 module github.com/mudler/LocalAGI
 
-go 1.24.1
-
-toolchain go1.24.2
+go 1.24.4
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
@@ -22,7 +20,7 @@ require (
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/slack-go/slack v0.17.3
 	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64
-	github.com/tmc/langchaingo v0.1.13
+	github.com/tmc/langchaingo v0.1.14
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.68.0
 	golang.org/x/crypto v0.43.0
@@ -32,7 +30,7 @@ require (
 )
 
 require (
-	dario.cat/mergo v1.0.1 // indirect
+	dario.cat/mergo v1.0.2 // indirect
 	github.com/JohannesKaufmann/dom v0.2.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
@@ -91,7 +89,7 @@ require (
 	go.mau.fi/util v0.3.0 // indirect
 	go.starlark.net v0.0.0-20250417143717-f57e51f710eb // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
-	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3
+	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
 	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
