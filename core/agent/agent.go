@@ -310,6 +310,21 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			continue
 		}
 
+		content := message.Content
+
+		if strings.Contains(content, "{{") {
+			promptTemplate, err := templateBase("template", content)
+			if err != nil {
+				xlog.Error("Error rendering template", "error", err)
+			}
+
+			content, err = templateExecute(promptTemplate, struct{}{})
+			if err != nil {
+				xlog.Error("Error executing template", "error", err)
+				content = message.Content
+			}
+		}
+
 		if message.ImageBase64 != "" {
 			// iF model support both images and text, process it as a single multicontent message and return
 			if !a.options.SeparatedMultimodalModel() {
@@ -319,7 +334,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 						MultiContent: []openai.ChatMessagePart{
 							{
 								Type: openai.ChatMessagePartTypeText,
-								Text: message.Content,
+								Text: content,
 							},
 							{
 								Type: openai.ChatMessagePartTypeImageURL,
@@ -339,7 +354,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 					conversation = append([]openai.ChatCompletionMessage{
 						{
 							Role:    prompt.Role(),
-							Content: fmt.Sprintf("%s\n\nImage description: %s", message.Content, imageDescription),
+							Content: fmt.Sprintf("%s\n\nImage description: %s", content, imageDescription),
 						}}, conversation...)
 				}
 			}
@@ -347,18 +362,33 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			conversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    prompt.Role(),
-					Content: message.Content,
+					Content: content,
 				}}, conversation...)
 		}
 	}
 
 	// TODO: move to a Promptblock?
 	if a.options.systemPrompt != "" {
-		if !conversation.Exist(a.options.systemPrompt) {
+		content := a.options.systemPrompt
+
+		if strings.Contains(content, "{{") {
+			promptTemplate, err := templateBase("template", a.options.systemPrompt)
+			if err != nil {
+				xlog.Error("Error rendering template", "error", err)
+			}
+
+			content, err = templateExecute(promptTemplate, struct{}{})
+			if err != nil {
+				xlog.Error("Error executing template", "error", err)
+				content = a.options.systemPrompt
+			}
+		}
+
+		if !conversation.Exist(content) {
 			conversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    "system",
-					Content: a.options.systemPrompt,
+					Content: content,
 				}}, conversation...)
 		}
 	}

@@ -2,18 +2,32 @@ package agent
 
 import (
 	"bytes"
-	"html/template"
+	"text/template"
 	"time"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai"
 )
+
+func templateBase(templateName, templatetext string) (*template.Template, error) {
+	return template.New(templateName).Funcs(sprig.FuncMap()).Parse(templatetext)
+}
+
+func templateExecute(template *template.Template, data interface{}) (string, error) {
+	prompt := bytes.NewBuffer([]byte{})
+	err := template.Execute(prompt, data)
+	if err != nil {
+		return "", err
+	}
+	return prompt.String(), nil
+}
 
 func renderTemplate(templ string, hud *PromptHUD, actions types.Actions, reasoning string) (string, error) {
 	// prepare the prompt
 	prompt := bytes.NewBuffer([]byte{})
 
-	promptTemplate, err := template.New("pickAction").Parse(templ)
+	promptTemplate, err := templateBase("pickAction", templ)
 	if err != nil {
 		return "", err
 	}
