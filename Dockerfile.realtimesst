@@ -1,5 +1,5 @@
 # python 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y python3-dev portaudio19-dev ffmpeg build-essential
