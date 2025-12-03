@@ -24,7 +24,7 @@ services:
     volumes:
       - ./volumes/models:/models
       - ./volumes/backends:/backends
-      - ./volumes/images:/tmp/generated/images
+      - ./volumes/content:/tmp/generated/content
 
   localrecall:
     image: quay.io/mudler/localrecall:main
