@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"os"
@@ -61,11 +62,19 @@ func (m *mcpAction) Run(ctx context.Context, sharedState *types.AgentSharedState
 	}
 
 	result := ""
+	imageBase64Result := ""
 	for _, c := range resp.Content {
-		result += c.(*mcp.TextContent).Text
+		switch content := c.(type) {
+		case *mcp.TextContent:
+			result += content.Text
+		case *mcp.ImageContent:
+			imageBase64Result = base64.StdEncoding.EncodeToString(content.Data)
+		default:
+			log.Error().Msgf("[Unknown content type received: %T]", content)
+		}
 	}
 
-	return types.ActionResult{Result: result}, nil
+	return types.ActionResult{Result: result, ImageBase64Result: imageBase64Result}, nil
 }
 
 func (m *mcpAction) Definition() types.ActionDefinition {

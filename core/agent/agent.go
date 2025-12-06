@@ -297,7 +297,7 @@ func (a *Agent) Stop() {
 	a.Lock()
 	defer a.Unlock()
 	xlog.Debug("Stopping agent", "agent", a.Character.Name)
-	a.closeMCPSTDIOServers()
+	a.closeMCPServers()
 	a.context.Cancel()
 }
 
@@ -1216,7 +1216,7 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 					{
 						Type: openai.ChatMessagePartTypeImageURL,
 						ImageURL: &openai.ChatMessageImageURL{
-							URL: result.ImageBase64Result,
+							URL: "data:image/png;base64," + result.ImageBase64Result,
 						},
 					},
 				},
