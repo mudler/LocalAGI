@@ -170,7 +170,7 @@ func (a *Agent) initMCPActions() error {
 	generatedActions := types.Actions{}
 	client := mcp.NewClient(&mcp.Implementation{Name: "LocalAI", Version: "v1.0.0"}, nil)
 
-	// Connect to a server over stdin/stdout.
+	a.closeMCPServers() // Make sure we stop all previous servers if any is active
 
 	// MCP HTTP Servers
 	for _, mcpServer := range a.options.mcpServers {
@@ -199,8 +199,6 @@ func (a *Agent) initMCPActions() error {
 	}
 
 	// MCP STDIO Servers
-
-	a.closeMCPSTDIOServers() // Make sure we stop all previous servers if any is active
 
 	if a.options.mcpPrepareScript != "" {
 		xlog.Debug("Preparing MCP", "script", a.options.mcpPrepareScript)
@@ -240,7 +238,7 @@ func (a *Agent) initMCPActions() error {
 	return err
 }
 
-func (a *Agent) closeMCPSTDIOServers() {
+func (a *Agent) closeMCPServers() {
 	for _, s := range a.mcpSessions {
 		s.Close()
 	}
