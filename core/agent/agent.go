@@ -1216,7 +1216,7 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 					{
 						Type: openai.ChatMessagePartTypeImageURL,
 						ImageURL: &openai.ChatMessageImageURL{
-							URL: "data:image/png;base64," + result.ImageBase64Result,
+							URL: result.ImageBase64Result,
 						},
 					},
 				},

@@ -68,7 +68,7 @@ func (m *mcpAction) Run(ctx context.Context, sharedState *types.AgentSharedState
 		case *mcp.TextContent:
 			result += content.Text
 		case *mcp.ImageContent:
-			imageBase64Result = base64.StdEncoding.EncodeToString(content.Data)
+			imageBase64Result = "data:" + content.MIMEType + ";base64," + base64.StdEncoding.EncodeToString(content.Data)
 		default:
 			log.Error().Msgf("[Unknown content type received: %T]", content)
 		}
