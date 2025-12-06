@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/mudler/cogito"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
@@ -88,11 +89,35 @@ func (a ActionDefinition) ToFunctionDefinition() *openai.FunctionDefinition {
 	}
 }
 
+type cogitoWrapper struct {
+	action      Action
+	ctx         context.Context
+	sharedState *AgentSharedState
+}
+
+func (c *cogitoWrapper) Tool() openai.Tool {
+	return openai.Tool{
+		Type:     openai.ToolTypeFunction,
+		Function: c.action.Definition().ToFunctionDefinition(),
+	}
+}
+
+func (c *cogitoWrapper) Run(args map[string]any) (string, error) {
+	ctx := c.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	result, err := c.action.Run(ctx, c.sharedState, ActionParams(args))
+	if err != nil {
+		return "", err
+	}
+	return result.Result, nil
+}
+
 // Actions is something the agent can do
 type Action interface {
 	Run(ctx context.Context, sharedState *AgentSharedState, action ActionParams) (ActionResult, error)
 	Definition() ActionDefinition
-	Plannable() bool
 }
 
 // UserDefinedChecker interface to identify user-defined actions
@@ -158,6 +183,14 @@ func (a Actions) ToTools() []openai.Tool {
 			Type:     openai.ToolTypeFunction,
 			Function: action.Definition().ToFunctionDefinition(),
 		})
+	}
+	return tools
+}
+
+func (a Actions) ToCogitoTools(ctx context.Context, sharedState *AgentSharedState) []cogito.Tool {
+	tools := []cogito.Tool{}
+	for _, action := range a {
+		tools = append(tools, &cogitoWrapper{action: action, ctx: ctx, sharedState: sharedState})
 	}
 	return tools
 }

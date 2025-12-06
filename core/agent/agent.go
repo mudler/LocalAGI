@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/cogito"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
@@ -26,7 +28,6 @@ const (
 	UserRole      = "user"
 	AssistantRole = "assistant"
 	SystemRole    = "system"
-	maxRetries    = 5
 )
 
 type Agent struct {
@@ -44,14 +45,16 @@ type Agent struct {
 
 	newConversations chan openai.ChatCompletionMessage
 
-	mcpActions  types.Actions
 	mcpSessions []*mcp.ClientSession
+	// only contains the MCP action definitions for observables
+	mcpActionDefinitions types.Actions
 
 	subscriberMutex        sync.Mutex
 	newMessagesSubscribers []func(openai.ChatCompletionMessage)
 
 	observer Observer
 
+	llm         cogito.LLM
 	sharedState *types.AgentSharedState
 }
 
@@ -69,7 +72,7 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL, options.timeout)
-
+	llmClient := cogito.NewOpenAILLM(options.LLMAPI.Model, options.LLMAPI.APIKey, options.LLMAPI.APIURL)
 	c := context.Background()
 	if options.context != nil {
 		c = options.context
@@ -82,6 +85,7 @@ func New(opts ...Option) (*Agent, error) {
 		client:                 client,
 		Character:              options.character,
 		currentState:           &types.AgentInternalState{},
+		llm:                    llmClient,
 		context:                types.NewActionContext(ctx, cancel),
 		newConversations:       make(chan openai.ChatCompletionMessage),
 		newMessagesSubscribers: options.newConversationsSubscribers,
@@ -260,37 +264,6 @@ func (a *Agent) TTS(ctx context.Context, text string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (a *Agent) askLLM(ctx context.Context, conversation []openai.ChatCompletionMessage, maxRetries int) (openai.ChatCompletionMessage, error) {
-	var resp openai.ChatCompletionResponse
-	var err error
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		resp, err = a.client.CreateChatCompletion(ctx,
-			openai.ChatCompletionRequest{
-				Model:    a.options.LLMAPI.Model,
-				Messages: conversation,
-			},
-		)
-		if err == nil && len(resp.Choices) == 1 && resp.Choices[0].Message.Content != "" {
-			break
-		}
-		xlog.Warn("Error asking LLM, retrying", "attempt", attempt+1, "error", err)
-		if attempt < maxRetries {
-			time.Sleep(2 * time.Second) // Optional: Add a delay between retries
-		}
-	}
-
-	if err != nil {
-		return openai.ChatCompletionMessage{}, err
-	}
-
-	if len(resp.Choices) != 1 {
-		return openai.ChatCompletionMessage{}, fmt.Errorf("not enough choices: %w", err)
-	}
-
-	return resp.Choices[0].Message, nil
-}
-
 var ErrContextCanceled = fmt.Errorf("context canceled")
 
 func (a *Agent) Stop() {
@@ -324,93 +297,6 @@ func (a *Agent) Memory() RAGDB {
 	return a.options.ragdb
 }
 
-func (a *Agent) runAction(job *types.Job, chosenAction types.Action, params types.ActionParams) (result types.ActionResult, err error) {
-	var obs *types.Observable
-	if job.Obs != nil {
-		obs = a.observer.NewObservable()
-		obs.Name = "action"
-		obs.Icon = "bolt"
-		obs.ParentID = job.Obs.ID
-		obs.Creation = &types.Creation{
-			FunctionDefinition: chosenAction.Definition().ToFunctionDefinition(),
-			FunctionParams:     params,
-		}
-		a.observer.Update(*obs)
-	}
-
-	xlog.Info("[runAction] Running action", "action", chosenAction.Definition().Name, "agent", a.Character.Name, "params", params.String())
-
-	for _, act := range a.availableActions() {
-		if act.Definition().Name == chosenAction.Definition().Name {
-			res, err := act.Run(job.GetContext(), a.sharedState, params)
-			if err != nil {
-				if obs != nil {
-					obs.Completion = &types.Completion{
-						Error: err.Error(),
-					}
-				}
-
-				return types.ActionResult{}, fmt.Errorf("error running action: %w", err)
-			}
-
-			if obs != nil {
-				obs.Progress = append(obs.Progress, types.Progress{
-					ActionResult: res.Result,
-				})
-				a.observer.Update(*obs)
-			}
-
-			result = res
-		}
-	}
-
-	if chosenAction.Definition().Name.Is(action.StateActionName) {
-		// We need to store the result in the state
-		state := types.AgentInternalState{}
-
-		err = params.Unmarshal(&state)
-		if err != nil {
-			werr := fmt.Errorf("error unmarshalling state of the agent: %w", err)
-			if obs != nil {
-				obs.Completion = &types.Completion{
-					Error: werr.Error(),
-				}
-			}
-			return types.ActionResult{}, werr
-		}
-		// update the current state with the one we just got from the action
-		a.currentState = &state
-		if obs != nil {
-			obs.Progress = append(obs.Progress, types.Progress{
-				AgentState: &state,
-			})
-			a.observer.Update(*obs)
-		}
-
-		// update the state file
-		if a.options.statefile != "" {
-			if err := a.SaveState(a.options.statefile); err != nil {
-				if obs != nil {
-					obs.Completion = &types.Completion{
-						Error: err.Error(),
-					}
-				}
-
-				return types.ActionResult{}, err
-			}
-		}
-	}
-
-	xlog.Debug("[runAction] Action result", "action", chosenAction.Definition().Name, "params", params.String(), "result", result.Result)
-
-	if obs != nil {
-		obs.MakeLastProgressCompletion()
-		a.observer.Update(*obs)
-	}
-
-	return result, nil
-}
-
 func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messages {
 	// Add custom prompts
 	for _, prompt := range a.options.prompts {
@@ -424,6 +310,21 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			continue
 		}
 
+		content := message.Content
+
+		if strings.Contains(content, "{{") {
+			promptTemplate, err := templateBase("template", content)
+			if err != nil {
+				xlog.Error("Error rendering template", "error", err)
+			}
+
+			content, err = templateExecute(promptTemplate, struct{}{})
+			if err != nil {
+				xlog.Error("Error executing template", "error", err)
+				content = message.Content
+			}
+		}
+
 		if message.ImageBase64 != "" {
 			// iF model support both images and text, process it as a single multicontent message and return
 			if !a.options.SeparatedMultimodalModel() {
@@ -433,7 +334,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 						MultiContent: []openai.ChatMessagePart{
 							{
 								Type: openai.ChatMessagePartTypeText,
-								Text: message.Content,
+								Text: content,
 							},
 							{
 								Type: openai.ChatMessagePartTypeImageURL,
@@ -453,7 +354,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 					conversation = append([]openai.ChatCompletionMessage{
 						{
 							Role:    prompt.Role(),
-							Content: fmt.Sprintf("%s\n\nImage description: %s", message.Content, imageDescription),
+							Content: fmt.Sprintf("%s\n\nImage description: %s", content, imageDescription),
 						}}, conversation...)
 				}
 			}
@@ -461,18 +362,33 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			conversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    prompt.Role(),
-					Content: message.Content,
+					Content: content,
 				}}, conversation...)
 		}
 	}
 
 	// TODO: move to a Promptblock?
 	if a.options.systemPrompt != "" {
-		if !conversation.Exist(a.options.systemPrompt) {
+		content := a.options.systemPrompt
+
+		if strings.Contains(content, "{{") {
+			promptTemplate, err := templateBase("template", a.options.systemPrompt)
+			if err != nil {
+				xlog.Error("Error rendering template", "error", err)
+			}
+
+			content, err = templateExecute(promptTemplate, struct{}{})
+			if err != nil {
+				xlog.Error("Error executing template", "error", err)
+				content = a.options.systemPrompt
+			}
+		}
+
+		if !conversation.Exist(content) {
 			conversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    "system",
-					Content: a.options.systemPrompt,
+					Content: content,
 				}}, conversation...)
 		}
 	}
@@ -674,41 +590,6 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
 }
 
-// validateBuiltinTools checks that builtin tools specified by the user can be matched to available actions
-func (a *Agent) validateBuiltinTools(job *types.Job) {
-	builtinTools := job.GetBuiltinTools()
-	if len(builtinTools) == 0 {
-		return
-	}
-
-	// Get available actions
-	availableActions := a.mcpActions
-
-	for _, tool := range builtinTools {
-		functionName := tool.Name
-
-		// Check if this is a web search builtin tool
-		if strings.HasPrefix(string(functionName), "web_search_") {
-			// Look for a search action
-			searchAction := availableActions.Find("search")
-			if searchAction == nil {
-				xlog.Warn("Web search builtin tool specified but no 'search' action available",
-					"function_name", functionName,
-					"agent", a.Character.Name)
-			} else {
-				xlog.Debug("Web search builtin tool matched to search action",
-					"function_name", functionName,
-					"agent", a.Character.Name)
-			}
-		} else {
-			// For future builtin tools, add more matching logic here
-			xlog.Warn("Unknown builtin tool specified",
-				"function_name", functionName,
-				"agent", a.Character.Name)
-		}
-	}
-}
-
 // replyWithToolCall handles user-defined actions by recording the action state without setting Response
 func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMessage, params types.ActionParams, chosenAction types.Action, reasoning string) {
 	// Record the action state so the webui can detect this is a user-defined action
@@ -748,441 +629,39 @@ func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMe
 	job.Result.Finish(nil)
 }
 
-func (a *Agent) consumeJob(job *types.Job, role string, retries int) {
-	if err := job.GetContext().Err(); err != nil {
-		job.Result.Finish(fmt.Errorf("expired"))
+// validateBuiltinTools checks that builtin tools specified by the user can be matched to available actions
+func (a *Agent) validateBuiltinTools(job *types.Job) {
+	builtinTools := job.GetBuiltinTools()
+	if len(builtinTools) == 0 {
 		return
 	}
 
-	if retries < 1 {
-		job.Result.Finish(fmt.Errorf("Exceeded recursive retries"))
-		return
-	}
+	// Get available actions
+	availableActions := a.availableActions()
 
-	a.Lock()
-	paused := a.pause
-	a.Unlock()
+	for _, tool := range builtinTools {
+		functionName := tool.Name
 
-	if paused {
-		xlog.Info("Agent is paused, skipping job", "agent", a.Character.Name)
-		job.Result.Finish(fmt.Errorf("agent is paused"))
-		return
-	}
-
-	// We are self evaluating if we consume the job as a system role
-	selfEvaluation := role == SystemRole
-
-	conv := job.ConversationHistory
-
-	a.Lock()
-	a.selfEvaluationInProgress = selfEvaluation
-	a.Unlock()
-	defer job.Cancel()
-
-	if selfEvaluation {
-		defer func() {
-			a.Lock()
-			a.selfEvaluationInProgress = false
-			a.Unlock()
-		}()
-	}
-
-	conv = a.processPrompts(job.GetContext(), conv)
-	if ok, err := a.filterJob(job); !ok || err != nil {
-		if err != nil {
-			job.Result.Finish(fmt.Errorf("Error in job filter: %w", err))
-		} else {
-			job.Result.Finish(nil)
-		}
-		return
-	}
-	conv = a.processUserInputs(conv)
-
-	// RAG
-	conv = a.knowledgeBaseLookup(job, conv)
-
-	// Validate builtin tools against available actions
-	a.validateBuiltinTools(job)
-
-	var pickTemplate string
-	var reEvaluationTemplate string
-
-	if selfEvaluation {
-		pickTemplate = pickSelfTemplate
-		reEvaluationTemplate = reSelfEvalTemplate
-	} else {
-		pickTemplate = pickActionTemplate
-		reEvaluationTemplate = reEvalTemplate
-	}
-
-	// choose an action first
-	var chosenAction types.Action
-	var reasoning string
-	var actionParams types.ActionParams
-
-	if job.HasNextAction() {
-		// if we are being re-evaluated, we already have the action
-		// and the reasoning. Consume it here and reset it
-		action, params, reason := job.GetNextAction()
-		chosenAction = *action
-		reasoning = reason
-		if params == nil {
-			p, err := a.generateParameters(job, pickTemplate, chosenAction, conv, reasoning, maxRetries)
-			if err != nil {
-				xlog.Error("Error generating parameters, trying again", "error", err)
-				// try again
-				job.SetNextAction(&chosenAction, nil, reasoning)
-				a.consumeJob(job, role, retries-1)
-				return
+		// Check if this is a web search builtin tool
+		if strings.HasPrefix(string(functionName), "web_search_") {
+			// Look for a search action
+			searchAction := availableActions.Find("search")
+			if searchAction == nil {
+				xlog.Warn("Web search builtin tool specified but no 'search' action available",
+					"function_name", functionName,
+					"agent", a.Character.Name)
+			} else {
+				xlog.Debug("Web search builtin tool matched to search action",
+					"function_name", functionName,
+					"agent", a.Character.Name)
 			}
-			actionParams = p.actionParams
 		} else {
-			actionParams = *params
-		}
-		job.ResetNextAction()
-	} else {
-		var err error
-		chosenAction, actionParams, reasoning, err = a.pickAction(job, pickTemplate, conv, maxRetries)
-		if err != nil {
-			xlog.Error("Error picking action", "error", err)
-			job.Result.Finish(err)
-			return
+			// For future builtin tools, add more matching logic here
+			xlog.Warn("Unknown builtin tool specified",
+				"function_name", functionName,
+				"agent", a.Character.Name)
 		}
 	}
-
-	if chosenAction == nil {
-		// If no action was picked up, the reasoning is the message returned by the assistant
-		// so we can consume it as if it was a reply.
-		xlog.Info("No action to do, just reply", "agent", a.Character.Name, "reasoning", reasoning)
-
-		if reasoning != "" {
-			conv = append(conv, openai.ChatCompletionMessage{
-				Role:    "assistant",
-				Content: a.cleanupLLMResponse(reasoning),
-			})
-		} else {
-			xlog.Info("No reasoning, just reply", "agent", a.Character.Name)
-			msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
-			if err != nil {
-				job.Result.Finish(fmt.Errorf("error asking LLM for a reply: %w", err))
-				return
-			}
-			msg.Content = a.cleanupLLMResponse(msg.Content)
-			conv = append(conv, msg)
-			reasoning = msg.Content
-		}
-
-		var satisfied bool
-		var err error
-		// Evaluate the response
-		satisfied, conv, err = a.handleEvaluation(job, conv, job.GetEvaluationLoop())
-		if err != nil {
-			job.Result.Finish(fmt.Errorf("error evaluating response: %w", err))
-			return
-		}
-
-		if !satisfied {
-			// If not satisfied, continue with the conversation
-			job.ConversationHistory = conv
-			job.IncrementEvaluationLoop()
-			a.consumeJob(job, role, retries)
-			return
-		}
-
-		xlog.Debug("Finish job with reasoning", "reasoning", reasoning, "agent", a.Character.Name, "conversation", fmt.Sprintf("%+v", conv))
-		job.Result.Conversation = conv
-		job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
-			a.saveCurrentConversation(conv)
-		})
-		job.Result.SetResponse(reasoning)
-		job.Result.Finish(nil)
-		return
-	}
-
-	if chosenAction.Definition().Name.Is(action.StopActionName) {
-		xlog.Info("LLM decided to stop")
-		job.Result.Finish(nil)
-		return
-	}
-
-	// if we force a reasoning, we need to generate the parameters
-	if a.options.forceReasoning || actionParams == nil {
-		xlog.Info("Generating parameters",
-			"agent", a.Character.Name,
-			"action", chosenAction.Definition().Name,
-			"reasoning", reasoning,
-		)
-
-		params, err := a.generateParameters(job, pickTemplate, chosenAction, conv, reasoning, maxRetries)
-		if err != nil {
-			xlog.Error("Error generating parameters, trying again", "error", err)
-			// try again
-			job.SetNextAction(&chosenAction, nil, reasoning)
-			a.consumeJob(job, role, retries-1)
-			return
-		}
-		actionParams = params.actionParams
-	}
-
-	xlog.Info(
-		"Generated parameters",
-		"agent", a.Character.Name,
-		"action", chosenAction.Definition().Name,
-		"reasoning", reasoning,
-		"params", actionParams.String(),
-	)
-
-	if actionParams == nil {
-		job.Result.Finish(fmt.Errorf("no parameters"))
-		xlog.Error("No parameters", "agent", a.Character.Name)
-		return
-	}
-
-	if a.options.loopDetectionSteps > 0 && len(job.GetPastActions()) > 0 {
-		count := 0
-		for _, pastAction := range job.GetPastActions() {
-			if pastAction.Action.Definition().Name == chosenAction.Definition().Name &&
-				pastAction.Params.String() == actionParams.String() {
-				count++
-			}
-		}
-		if count > a.options.loopDetectionSteps {
-			xlog.Info("Loop detected, stopping agent", "agent", a.Character.Name, "action", chosenAction.Definition().Name)
-			a.reply(job, role, conv, actionParams, chosenAction, reasoning)
-			return
-		}
-		xlog.Debug("Checked for loops", "action", chosenAction.Definition().Name, "count", count)
-	}
-
-	job.AddPastAction(chosenAction, &actionParams)
-
-	if !job.Callback(types.ActionCurrentState{
-		Job:       job,
-		Action:    chosenAction,
-		Params:    actionParams,
-		Reasoning: reasoning}) {
-		job.Result.SetResult(types.ActionState{
-			ActionCurrentState: types.ActionCurrentState{
-				Job:       job,
-				Action:    chosenAction,
-				Params:    actionParams,
-				Reasoning: reasoning,
-			},
-			ActionResult: types.ActionResult{Result: "stopped by callback"}})
-		job.Result.Conversation = conv
-		job.Result.Finish(nil)
-		return
-	}
-
-	var err error
-	conv, err = a.handlePlanning(job.GetContext(), job, chosenAction, actionParams, reasoning, pickTemplate, conv)
-	if err != nil {
-		xlog.Error("error handling planning", "error", err)
-		a.reply(job, role, append(conv, openai.ChatCompletionMessage{
-			Role:    "assistant",
-			Content: fmt.Sprintf("Error handling planning: %v", err),
-		}), actionParams, chosenAction, reasoning)
-		return
-	}
-
-	if selfEvaluation && a.options.initiateConversations &&
-		chosenAction.Definition().Name.Is(action.ConversationActionName) {
-
-		xlog.Info("LLM decided to initiate a new conversation", "agent", a.Character.Name)
-
-		message := action.ConversationActionResponse{}
-		if err := actionParams.Unmarshal(&message); err != nil {
-			xlog.Error("Error unmarshalling conversation response", "error", err)
-			job.Result.Finish(fmt.Errorf("error unmarshalling conversation response: %w", err))
-			return
-		}
-
-		msg := openai.ChatCompletionMessage{
-			Role:    "assistant",
-			Content: message.Message,
-		}
-
-		go func(agent *Agent) {
-			xlog.Info("Sending new conversation to channel", "agent", agent.Character.Name, "message", msg.Content)
-			agent.newConversations <- msg
-		}(a)
-
-		job.Result.Conversation = []openai.ChatCompletionMessage{
-			msg,
-		}
-		job.Result.SetResponse("decided to initiate a new conversation")
-		job.Result.Finish(nil)
-		return
-	}
-
-	// if we have a reply action, we need to run it
-	if chosenAction.Definition().Name.Is(action.ReplyActionName) {
-		a.reply(job, role, conv, actionParams, chosenAction, reasoning)
-		return
-	}
-
-	if !chosenAction.Definition().Name.Is(action.PlanActionName) {
-		// Check if this is a user-defined action
-		if types.IsActionUserDefined(chosenAction) {
-			xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
-			a.replyWithToolCall(job, conv, actionParams, chosenAction, reasoning)
-			return
-		}
-
-		result, err := a.runAction(job, chosenAction, actionParams)
-		if err != nil {
-			result.Result = fmt.Sprintf("Error running tool: %v", err)
-		}
-
-		stateResult := types.ActionState{
-			ActionCurrentState: types.ActionCurrentState{
-				Job:       job,
-				Action:    chosenAction,
-				Params:    actionParams,
-				Reasoning: reasoning,
-			},
-			ActionResult: result,
-		}
-		job.Result.SetResult(stateResult)
-		job.CallbackWithResult(stateResult)
-		xlog.Debug("Action executed", "agent", a.Character.Name, "action", chosenAction.Definition().Name, "result", result)
-
-		conv = a.addFunctionResultToConversation(job.GetContext(), chosenAction, actionParams, result, conv)
-	}
-
-	// given the result, we can now re-evaluate the conversation
-	followingAction, followingParams, reasoning, err := a.pickAction(job, reEvaluationTemplate, conv, maxRetries)
-	if err != nil {
-		job.Result.Conversation = conv
-		job.Result.Finish(fmt.Errorf("error picking action: %w", err))
-		return
-	}
-
-	if followingAction != nil &&
-		!followingAction.Definition().Name.Is(action.ReplyActionName) &&
-		!chosenAction.Definition().Name.Is(action.ReplyActionName) {
-
-		xlog.Info("Following action", "action", followingAction.Definition().Name, "agent", a.Character.Name)
-		job.ConversationHistory = conv
-
-		// We need to do another action (?)
-		// The agent decided to do another action
-		// call ourselves again
-		job.SetNextAction(&followingAction, &followingParams, reasoning)
-		a.consumeJob(job, role, retries)
-		return
-	}
-
-	// Evaluate the final response
-	var satisfied bool
-	satisfied, conv, err = a.handleEvaluation(job, conv, job.GetEvaluationLoop())
-	if err != nil {
-		job.Result.Finish(fmt.Errorf("error evaluating response: %w", err))
-		return
-	}
-
-	if !satisfied {
-		// If not satisfied, continue with the conversation
-		job.ConversationHistory = conv
-		job.IncrementEvaluationLoop()
-		a.consumeJob(job, role, retries)
-		return
-	}
-
-	a.reply(job, role, conv, actionParams, chosenAction, reasoning)
-}
-
-func stripThinkingTags(content string) string {
-	// Remove content between <thinking> and </thinking> (including multi-line)
-	content = regexp.MustCompile(`(?s)<thinking>.*?</thinking>`).ReplaceAllString(content, "")
-	// Remove content between <think> and </think> (including multi-line)
-	content = regexp.MustCompile(`(?s)<think>.*?</think>`).ReplaceAllString(content, "")
-	// Clean up any extra whitespace
-	content = strings.TrimSpace(content)
-	return content
-}
-
-func (a *Agent) cleanupLLMResponse(content string) string {
-	if a.options.stripThinkingTags {
-		content = stripThinkingTags(content)
-	}
-	// Future post-processing options can be added here
-	return content
-}
-
-func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams types.ActionParams, chosenAction types.Action, reasoning string) {
-	job.Result.Conversation = conv
-
-	// At this point can only be a reply action
-	xlog.Info("Computing reply", "agent", a.Character.Name)
-
-	forceResponsePrompt := "Reply to the user without using any tools or function calls. Just reply with the message."
-
-	// If we have a hud, display it when answering normally
-	if a.options.enableHUD {
-		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(), reasoning)
-		if err != nil {
-			job.Result.Conversation = conv
-			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
-			return
-		}
-		if !Messages(conv).Exist(prompt) {
-			conv = append([]openai.ChatCompletionMessage{
-				{
-					Role:    "system",
-					Content: prompt,
-				},
-				{
-					Role:    "system",
-					Content: forceResponsePrompt,
-				},
-			}, conv...)
-		}
-	} else {
-		conv = append([]openai.ChatCompletionMessage{
-			{
-				Role:    "system",
-				Content: forceResponsePrompt,
-			},
-		}, conv...)
-	}
-
-	xlog.Info("Reasoning, ask LLM for a reply", "agent", a.Character.Name)
-	xlog.Debug("Conversation", "conversation", fmt.Sprintf("%+v", conv))
-	msg, err := a.askLLM(job.GetContext(), conv, maxRetries)
-	if err != nil {
-		job.Result.Conversation = conv
-		job.Result.Finish(err)
-		xlog.Error("Error asking LLM for a reply", "error", err)
-		return
-	}
-
-	msg.Content = a.cleanupLLMResponse(msg.Content)
-
-	if msg.Content == "" {
-		// If we didn't got any message, we can use the response from the action (it should be a reply)
-
-		replyResponse := action.ReplyResponse{}
-		if err := actionParams.Unmarshal(&replyResponse); err != nil {
-			job.Result.Conversation = conv
-			job.Result.Finish(fmt.Errorf("error unmarshalling reply response: %w", err))
-			return
-		}
-
-		if chosenAction.Definition().Name.Is(action.ReplyActionName) && replyResponse.Message != "" {
-			xlog.Info("No output returned from conversation, using the action response as a reply " + replyResponse.Message)
-			msg.Content = a.cleanupLLMResponse(replyResponse.Message)
-		}
-	}
-
-	conv = append(conv, msg)
-	job.Result.SetResponse(msg.Content)
-	xlog.Info("Response from LLM", "response", msg.Content, "agent", a.Character.Name)
-	job.Result.Conversation = conv
-	job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
-		a.saveCurrentConversation(conv)
-	})
-	job.Result.Finish(nil)
 }
 
 func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenAction types.Action, actionParams types.ActionParams, result types.ActionResult, conv Messages) Messages {
@@ -1259,6 +738,378 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 	return conv
 }
 
+func (a *Agent) consumeJob(job *types.Job, role string) {
+	if err := job.GetContext().Err(); err != nil {
+		job.Result.Finish(fmt.Errorf("expired"))
+		return
+	}
+
+	a.Lock()
+	paused := a.pause
+	a.Unlock()
+
+	if paused {
+		xlog.Info("Agent is paused, skipping job", "agent", a.Character.Name)
+		job.Result.Finish(fmt.Errorf("agent is paused"))
+		return
+	}
+
+	// We are self evaluating if we consume the job as a system role
+	selfEvaluation := role == SystemRole
+
+	conv := job.ConversationHistory
+
+	a.Lock()
+	a.selfEvaluationInProgress = selfEvaluation
+	a.Unlock()
+	defer job.Cancel()
+
+	if selfEvaluation {
+		defer func() {
+			a.Lock()
+			a.selfEvaluationInProgress = false
+			a.Unlock()
+		}()
+	}
+
+	conv = a.processPrompts(job.GetContext(), conv)
+	if ok, err := a.filterJob(job); !ok || err != nil {
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("Error in job filter: %w", err))
+		} else {
+			job.Result.Finish(nil)
+		}
+		return
+	}
+	conv = a.processUserInputs(conv)
+
+	// RAG
+	conv = a.knowledgeBaseLookup(job, conv)
+
+	// Validate builtin tools against available actions
+	a.validateBuiltinTools(job)
+
+	fragment := cogito.NewFragment(conv...)
+
+	if selfEvaluation {
+		fragment = fragment.AddStartMessage("system", pickSelfTemplate)
+	}
+
+	if a.options.enableHUD {
+		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(), "")
+		if err != nil {
+			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
+			return
+		}
+		fragment = fragment.AddStartMessage("system", prompt)
+	}
+
+	availableActions := a.getAvailableActionsForJob(job)
+	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
+	allActions := append(availableActions, a.mcpActionDefinitions...)
+
+	obs := job.Obs
+	if obs == nil && a.observer != nil && job.Obs != nil {
+		obs = a.observer.NewObservable()
+		obs.Name = "decision"
+		obs.Icon = "brain"
+		obs.ParentID = job.Obs.ID
+		obs.Creation = &types.Creation{
+			ChatCompletionRequest: &openai.ChatCompletionRequest{
+				Model:    a.options.LLMAPI.Model,
+				Messages: conv,
+			},
+		}
+	}
+
+	defer func() {
+		if obs != nil && a.observer != nil {
+			obs.MakeLastProgressCompletion()
+			a.observer.Update(*obs)
+		}
+	}()
+
+	var err error
+	var userTool bool
+
+	var observables = make(map[string]*types.Observable)
+
+	cogitoOpts := []cogito.Option{
+		cogito.WithMCPs(a.mcpSessions...),
+		cogito.WithReasoningCallback(func(s string) {
+			xlog.Debug("Cogito reasoning callback", "status", s)
+
+			if a.observer != nil && job.Obs != nil {
+				job.Obs.AddProgress(
+					types.Progress{
+						ChatCompletionResponse: &openai.ChatCompletionResponse{
+							Choices: []openai.ChatCompletionChoice{
+								{
+									Message: openai.ChatCompletionMessage{
+										Role:    "assistant",
+										Content: s,
+									},
+								},
+							},
+						},
+					})
+				a.observer.Update(*job.Obs)
+			}
+		}),
+		cogito.WithTools(
+			cogitoTools...,
+		),
+		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
+			if a.observer != nil && obs != nil {
+				obs := observables[t.ToolArguments.ID]
+				obs.Progress = append(obs.Progress, types.Progress{
+					ActionResult: t.Result,
+				})
+				obs.Name = "action"
+				obs.Icon = "bolt"
+				obs.MakeLastProgressCompletion()
+				a.observer.Update(*obs)
+			}
+
+			aa := allActions.Find(t.Name)
+			state := types.ActionState{
+				ActionCurrentState: types.ActionCurrentState{
+					Job:       job,
+					Action:    aa,
+					Params:    types.ActionParams(t.ToolArguments.Arguments),
+					Reasoning: t.ToolArguments.Reasoning,
+				},
+				ActionResult: types.ActionResult{Result: t.Result},
+			}
+			job.Result.SetResult(state)
+			job.CallbackWithResult(state)
+			conv = a.addFunctionResultToConversation(job.GetContext(), aa, types.ActionParams(t.ToolArguments.Arguments), types.ActionResult{Result: t.Result}, conv)
+		}),
+		cogito.WithToolCallBack(
+			func(tc *cogito.ToolChoice) bool {
+
+				xlog.Debug("Tool call back", "tool_call", tc)
+
+				// Check if this is a user-defined action
+				chosenAction := allActions.Find(tc.Name)
+
+				xlog.Debug("Action found", "action", chosenAction)
+
+				if chosenAction != nil && types.IsActionUserDefined(chosenAction) {
+					xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
+					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, tc.Reasoning)
+					userTool = true
+					return false
+				}
+
+				if a.observer != nil && job.Obs != nil {
+					obs := a.observer.NewObservable()
+					obs.Name = "decision"
+					obs.ParentID = job.Obs.ID
+					obs.Icon = "brain"
+					obs.Creation = &types.Creation{
+						ChatCompletionRequest: &openai.ChatCompletionRequest{
+							Model:    a.options.LLMAPI.Model,
+							Messages: conv,
+						},
+						FunctionDefinition: chosenAction.Definition().ToFunctionDefinition(),
+						FunctionParams:     types.ActionParams(tc.Arguments),
+					}
+
+					a.observer.Update(*obs)
+					observables[tc.ID] = obs
+				}
+
+				switch tc.Name {
+				case action.StopActionName:
+					return false
+				case action.ConversationActionName:
+					message := action.ConversationActionResponse{}
+					toolArgs, _ := json.Marshal(tc.Arguments)
+					if err := json.Unmarshal([]byte(toolArgs), &message); err != nil {
+						xlog.Error("Error unmarshalling conversation response", "error", err)
+						job.Result.Finish(fmt.Errorf("error unmarshalling conversation response: %w", err))
+						return false
+					}
+
+					msg := openai.ChatCompletionMessage{
+						Role:    "assistant",
+						Content: message.Message,
+					}
+
+					go func(agent *Agent) {
+						xlog.Info("Sending new conversation to channel", "agent", agent.Character.Name, "message", msg.Content)
+						agent.newConversations <- msg
+					}(a)
+
+					job.Result.Conversation = []openai.ChatCompletionMessage{
+						msg,
+					}
+					job.Result.SetResponse("decided to initiate a new conversation")
+					job.Result.Finish(nil)
+					return true
+				case action.StateActionName:
+					// We need to store the result in the state
+					state := types.AgentInternalState{}
+					dat, _ := json.Marshal(tc.Arguments)
+					err = json.Unmarshal(dat, &state)
+					if err != nil {
+						werr := fmt.Errorf("error unmarshalling state of the agent: %w", err)
+						if obs != nil && a.observer != nil {
+							obs.Completion = &types.Completion{
+								Error: werr.Error(),
+							}
+							a.observer.Update(*obs)
+						}
+						return false
+					}
+					// update the current state with the one we just got from the action
+					a.currentState = &state
+					if obs != nil && a.observer != nil {
+						obs.Progress = append(obs.Progress, types.Progress{
+							AgentState: &state,
+						})
+						a.observer.Update(*obs)
+					}
+
+					// update the state file
+					if a.options.statefile != "" {
+						if err := a.SaveState(a.options.statefile); err != nil {
+							if obs != nil && a.observer != nil {
+								obs.Completion = &types.Completion{
+									Error: err.Error(),
+								}
+								a.observer.Update(*obs)
+							}
+
+							return false
+						}
+					}
+
+				}
+
+				cont := job.Callback(types.ActionCurrentState{
+					Job:       job,
+					Action:    chosenAction,
+					Params:    types.ActionParams(tc.Arguments),
+					Reasoning: tc.Reasoning})
+
+				if !cont {
+					job.Result.SetResult(
+						types.ActionState{
+							ActionCurrentState: types.ActionCurrentState{
+								Job:       job,
+								Action:    chosenAction,
+								Params:    types.ActionParams(tc.Arguments),
+								Reasoning: tc.Reasoning,
+							},
+							ActionResult: types.ActionResult{Result: "stopped by callback"},
+						})
+
+					job.Result.Conversation = conv
+					job.Result.Finish(nil)
+
+				}
+				return cont
+			},
+		),
+	}
+
+	if a.options.canPlan {
+		cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlan)
+		if a.options.enableEvaluation {
+			cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlanReEvaluator)
+		}
+	}
+
+	if a.options.forceReasoning {
+		cogitoOpts = append(cogitoOpts, cogito.WithForceReasoning())
+	}
+
+	if a.options.maxEvaluationLoops > 0 {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithMaxAttempts(a.options.maxEvaluationLoops),
+			cogito.WithIterations(a.options.maxEvaluationLoops),
+		)
+	}
+
+	fragment, err = cogito.ExecuteTools(
+		a.llm, fragment,
+		cogitoOpts...,
+	)
+
+	if err != nil && !errors.Is(err, cogito.ErrNoToolSelected) && !errors.Is(err, cogito.ErrGoalNotAchieved) && !userTool {
+		if obs != nil {
+			obs.Completion = &types.Completion{
+				Error: err.Error(),
+			}
+			a.observer.Update(*obs)
+		}
+		xlog.Error("Error executing cogito", "error", err)
+		job.Result.Finish(err)
+		return
+	}
+
+	if userTool {
+		return
+	}
+
+	if len(fragment.Messages) > 0 &&
+		fragment.LastMessage().Role == "tool" {
+		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
+		switch toolToCall {
+		case action.StopActionName:
+			job.Result.Finish(nil)
+			return
+		}
+	}
+
+	if len(fragment.Messages) == 0 {
+		job.Result.Finish(fmt.Errorf("no messages in fragment"))
+		return
+	}
+
+	responseFragment, err := a.llm.Ask(job.GetContext(), fragment)
+	if err != nil {
+		job.Result.Finish(err)
+		return
+	}
+
+	result := a.cleanupLLMResponse(responseFragment.LastMessage().Content)
+
+	conv = append(fragment.Messages, openai.ChatCompletionMessage{
+		Role:    "assistant",
+		Content: result,
+	})
+
+	job.Result.Plans = fragment.Status.Plans
+	job.Result.Conversation = conv
+	job.ConversationHistory = conv
+	job.Result.AddFinalizer(func(conv []openai.ChatCompletionMessage) {
+		a.saveCurrentConversation(conv)
+	})
+	job.Result.SetResponse(result)
+	job.Result.Finish(nil)
+}
+
+func stripThinkingTags(content string) string {
+	// Remove content between <thinking> and </thinking> (including multi-line)
+	content = regexp.MustCompile(`(?s)<thinking>.*?</thinking>`).ReplaceAllString(content, "")
+	// Remove content between <think> and </think> (including multi-line)
+	content = regexp.MustCompile(`(?s)<think>.*?</think>`).ReplaceAllString(content, "")
+	// Clean up any extra whitespace
+	content = strings.TrimSpace(content)
+	return content
+}
+
+func (a *Agent) cleanupLLMResponse(content string) string {
+	if a.options.stripThinkingTags {
+		content = stripThinkingTags(content)
+	}
+	// Future post-processing options can be added here
+	return content
+}
+
 // This is running in the background.
 func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// Remember always to reset the timer - if we don't the agent will stop..
@@ -1316,7 +1167,7 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 		}
 
 		// Process the reminder as a normal conversation
-		a.consumeJob(reminderJob, UserRole, a.options.loopDetectionSteps)
+		a.consumeJob(reminderJob, UserRole)
 
 		// After the reminder job is complete, ensure the user is notified
 		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
@@ -1359,7 +1210,7 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 		types.WithReasoningCallback(a.options.reasoningCallback),
 		types.WithResultCallback(a.options.resultCallback),
 	)
-	a.consumeJob(whatNext, SystemRole, a.options.loopDetectionSteps)
+	a.consumeJob(whatNext, SystemRole)
 
 	xlog.Info("STOP -- Periodically run is done", "agent", a.Character.Name)
 }
@@ -1418,7 +1269,7 @@ func (a *Agent) run(timer *time.Timer) error {
 				<-timer.C
 			}
 			xlog.Debug("Agent is consuming a job", "agent", a.Character.Name, "job", job)
-			a.consumeJob(job, UserRole, a.options.loopDetectionSteps)
+			a.consumeJob(job, UserRole)
 			timer.Reset(a.options.periodicRuns)
 		case <-a.context.Done():
 			// Agent has been canceled, return error

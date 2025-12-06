@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"time"
@@ -14,12 +14,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/xlog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-var _ types.Action = &mcpAction{}
+var _ types.Action = &mcpWrapperAction{}
 
 type MCPServer struct {
 	URL   string `json:"url"`
@@ -32,15 +31,17 @@ type MCPSTDIOServer struct {
 	Cmd  string   `json:"cmd"`
 }
 
-type mcpAction struct {
+type mcpWrapperAction struct {
 	mcpClient       *mcp.ClientSession
 	inputSchema     ToolInputSchema
 	toolName        string
 	toolDescription string
 }
 
-func (a *mcpAction) Plannable() bool {
-	return true
+func (m *mcpWrapperAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	// We don't call the method here, it is used by cogito.
+	// We will just use these to have a list of actions that MCP server provides for resolving internal states
+	return types.ActionResult{Result: "MCP action called"}, fmt.Errorf("not implemented")
 }
 
 func (m *mcpAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
@@ -78,6 +79,7 @@ func (m *mcpAction) Run(ctx context.Context, sharedState *types.AgentSharedState
 }
 
 func (m *mcpAction) Definition() types.ActionDefinition {
+func (m *mcpWrapperAction) Definition() types.ActionDefinition {
 	props := map[string]jsonschema.Definition{}
 	dat, err := json.Marshal(m.inputSchema.Properties)
 	if err != nil {
@@ -101,7 +103,6 @@ type ToolInputSchema struct {
 }
 
 func (a *Agent) addTools(client *mcp.ClientSession) (types.Actions, error) {
-
 	var generatedActions types.Actions
 
 	tools, err := client.ListTools(a.context, nil)
@@ -133,7 +134,7 @@ func (a *Agent) addTools(client *mcp.ClientSession) (types.Actions, error) {
 		}
 
 		// Create a new action with Client + tool
-		generatedActions = append(generatedActions, &mcpAction{
+		generatedActions = append(generatedActions, &mcpWrapperAction{
 			mcpClient:       client,
 			toolName:        t.Name,
 			inputSchema:     inputSchema,
@@ -142,7 +143,6 @@ func (a *Agent) addTools(client *mcp.ClientSession) (types.Actions, error) {
 	}
 
 	return generatedActions, nil
-
 }
 
 // bearerTokenRoundTripper is a custom roundtripper that injects a bearer token
@@ -172,8 +172,9 @@ func newBearerTokenRoundTripper(token string, base http.RoundTripper) http.Round
 }
 
 func (a *Agent) initMCPActions() error {
+	a.closeMCPSTDIOServers() // Make sure we stop all previous servers if any is active
 
-	a.mcpActions = nil
+	a.mcpActionDefinitions = nil
 	var err error
 
 	generatedActions := types.Actions{}
@@ -242,7 +243,7 @@ func (a *Agent) initMCPActions() error {
 		generatedActions = append(generatedActions, actions...)
 	}
 
-	a.mcpActions = generatedActions
+	a.mcpActionDefinitions = generatedActions
 
 	return err
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/google/uuid"
+	"github.com/mudler/cogito"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -20,19 +21,15 @@ type Job struct {
 	UUID                string
 	Metadata            map[string]interface{}
 	DoneFilter          bool
-	
+
 	// Tools available for this job
 	BuiltinTools []ActionDefinition // Built-in tools like web search
 	UserTools    []ActionDefinition // User-defined function tools
 	ToolChoice   string
 
-	pastActions         []*ActionRequest
-	nextAction          *Action
-	nextActionParams    *ActionParams
-	nextActionReasoning string
-
-	context context.Context
-	cancel  context.CancelFunc
+	context  context.Context
+	fragment *cogito.Fragment
+	cancel   context.CancelFunc
 
 	Obs *Observable
 }
@@ -106,37 +103,6 @@ func (j *Job) CallbackWithResult(stateResult ActionState) {
 		return
 	}
 	j.ResultCallback(stateResult)
-}
-
-func (j *Job) SetNextAction(action *Action, params *ActionParams, reasoning string) {
-	j.nextAction = action
-	j.nextActionParams = params
-	j.nextActionReasoning = reasoning
-}
-
-func (j *Job) AddPastAction(action Action, params *ActionParams) {
-	j.pastActions = append(j.pastActions, &ActionRequest{
-		Action: action,
-		Params: params,
-	})
-}
-
-func (j *Job) GetPastActions() []*ActionRequest {
-	return j.pastActions
-}
-
-func (j *Job) GetNextAction() (*Action, *ActionParams, string) {
-	return j.nextAction, j.nextActionParams, j.nextActionReasoning
-}
-
-func (j *Job) HasNextAction() bool {
-	return j.nextAction != nil
-}
-
-func (j *Job) ResetNextAction() {
-	j.nextAction = nil
-	j.nextActionParams = nil
-	j.nextActionReasoning = ""
 }
 
 func WithTextImage(text, image string) JobOption {
