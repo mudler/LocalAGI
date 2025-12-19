@@ -8,7 +8,7 @@ import (
 
 	localagi "github.com/mudler/LocalAGI/pkg/client"
 	"github.com/mudler/LocalAGI/pkg/utils/ptr"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 
 	. "github.com/onsi/ginkgo/v2"

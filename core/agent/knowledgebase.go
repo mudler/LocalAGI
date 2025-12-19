@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/cogito"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
 )
 
