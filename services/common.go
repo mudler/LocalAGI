@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 )
 
 func memoryPath(agentName string, actionsConfigs map[string]string) string {

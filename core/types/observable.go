@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -25,7 +25,7 @@ type Completion struct {
 	Conversation           []openai.ChatCompletionMessage `json:"conversation,omitempty"`
 	ActionResult           string                         `json:"action_result,omitempty"`
 	AgentState             *AgentInternalState            `json:"agent_state,omitempty"`
-	FilterResult 					 *FilterResult 									`json:"filter_result,omitempty"`
+	FilterResult           *FilterResult                  `json:"filter_result,omitempty"`
 }
 
 type Observable struct {

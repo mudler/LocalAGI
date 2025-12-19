@@ -7,7 +7,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 )
 
 type Observer interface {

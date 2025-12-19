@@ -15,9 +15,9 @@ import (
 	coreTypes "github.com/mudler/LocalAGI/core/types"
 	internalTypes "github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/llm"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/LocalAGI/webui/types"
+	"github.com/mudler/xlog"
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"

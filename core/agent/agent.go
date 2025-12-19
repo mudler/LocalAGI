@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/cogito"
+	"github.com/mudler/xlog"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
