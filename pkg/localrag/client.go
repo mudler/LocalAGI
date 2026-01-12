@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mudler/LocalAGI/core/agent"
@@ -26,7 +27,8 @@ type WrappedClient struct {
 	collection string
 }
 
-func NewWrappedClient(baseURL, apiKey, collection string) *WrappedClient {
+func NewWrappedClient(baseURL, apiKey, c string) *WrappedClient {
+	collection := strings.TrimSpace(strings.ToLower(c))
 	wc := &WrappedClient{
 		Client:     NewClient(baseURL, apiKey),
 		collection: collection,
