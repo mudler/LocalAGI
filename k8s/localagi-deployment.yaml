@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: localagi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localagi
+  namespace: localagi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localagi
+  template:
+    metadata:
+      labels:
+        app: localagi
+    spec:
+      containers:
+      - name: localagi
+        image: mudler/localagi:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: LOCALAGI_MODEL
+          value: "gemma-3-12b-it-qat"
+        - name: LOCALAGI_MULTIMODAL_MODEL
+          value: "minicpm-v-2_6"
+        - name: LOCALAGI_IMAGE_MODEL
+          value: "sd-1.5-ggml"
+        - name: LOCALAGI_TIMEOUT
+          value: "60s"
+        - name: LOCALAGI_STATE_DIR
+          value: "/var/lib/localagi"
+        - name: LOCALAGI_LOCALRAG_URL
+          value: "http://localrecall.local:8080"
+        volumeMounts:
+        - name: localagi-data
+          mountPath: "/var/lib/localagi"
+      volumes:
+      - name: localagi-data
+        persistentVolumeClaim:
+          claimName: localagi-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localagi
+  namespace: localagi
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 3000
+  selector:
+    app: localagi
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: localagi
+  namespace: localagi
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: localagi
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: localagi-data
+  namespace: localagi
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
