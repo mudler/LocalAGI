@@ -26,18 +26,41 @@ services:
       - ./volumes/backends:/backends
       - ./volumes/images:/tmp/generated/images
 
+  localrecall-postgres:
+    image: quay.io/mudler/localrecall:${LOCALRECALL_VERSION:-v0.5.2}-postgresql
+    environment:
+      - POSTGRES_DB=localrecall
+      - POSTGRES_USER=localrecall
+      - POSTGRES_PASSWORD=localrecall
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U localrecall"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   localrecall:
-    image: quay.io/mudler/localrecall:main
+    image: quay.io/mudler/localrecall:${LOCALRECALL_VERSION:-v0.5.2}
+    depends_on:
+      localrecall-postgres:
+        condition: service_healthy
+      localai:
+        condition: service_started
     ports:
       - 8080
     environment:
-      - COLLECTION_DB_PATH=/db
+      - DATABASE_URL=postgresql://localrecall:localrecall@localrecall-postgres:5432/localrecall?sslmode=disable
+      - VECTOR_ENGINE=postgres
       - EMBEDDING_MODEL=granite-embedding-107m-multilingual
       - FILE_ASSETS=/assets
       - OPENAI_API_KEY=sk-1234567890
       - OPENAI_BASE_URL=http://localai:8080
+      - HYBRID_SEARCH_BM25_WEIGHT=0.5
+      - HYBRID_SEARCH_VECTOR_WEIGHT=0.5
     volumes:
-      - ./volumes/localrag/db:/db
       - ./volumes/localrag/assets/:/assets
 
   localrecall-healthcheck:
@@ -102,3 +125,6 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./volumes/localagi/:/pool
+
+volumes:
+  postgres_data:
