@@ -22,6 +22,11 @@ services:
       file: docker-compose.yaml
       service: dind
 
+  localrecall-postgres:
+    extends:
+      file: docker-compose.yaml
+      service: localrecall-postgres
+
   localrecall:
     extends:
       file: docker-compose.yaml
