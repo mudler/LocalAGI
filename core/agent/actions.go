@@ -8,7 +8,7 @@ import (
 	"github.com/mudler/LocalAGI/core/types"
 	"golang.org/x/exp/slices"
 
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 
 	"github.com/sashabaranov/go-openai"
 )

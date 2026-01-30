@@ -11,9 +11,9 @@ import (
 
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/mudler/LocalAGI/pkg/localoperator"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/mudler/LocalAGI/core/agent"

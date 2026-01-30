@@ -13,10 +13,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mudler/LocalAGI/core/agent"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 )
 
 var _ agent.RAGDB = &WrappedClient{}
@@ -26,7 +27,8 @@ type WrappedClient struct {
 	collection string
 }
 
-func NewWrappedClient(baseURL, apiKey, collection string) *WrappedClient {
+func NewWrappedClient(baseURL, apiKey, c string) *WrappedClient {
+	collection := strings.TrimSpace(strings.ToLower(c))
 	wc := &WrappedClient{
 		Client:     NewClient(baseURL, apiKey),
 		collection: collection,
@@ -86,6 +88,32 @@ func (c *WrappedClient) Store(s string) error {
 
 	defer os.Remove(f)
 	return c.Client.Store(c.collection, f)
+}
+
+// apiResponse is the standardized LocalRecall API response wrapper (since 3f73ff3a).
+type apiResponse struct {
+	Success bool            `json:"success"`
+	Message string         `json:"message,omitempty"`
+	Data    json.RawMessage `json:"data,omitempty"`
+	Error   *apiError       `json:"error,omitempty"`
+}
+
+type apiError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Details string `json:"details,omitempty"`
+}
+
+// parseAPIError reads the response body and returns an error from the API response or a generic message.
+func parseAPIError(resp *http.Response, body []byte, fallback string) error {
+	var wrap apiResponse
+	if err := json.Unmarshal(body, &wrap); err == nil && wrap.Error != nil {
+		if wrap.Error.Details != "" {
+			return fmt.Errorf("%s: %s", wrap.Error.Message, wrap.Error.Details)
+		}
+		return errors.New(wrap.Error.Message)
+	}
+	return fmt.Errorf("%s: %s", fallback, string(body))
 }
 
 // Result represents a single result from a query.
@@ -151,7 +179,8 @@ func (c *Client) CreateCollection(name string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		return errors.New("failed to create collection")
+		body, _ := io.ReadAll(resp.Body)
+		return parseAPIError(resp, body, "failed to create collection")
 	}
 
 	return nil
@@ -174,17 +203,30 @@ func (c *Client) ListCollections() ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to list collections")
-	}
-
-	var collections []string
-	err = json.NewDecoder(resp.Body).Decode(&collections)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	return collections, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, body, "failed to list collections")
+	}
+
+	var wrap apiResponse
+	if err := json.Unmarshal(body, &wrap); err != nil || !wrap.Success {
+		if wrap.Error != nil {
+			return nil, errors.New(wrap.Error.Message)
+		}
+		return nil, fmt.Errorf("invalid response: %w", err)
+	}
+
+	var data struct {
+		Collections []string `json:"collections"`
+	}
+	if err := json.Unmarshal(wrap.Data, &data); err != nil {
+		return nil, err
+	}
+	return data.Collections, nil
 }
 
 // ListEntries lists all entries in a collection
@@ -204,17 +246,30 @@ func (c *Client) ListEntries(collection string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to list entries")
-	}
-
-	var entries []string
-	err = json.NewDecoder(resp.Body).Decode(&entries)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	return entries, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, body, "failed to list entries")
+	}
+
+	var wrap apiResponse
+	if err := json.Unmarshal(body, &wrap); err != nil || !wrap.Success {
+		if wrap.Error != nil {
+			return nil, errors.New(wrap.Error.Message)
+		}
+		return nil, fmt.Errorf("invalid response: %w", err)
+	}
+
+	var data struct {
+		Entries []string `json:"entries"`
+	}
+	if err := json.Unmarshal(wrap.Data, &data); err != nil {
+		return nil, err
+	}
+	return data.Entries, nil
 }
 
 // DeleteEntry deletes an entry in a collection
@@ -244,19 +299,30 @@ func (c *Client) DeleteEntry(collection, entry string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyResult := new(bytes.Buffer)
-		bodyResult.ReadFrom(resp.Body)
-		return nil, errors.New("failed to delete entry: " + bodyResult.String())
-	}
-
-	var results []string
-	err = json.NewDecoder(resp.Body).Decode(&results)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	return results, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, body, "failed to delete entry")
+	}
+
+	var wrap apiResponse
+	if err := json.Unmarshal(body, &wrap); err != nil || !wrap.Success {
+		if wrap.Error != nil {
+			return nil, errors.New(wrap.Error.Message)
+		}
+		return nil, fmt.Errorf("invalid response: %w", err)
+	}
+
+	var data struct {
+		RemainingEntries []string `json:"remaining_entries"`
+	}
+	if err := json.Unmarshal(wrap.Data, &data); err != nil {
+		return nil, err
+	}
+	return data.RemainingEntries, nil
 }
 
 // Search searches a collection
@@ -287,17 +353,30 @@ func (c *Client) Search(collection, query string, maxResults int) ([]Result, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to search collection")
-	}
-
-	var results []Result
-	err = json.NewDecoder(resp.Body).Decode(&results)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	return results, nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, body, "failed to search collection")
+	}
+
+	var wrap apiResponse
+	if err := json.Unmarshal(body, &wrap); err != nil || !wrap.Success {
+		if wrap.Error != nil {
+			return nil, errors.New(wrap.Error.Message)
+		}
+		return nil, fmt.Errorf("invalid response: %w", err)
+	}
+
+	var data struct {
+		Results []Result `json:"results"`
+	}
+	if err := json.Unmarshal(wrap.Data, &data); err != nil {
+		return nil, err
+	}
+	return data.Results, nil
 }
 
 // Reset resets a collection
@@ -318,9 +397,8 @@ func (c *Client) Reset(collection string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		b := new(bytes.Buffer)
-		b.ReadFrom(resp.Body)
-		return errors.New("failed to reset collection: " + b.String())
+		body, _ := io.ReadAll(resp.Body)
+		return parseAPIError(resp, body, "failed to reset collection")
 	}
 
 	return nil
@@ -369,20 +447,8 @@ func (c *Client) Store(collection, filePath string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		b := new(bytes.Buffer)
-		b.ReadFrom(resp.Body)
-
-		type response struct {
-			Error string `json:"error"`
-		}
-
-		var r response
-		err = json.Unmarshal(b.Bytes(), &r)
-		if err == nil {
-			return errors.New("failed to upload file: " + r.Error)
-		}
-
-		return errors.New("failed to upload file")
+		body, _ := io.ReadAll(resp.Body)
+		return parseAPIError(resp, body, "failed to upload file")
 	}
 
 	return nil
