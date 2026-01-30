@@ -136,7 +136,7 @@ func newBearerTokenRoundTripper(token string, base http.RoundTripper) http.Round
 }
 
 func (a *Agent) initMCPActions() error {
-	a.closeMCPSTDIOServers() // Make sure we stop all previous servers if any is active
+	a.closeMCPServers() // Make sure we stop all previous servers if any is active
 
 	a.mcpActionDefinitions = nil
 	var err error
@@ -154,13 +154,17 @@ func (a *Agent) initMCPActions() error {
 			Transport: newBearerTokenRoundTripper(mcpServer.Token, http.DefaultTransport),
 		}
 
-		transport := &mcp.SSEClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
-
-		// Create a new client
-		session, err := client.Connect(a.context, transport, nil)
+		streamableTransport := &mcp.StreamableClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
+		session, err := client.Connect(a.context, streamableTransport, nil)
 		if err != nil {
-			xlog.Error("Failed to connect to MCP server", "server", mcpServer, "error", err.Error())
-			continue
+			xlog.Error("Failed to connect to MCP server via StreamableClientTransport", "server", mcpServer, "error", err.Error())
+
+			sseTransport := &mcp.SSEClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
+			session, err = client.Connect(a.context, sseTransport, nil)
+			if err != nil {
+				xlog.Error("Failed to connect to MCP server via SSEClientTransport", "server", mcpServer, "error", err.Error())
+				continue
+			}
 		}
 		a.mcpSessions = append(a.mcpSessions, session)
 
@@ -173,9 +177,6 @@ func (a *Agent) initMCPActions() error {
 	}
 
 	// MCP STDIO Servers
-
-	a.closeMCPSTDIOServers() // Make sure we stop all previous servers if any is active
-
 	if a.options.mcpPrepareScript != "" {
 		xlog.Debug("Preparing MCP", "script", a.options.mcpPrepareScript)
 
@@ -214,7 +215,7 @@ func (a *Agent) initMCPActions() error {
 	return err
 }
 
-func (a *Agent) closeMCPSTDIOServers() {
+func (a *Agent) closeMCPServers() {
 	for _, s := range a.mcpSessions {
 		s.Close()
 	}
