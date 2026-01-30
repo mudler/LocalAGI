@@ -44,6 +44,11 @@ type options struct {
 	kbResults             int
 	ragdb                 RAGDB
 
+	// KB compaction (when enableKB is true)
+	enableKBCompaction    bool
+	kbCompactionInterval  string // "daily", "weekly", "monthly"
+	kbCompactionSummarize bool
+
 	// Evaluation settings
 	maxEvaluationLoops int
 	enableEvaluation   bool
@@ -145,6 +150,33 @@ func EnableKnowledgeBaseWithResults(results int) Option {
 	return func(o *options) error {
 		o.enableKB = true
 		o.kbResults = results
+		return nil
+	}
+}
+
+// EnableKBCompaction enables periodic KB compaction (group by date, optionally summarize, store, delete originals).
+var EnableKBCompaction = func(o *options) error {
+	o.enableKBCompaction = true
+	return nil
+}
+
+// WithKBCompactionInterval sets the compaction window: "daily", "weekly", or "monthly".
+func WithKBCompactionInterval(interval string) Option {
+	return func(o *options) error {
+		switch interval {
+		case "daily", "weekly", "monthly":
+			o.kbCompactionInterval = interval
+		default:
+			o.kbCompactionInterval = "daily"
+		}
+		return nil
+	}
+}
+
+// WithKBCompactionSummarize sets whether compaction uses LLM to summarize (true) or just concatenates (false).
+func WithKBCompactionSummarize(summarize bool) Option {
+	return func(o *options) error {
+		o.kbCompactionSummarize = summarize
 		return nil
 	}
 }
