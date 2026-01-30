@@ -122,7 +122,7 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 
 			dynamicPromptsFound := dynamicPrompts(customDirectory, existingDynamicPromptsConfigs)
 
-			memoryFilePath := memoryPath(a.Name, dynamicConfig)
+			memoryIdxPath := memoryIndexPath(a.Name, dynamicConfig)
 			promptblocks := []agent.DynamicPrompt{}
 
 			for _, c := range a.DynamicPrompts {
@@ -137,7 +137,7 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 					}
 					promptblocks = append(promptblocks, prompt)
 				case DynamicPromptMemory:
-					_, memory, _ := actions.NewMemoryActions(memoryFilePath, dynamicConfig)
+					_, memory, _, _ := actions.NewMemoryActions(memoryIdxPath, dynamicConfig)
 
 					promptblocks = append(promptblocks,
 						prompts.NewMemoryPrompt(config, memory),
