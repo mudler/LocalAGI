@@ -66,10 +66,10 @@ type ToolInputSchema struct {
 	Required   []string               `json:"required,omitempty"`
 }
 
-func (a *Agent) addTools(client *mcp.ClientSession) (types.Actions, error) {
+func (a *Agent) addToolsWithContext(ctx context.Context, client *mcp.ClientSession) (types.Actions, error) {
 	var generatedActions types.Actions
 
-	tools, err := client.ListTools(a.context, nil)
+	tools, err := client.ListTools(ctx, nil)
 	if err != nil {
 		xlog.Error("Failed to list tools", "error", err.Error())
 		return nil, err
@@ -150,17 +150,25 @@ func (a *Agent) initMCPActions() error {
 	for _, mcpServer := range a.options.mcpServers {
 		// Create HTTP client with custom roundtripper for bearer token injection
 		httpclient := &http.Client{
-			Timeout:   360 * time.Second,
+			Timeout:   30 * time.Second, // Reduced from 360s to fail faster
 			Transport: newBearerTokenRoundTripper(mcpServer.Token, http.DefaultTransport),
 		}
 
+		// Add timeout context for connection attempts to prevent blocking
+		connectCtx, cancel := context.WithTimeout(a.context, 30*time.Second)
+		defer cancel()
+
 		streamableTransport := &mcp.StreamableClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
-		session, err := client.Connect(a.context, streamableTransport, nil)
+		session, err := client.Connect(connectCtx, streamableTransport, nil)
 		if err != nil {
 			xlog.Error("Failed to connect to MCP server via StreamableClientTransport", "server", mcpServer, "error", err.Error())
 
+			// Retry with SSE transport, but create a new timeout context
+			connectCtx2, cancel2 := context.WithTimeout(a.context, 30*time.Second)
+			defer cancel2()
+
 			sseTransport := &mcp.SSEClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
-			session, err = client.Connect(a.context, sseTransport, nil)
+			session, err = client.Connect(connectCtx2, sseTransport, nil)
 			if err != nil {
 				xlog.Error("Failed to connect to MCP server via SSEClientTransport", "server", mcpServer, "error", err.Error())
 				continue
@@ -169,7 +177,10 @@ func (a *Agent) initMCPActions() error {
 		a.mcpSessions = append(a.mcpSessions, session)
 
 		xlog.Debug("Adding tools for MCP server", "server", mcpServer)
-		actions, err := a.addTools(session)
+		// Add timeout for ListTools call
+		toolsCtx, cancel := context.WithTimeout(a.context, 10*time.Second)
+		defer cancel()
+		actions, err := a.addToolsWithContext(toolsCtx, session)
 		if err != nil {
 			xlog.Error("Failed to add tools for MCP server", "server", mcpServer, "error", err.Error())
 		}
@@ -193,8 +204,12 @@ func (a *Agent) initMCPActions() error {
 		command.Env = os.Environ()
 		command.Env = append(command.Env, mcpStdioServer.Env...)
 
+		// Add timeout context for connection attempts to prevent blocking
+		connectCtx, cancel := context.WithTimeout(a.context, 30*time.Second)
+		defer cancel()
+
 		// Create a new client
-		session, err := client.Connect(a.context, &mcp.CommandTransport{
+		session, err := client.Connect(connectCtx, &mcp.CommandTransport{
 			Command: command}, nil)
 		if err != nil {
 			xlog.Error("Failed to connect to MCP server", "server", mcpStdioServer, "error", err.Error())
@@ -203,7 +218,10 @@ func (a *Agent) initMCPActions() error {
 		a.mcpSessions = append(a.mcpSessions, session)
 
 		xlog.Debug("Adding tools for MCP server (stdio)", "server", mcpStdioServer)
-		actions, err := a.addTools(session)
+		// Add timeout for ListTools call
+		toolsCtx, cancel := context.WithTimeout(a.context, 10*time.Second)
+		defer cancel()
+		actions, err := a.addToolsWithContext(toolsCtx, session)
 		if err != nil {
 			xlog.Error("Failed to add tools for MCP server", "server", mcpStdioServer, "error", err.Error())
 		}
