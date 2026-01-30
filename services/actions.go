@@ -57,6 +57,7 @@ const (
 	ActionAddToMemory                    = "add_to_memory"
 	ActionListMemory                     = "list_memory"
 	ActionRemoveFromMemory               = "remove_from_memory"
+	ActionSearchMemory                   = "search_memory"
 	ActionPiKVMPowerControl              = "pikvm_power_control"
 	ActionWebhook                        = "webhook"
 )
@@ -105,6 +106,7 @@ var AvailableActions = []string{
 	ActionAddToMemory,
 	ActionListMemory,
 	ActionRemoveFromMemory,
+	ActionSearchMemory,
 	ActionPiKVMPowerControl,
 	ActionWebhook,
 }
@@ -144,6 +146,11 @@ var DefaultActions = []config.FieldGroup{
 		Name:   "remove_from_memory",
 		Label:  "Remove from Memory",
 		Fields: actions.RemoveFromMemoryConfigMeta(),
+	},
+	{
+		Name:   "search_memory",
+		Label:  "Search Memory",
+		Fields: actions.SearchMemoryConfigMeta(),
 	},
 	{
 		Name:   "github-issue-labeler",
@@ -400,7 +407,7 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		config = map[string]string{}
 	}
 
-	memoryFilePath := memoryPath(agentName, actionsConfigs)
+	memoryIdxPath := memoryIndexPath(agentName, actionsConfigs)
 
 	switch name {
 	case ActionCustom:
@@ -474,11 +481,13 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	case ActionRemoveReminder:
 		a = action.NewRemoveReminder()
 	case ActionAddToMemory:
-		a, _, _ = actions.NewMemoryActions(memoryFilePath, config)
+		a, _, _, _ = actions.NewMemoryActions(memoryIdxPath, config)
 	case ActionListMemory:
-		_, a, _ = actions.NewMemoryActions(memoryFilePath, config)
+		_, a, _, _ = actions.NewMemoryActions(memoryIdxPath, config)
 	case ActionRemoveFromMemory:
-		_, _, a = actions.NewMemoryActions(memoryFilePath, config)
+		_, _, a, _ = actions.NewMemoryActions(memoryIdxPath, config)
+	case ActionSearchMemory:
+		_, _, _, a = actions.NewMemoryActions(memoryIdxPath, config)
 	case ActionPiKVMPowerControl:
 		a = actions.NewPiKVMAction(config)
 	default:
