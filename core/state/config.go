@@ -67,7 +67,10 @@ type AgentConfig struct {
 	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
-	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
+	EnableKnowledgeBase    bool   `json:"enable_kb" form:"enable_kb"`
+	EnableKBCompaction     bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
+	KBCompactionInterval   string `json:"kb_compaction_interval" form:"kb_compaction_interval"`
+	KBCompactionSummarize  bool   `json:"kb_compaction_summarize" form:"kb_compaction_summarize"`
 	EnableReasoning       bool   `json:"enable_reasoning" form:"enable_reasoning"`
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
 	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
@@ -210,6 +213,31 @@ func NewAgentConfigMeta(
 				DefaultValue: 5,
 				Min:          1,
 				Step:         1,
+				Tags:         config.Tags{Section: "MemorySettings"},
+			},
+			{
+				Name:         "enable_kb_compaction",
+				Label:        "Enable KB Compaction",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Periodically group collection entries by date (daily/weekly/monthly), optionally summarize or concatenate, then store and remove originals",
+				Tags:         config.Tags{Section: "MemorySettings"},
+			},
+			{
+				Name:         "kb_compaction_interval",
+				Label:        "KB Compaction Interval",
+				Type:         "text",
+				DefaultValue: "daily",
+				Placeholder:  "daily, weekly, monthly",
+				HelpText:     "Compaction window: daily, weekly, or monthly",
+				Tags:         config.Tags{Section: "MemorySettings"},
+			},
+			{
+				Name:         "kb_compaction_summarize",
+				Label:        "KB Compaction Summarize",
+				Type:         "checkbox",
+				DefaultValue: true,
+				HelpText:     "When enabled, summarize grouped content via LLM; when disabled, store concatenated content only (no LLM call)",
 				Tags:         config.Tags{Section: "MemorySettings"},
 			},
 			{
