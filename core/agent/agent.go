@@ -270,7 +270,7 @@ func (a *Agent) Stop() {
 	a.Lock()
 	defer a.Unlock()
 	xlog.Debug("Stopping agent", "agent", a.Character.Name)
-	a.closeMCPSTDIOServers()
+	a.closeMCPServers()
 	a.context.Cancel()
 }
 
