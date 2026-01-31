@@ -102,13 +102,10 @@ func main() {
 		webui.WithStateDir(stateDir),
 	)
 
-	// Start the agents in a goroutine so HTTP server can start in parallel
-	// This prevents MCP server connection issues from blocking the web server
-	go func() {
-		if err := pool.StartAll(); err != nil {
-			log.Printf("Error starting agents: %v", err)
-		}
-	}()
+	// Start the agents
+	if err := pool.StartAll(); err != nil {
+		panic(err)
+	}
 
 	// Start the web server
 	log.Fatal(app.Listen(":3000"))
