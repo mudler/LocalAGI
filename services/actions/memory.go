@@ -6,12 +6,20 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
+)
+
+// indexCache avoids opening the same Bleve index path multiple times, which would
+// deadlock (Bleve uses file locks; a second Open() on the same path blocks).
+var (
+	indexCache   = map[string]bleve.Index{}
+	indexCacheMu sync.Mutex
 )
 
 type MemoryActions struct {
@@ -52,29 +60,47 @@ func NewMemoryActions(indexPath string, config map[string]string) (*AddToMemoryA
 }
 
 func openOrCreateBleveIndex(indexPath string) (bleve.Index, error) {
-	if _, err := os.Stat(indexPath); err == nil {
-		return bleve.Open(indexPath)
+	indexCacheMu.Lock()
+	if idx, ok := indexCache[indexPath]; ok {
+		indexCacheMu.Unlock()
+		return idx, nil
 	}
-	os.MkdirAll(filepath.Dir(indexPath), 0755)
-	mapping := bleve.NewIndexMapping()
-	entryMapping := bleve.NewDocumentMapping()
+	indexCacheMu.Unlock()
 
-	nameFieldMapping := bleve.NewTextFieldMapping()
-	nameFieldMapping.Analyzer = "standard"
-	nameFieldMapping.Store = true
-	entryMapping.AddFieldMappingsAt("name", nameFieldMapping)
+	var idx bleve.Index
+	var err error
+	if _, statErr := os.Stat(indexPath); statErr == nil {
+		idx, err = bleve.Open(indexPath)
+	} else {
+		os.MkdirAll(filepath.Dir(indexPath), 0755)
+		mapping := bleve.NewIndexMapping()
+		entryMapping := bleve.NewDocumentMapping()
 
-	contentFieldMapping := bleve.NewTextFieldMapping()
-	contentFieldMapping.Analyzer = "standard"
-	contentFieldMapping.Store = true
-	entryMapping.AddFieldMappingsAt("content", contentFieldMapping)
+		nameFieldMapping := bleve.NewTextFieldMapping()
+		nameFieldMapping.Analyzer = "standard"
+		nameFieldMapping.Store = true
+		entryMapping.AddFieldMappingsAt("name", nameFieldMapping)
 
-	dateFieldMapping := bleve.NewDateTimeFieldMapping()
-	dateFieldMapping.Store = true
-	entryMapping.AddFieldMappingsAt("created_at", dateFieldMapping)
+		contentFieldMapping := bleve.NewTextFieldMapping()
+		contentFieldMapping.Analyzer = "standard"
+		contentFieldMapping.Store = true
+		entryMapping.AddFieldMappingsAt("content", contentFieldMapping)
 
-	mapping.AddDocumentMapping("_default", entryMapping)
-	return bleve.New(indexPath, mapping)
+		dateFieldMapping := bleve.NewDateTimeFieldMapping()
+		dateFieldMapping.Store = true
+		entryMapping.AddFieldMappingsAt("created_at", dateFieldMapping)
+
+		mapping.AddDocumentMapping("_default", entryMapping)
+		idx, err = bleve.New(indexPath, mapping)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	indexCacheMu.Lock()
+	indexCache[indexPath] = idx
+	indexCacheMu.Unlock()
+	return idx, nil
 }
 
 func (m *MemoryActions) ensureIndex() error {
