@@ -85,6 +85,7 @@ func defaultOptions() *options {
 		periodicRuns:       15 * time.Minute,
 		maxEvaluationLoops: 2,
 		enableEvaluation:   false,
+		stripThinkingTags:  true,
 		LLMAPI: llmOptions{
 			APIURL:                "http://localhost:8080",
 			Model:                 "gpt-4",
