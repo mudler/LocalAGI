@@ -34,6 +34,7 @@ type options struct {
 	canStopItself         bool
 	initiateConversations bool
 	forceReasoning        bool
+	enableGuidedTools     bool
 	canPlan               bool
 	characterfile         string
 	statefile             string
@@ -118,6 +119,11 @@ var EnableHUD = func(o *options) error {
 
 var EnableForceReasoning = func(o *options) error {
 	o.forceReasoning = true
+	return nil
+}
+
+var EnableGuidedTools = func(o *options) error {
+	o.enableGuidedTools = true
 	return nil
 }
 

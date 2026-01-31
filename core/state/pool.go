@@ -571,6 +571,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		opts = append(opts, EnableForceReasoning)
 	}
 
+	if config.EnableGuidedTools {
+		opts = append(opts, EnableGuidedTools)
+	}
+
 	if config.StripThinkingTags {
 		opts = append(opts, EnableStripThinkingTags)
 	}
