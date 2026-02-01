@@ -344,7 +344,7 @@ func NewAgentConfigMeta(
 				Type:         "textarea",
 				DefaultValue: "",
 				HelpText:     "JSON configuration for MCP STDIO servers",
-				Tags:         config.Tags{Section: "AdvancedSettings"},
+				Tags:         config.Tags{Section: "MCP"},
 			},
 			{
 				Name:         "mcp_prepare_script",
@@ -352,7 +352,7 @@ func NewAgentConfigMeta(
 				Type:         "textarea",
 				DefaultValue: "",
 				HelpText:     "Script to prepare for running MCP servers",
-				Tags:         config.Tags{Section: "AdvancedSettings"},
+				Tags:         config.Tags{Section: "MCP"},
 			},
 			{
 				Name:         "strip_thinking_tags",

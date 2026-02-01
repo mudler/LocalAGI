@@ -87,8 +87,11 @@ services:
   dind:
     image: docker:dind
     privileged: true
+    command: ["dockerd", "-H", "tcp://0.0.0.0:2375", "-H", "unix:///var/run/docker.sock"]
     environment:
       - DOCKER_TLS_CERTDIR=""
+    expose:
+      - 2375
     healthcheck:
       test: ["CMD", "docker", "info"]
       interval: 10s

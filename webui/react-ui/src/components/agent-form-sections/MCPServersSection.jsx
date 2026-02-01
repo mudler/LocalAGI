@@ -8,8 +8,35 @@ const MCPServersSection = ({
   formData, 
   handleAddMCPServer, 
   handleRemoveMCPServer, 
-  handleMCPServerChange 
+  handleMCPServerChange,
+  handleInputChange,
+  metadata 
 }) => {
+  // Get MCP configuration fields from metadata (mcp_stdio_servers, mcp_prepare_script)
+  const mcpFields = metadata?.MCPSection || [];
+
+  // Handle MCP configuration field value changes (FormField passes the event)
+  const handleMCPFieldChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const field = mcpFields.find(f => f.name === name);
+    if (field && field.type === 'checkbox') {
+      handleInputChange({
+        target: {
+          name,
+          type: 'checkbox',
+          checked
+        }
+      });
+    } else {
+      handleInputChange({
+        target: {
+          name,
+          value
+        }
+      });
+    }
+  };
+
   // Define field definitions for each MCP server
   const getServerFields = () => [
     {
@@ -43,6 +70,18 @@ const MCPServersSection = ({
       <p className="section-description">
         Configure MCP servers for this agent.
       </p>
+
+      {mcpFields.length > 0 && (
+        <div className="mcp-config-fields mb-4">
+          <h4 className="subsection-title">MCP configuration</h4>
+          <FormFieldDefinition
+            fields={mcpFields}
+            values={formData}
+            onChange={handleMCPFieldChange}
+            idPrefix="mcp_"
+          />
+        </div>
+      )}
       
       <div className="mcp-servers-container">
         {formData.mcp_servers && formData.mcp_servers.map((server, index) => (
