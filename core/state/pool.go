@@ -453,7 +453,6 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		WithCharacterFile(characterFile),
 		WithLLMAPIKey(a.apiKey),
 		WithTimeout(a.timeout),
-		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)),
 		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
 			xlog.Info(
 				"Agent is thinking",
@@ -554,12 +553,26 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		}
 	}
 
+	var ragClient *localrag.WrappedClient
 	if config.EnableKnowledgeBase {
-		opts = append(opts, EnableKnowledgeBase)
+		ragClient = localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)
+		opts = append(opts, WithRAGDB(ragClient), EnableKnowledgeBase)
+		if config.EnableKBCompaction {
+			interval := config.KBCompactionInterval
+			if interval == "" {
+				interval = "daily"
+			}
+			summarize := config.KBCompactionSummarize
+			opts = append(opts, EnableKBCompaction, WithKBCompactionInterval(interval), WithKBCompactionSummarize(summarize))
+		}
 	}
 
 	if config.EnableReasoning {
 		opts = append(opts, EnableForceReasoning)
+	}
+
+	if config.EnableGuidedTools {
+		opts = append(opts, EnableGuidedTools)
 	}
 
 	if config.StripThinkingTags {
@@ -597,6 +610,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 			xlog.Error("Agent stopped", "error", err.Error(), "name", name)
 		}
 	}()
+
+	if config.EnableKnowledgeBase && config.EnableKBCompaction && ragClient != nil {
+		go runCompactionTicker(ctx, ragClient, config, a.apiURL, a.apiKey, model)
+	}
 
 	xlog.Info("Starting connectors", "name", name, "config", config)
 

@@ -8,8 +8,8 @@ services:
     image: localai/localai:master
     command: 
     - ${MODEL_NAME:-gemma-3-4b-it-qat}
-    - ${MULTIMODAL_MODEL:-moondream2-20250414}
-    - ${IMAGE_MODEL:-sd-1.5-ggml}
+    - ${MULTIMODAL_MODEL:-gemma-3-4b-it-qat}
+#    - ${IMAGE_MODEL:-sd-1.5-ggml}
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -22,9 +22,9 @@ services:
       - DEBUG=true
       #- LOCALAI_API_KEY=sk-1234567890
     volumes:
-      - ./volumes/models:/models
-      - ./volumes/backends:/backends
-      - ./volumes/images:/tmp/generated/images
+      - models:/models
+      - backends:/backends
+      - images:/tmp/generated/images
 
   localrecall-postgres:
     image: quay.io/mudler/localrecall:${LOCALRECALL_VERSION:-v0.5.2}-postgresql
@@ -61,7 +61,7 @@ services:
       - HYBRID_SEARCH_BM25_WEIGHT=0.5
       - HYBRID_SEARCH_VECTOR_WEIGHT=0.5
     volumes:
-      - ./volumes/localrag/assets/:/assets
+      - localrag_assets:/assets
 
   localrecall-healthcheck:
     depends_on:
@@ -124,7 +124,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./volumes/localagi/:/pool
+      - localagi_pool:/pool
 
 volumes:
   postgres_data:
+  models:
+  backends:
+  images:
+  localrag_assets:
+  localagi_pool:

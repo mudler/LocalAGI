@@ -11,6 +11,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +38,11 @@ func NewWrappedClient(baseURL, apiKey, c string) *WrappedClient {
 	wc.CreateCollection(collection)
 
 	return wc
+}
+
+// Collection returns the collection name for this client.
+func (c *WrappedClient) Collection() string {
+	return c.collection
 }
 
 func (c *WrappedClient) Count() int {
@@ -90,6 +96,11 @@ func (c *WrappedClient) Store(s string) error {
 	return c.Client.Store(c.collection, f)
 }
 
+// GetEntryContent returns the full file content (no chunk overlap) and the number of chunks for the entry.
+func (c *WrappedClient) GetEntryContent(entry string) (content string, chunkCount int, err error) {
+	return c.Client.GetEntryContent(c.collection, entry)
+}
+
 // apiResponse is the standardized LocalRecall API response wrapper (since 3f73ff3a).
 type apiResponse struct {
 	Success bool            `json:"success"`
@@ -127,6 +138,13 @@ type Result struct {
 	// The higher the value, the more similar the document is to the query.
 	// The value is in the range [-1, 1].
 	Similarity float32
+}
+
+// EntryChunk represents a single chunk (legacy; GetEntryContent now returns full file content).
+type EntryChunk struct {
+	ID       string            `json:"id"`
+	Content  string            `json:"content"`
+	Metadata map[string]string `json:"metadata"`
 }
 
 // Client is a client for the RAG API
@@ -270,6 +288,51 @@ func (c *Client) ListEntries(collection string) ([]string, error) {
 		return nil, err
 	}
 	return data.Entries, nil
+}
+
+// GetEntryContent returns the full file content (no chunk overlap) and the number of chunks for the entry.
+func (c *Client) GetEntryContent(collection, entry string) (content string, chunkCount int, err error) {
+	entryEscaped := url.PathEscape(entry)
+	reqURL := fmt.Sprintf("%s/api/collections/%s/entries/%s", c.BaseURL, collection, entryEscaped)
+
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", 0, err
+	}
+	c.addAuthHeader(req)
+
+	httpClient := &http.Client{}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", 0, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", 0, parseAPIError(resp, body, "failed to get entry content")
+	}
+
+	var wrap apiResponse
+	if err := json.Unmarshal(body, &wrap); err != nil || !wrap.Success {
+		if wrap.Error != nil {
+			return "", 0, errors.New(wrap.Error.Message)
+		}
+		return "", 0, fmt.Errorf("invalid response: %w", err)
+	}
+
+	var data struct {
+		Content    string `json:"content"`
+		ChunkCount int    `json:"chunk_count"`
+	}
+	if err := json.Unmarshal(wrap.Data, &data); err != nil {
+		return "", 0, err
+	}
+	return data.Content, data.ChunkCount, nil
 }
 
 // DeleteEntry deletes an entry in a collection

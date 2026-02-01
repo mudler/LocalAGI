@@ -270,7 +270,7 @@ func (a *Agent) Stop() {
 	a.Lock()
 	defer a.Unlock()
 	xlog.Debug("Stopping agent", "agent", a.Character.Name)
-	a.closeMCPSTDIOServers()
+	a.closeMCPServers()
 	a.context.Cancel()
 }
 
@@ -886,7 +886,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			conv = a.addFunctionResultToConversation(job.GetContext(), aa, types.ActionParams(t.ToolArguments.Arguments), types.ActionResult{Result: t.Result}, conv)
 		}),
 		cogito.WithToolCallBack(
-			func(tc *cogito.ToolChoice) bool {
+			func(tc *cogito.ToolChoice, _ *cogito.SessionState) cogito.ToolCallDecision {
 
 				xlog.Debug("Tool call back", "tool_call", tc)
 
@@ -899,7 +899,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
 					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, tc.Reasoning)
 					userTool = true
-					return false
+					return cogito.ToolCallDecision{
+						Approved: false,
+					}
 				}
 
 				if a.observer != nil && job.Obs != nil {
@@ -922,14 +924,18 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 				switch tc.Name {
 				case action.StopActionName:
-					return false
+					return cogito.ToolCallDecision{
+						Approved: false,
+					}
 				case action.ConversationActionName:
 					message := action.ConversationActionResponse{}
 					toolArgs, _ := json.Marshal(tc.Arguments)
 					if err := json.Unmarshal([]byte(toolArgs), &message); err != nil {
 						xlog.Error("Error unmarshalling conversation response", "error", err)
 						job.Result.Finish(fmt.Errorf("error unmarshalling conversation response: %w", err))
-						return false
+						return cogito.ToolCallDecision{
+							Approved: false,
+						}
 					}
 
 					msg := openai.ChatCompletionMessage{
@@ -947,7 +953,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					}
 					job.Result.SetResponse("decided to initiate a new conversation")
 					job.Result.Finish(nil)
-					return true
+					return cogito.ToolCallDecision{
+						Approved: true,
+					}
 				case action.StateActionName:
 					// We need to store the result in the state
 					state := types.AgentInternalState{}
@@ -961,7 +969,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 							}
 							a.observer.Update(*obs)
 						}
-						return false
+						return cogito.ToolCallDecision{
+							Approved: false,
+						}
 					}
 					// update the current state with the one we just got from the action
 					a.currentState = &state
@@ -982,7 +992,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 								a.observer.Update(*obs)
 							}
 
-							return false
+							return cogito.ToolCallDecision{
+								Approved: false,
+							}
 						}
 					}
 
@@ -1010,7 +1022,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					job.Result.Finish(nil)
 
 				}
-				return cont
+				return cogito.ToolCallDecision{
+					Approved: cont,
+				}
 			},
 		),
 	}
@@ -1024,6 +1038,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	if a.options.forceReasoning {
 		cogitoOpts = append(cogitoOpts, cogito.WithForceReasoning())
+	}
+
+	if a.options.enableGuidedTools {
+		cogitoOpts = append(cogitoOpts, cogito.EnableGuidedTools)
 	}
 
 	if a.options.maxEvaluationLoops > 0 {

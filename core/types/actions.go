@@ -102,7 +102,7 @@ func (c *cogitoWrapper) Tool() openai.Tool {
 	}
 }
 
-func (c *cogitoWrapper) Run(args map[string]any) (string, error) {
+func (c *cogitoWrapper) Execute(args map[string]any) (string, error) {
 	ctx := c.ctx
 	if ctx == nil {
 		ctx = context.Background()
@@ -187,8 +187,8 @@ func (a Actions) ToTools() []openai.Tool {
 	return tools
 }
 
-func (a Actions) ToCogitoTools(ctx context.Context, sharedState *AgentSharedState) []cogito.Tool {
-	tools := []cogito.Tool{}
+func (a Actions) ToCogitoTools(ctx context.Context, sharedState *AgentSharedState) []cogito.ToolDefinitionInterface {
+	tools := []cogito.ToolDefinitionInterface{}
 	for _, action := range a {
 		tools = append(tools, &cogitoWrapper{action: action, ctx: ctx, sharedState: sharedState})
 	}
