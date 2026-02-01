@@ -1266,6 +1266,16 @@ select.form-control {
   text-shadow: 0 0 5px rgba(94, 0, 255, 0.5);
 }
 
+/* Split MCP STDIO vs MCP HTTP blocks */
+.mcp-block {
+  margin-bottom: 1.5rem;
+}
+.mcp-http-block {
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  margin-top: 0.5rem;
+}
+
 .remove-btn {
   background: none;
   border: none;
