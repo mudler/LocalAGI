@@ -1184,6 +1184,15 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 			"is_reminder": true,
 		}
 
+		// Attach observable so UI can show reminder processing state
+		if a.observer != nil {
+			obs := a.observer.NewObservable()
+			obs.Name = "reminder"
+			obs.Icon = "bell"
+			a.observer.Update(*obs)
+			reminderJob.Obs = obs
+		}
+
 		// Process the reminder as a normal conversation
 		a.consumeJob(reminderJob, UserRole)
 
@@ -1228,6 +1237,16 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 		types.WithReasoningCallback(a.options.reasoningCallback),
 		types.WithResultCallback(a.options.resultCallback),
 	)
+
+	// Attach observable so UI can show standalone job progress (decisions, actions, reasoning)
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "standalone"
+		obs.Icon = "clock"
+		a.observer.Update(*obs)
+		whatNext.Obs = obs
+	}
+
 	a.consumeJob(whatNext, SystemRole)
 
 	xlog.Info("STOP -- Periodically run is done", "agent", a.Character.Name)
