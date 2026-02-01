@@ -25,6 +25,7 @@ type MCPServer struct {
 }
 
 type MCPSTDIOServer struct {
+	Name string   `json:"name,omitempty"`
 	Args []string `json:"args"`
 	Env  []string `json:"env"`
 	Cmd  string   `json:"cmd"`

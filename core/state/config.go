@@ -449,7 +449,7 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 			}
 
 			a.MCPSTDIOServers = make([]agent.MCPSTDIOServer, 0, len(mcpConfig.MCPServers))
-			for _, server := range mcpConfig.MCPServers {
+			for name, server := range mcpConfig.MCPServers {
 				// Convert env map to slice of "KEY=VALUE" strings
 				envSlice := make([]string, 0, len(server.Env))
 				for k, v := range server.Env {
@@ -457,6 +457,7 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 				}
 
 				a.MCPSTDIOServers = append(a.MCPSTDIOServers, agent.MCPSTDIOServer{
+					Name: name,
 					Cmd:  server.Command,
 					Args: server.Args,
 					Env:  envSlice,
@@ -471,6 +472,7 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 					return fmt.Errorf("invalid server configuration format")
 				}
 
+				name, _ := serverMap["name"].(string)
 				cmd, _ := serverMap["cmd"].(string)
 				args := make([]string, 0)
 				if argsInterface, ok := serverMap["args"].([]interface{}); ok {
@@ -491,6 +493,7 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 				}
 
 				a.MCPSTDIOServers = append(a.MCPSTDIOServers, agent.MCPSTDIOServer{
+					Name: name,
 					Cmd:  cmd,
 					Args: args,
 					Env:  env,
@@ -539,7 +542,11 @@ func (a *AgentConfig) MarshalJSON() ([]byte, error) {
 				}
 			}
 
-			mcpConfig.MCPServers[fmt.Sprintf("server%d", i)] = struct {
+			key := server.Name
+			if key == "" {
+				key = fmt.Sprintf("server%d", i)
+			}
+			mcpConfig.MCPServers[key] = struct {
 				Command string            `json:"command"`
 				Args    []string          `json:"args"`
 				Env     map[string]string `json:"env"`
