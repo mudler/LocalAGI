@@ -18,7 +18,7 @@ Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-b
 
 Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
 
-**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. A complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
+**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. Create Agents with a couple of clicks, connect via MCP and give it skills with [skillserver](https://github.com/mudler/skillserver). Every agent exposes a complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
 
 ## 🛡️ Take Back Your Privacy
 
