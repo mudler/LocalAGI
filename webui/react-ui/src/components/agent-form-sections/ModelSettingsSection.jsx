@@ -13,15 +13,16 @@ const ModelSettingsSection = ({ formData, handleInputChange, metadata }) => {
   // Get fields from metadata
   const fields = metadata?.ModelSettingsSection || [];
 
-  // Handle field value changes
-  const handleFieldChange = (name, value) => {
+  // Handle field value changes (FormField passes the event)
+  const handleFieldChange = (e) => {
+    const { name, value, type, checked } = e.target;
     const field = fields.find(f => f.name === name);
     if (field && field.type === 'checkbox') {
       handleInputChange({
         target: {
           name,
           type: 'checkbox',
-          checked: value === 'true'
+          checked
         }
       });
     } else {
