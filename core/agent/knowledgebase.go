@@ -13,9 +13,14 @@ import (
 )
 
 func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
-	if (!a.options.enableKB && !a.options.enableLongTermMemory && !a.options.enableSummaryMemory) ||
-		len(conv) <= 0 {
+	// Only run KB recall/lookup when KB is explicitly enabled; long-term/summary memory
+	// only affect saving in saveConversation, not this lookup.
+	if !a.options.enableKB || len(conv) <= 0 {
 		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
+		return conv
+	}
+	if a.options.ragdb == nil {
+		xlog.Debug("[Knowledge Base Lookup] No RAG DB configured, skipping", "agent", a.Character.Name)
 		return conv
 	}
 
