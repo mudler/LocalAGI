@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -535,6 +536,30 @@ func sendAudioToTelegram(ctx context.Context, b *bot.Bot, chatID int64, audioDat
 	return nil
 }
 
+// sendSongToTelegram reads a song file from path and sends it to Telegram as audio.
+func sendSongToTelegram(ctx context.Context, b *bot.Bot, chatID int64, path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("error reading song file: %w", err)
+	}
+	filename := filepath.Base(path)
+	if filename == "" || filename == "." {
+		filename = "audio"
+	}
+	_, err = b.SendAudio(ctx, &bot.SendAudioParams{
+		ChatID: chatID,
+		Audio: &models.InputFileUpload{
+			Filename: filename,
+			Data:     bytes.NewReader(data),
+		},
+		Caption: "Generated song",
+	})
+	if err != nil {
+		return fmt.Errorf("error sending audio: %w", err)
+	}
+	return nil
+}
+
 // handleMultimediaContent processes and sends multimedia content from the agent's response
 func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, res *types.JobResult) ([]string, error) {
 	var urls []string
@@ -551,6 +576,16 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 				xlog.Debug("Sending photo", "url", url)
 				if err := sendImageToTelegram(ctx, t.bot, chatID, url); err != nil {
 					xlog.Error("Error handling image", "error", err)
+				}
+			}
+		}
+
+		// Handle songs from generate_song action (local file paths)
+		if songPaths, exists := state.Metadata[actions.MetadataSongs]; exists {
+			for _, path := range xstrings.UniqueSlice(songPaths.([]string)) {
+				xlog.Debug("Sending song", "path", path)
+				if err := sendSongToTelegram(ctx, t.bot, chatID, path); err != nil {
+					xlog.Error("Error sending song", "error", err)
 				}
 			}
 		}

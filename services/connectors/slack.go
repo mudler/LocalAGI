@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -202,6 +203,32 @@ func generateAttachmentsFromJobResponse(j *types.JobResult, api *slack.Client, c
 					ImageURL:  url,
 				}
 				attachments = append(attachments, attachment)
+			}
+		}
+
+		// coming from the generate_song action (local file paths)
+		if songPaths, exists := state.Metadata[actions.MetadataSongs]; exists {
+			for _, path := range xstrings.UniqueSlice(songPaths.([]string)) {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					xlog.Error(fmt.Sprintf("Error reading song file %s: %v", path, err))
+					continue
+				}
+				filename := filepath.Base(path)
+				if filename == "" || filename == "." {
+					filename = "audio"
+				}
+				_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+					Reader:           bytes.NewReader(data),
+					FileSize:         len(data),
+					ThreadTimestamp: ts,
+					Channel:          channelID,
+					Filename:         filename,
+					InitialComment:  "Generated song",
+				})
+				if err != nil {
+					xlog.Error(fmt.Sprintf("Error uploading song to Slack: %v", err))
+				}
 			}
 		}
 	}
