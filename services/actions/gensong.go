@@ -164,7 +164,7 @@ func (a *GenSongAction) Run(ctx context.Context, sharedState *types.AgentSharedS
 		return types.ActionResult{}, err
 	}
 
-	url := a.apiURL + "/sound"
+	url := a.apiURL + "/v1/sound-generation"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return types.ActionResult{}, err
