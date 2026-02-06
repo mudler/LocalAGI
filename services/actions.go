@@ -22,8 +22,6 @@ const (
 	// Actions
 	ActionSearch                         = "search"
 	ActionCustom                         = "custom"
-	ActionBrowserAgentRunner             = "browser-agent-runner"
-	ActionDeepResearchRunner             = "deep-research-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
 	ActionGithubIssueOpener              = "github-issue-opener"
 	ActionGithubIssueEditor              = "github-issue-editor"
@@ -81,8 +79,6 @@ var AvailableActions = []string{
 	ActionGithubGetAllContent,
 	ActionGithubRepositorySearchFiles,
 	ActionGithubRepositoryListFiles,
-	ActionBrowserAgentRunner,
-	ActionDeepResearchRunner,
 	ActionGithubRepositoryCreateOrUpdate,
 	ActionGithubIssueReader,
 	ActionGithubIssueCommenter,
@@ -118,16 +114,6 @@ var DefaultActions = []config.FieldGroup{
 		Name:   "search",
 		Label:  "Search",
 		Fields: actions.SearchConfigMeta(),
-	},
-	{
-		Name:   "browser-agent-runner",
-		Label:  "Browser Agent Runner",
-		Fields: actions.BrowserAgentRunnerConfigMeta(),
-	},
-	{
-		Name:   "deep-research-runner",
-		Label:  "Deep Research Runner",
-		Fields: actions.DeepResearchRunnerConfigMeta(),
 	},
 	{
 		Name:   "generate_image",
@@ -322,11 +308,9 @@ var DefaultActions = []config.FieldGroup{
 }
 
 const (
-	ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
-	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
-	ActionConfigSSHBoxURL          = "sshbox-url"
-	ConfigStateDir                 = "state-dir"
-	CustomActionsDir               = "custom-actions-dir"
+	ActionConfigSSHBoxURL = "sshbox-url"
+	ConfigStateDir        = "state-dir"
+	CustomActionsDir      = "custom-actions-dir"
 )
 
 func customActions(customActionsDir string, existingActionConfigs map[string]map[string]string) (allActions []types.Action) {
@@ -435,10 +419,6 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubIssueCloser(config)
 	case ActionGithubIssueSearcher:
 		a = actions.NewGithubIssueSearch(config)
-	case ActionBrowserAgentRunner:
-		a = actions.NewBrowserAgentRunner(config, actionsConfigs[ActionConfigBrowserAgentRunner])
-	case ActionDeepResearchRunner:
-		a = actions.NewDeepResearchRunner(config, actionsConfigs[ActionConfigDeepResearchRunner])
 	case ActionGithubIssueReader:
 		a = actions.NewGithubIssueReader(config)
 	case ActionGithubPRReader:
