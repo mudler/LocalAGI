@@ -565,6 +565,24 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 			summarize := config.KBCompactionSummarize
 			opts = append(opts, EnableKBCompaction, WithKBCompactionInterval(interval), WithKBCompactionSummarize(summarize))
 		}
+		// Set KB auto search option (defaults to true for backward compatibility)
+		// For backward compatibility: if both new KB fields are false (zero values),
+		// assume this is an old config and default KBAutoSearch to true
+		kbAutoSearch := config.KBAutoSearch
+		if !config.KBAutoSearch && !config.KBAsTools {
+			// Both new fields are false, likely an old config - default to true for backward compatibility
+			kbAutoSearch = true
+		}
+		opts = append(opts, WithKBAutoSearch(kbAutoSearch))
+		// Inject KB wrapper actions if enabled
+		if config.KBAsTools && ragClient != nil {
+			kbResults := config.KnowledgeBaseResults
+			if kbResults <= 0 {
+				kbResults = 5 // Default
+			}
+			searchAction, addAction := NewKBWrapperActions(ragClient, kbResults)
+			actions = append(actions, searchAction, addAction)
+		}
 	}
 
 	if config.EnableReasoning {
