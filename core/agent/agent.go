@@ -871,6 +871,18 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				a.observer.Update(*obs)
 			}
 
+			// Use full ActionResult (including Metadata) from shared state when available,
+			// so connectors receive e.g. songs_paths, images_url for sending files.
+			actionResult := &types.ActionResult{
+				Result: t.Result,
+			}
+			if t.ResultData != nil {
+				switch res := t.ResultData.(type) {
+				case types.ActionResult:
+					actionResult = &res
+				}
+			}
+
 			aa := allActions.Find(t.Name)
 			state := types.ActionState{
 				ActionCurrentState: types.ActionCurrentState{
@@ -879,11 +891,11 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					Params:    types.ActionParams(t.ToolArguments.Arguments),
 					Reasoning: t.ToolArguments.Reasoning,
 				},
-				ActionResult: types.ActionResult{Result: t.Result},
+				ActionResult: *actionResult,
 			}
 			job.Result.SetResult(state)
 			job.CallbackWithResult(state)
-			conv = a.addFunctionResultToConversation(job.GetContext(), aa, types.ActionParams(t.ToolArguments.Arguments), types.ActionResult{Result: t.Result}, conv)
+			conv = a.addFunctionResultToConversation(job.GetContext(), aa, types.ActionParams(t.ToolArguments.Arguments), *actionResult, conv)
 		}),
 		cogito.WithToolCallBack(
 			func(tc *cogito.ToolChoice, _ *cogito.SessionState) cogito.ToolCallDecision {

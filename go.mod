@@ -13,7 +13,7 @@ require (
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
 	github.com/modelcontextprotocol/go-sdk v1.1.0
-	github.com/mudler/cogito v0.8.1
+	github.com/mudler/cogito v0.8.2-0.20260206153401-a5346975d42b
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
 	github.com/philippgille/chromem-go v0.7.0

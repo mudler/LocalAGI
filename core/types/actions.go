@@ -102,16 +102,17 @@ func (c *cogitoWrapper) Tool() openai.Tool {
 	}
 }
 
-func (c *cogitoWrapper) Execute(args map[string]any) (string, error) {
+func (c *cogitoWrapper) Execute(args map[string]any) (string, any, error) {
 	ctx := c.ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	result, err := c.action.Run(ctx, c.sharedState, ActionParams(args))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return result.Result, nil
+
+	return result.Result, result, nil
 }
 
 // Actions is something the agent can do
