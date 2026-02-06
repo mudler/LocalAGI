@@ -25,7 +25,6 @@ var withLogs = os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
 var apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
 var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
 var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
-var localOperatorBaseURL = os.Getenv("LOCALOPERATOR_BASE_URL")
 var customActionsDir = os.Getenv("LOCALAGI_CUSTOM_ACTIONS_DIR")
 var sshBoxURL = os.Getenv("LOCALAGI_SSHBOX_URL")
 
@@ -71,11 +70,9 @@ func main() {
 		stateDir,
 		localRAG,
 		services.Actions(map[string]string{
-			services.ActionConfigBrowserAgentRunner: localOperatorBaseURL,
-			services.ActionConfigDeepResearchRunner: localOperatorBaseURL,
-			services.ActionConfigSSHBoxURL:          sshBoxURL,
-			services.ConfigStateDir:                 stateDir,
-			services.CustomActionsDir:               customActionsDir,
+			services.ActionConfigSSHBoxURL: sshBoxURL,
+			services.ConfigStateDir:        stateDir,
+			services.CustomActionsDir:      customActionsDir,
 		}),
 		services.Connectors,
 		services.DynamicPrompts(map[string]string{
