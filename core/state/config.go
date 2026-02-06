@@ -67,10 +67,12 @@ type AgentConfig struct {
 	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
-	EnableKnowledgeBase    bool   `json:"enable_kb" form:"enable_kb"`
-	EnableKBCompaction     bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
-	KBCompactionInterval   string `json:"kb_compaction_interval" form:"kb_compaction_interval"`
-	KBCompactionSummarize  bool   `json:"kb_compaction_summarize" form:"kb_compaction_summarize"`
+	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
+	EnableKBCompaction    bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
+	KBCompactionInterval  string `json:"kb_compaction_interval" form:"kb_compaction_interval"`
+	KBCompactionSummarize bool   `json:"kb_compaction_summarize" form:"kb_compaction_summarize"`
+	KBAutoSearch          bool   `json:"kb_auto_search" form:"kb_auto_search"`
+	KBAsTools             bool   `json:"kb_as_tools" form:"kb_as_tools"`
 	EnableReasoning       bool   `json:"enable_reasoning" form:"enable_reasoning"`
 	EnableGuidedTools     bool   `json:"enable_guided_tools" form:"enable_guided_tools"`
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
@@ -253,6 +255,22 @@ func NewAgentConfigMeta(
 				Label:        "Summary Long Term Memory",
 				Type:         "checkbox",
 				DefaultValue: false,
+				Tags:         config.Tags{Section: "MemorySettings"},
+			},
+			{
+				Name:         "kb_auto_search",
+				Label:        "KB Auto Search",
+				Type:         "checkbox",
+				DefaultValue: true,
+				HelpText:     "Automatically search knowledge base when a user message is received",
+				Tags:         config.Tags{Section: "MemorySettings"},
+			},
+			{
+				Name:         "kb_as_tools",
+				Label:        "KB As Tools",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Inject knowledge base search and add actions as tools, allowing the agent to access its memory without manual configuration",
 				Tags:         config.Tags{Section: "MemorySettings"},
 			},
 			{

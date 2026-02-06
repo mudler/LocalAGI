@@ -30,6 +30,7 @@ type options struct {
 	jobFilters                                                                                   types.JobFilters
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
 	stripThinkingTags                                                                            bool
+	kbAutoSearch                                                                                  bool
 
 	canStopItself         bool
 	initiateConversations bool
@@ -85,6 +86,7 @@ func defaultOptions() *options {
 		periodicRuns:       15 * time.Minute,
 		maxEvaluationLoops: 2,
 		enableEvaluation:   false,
+		kbAutoSearch:       true, // Default to true to maintain backward compatibility
 		LLMAPI: llmOptions{
 			APIURL:                "http://localhost:8080",
 			Model:                 "gpt-4",
@@ -470,6 +472,13 @@ func WithTranscriptionLanguage(language string) Option {
 func WithTTSModel(model string) Option {
 	return func(o *options) error {
 		o.LLMAPI.TTSModel = model
+		return nil
+	}
+}
+
+func WithKBAutoSearch(enabled bool) Option {
+	return func(o *options) error {
+		o.kbAutoSearch = enabled
 		return nil
 	}
 }

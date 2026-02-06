@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/mudler/cogito"
 	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
+	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
 func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
@@ -17,6 +19,10 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 	// only affect saving in saveConversation, not this lookup.
 	if !a.options.enableKB || len(conv) <= 0 {
 		xlog.Debug("[Knowledge Base Lookup] Disabled, skipping", "agent", a.Character.Name)
+		return conv
+	}
+	if !a.options.kbAutoSearch {
+		xlog.Debug("[Knowledge Base Lookup] Auto search disabled, skipping", "agent", a.Character.Name)
 		return conv
 	}
 	if a.options.ragdb == nil {
@@ -149,5 +155,126 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 				}
 			}
 		}
+	}
+}
+
+// KBWrapperActions wraps RAGDB functionality as actions
+type KBWrapperActions struct {
+	ragdb     RAGDB
+	kbResults int
+}
+
+type SearchKnowledgeBaseAction struct {
+	*KBWrapperActions
+}
+
+type AddToKnowledgeBaseAction struct {
+	*KBWrapperActions
+}
+
+// NewKBWrapperActions creates factory functions for KB wrapper actions
+func NewKBWrapperActions(ragdb RAGDB, kbResults int) (*SearchKnowledgeBaseAction, *AddToKnowledgeBaseAction) {
+	wrapper := &KBWrapperActions{
+		ragdb:     ragdb,
+		kbResults: kbResults,
+	}
+	return &SearchKnowledgeBaseAction{wrapper}, &AddToKnowledgeBaseAction{wrapper}
+}
+
+func (a *SearchKnowledgeBaseAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	if a.ragdb == nil {
+		return types.ActionResult{}, fmt.Errorf("knowledge base is not configured")
+	}
+
+	var req struct {
+		Query string `json:"query"`
+	}
+	if err := params.Unmarshal(&req); err != nil {
+		return types.ActionResult{}, fmt.Errorf("invalid parameters: %w", err)
+	}
+
+	if req.Query == "" {
+		return types.ActionResult{}, fmt.Errorf("query cannot be empty")
+	}
+
+	results, err := a.ragdb.Search(req.Query, a.kbResults)
+	if err != nil {
+		return types.ActionResult{}, fmt.Errorf("failed to search knowledge base: %w", err)
+	}
+
+	if len(results) == 0 {
+		return types.ActionResult{
+			Result: fmt.Sprintf("No results found for query: %q", req.Query),
+		}, nil
+	}
+
+	formatResults := ""
+	for i, r := range results {
+		formatResults += fmt.Sprintf("%d. %s\n", i+1, r)
+	}
+
+	return types.ActionResult{
+		Result: fmt.Sprintf("Found %d result(s) for query %q:\n%s", len(results), req.Query, formatResults),
+		Metadata: map[string]interface{}{
+			"query":   req.Query,
+			"results": results,
+			"count":   len(results),
+		},
+	}, nil
+}
+
+func (a *SearchKnowledgeBaseAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName("search_knowledge_base"),
+		Description: "Search the knowledge base for relevant information using a query string",
+		Properties: map[string]jsonschema.Definition{
+			"query": {
+				Type:        jsonschema.String,
+				Description: "The search query to find relevant information in the knowledge base",
+			},
+		},
+		Required: []string{"query"},
+	}
+}
+
+func (a *AddToKnowledgeBaseAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	if a.ragdb == nil {
+		return types.ActionResult{}, fmt.Errorf("knowledge base is not configured")
+	}
+
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := params.Unmarshal(&req); err != nil {
+		return types.ActionResult{}, fmt.Errorf("invalid parameters: %w", err)
+	}
+
+	if req.Content == "" {
+		return types.ActionResult{}, fmt.Errorf("content cannot be empty")
+	}
+
+	if err := a.ragdb.Store(req.Content); err != nil {
+		return types.ActionResult{}, fmt.Errorf("failed to store content in knowledge base: %w", err)
+	}
+
+	return types.ActionResult{
+		Result: "Successfully added content to knowledge base",
+		Metadata: map[string]interface{}{
+			"content": req.Content,
+		},
+	}, nil
+}
+
+func (a *AddToKnowledgeBaseAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName("add_to_knowledge_base"),
+		Description: "Add new content to the knowledge base for future retrieval",
+		Properties: map[string]jsonschema.Definition{
+			"content": {
+				Type:        jsonschema.String,
+				Description: "The content to store in the knowledge base",
+			},
+		},
+		Required: []string{"content"},
 	}
 }
