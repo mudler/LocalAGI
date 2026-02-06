@@ -581,7 +581,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 				kbResults = 5 // Default
 			}
 			searchAction, addAction := NewKBWrapperActions(ragClient, kbResults)
-			actions = append(actions, searchAction, addAction)
+			opts = append(opts, WithActions(searchAction, addAction))
 		}
 	}
 
