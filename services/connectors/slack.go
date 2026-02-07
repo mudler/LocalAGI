@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/localoperator"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
 	"github.com/mudler/xlog"
@@ -153,34 +152,34 @@ func replaceUserIDsWithNamesInMessage(api *slack.Client, message string) string 
 func generateAttachmentsFromJobResponse(j *types.JobResult, api *slack.Client, channelID, ts string) (attachments []slack.Attachment) {
 	for _, state := range j.State {
 		// coming from the browser agent
-		if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
-			if historyStruct, ok := history.(*localoperator.StateHistory); ok {
-				state := historyStruct.States[len(historyStruct.States)-1]
-				// Decode base64 screenshot and upload to Slack
-				if state.Screenshot != "" {
-					screenshotData, err := base64.StdEncoding.DecodeString(state.Screenshot)
-					if err != nil {
-						xlog.Error(fmt.Sprintf("Error decoding screenshot: %v", err))
-						continue
-					}
+		// if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
+		// 	if historyStruct, ok := history.(*localoperator.StateHistory); ok {
+		// 		state := historyStruct.States[len(historyStruct.States)-1]
+		// 		// Decode base64 screenshot and upload to Slack
+		// 		if state.Screenshot != "" {
+		// 			screenshotData, err := base64.StdEncoding.DecodeString(state.Screenshot)
+		// 			if err != nil {
+		// 				xlog.Error(fmt.Sprintf("Error decoding screenshot: %v", err))
+		// 				continue
+		// 			}
 
-					data := string(screenshotData)
-					// Upload the file to Slack
-					_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
-						Reader:          bytes.NewReader(screenshotData),
-						FileSize:        len(data),
-						ThreadTimestamp: ts,
-						Channel:         channelID,
-						Filename:        "screenshot.png",
-						InitialComment:  "Browser Agent Screenshot",
-					})
-					if err != nil {
-						xlog.Error(fmt.Sprintf("Error uploading screenshot: %v", err))
-						continue
-					}
-				}
-			}
-		}
+		// 			data := string(screenshotData)
+		// 			// Upload the file to Slack
+		// 			_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+		// 				Reader:          bytes.NewReader(screenshotData),
+		// 				FileSize:        len(data),
+		// 				ThreadTimestamp: ts,
+		// 				Channel:         channelID,
+		// 				Filename:        "screenshot.png",
+		// 				InitialComment:  "Browser Agent Screenshot",
+		// 			})
+		// 			if err != nil {
+		// 				xlog.Error(fmt.Sprintf("Error uploading screenshot: %v", err))
+		// 				continue
+		// 			}
+		// 		}
+		// 	}
+		// }
 
 		// coming from the search action
 		if urls, exists := state.Metadata[actions.MetadataUrls]; exists {
@@ -219,11 +218,11 @@ func generateAttachmentsFromJobResponse(j *types.JobResult, api *slack.Client, c
 					filename = "audio"
 				}
 				_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
-					Reader:           bytes.NewReader(data),
-					FileSize:         len(data),
+					Reader:          bytes.NewReader(data),
+					FileSize:        len(data),
 					ThreadTimestamp: ts,
-					Channel:          channelID,
-					Filename:         filename,
+					Channel:         channelID,
+					Filename:        filename,
 					InitialComment:  "Generated song",
 				})
 				if err != nil {

@@ -21,7 +21,6 @@ import (
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/localoperator"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
 	"github.com/mudler/xlog"
@@ -591,32 +590,32 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 		}
 
 		// Handle browser agent screenshots
-		if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
-			if historyStruct, ok := history.(*localoperator.StateHistory); ok {
-				state := historyStruct.States[len(historyStruct.States)-1]
-				if state.Screenshot != "" {
-					// Decode base64 screenshot
-					screenshotData, err := base64.StdEncoding.DecodeString(state.Screenshot)
-					if err != nil {
-						xlog.Error("Error decoding screenshot", "error", err)
-						continue
-					}
+		// if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
+		// 	if historyStruct, ok := history.(*localoperator.StateHistory); ok {
+		// 		state := historyStruct.States[len(historyStruct.States)-1]
+		// 		if state.Screenshot != "" {
+		// 			// Decode base64 screenshot
+		// 			screenshotData, err := base64.StdEncoding.DecodeString(state.Screenshot)
+		// 			if err != nil {
+		// 				xlog.Error("Error decoding screenshot", "error", err)
+		// 				continue
+		// 			}
 
-					// Send screenshot with caption
-					_, err = t.bot.SendPhoto(ctx, &bot.SendPhotoParams{
-						ChatID: chatID,
-						Photo: &models.InputFileUpload{
-							Filename: "screenshot.png",
-							Data:     bytes.NewReader(screenshotData),
-						},
-						Caption: "Browser Agent Screenshot",
-					})
-					if err != nil {
-						xlog.Error("Error sending screenshot", "error", err)
-					}
-				}
-			}
-		}
+		// 			// Send screenshot with caption
+		// 			_, err = t.bot.SendPhoto(ctx, &bot.SendPhotoParams{
+		// 				ChatID: chatID,
+		// 				Photo: &models.InputFileUpload{
+		// 					Filename: "screenshot.png",
+		// 					Data:     bytes.NewReader(screenshotData),
+		// 				},
+		// 				Caption: "Browser Agent Screenshot",
+		// 			})
+		// 			if err != nil {
+		// 				xlog.Error("Error sending screenshot", "error", err)
+		// 			}
+		// 		}
+		// 	}
+		// }
 	}
 
 	return urls, nil
