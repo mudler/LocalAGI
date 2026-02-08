@@ -1,104 +1,95 @@
-# Task Scheduler
+# Task Scheduler - Integrated with LocalAGI Reminder System
 
-A comprehensive task scheduling system for LocalAGI, enabling agents to execute tasks on cron schedules, intervals, or one-time execution.
+A comprehensive task scheduling system integrated into LocalAGI's existing reminder functionality, enabling agents to execute tasks on cron schedules, intervals, or one-time execution.
 
-## Features
+## Overview
 
-- ✅ **Multiple Schedule Types**:
-  - **Cron**: Use standard cron expressions with seconds (e.g., `0 0 0 * * *` for daily at midnight)
-  - **Interval**: Execute tasks at fixed intervals in milliseconds (e.g., `300000` for every 5 minutes)
-  - **Once**: Execute tasks at a specific time (ISO 8601 timestamp)
+The task scheduler is automatically initialized when an agent is created and manages all reminder functionality. It provides:
 
-- ✅ **JSON Storage**: Simple file-based persistence with thread-safe operations
-- ✅ **Task Management**: Create, update, pause, resume, delete tasks
-- ✅ **Execution Logging**: Track task runs with duration, status, and results
-- ✅ **Interface-Based Design**: Easy to extend with different storage backends
+- **Persistent Storage**: Reminders survive agent restarts (stored in JSON)
+- **Multiple Schedule Types**: Cron, interval, and once schedules
+- **Execution History**: Full tracking of task runs with duration and status
+- **Interface-Based Design**: Easy to extend with different storage backends
 
-## Installation
+## Integration
 
-The scheduler is part of the LocalAGI core package. Import it in your Go code:
+The scheduler is transparently integrated into LocalAGI's reminder system:
 
-```go
-import "github.com/mudler/LocalAGI/core/scheduler"
+1. **Automatic Initialization**: Created when agent starts
+2. **Existing Actions**: `set_reminder`, `list_reminders`, `remove_reminder` use the scheduler
+3. **Backward Compatible**: Falls back to in-memory storage if needed
+4. **Persistent**: Tasks stored in `data/scheduled_tasks.json` by default
+
+## How to Use (Agent Actions)
+
+### Setting Reminders
+
+Agents can set reminders using the `set_reminder` action:
+
+```python
+# Through agent conversation
+User: "Remind me to check emails every 5 minutes"
+Agent: *uses set_reminder action*
+  {
+    "message": "check emails",
+    "cron_expr": "0 */5 * * * *",  # Every 5 minutes
+    "is_recurring": true
+  }
 ```
 
-## Quick Start
+### Listing Reminders
 
-### 1. Create a Store
-
-```go
-store, err := scheduler.NewJSONStore("data/scheduled_tasks.json")
-if err != nil {
-    log.Fatal(err)
-}
-defer store.Close()
+```python
+User: "What reminders do I have?"
+Agent: *uses list_reminders action*
+# Returns:
+# 1. check emails (Next run: 2026-02-08T10:00:00Z, Status: recurring, ID: abc-123)
+# 2. meeting reminder (Next run: 2026-02-08T14:00:00Z, Status: one-time, ID: def-456)
 ```
 
-### 2. Implement AgentExecutor
+### Removing Reminders
 
-```go
-type MyAgentExecutor struct {
-    // Your agent execution logic
-}
-
-func (e *MyAgentExecutor) Execute(ctx context.Context, agentName string, prompt string) (*scheduler.JobResult, error) {
-    // Execute the agent with the given prompt
-    // Return the result
-    return &scheduler.JobResult{
-        Response: "Task completed",
-        Error:    nil,
-    }, nil
-}
+```python
+User: "Remove the first reminder"
+Agent: *uses remove_reminder action with index: 1*
+# Removes: "check emails" reminder
 ```
 
-### 3. Create and Start Scheduler
+## Programmatic Usage (Go)
+
+For direct programmatic access to the scheduler (advanced use):
 
 ```go
-executor := &MyAgentExecutor{}
+import (
+    "github.com/mudler/LocalAGI/core/agent"
+    "github.com/mudler/LocalAGI/core/scheduler"
+)
+
+// Create agent with custom scheduler path
+agent, err := agent.New(
+    agent.WithSchedulerStorePath("custom/path/tasks.json"),
+    // ... other options
+)
+
+// Access scheduler through agent
+// (scheduler is started automatically when agent.Run() is called)
+```
+
+### Manual Scheduler Usage
+
+If you need direct control (not typical):
+
+#### Create and Start Scheduler
+
+```go
+store, _ := scheduler.NewJSONStore("tasks.json")
+executor := &MyExecutor{}
 sched := scheduler.NewScheduler(store, executor, time.Minute)
 sched.Start()
 defer sched.Stop()
 ```
 
-### 4. Create Tasks
-
-#### Cron Task (Daily at midnight)
-```go
-task, err := scheduler.NewTask(
-    "my-agent",
-    "Check for new emails and summarize",
-    scheduler.ScheduleTypeCron,
-    "0 0 0 * * *", // 6 fields: second minute hour day month day-of-week
-)
-if err != nil {
-    log.Fatal(err)
-}
-sched.CreateTask(task)
-```
-
-#### Interval Task (Every 5 minutes)
-```go
-intervalTask, err := scheduler.NewTask(
-    "monitor-agent",
-    "Monitor system health",
-    scheduler.ScheduleTypeInterval,
-    "300000", // 300,000 milliseconds = 5 minutes
-)
-sched.CreateTask(intervalTask)
-```
-
-#### One-Time Task
-```go
-oneTimeTask, err := scheduler.NewTask(
-    "reminder-agent",
-    "Send meeting reminder",
-    scheduler.ScheduleTypeOnce,
-    "2026-12-25T09:00:00Z", // RFC3339 format
-)
-sched.CreateTask(oneTimeTask)
-```
-
-## Task Management
+#### Create Tasks
 
 ### Pause a Task
 ```go
@@ -123,26 +114,55 @@ if err != nil {
 }
 fmt.Printf("Task status: %s\n", task.Status)
 fmt.Printf("Next run: %s\n", task.NextRun)
-```
-
-### Get Tasks by Agent
 ```go
-tasks, err := sched.GetTasksByAgent("my-agent")
-for _, task := range tasks {
-    fmt.Printf("Task %s: %s\n", task.ID, task.Prompt)
-}
+task, err := scheduler.NewTask(
+    "agent-name",
+    "Check for new emails",
+    scheduler.ScheduleTypeCron,
+    "0 0 0 * * *", // Daily at midnight (6 fields: second minute hour day month day-of-week)
+)
+sched.CreateTask(task)
 ```
 
-### Get Task Execution History
+**Interval Task** (Every 5 minutes):
 ```go
-runs, err := sched.GetTaskRuns(taskID, 10) // Get last 10 runs
-for _, run := range runs {
-    fmt.Printf("Run at %s: %s (took %dms)\n", 
-        run.RunAt, run.Status, run.DurationMs)
-}
+task, _ := scheduler.NewTask(
+    "agent-name",
+    "Monitor health",
+    scheduler.ScheduleTypeInterval,
+    "300000", // 300,000 milliseconds
+)
+sched.CreateTask(task)
 ```
 
-## Cron Expression Format
+**One-Time Task**:
+```go
+task, _ := scheduler.NewTask(
+    "agent-name",
+    "Send reminder",
+    scheduler.ScheduleTypeOnce,
+    "2026-12-25T09:00:00Z", // RFC3339 format
+)
+sched.CreateTask(task)
+```
+
+#### Task Management
+
+```go
+// Pause/Resume
+sched.PauseTask(taskID)
+sched.ResumeTask(taskID)
+
+// Delete
+sched.DeleteTask(taskID)
+
+// Query
+task, _ := sched.GetTask(taskID)
+tasks, _ := sched.GetAllTasks()
+runs, _ := sched.GetTaskRuns(taskID, 10) // Last 10 runs
+```
+
+## Schedule Types
 
 The scheduler uses 6-field cron expressions with the following format:
 
