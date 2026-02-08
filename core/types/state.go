@@ -7,6 +7,16 @@ import (
 	"github.com/mudler/LocalAGI/core/conversations"
 )
 
+// Forward declaration to avoid circular import
+type TaskScheduler interface {
+	CreateTask(task interface{}) error
+	GetAllTasks() ([]interface{}, error)
+	GetTask(id string) (interface{}, error)
+	DeleteTask(id string) error
+	PauseTask(id string) error
+	ResumeTask(id string) error
+}
+
 // State is the structure
 // that is used to keep track of the current state
 // and the Agent's short memory that it can update
@@ -40,6 +50,7 @@ type ReminderActionResponse struct {
 type AgentSharedState struct {
 	ConversationTracker *conversations.ConversationTracker[string] `json:"conversation_tracker"`
 	Reminders           []ReminderActionResponse                   `json:"reminders"`
+	Scheduler           TaskScheduler                              `json:"-"` // Not serialized, set at runtime
 }
 
 func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
