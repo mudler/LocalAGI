@@ -140,6 +140,7 @@ func New(opts ...Option) (*Agent, error) {
 
 	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)
 	a.sharedState.Scheduler = &schedulerWrapper{Scheduler: a.taskScheduler}
+	a.sharedState.AgentName = a.Character.Name
 	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)
 
 	xlog.Info(
@@ -296,10 +297,8 @@ func (a *Agent) Stop() {
 	xlog.Debug("Stopping agent", "agent", a.Character.Name)
 
 	// Stop the scheduler
-	if a.taskScheduler != nil {
-		a.taskScheduler.Stop()
-		xlog.Info("Task scheduler stopped")
-	}
+	a.taskScheduler.Stop()
+	xlog.Info("Task scheduler stopped")
 
 	a.closeMCPServers()
 	a.context.Cancel()
@@ -1210,10 +1209,8 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 
 func (a *Agent) Run() error {
 	// Start the scheduler
-	if a.taskScheduler != nil {
-		a.taskScheduler.Start()
-		xlog.Info("Task scheduler started")
-	}
+	a.taskScheduler.Start()
+	xlog.Info("Task scheduler started")
 
 	a.startNewConversationsConsumer()
 	xlog.Debug("Agent is now running", "agent", a.Character.Name)

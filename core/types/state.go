@@ -50,6 +50,7 @@ type ReminderActionResponse struct {
 type AgentSharedState struct {
 	ConversationTracker *conversations.ConversationTracker[string] `json:"conversation_tracker"`
 	Scheduler           TaskScheduler                              `json:"-"` // Not serialized, set at runtime
+	AgentName           string                                     `json:"agent_name"`
 }
 
 func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {

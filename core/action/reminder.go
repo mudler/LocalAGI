@@ -59,7 +59,7 @@ func (a *ReminderAction) Run(ctx context.Context, sharedState *types.AgentShared
 	}
 
 	task, err := scheduler.NewTask(
-		"reminder", // agent name (not used for reminders, but required)
+		sharedState.AgentName,
 		result.Message,
 		scheduleType,
 		result.CronExpr,

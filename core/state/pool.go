@@ -177,7 +177,7 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 		}
 	}(a.pool[name])
 
-	return a.startAgentWithConfig(name, agentConfig, nil)
+	return a.startAgentWithConfig(name, a.pooldir, agentConfig, nil)
 }
 
 func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
@@ -213,7 +213,7 @@ func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
 		return err
 	}
 
-	if err := a.startAgentWithConfig(name, agentConfig, obs); err != nil {
+	if err := a.startAgentWithConfig(name, a.pooldir, agentConfig, obs); err != nil {
 		if obs != nil {
 			o.Completion = &types.Completion{Error: err.Error()}
 			obs.Update(*o)
@@ -328,7 +328,7 @@ func (a *AgentPool) GetStatusHistory(name string) *Status {
 	return a.agentStatus[name]
 }
 
-func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs Observer) error {
+func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConfig, obs Observer) error {
 	var manager sse.Manager
 	if m, ok := a.managers[name]; ok {
 		manager = m
@@ -429,6 +429,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 	}
 
 	opts := []Option{
+		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
 		WithModel(model),
 		WithLLMAPIURL(a.apiURL),
 		WithContext(ctx),
@@ -661,7 +662,7 @@ func (a *AgentPool) StartAll() error {
 		if a.agents[name] != nil { // Agent already started
 			continue
 		}
-		if err := a.startAgentWithConfig(name, &config, nil); err != nil {
+		if err := a.startAgentWithConfig(name, a.pooldir, &config, nil); err != nil {
 			xlog.Error("Failed to start agent", "name", name, "error", err)
 		}
 	}
@@ -699,7 +700,7 @@ func (a *AgentPool) Start(name string) error {
 		return nil
 	}
 	if config, ok := a.pool[name]; ok {
-		return a.startAgentWithConfig(name, &config, nil)
+		return a.startAgentWithConfig(name, a.pooldir, &config, nil)
 	}
 
 	return fmt.Errorf("agent %s not found", name)
