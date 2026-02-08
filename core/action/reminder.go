@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	RecurringReminderActionName = "set_recurring_reminder"
-	OneTimeReminderActionName   = "set_onetime_reminder"
-	ListRemindersName           = "list_reminders"
-	RemoveReminderName          = "remove_reminder"
+	RecurringReminderActionName = "set_recurring_task"
+	OneTimeReminderActionName   = "set_onetime_task"
+	ListRemindersName           = "list_tasks"
+	RemoveReminderName          = "remove_task"
 )
 
 func NewRecurringReminder() *RecurringReminderAction {
