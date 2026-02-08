@@ -51,6 +51,8 @@ const (
 	ActionShellcommand                   = "shell-command"
 	ActionSendTelegramMessage            = "send-telegram-message"
 	ActionSetReminder                    = "set_reminder"
+	ActionSetRecurringReminder           = "set_recurring_reminder"
+	ActionSetOneTimeReminder             = "set_onetime_reminder"
 	ActionListReminders                  = "list_reminders"
 	ActionRemoveReminder                 = "remove_reminder"
 	ActionAddToMemory                    = "add_to_memory"
@@ -282,7 +284,17 @@ var DefaultActions = []config.FieldGroup{
 	},
 	{
 		Name:   "set_reminder",
-		Label:  "Set Reminder",
+		Label:  "Set Reminder (deprecated, use recurring/onetime)",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "set_recurring_reminder",
+		Label:  "Set Recurring Reminder",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "set_onetime_reminder",
+		Label:  "Set One-Time Reminder",
 		Fields: []config.Field{},
 	},
 	{
@@ -465,6 +477,10 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewSendTelegramMessageRunner(config)
 	case ActionSetReminder:
 		a = action.NewReminder()
+	case ActionSetRecurringReminder:
+		a = action.NewRecurringReminder()
+	case ActionSetOneTimeReminder:
+		a = action.NewOneTimeReminder()
 	case ActionListReminders:
 		a = action.NewListReminders()
 	case ActionRemoveReminder:

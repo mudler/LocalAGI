@@ -78,11 +78,27 @@ var _ = Describe("Scheduler", func() {
 			Expect(task.NextRun).To(BeTemporally("~", time.Now().Add(time.Hour), 5*time.Second))
 		})
 
-		It("should create a valid task with once schedule", func() {
-			futureTime := time.Now().Add(24 * time.Hour)
-			task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, futureTime.Format(time.RFC3339))
+		It("should create a valid task with once schedule using duration", func() {
+			task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, "24h")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(task.NextRun).To(BeTemporally("~", futureTime, time.Second))
+			Expect(task.NextRun).To(BeTemporally("~", time.Now().Add(24*time.Hour), 5*time.Second))
+		})
+
+		It("should create a valid task with once schedule using day syntax", func() {
+			task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, "1d")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(task.NextRun).To(BeTemporally("~", time.Now().Add(24*time.Hour), 5*time.Second))
+		})
+
+		It("should create a valid task with once schedule using combined day+time", func() {
+			task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, "2d12h30m")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(task.NextRun).To(BeTemporally("~", time.Now().Add(2*24*time.Hour+12*time.Hour+30*time.Minute), 5*time.Second))
+		})
+
+		It("should return error for invalid once duration", func() {
+			_, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, "invalid")
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
@@ -161,11 +177,15 @@ var _ = Describe("Scheduler", func() {
 		Context("Querying tasks", func() {
 			BeforeEach(func() {
 				// Create test tasks
-				task1, err := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Hour).Format(time.RFC3339))
+				// task1: once schedule with 0s delay => immediately due
+				task1, err := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeOnce, "0s")
 				Expect(err).NotTo(HaveOccurred())
-				task2, err := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeOnce, time.Now().Add(1*time.Hour).Format(time.RFC3339))
+				task1.NextRun = time.Now().Add(-1 * time.Hour) // force into the past
+				// task2: cron schedule => next run in the future, not due
+				task2, err := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeCron, "0 0 1 1 *")
 				Expect(err).NotTo(HaveOccurred())
-				task3, err := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Hour).Format(time.RFC3339))
+				// task3: once schedule but paused => not due
+				task3, err := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeOnce, "0s")
 				Expect(err).NotTo(HaveOccurred())
 				task3.Status = scheduler.TaskStatusPaused
 
@@ -251,7 +271,8 @@ var _ = Describe("Scheduler", func() {
 
 	Describe("Scheduler Execution", func() {
 		It("should execute a due task", func() {
-			task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Second).Format(time.RFC3339))
+			task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, "0s")
+			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
 			err := sched.CreateTask(task)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -294,7 +315,8 @@ var _ = Describe("Scheduler", func() {
 
 		It("should handle task execution errors", func() {
 			executor.shouldError = true
-			task, _ := scheduler.NewTask("test-agent", "error task", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Second).Format(time.RFC3339))
+			task, _ := scheduler.NewTask("test-agent", "error task", scheduler.ScheduleTypeOnce, "0s")
+			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
 			sched.CreateTask(task)
 
 			// Scheduler is already started in BeforeEach
@@ -310,7 +332,8 @@ var _ = Describe("Scheduler", func() {
 		})
 
 		It("should not execute paused tasks", func() {
-			task, _ := scheduler.NewTask("test-agent", "paused", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Second).Format(time.RFC3339))
+			task, _ := scheduler.NewTask("test-agent", "paused", scheduler.ScheduleTypeOnce, "0s")
+			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
 			task.Status = scheduler.TaskStatusPaused
 			sched.CreateTask(task)
 

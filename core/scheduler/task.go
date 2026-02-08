@@ -2,12 +2,36 @@ package scheduler
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
 )
+
+var dayPattern = regexp.MustCompile(`^(\d+)d(.*)$`)
+
+// ParseDuration extends time.ParseDuration with support for days ("d").
+// Examples: "1d" = 24h, "2d12h" = 60h, "30m", "2h30m".
+func ParseDuration(s string) (time.Duration, error) {
+	if m := dayPattern.FindStringSubmatch(s); m != nil {
+		days, err := strconv.Atoi(m[1])
+		if err != nil {
+			return 0, fmt.Errorf("invalid duration: %s", s)
+		}
+		d := time.Duration(days) * 24 * time.Hour
+		if m[2] != "" {
+			rest, err := time.ParseDuration(m[2])
+			if err != nil {
+				return 0, fmt.Errorf("invalid duration: %w", err)
+			}
+			d += rest
+		}
+		return d, nil
+	}
+	return time.ParseDuration(s)
+}
 
 type TaskStatus string
 
@@ -78,7 +102,7 @@ func (t *Task) CalculateNextRun() error {
 	now := time.Now()
 
 	switch t.ScheduleType {
-	case ScheduleTypeCron, ScheduleTypeOnce:
+	case ScheduleTypeCron:
 		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 		schedule, err := parser.Parse(t.ScheduleValue)
 		if err != nil {
@@ -100,12 +124,15 @@ func (t *Task) CalculateNextRun() error {
 			t.NextRun = now.Add(time.Duration(intervalMs) * time.Millisecond)
 		}
 
-	// case ScheduleTypeOnce:
-	// 	nextRun, err := time.Parse(time.RFC3339, t.ScheduleValue)
-	// 	if err != nil {
-	// 		return fmt.Errorf("invalid timestamp: %w", err)
-	// 	}
-	// 	t.NextRun = nextRun
+	case ScheduleTypeOnce:
+		duration, err := ParseDuration(t.ScheduleValue)
+		if err != nil {
+			return fmt.Errorf("invalid duration: %w", err)
+		}
+		if duration < 0 {
+			return fmt.Errorf("duration must be positive: %s", t.ScheduleValue)
+		}
+		t.NextRun = now.Add(duration)
 
 	default:
 		return fmt.Errorf("unknown schedule type: %s", t.ScheduleType)

@@ -12,13 +12,27 @@ import (
 )
 
 const (
+	RecurringReminderActionName = "set_recurring_reminder"
+	OneTimeReminderActionName   = "set_onetime_reminder"
+	ListRemindersName           = "list_reminders"
+	RemoveReminderName          = "remove_reminder"
+
+	// Deprecated: use RecurringReminderActionName or OneTimeReminderActionName
 	ReminderActionName = "set_reminder"
-	ListRemindersName  = "list_reminders"
-	RemoveReminderName = "remove_reminder"
 )
 
-func NewReminder() *ReminderAction {
-	return &ReminderAction{}
+func NewRecurringReminder() *RecurringReminderAction {
+	return &RecurringReminderAction{}
+}
+
+func NewOneTimeReminder() *OneTimeReminderAction {
+	return &OneTimeReminderAction{}
+}
+
+// NewReminder returns a RecurringReminderAction for backward compatibility.
+// Deprecated: use NewRecurringReminder or NewOneTimeReminder.
+func NewReminder() *RecurringReminderAction {
+	return &RecurringReminderAction{}
 }
 
 func NewListReminders() *ListRemindersAction {
@@ -29,7 +43,8 @@ func NewRemoveReminder() *RemoveReminderAction {
 	return &RemoveReminderAction{}
 }
 
-type ReminderAction struct{}
+type RecurringReminderAction struct{}
+type OneTimeReminderAction struct{}
 type ListRemindersAction struct{}
 type RemoveReminderAction struct{}
 
@@ -37,30 +52,23 @@ type RemoveReminderParams struct {
 	Index int `json:"index"`
 }
 
-func (a *ReminderAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
-	result := types.ReminderActionResponse{}
+func (a *RecurringReminderAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	result := types.RecurringReminderParams{}
 	err := params.Unmarshal(&result)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 
-	// Create a scheduler task
-	scheduleType := scheduler.ScheduleTypeCron
-	if !result.IsRecurring {
-		scheduleType = scheduler.ScheduleTypeOnce
-	}
-
 	task, err := scheduler.NewTask(
 		sharedState.AgentName,
 		result.Message,
-		scheduleType,
+		scheduler.ScheduleTypeCron,
 		result.CronExpr,
 	)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 
-	// Store task ID in metadata for tracking
 	task.Metadata["reminder_type"] = "user_created"
 
 	err = sharedState.Scheduler.CreateTask(task)
@@ -69,15 +77,53 @@ func (a *ReminderAction) Run(ctx context.Context, sharedState *types.AgentShared
 	}
 
 	return types.ActionResult{
-		Result: fmt.Sprintf("Reminder set successfully (ID: %s)", task.ID),
+		Result: fmt.Sprintf("Recurring reminder set successfully (ID: %s). Next run: %s", task.ID, task.NextRun.Format(time.RFC3339)),
 		Metadata: map[string]interface{}{
-			"task_id":   task.ID,
-			"message":   result.Message,
-			"next_run":  task.NextRun,
-			"recurring": result.IsRecurring,
+			"task_id":  task.ID,
+			"message":  result.Message,
+			"next_run": task.NextRun,
 		},
 	}, nil
+}
 
+func (a *OneTimeReminderAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	result := types.OneTimeReminderParams{}
+	err := params.Unmarshal(&result)
+	if err != nil {
+		return types.ActionResult{}, err
+	}
+
+	// Validate the delay parses correctly before creating the task
+	_, err = scheduler.ParseDuration(result.Delay)
+	if err != nil {
+		return types.ActionResult{}, fmt.Errorf("invalid delay format, expected a duration like '30m', '2h', '1d', '1d12h': %w", err)
+	}
+
+	task, err := scheduler.NewTask(
+		sharedState.AgentName,
+		result.Message,
+		scheduler.ScheduleTypeOnce,
+		result.Delay,
+	)
+	if err != nil {
+		return types.ActionResult{}, err
+	}
+
+	task.Metadata["reminder_type"] = "user_created"
+
+	err = sharedState.Scheduler.CreateTask(task)
+	if err != nil {
+		return types.ActionResult{}, err
+	}
+
+	return types.ActionResult{
+		Result: fmt.Sprintf("One-time reminder set in %s (at %s, ID: %s)", result.Delay, task.NextRun.Format(time.RFC3339), task.ID),
+		Metadata: map[string]interface{}{
+			"task_id":  task.ID,
+			"message":  result.Message,
+			"next_run": task.NextRun,
+		},
+	}, nil
 }
 
 func (a *ListRemindersAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
@@ -155,7 +201,11 @@ func (a *RemoveReminderAction) Run(ctx context.Context, sharedState *types.Agent
 	}, nil
 }
 
-func (a *ReminderAction) Plannable() bool {
+func (a *RecurringReminderAction) Plannable() bool {
+	return true
+}
+
+func (a *OneTimeReminderAction) Plannable() bool {
 	return true
 }
 
@@ -167,10 +217,10 @@ func (a *RemoveReminderAction) Plannable() bool {
 	return true
 }
 
-func (a *ReminderAction) Definition() types.ActionDefinition {
+func (a *RecurringReminderAction) Definition() types.ActionDefinition {
 	return types.ActionDefinition{
-		Name:        ReminderActionName,
-		Description: "Set a reminder for the agent to wake up and perform a task based on a cron schedule. Examples: '0 0 * * *' (daily at midnight), '0 */2 * * *' (every 2 hours), '0 0 * * 1' (every Monday at midnight)",
+		Name:        RecurringReminderActionName,
+		Description: "Set a recurring reminder for the agent to wake up and perform a task on a cron schedule. The reminder will keep repeating. Examples: '0 0 * * *' (daily at midnight), '0 */2 * * *' (every 2 hours), '0 0 * * 1' (every Monday at midnight)",
 		Properties: map[string]jsonschema.Definition{
 			"message": {
 				Type:        jsonschema.String,
@@ -180,12 +230,26 @@ func (a *ReminderAction) Definition() types.ActionDefinition {
 				Type:        jsonschema.String,
 				Description: "Cron expression for scheduling (e.g. '0 0 * * *' for daily at midnight). Format: 'minute hour day month weekday'",
 			},
-			"is_recurring": {
-				Type:        jsonschema.Boolean,
-				Description: "Whether this reminder should repeat according to the cron schedule (true) or trigger only once (false)",
+		},
+		Required: []string{"message", "cron_expr"},
+	}
+}
+
+func (a *OneTimeReminderAction) Definition() types.ActionDefinition {
+	return types.ActionDefinition{
+		Name:        OneTimeReminderActionName,
+		Description: "Set a one-time reminder for the agent to wake up and perform a task after a delay. The reminder triggers only once and is then automatically removed. Use this when asked to do something 'in X minutes/hours/days'. Examples: '30m' (30 minutes), '2h' (2 hours), '1d' (1 day), '1d12h' (1.5 days), '2h30m' (2.5 hours)",
+		Properties: map[string]jsonschema.Definition{
+			"message": {
+				Type:        jsonschema.String,
+				Description: "The message or task to be reminded about",
+			},
+			"delay": {
+				Type:        jsonschema.String,
+				Description: "How long to wait before triggering. Use Go duration format: '30m' (30 minutes), '2h' (2 hours), '1d' (1 day), '1d12h' (1.5 days), '2h30m' (2.5 hours)",
 			},
 		},
-		Required: []string{"message", "cron_expr", "is_recurring"},
+		Required: []string{"message", "delay"},
 	}
 }
 
