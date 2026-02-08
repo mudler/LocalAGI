@@ -11,6 +11,7 @@ import (
 	"github.com/jung-kurt/gofpdf"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -27,8 +28,7 @@ func NewGenPDF(config map[string]string) *GenPDFAction {
 
 	if a.outputDir != "" {
 		if err := os.MkdirAll(a.outputDir, 0755); err != nil {
-			// log but continue; Run will fail with a clear error when saving
-			_ = err
+			xlog.Error("Failed to create output directory", "path", a.outputDir, "error", err)
 		}
 		if a.cleanOnStart {
 			entries, err := os.ReadDir(a.outputDir)
@@ -121,7 +121,7 @@ func (a *GenPDFAction) Definition() types.ActionDefinition {
 			},
 			"filename": {
 				Type:        jsonschema.String,
-				Description: "Optional custom filename (without .pdf extension)",
+				Description: "Optional custom filename (extension is optional - .pdf will be automatically added if missing)",
 			},
 		},
 		Required: []string{"content"},
