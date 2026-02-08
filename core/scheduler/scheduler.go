@@ -48,12 +48,14 @@ func (s *Scheduler) Start() {
 
 // Stop gracefully stops the scheduler
 func (s *Scheduler) Stop() {
-	s.cancel()
-	s.cancel = nil
-	s.ctx = nil
+	if s.cancel != nil {
+		s.cancel()
+	}
 	s.wg.Wait()
 	s.store.Close()
 	xlog.Info("Task scheduler stopped")
+	s.cancel = nil
+	s.ctx = nil
 }
 
 // run is the main polling loop

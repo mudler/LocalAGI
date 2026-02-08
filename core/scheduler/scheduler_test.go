@@ -45,6 +45,7 @@ var _ = Describe("Scheduler", func() {
 
 		executor = &MockExecutor{}
 		sched = scheduler.NewScheduler(store, executor, 100*time.Millisecond)
+		sched.Start()
 	})
 
 	AfterEach(func() {
@@ -56,7 +57,7 @@ var _ = Describe("Scheduler", func() {
 
 	Describe("Task Creation", func() {
 		It("should create a valid task with cron schedule", func() {
-			task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+			task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 * * *")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(task.ID).NotTo(BeEmpty())
 			Expect(task.AgentName).To(Equal("test-agent"))
@@ -114,7 +115,7 @@ var _ = Describe("Scheduler", func() {
 	Describe("JSON Store", func() {
 		Context("CRUD operations", func() {
 			It("should create and retrieve a task", func() {
-				task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+				task, err := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 * * *")
 				Expect(err).NotTo(HaveOccurred())
 
 				err = store.Create(task)
@@ -128,7 +129,7 @@ var _ = Describe("Scheduler", func() {
 			})
 
 			It("should update a task", func() {
-				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 * * *")
 				store.Create(task)
 
 				task.Prompt = "updated prompt"
@@ -141,7 +142,7 @@ var _ = Describe("Scheduler", func() {
 			})
 
 			It("should delete a task", func() {
-				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 * * *")
 				store.Create(task)
 
 				err := store.Delete(task.ID)
@@ -193,7 +194,7 @@ var _ = Describe("Scheduler", func() {
 
 		Context("Task runs", func() {
 			It("should log and retrieve task runs", func() {
-				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 * * *")
 				store.Create(task)
 
 				run := scheduler.NewTaskRun(task.ID)
@@ -212,7 +213,7 @@ var _ = Describe("Scheduler", func() {
 			})
 
 			It("should limit returned runs", func() {
-				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 * * *")
 				store.Create(task)
 
 				// Create 5 runs
@@ -229,7 +230,7 @@ var _ = Describe("Scheduler", func() {
 
 		Context("Persistence", func() {
 			It("should persist data across store instances", func() {
-				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+				task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeCron, "0 0 * * *")
 				store.Create(task)
 				store.Close()
 
@@ -320,7 +321,7 @@ var _ = Describe("Scheduler", func() {
 
 	Describe("Task Management", func() {
 		It("should pause and resume a task", func() {
-			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 * * *")
 			sched.CreateTask(task)
 
 			err := sched.PauseTask(task.ID)
@@ -338,9 +339,9 @@ var _ = Describe("Scheduler", func() {
 		})
 
 		It("should get tasks by agent", func() {
-			task1, _ := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeCron, "0 0 0 * * *")
-			task2, _ := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeCron, "0 0 0 * * *")
-			task3, _ := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+			task1, _ := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeCron, "0 0 * * *")
+			task2, _ := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeCron, "0 0 * * *")
+			task3, _ := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeCron, "0 0 * * *")
 
 			sched.CreateTask(task1)
 			sched.CreateTask(task2)
@@ -352,7 +353,7 @@ var _ = Describe("Scheduler", func() {
 		})
 
 		It("should delete a task", func() {
-			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 0 * * *")
+			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 * * *")
 			sched.CreateTask(task)
 
 			err := sched.DeleteTask(task.ID)
