@@ -5,7 +5,18 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/core/conversations"
+	"github.com/mudler/LocalAGI/core/scheduler"
 )
+
+// Forward declaration to avoid circular import
+type TaskScheduler interface {
+	CreateTask(task *scheduler.Task) error
+	GetAllTasks() ([]*scheduler.Task, error)
+	GetTask(id string) (*scheduler.Task, error)
+	DeleteTask(id string) error
+	PauseTask(id string) error
+	ResumeTask(id string) error
+}
 
 // State is the structure
 // that is used to keep track of the current state
@@ -29,17 +40,26 @@ const (
 	DefaultLastMessageDuration = 5 * time.Minute
 )
 
-type ReminderActionResponse struct {
-	Message     string    `json:"message"`
-	CronExpr    string    `json:"cron_expr"`    // Cron expression for scheduling
-	LastRun     time.Time `json:"last_run"`     // Last time this reminder was triggered
-	NextRun     time.Time `json:"next_run"`     // Next scheduled run time
-	IsRecurring bool      `json:"is_recurring"` // Whether this is a recurring reminder
+// RecurringReminderParams are the parameters the LLM provides for set_recurring_reminder.
+type RecurringReminderParams struct {
+	Message  string `json:"message"`
+	CronExpr string `json:"cron_expr"`
 }
+
+// OneTimeReminderParams are the parameters the LLM provides for set_onetime_reminder.
+type OneTimeReminderParams struct {
+	Message string `json:"message"`
+	Delay   string `json:"delay"` // Go duration format with day support: "30m", "2h", "1d", "1d12h"
+}
+
+// ReminderActionResponse is kept for backward compatibility.
+// Deprecated: use RecurringReminderParams or OneTimeReminderParams.
+type ReminderActionResponse = RecurringReminderParams
 
 type AgentSharedState struct {
 	ConversationTracker *conversations.ConversationTracker[string] `json:"conversation_tracker"`
-	Reminders           []ReminderActionResponse                   `json:"reminders"`
+	Scheduler           TaskScheduler                              `json:"-"` // Not serialized, set at runtime
+	AgentName           string                                     `json:"agent_name"`
 }
 
 func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
@@ -48,7 +68,6 @@ func NewAgentSharedState(lastMessageDuration time.Duration) *AgentSharedState {
 	}
 	return &AgentSharedState{
 		ConversationTracker: conversations.NewConversationTracker[string](lastMessageDuration),
-		Reminders:           make([]ReminderActionResponse, 0),
 	}
 }
 

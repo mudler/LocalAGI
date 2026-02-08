@@ -18,9 +18,9 @@ import (
 	"github.com/mudler/xlog"
 
 	"github.com/mudler/LocalAGI/core/action"
+	"github.com/mudler/LocalAGI/core/scheduler"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/llm"
-	"github.com/robfig/cron/v3"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -56,6 +56,9 @@ type Agent struct {
 
 	llm         cogito.LLM
 	sharedState *types.AgentSharedState
+
+	// Task scheduler for managing reminders
+	taskScheduler *scheduler.Scheduler
 }
 
 type RAGDB interface {
@@ -117,6 +120,28 @@ func New(opts ...Option) (*Agent, error) {
 	xlog.Info("Populating actions from MCP Servers (if any)")
 	a.initMCPActions()
 	xlog.Info("Done populating actions from MCP Servers")
+
+	// Initialize task scheduler for reminders
+	schedulerPath := options.schedulerStorePath
+	if schedulerPath == "" {
+		schedulerPath = "scheduled_tasks.json"
+	}
+
+	store, err := scheduler.NewJSONStore(schedulerPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scheduler store: %v", err)
+	}
+
+	executor := &agentSchedulerExecutor{agent: a}
+	pollInterval := options.periodicRuns
+	if pollInterval == 0 {
+		pollInterval = 1 * time.Minute
+	}
+
+	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)
+	a.sharedState.Scheduler = a.taskScheduler
+	a.sharedState.AgentName = a.Character.Name
+	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)
 
 	xlog.Info(
 		"Agent created",
@@ -218,7 +243,11 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 	}
 
 	a.Enqueue(j)
-	return j.Result.WaitResult()
+	result, err := j.Result.WaitResult(a.context.Context)
+	if err != nil {
+		return nil
+	}
+	return result
 }
 
 func (a *Agent) Enqueue(j *types.Job) {
@@ -267,9 +296,15 @@ func (a *Agent) TTS(ctx context.Context, text string) ([]byte, error) {
 var ErrContextCanceled = fmt.Errorf("context canceled")
 
 func (a *Agent) Stop() {
+	xlog.Debug("Stopping agent", "agent", a.Character.Name)
+
+	// Stop the scheduler
+	a.taskScheduler.Stop()
+	xlog.Info("Task scheduler stopped")
+
 	a.Lock()
 	defer a.Unlock()
-	xlog.Debug("Stopping agent", "agent", a.Character.Name)
+
 	a.closeMCPServers()
 	a.context.Cancel()
 }
@@ -1147,93 +1182,6 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 
 	xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 
-	// Check for reminders that need to be triggered
-	now := time.Now()
-	var triggeredReminders []types.ReminderActionResponse
-	var remainingReminders []types.ReminderActionResponse
-
-	for _, reminder := range a.sharedState.Reminders {
-		xlog.Debug("Checking reminder", "reminder", reminder)
-		if now.After(reminder.NextRun) {
-			triggeredReminders = append(triggeredReminders, reminder)
-			xlog.Debug("Reminder triggered", "reminder", reminder)
-			// Calculate next run time for recurring reminders
-			if reminder.IsRecurring {
-				xlog.Debug("Reminder is recurring", "reminder", reminder)
-				parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-				schedule, err := parser.Parse(reminder.CronExpr)
-				if err == nil {
-					nextRun := schedule.Next(now)
-					xlog.Debug("Next run time", "reminder", reminder, "nextRun", nextRun)
-					reminder.LastRun = now
-					reminder.NextRun = nextRun
-					remainingReminders = append(remainingReminders, reminder)
-				}
-			}
-		} else {
-			xlog.Debug("Reminder not triggered", "reminder", reminder)
-			remainingReminders = append(remainingReminders, reminder)
-		}
-	}
-
-	// Update the reminders list
-	a.sharedState.Reminders = remainingReminders
-
-	// Handle triggered reminders
-	for _, reminder := range triggeredReminders {
-		xlog.Info("Processing triggered reminder", "agent", a.Character.Name, "message", reminder.Message)
-
-		// Create a more natural conversation flow for the reminder
-		reminderJob := types.NewJob(
-			types.WithText(fmt.Sprintf("I have a reminder for you: %s", reminder.Message)),
-			types.WithReasoningCallback(a.options.reasoningCallback),
-			types.WithResultCallback(a.options.resultCallback),
-		)
-
-		// Add the reminder message to the job's metadata
-		reminderJob.Metadata = map[string]interface{}{
-			"message":     reminder.Message,
-			"is_reminder": true,
-		}
-
-		// Attach observable so UI can show reminder processing state
-		if a.observer != nil {
-			obs := a.observer.NewObservable()
-			obs.Name = "reminder"
-			obs.Icon = "bell"
-			a.observer.Update(*obs)
-			reminderJob.Obs = obs
-		}
-
-		// Process the reminder as a normal conversation
-		a.consumeJob(reminderJob, UserRole)
-
-		// After the reminder job is complete, ensure the user is notified
-		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
-			// Get the last assistant message from the conversation
-			var lastAssistantMsg *openai.ChatCompletionMessage
-			for i := len(reminderJob.Result.Conversation) - 1; i >= 0; i-- {
-				if reminderJob.Result.Conversation[i].Role == AssistantRole {
-					lastAssistantMsg = &reminderJob.Result.Conversation[i]
-					break
-				}
-			}
-
-			if lastAssistantMsg != nil && lastAssistantMsg.Content != "" {
-				// Send the reminder response to the user
-				msg := openai.ChatCompletionMessage{
-					Role:    "assistant",
-					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, lastAssistantMsg.Content),
-				}
-
-				go func(agent *Agent) {
-					xlog.Info("Sending reminder response to user", "agent", agent.Character.Name, "message", msg.Content)
-					agent.newConversations <- msg
-				}(a)
-			}
-		}
-	}
-
 	if !a.options.standaloneJob {
 		return
 	}
@@ -1265,6 +1213,10 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 }
 
 func (a *Agent) Run() error {
+	// Start the scheduler
+	a.taskScheduler.Start()
+	xlog.Info("Task scheduler started")
+
 	a.startNewConversationsConsumer()
 	xlog.Debug("Agent is now running", "agent", a.Character.Name)
 	// The agent run does two things:

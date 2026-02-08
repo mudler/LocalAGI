@@ -39,6 +39,7 @@ type options struct {
 	canPlan               bool
 	characterfile         string
 	statefile             string
+	schedulerStorePath    string // Path to scheduler JSON storage file
 	context               context.Context
 	permanentGoal         string
 	timeout               string
@@ -479,6 +480,14 @@ func WithTTSModel(model string) Option {
 func WithKBAutoSearch(enabled bool) Option {
 	return func(o *options) error {
 		o.kbAutoSearch = enabled
+		return nil
+	}
+}
+
+// WithSchedulerStorePath sets the path for the scheduler's JSON storage file
+func WithSchedulerStorePath(path string) Option {
+	return func(o *options) error {
+		o.schedulerStorePath = path
 		return nil
 	}
 }
