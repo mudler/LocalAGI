@@ -290,11 +290,6 @@ var DefaultActions = []config.FieldGroup{
 		Fields: actions.SendTelegramMessageConfigMeta(),
 	},
 	{
-		Name:   "set_reminder",
-		Label:  "Set Reminder (deprecated, use recurring/onetime)",
-		Fields: []config.Field{},
-	},
-	{
 		Name:   "set_recurring_reminder",
 		Label:  "Set Recurring Reminder",
 		Fields: []config.Field{},
@@ -484,8 +479,6 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewShell(config, actionsConfigs[ActionConfigSSHBoxURL])
 	case ActionSendTelegramMessage:
 		a = actions.NewSendTelegramMessageRunner(config)
-	case ActionSetReminder:
-		a = action.NewReminder()
 	case ActionSetRecurringReminder:
 		a = action.NewRecurringReminder()
 	case ActionSetOneTimeReminder:

@@ -16,9 +16,6 @@ const (
 	OneTimeReminderActionName   = "set_onetime_reminder"
 	ListRemindersName           = "list_reminders"
 	RemoveReminderName          = "remove_reminder"
-
-	// Deprecated: use RecurringReminderActionName or OneTimeReminderActionName
-	ReminderActionName = "set_reminder"
 )
 
 func NewRecurringReminder() *RecurringReminderAction {
@@ -27,12 +24,6 @@ func NewRecurringReminder() *RecurringReminderAction {
 
 func NewOneTimeReminder() *OneTimeReminderAction {
 	return &OneTimeReminderAction{}
-}
-
-// NewReminder returns a RecurringReminderAction for backward compatibility.
-// Deprecated: use NewRecurringReminder or NewOneTimeReminder.
-func NewReminder() *RecurringReminderAction {
-	return &RecurringReminderAction{}
 }
 
 func NewListReminders() *ListRemindersAction {
