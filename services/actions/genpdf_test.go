@@ -147,4 +147,18 @@ var _ = Describe("GenPDFAction", func() {
 		// The test file should still exist
 		Expect(testFile).To(BeAnExistingFile())
 	})
+
+	It("prevents path traversal in filename", func() {
+		result, err := action.Run(ctx, sharedState, types.ActionParams{
+			"content":  "Test content",
+			"filename": "../../../etc/passwd",
+		})
+
+		Expect(err).ToNot(HaveOccurred())
+		paths := result.Metadata[actions.MetadataPDFs].([]string)
+		// Should only use the base filename, not the path
+		Expect(filepath.Base(paths[0])).To(Equal("passwd.pdf"))
+		// Should be in the tmpDir, not in /etc
+		Expect(filepath.Dir(paths[0])).To(Equal(tmpDir))
+	})
 })

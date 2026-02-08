@@ -72,6 +72,9 @@ func (a *GenPDFAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 		filename = fmt.Sprintf("document_%d", time.Now().UnixNano())
 	}
 
+	// Clean filename to prevent path traversal
+	filename = filepath.Base(filename)
+
 	// Ensure filename has .pdf extension
 	if !strings.HasSuffix(strings.ToLower(filename), ".pdf") {
 		filename = filename + ".pdf"
