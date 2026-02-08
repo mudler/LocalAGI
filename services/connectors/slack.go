@@ -230,6 +230,33 @@ func generateAttachmentsFromJobResponse(j *types.JobResult, api *slack.Client, c
 				}
 			}
 		}
+
+		// coming from the generate_pdf action (local file paths)
+		if pdfPaths, exists := state.Metadata[actions.MetadataPDFs]; exists {
+			for _, path := range xstrings.UniqueSlice(pdfPaths.([]string)) {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					xlog.Error(fmt.Sprintf("Error reading PDF file %s: %v", path, err))
+					continue
+				}
+				filename := filepath.Base(path)
+				if filename == "" || filename == "." {
+					filename = "document.pdf"
+				}
+
+				_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+					Reader:          bytes.NewReader(data),
+					FileSize:        len(data),
+					ThreadTimestamp: ts,
+					Channel:         channelID,
+					Filename:        filename,
+					InitialComment:  "Generated PDF document",
+				})
+				if err != nil {
+					xlog.Error(fmt.Sprintf("Error uploading PDF to Slack: %v", err))
+				}
+			}
+		}
 	}
 	return
 }

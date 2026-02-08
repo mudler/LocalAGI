@@ -46,6 +46,7 @@ const (
 	ActionSendMail                       = "send-mail"
 	ActionGenerateImage                  = "generate_image"
 	ActionGenerateSong                   = "generate_song"
+	ActionGeneratePDF                    = "generate_pdf"
 	ActionCounter                        = "counter"
 	ActionCallAgents                     = "call_agents"
 	ActionShellcommand                   = "shell-command"
@@ -93,6 +94,7 @@ var AvailableActions = []string{
 	ActionSendMail,
 	ActionGenerateImage,
 	ActionGenerateSong,
+	ActionGeneratePDF,
 	ActionTwitterPost,
 	ActionCounter,
 	ActionCallAgents,
@@ -124,6 +126,11 @@ var DefaultActions = []config.FieldGroup{
 		Name:   "generate_song",
 		Label:  "Generate Song",
 		Fields: actions.GenSongConfigMeta(),
+	},
+	{
+		Name:   "generate_pdf",
+		Label:  "Generate PDF",
+		Fields: actions.GenPDFConfigMeta(),
 	},
 	{
 		Name:   "add_to_memory",
@@ -407,6 +414,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGenImage(config)
 	case ActionGenerateSong:
 		a = actions.NewGenSong(config)
+	case ActionGeneratePDF:
+		a = actions.NewGenPDF(config)
 	case ActionSearch:
 		a = actions.NewSearch(config)
 	case ActionGithubIssueLabeler:
