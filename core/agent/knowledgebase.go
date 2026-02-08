@@ -225,8 +225,8 @@ func (a *SearchKnowledgeBaseAction) Run(ctx context.Context, sharedState *types.
 
 func (a *SearchKnowledgeBaseAction) Definition() types.ActionDefinition {
 	return types.ActionDefinition{
-		Name:        types.ActionDefinitionName("search_knowledge_base"),
-		Description: "Search the knowledge base for relevant information using a query string",
+		Name:        types.ActionDefinitionName("search_memory"),
+		Description: "Search your memory for relevant information using a query string",
 		Properties: map[string]jsonschema.Definition{
 			"query": {
 				Type:        jsonschema.String,
@@ -267,8 +267,8 @@ func (a *AddToKnowledgeBaseAction) Run(ctx context.Context, sharedState *types.A
 
 func (a *AddToKnowledgeBaseAction) Definition() types.ActionDefinition {
 	return types.ActionDefinition{
-		Name:        types.ActionDefinitionName("add_to_knowledge_base"),
-		Description: "Add new content to the knowledge base for future retrieval",
+		Name:        types.ActionDefinitionName("add_memory"),
+		Description: "Add new content to your memory for future retrieval",
 		Properties: map[string]jsonschema.Definition{
 			"content": {
 				Type:        jsonschema.String,
