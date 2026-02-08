@@ -133,9 +133,9 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	executor := &agentSchedulerExecutor{agent: a}
-	pollInterval := options.periodicRuns
+	pollInterval := options.schedulerPollInterval
 	if pollInterval == 0 {
-		pollInterval = 1 * time.Minute
+		pollInterval = 30 * time.Second
 	}
 
 	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)

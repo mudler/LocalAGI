@@ -44,6 +44,7 @@ type options struct {
 	permanentGoal         string
 	timeout               string
 	periodicRuns          time.Duration
+	schedulerPollInterval time.Duration
 	kbResults             int
 	ragdb                 RAGDB
 
@@ -83,9 +84,10 @@ func (o *options) SeparatedMultimodalModel() bool {
 
 func defaultOptions() *options {
 	return &options{
-		parallelJobs:       1,
-		periodicRuns:       15 * time.Minute,
-		maxEvaluationLoops: 2,
+		parallelJobs:          1,
+		periodicRuns:          15 * time.Minute,
+		schedulerPollInterval: 30 * time.Second,
+		maxEvaluationLoops:    2,
 		enableEvaluation:   false,
 		kbAutoSearch:       true, // Default to true to maintain backward compatibility
 		LLMAPI: llmOptions{
@@ -357,6 +359,18 @@ func WithPeriodicRuns(duration string) Option {
 			o.periodicRuns, _ = time.ParseDuration("10m")
 		}
 		o.periodicRuns = t
+		return nil
+	}
+}
+
+func WithSchedulerPollInterval(duration string) Option {
+	return func(o *options) error {
+		t, err := time.ParseDuration(duration)
+		if err != nil {
+			o.schedulerPollInterval = 30 * time.Second
+			return nil
+		}
+		o.schedulerPollInterval = t
 		return nil
 	}
 }

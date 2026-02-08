@@ -367,6 +367,10 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		config.PeriodicRuns = "10m"
 	}
 
+	if config.SchedulerPollInterval == "" {
+		config.SchedulerPollInterval = "30s"
+	}
+
 	// XXX: Why do we update the pool config from an Agent's config?
 	if config.APIURL != "" {
 		a.apiURL = config.APIURL
@@ -438,6 +442,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		WithTranscriptionLanguage(transcriptionLanguage),
 		WithTTSModel(ttsModel),
 		WithPeriodicRuns(config.PeriodicRuns),
+		WithSchedulerPollInterval(config.SchedulerPollInterval),
 		WithPermanentGoal(config.PermanentGoal),
 		WithMCPSTDIOServers(config.MCPSTDIOServers...),
 		WithPrompts(promptBlocks...),

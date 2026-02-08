@@ -66,6 +66,7 @@ type AgentConfig struct {
 	CanPlan               bool   `json:"enable_planning" form:"enable_planning"`
 	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
+	SchedulerPollInterval string `json:"scheduler_poll_interval" form:"scheduler_poll_interval"`
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
 	EnableKBCompaction    bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
@@ -328,6 +329,15 @@ func NewAgentConfigMeta(
 				DefaultValue: "",
 				Placeholder:  "10m",
 				HelpText:     "Duration for scheduling periodic agent runs",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "scheduler_poll_interval",
+				Label:        "Scheduler Poll Interval",
+				Type:         "text",
+				DefaultValue: "30s",
+				Placeholder:  "30s",
+				HelpText:     "Duration for polling the scheduler for planned tasks",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{
