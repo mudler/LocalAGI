@@ -190,7 +190,19 @@ func (s *JSONStore) load() error {
 		return nil
 	}
 
-	return json.Unmarshal(file, s.data)
+	if err := json.Unmarshal(file, s.data); err != nil {
+		return err
+	}
+
+	// Ensure slices are not nil after unmarshaling
+	if s.data.Tasks == nil {
+		s.data.Tasks = make([]*Task, 0)
+	}
+	if s.data.TaskRuns == nil {
+		s.data.TaskRuns = make([]*TaskRun, 0)
+	}
+
+	return nil
 }
 
 // save writes data to the JSON file

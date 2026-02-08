@@ -161,14 +161,17 @@ var _ = Describe("Scheduler", func() {
 		Context("Querying tasks", func() {
 			BeforeEach(func() {
 				// Create test tasks
-				task1, _ := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Hour).Format(time.RFC3339))
-				task2, _ := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeOnce, time.Now().Add(1*time.Hour).Format(time.RFC3339))
-				task3, _ := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Hour).Format(time.RFC3339))
+				task1, err := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Hour).Format(time.RFC3339))
+				Expect(err).NotTo(HaveOccurred())
+				task2, err := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeOnce, time.Now().Add(1*time.Hour).Format(time.RFC3339))
+				Expect(err).NotTo(HaveOccurred())
+				task3, err := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Hour).Format(time.RFC3339))
+				Expect(err).NotTo(HaveOccurred())
 				task3.Status = scheduler.TaskStatusPaused
 
-				store.Create(task1)
-				store.Create(task2)
-				store.Create(task3)
+				Expect(store.Create(task1)).To(Succeed())
+				Expect(store.Create(task2)).To(Succeed())
+				Expect(store.Create(task3)).To(Succeed())
 			})
 
 			It("should get all tasks", func() {
@@ -252,7 +255,7 @@ var _ = Describe("Scheduler", func() {
 			err := sched.CreateTask(task)
 			Expect(err).NotTo(HaveOccurred())
 
-			sched.Start()
+			// Scheduler is already started in BeforeEach
 
 			Eventually(func() int {
 				return len(executor.executedTasks)
@@ -277,7 +280,7 @@ var _ = Describe("Scheduler", func() {
 			err := sched.CreateTask(task)
 			Expect(err).NotTo(HaveOccurred())
 
-			sched.Start()
+			// Scheduler is already started in BeforeEach
 
 			Eventually(func() int {
 				return len(executor.executedTasks)
@@ -294,7 +297,7 @@ var _ = Describe("Scheduler", func() {
 			task, _ := scheduler.NewTask("test-agent", "error task", scheduler.ScheduleTypeOnce, time.Now().Add(-1*time.Second).Format(time.RFC3339))
 			sched.CreateTask(task)
 
-			sched.Start()
+			// Scheduler is already started in BeforeEach
 
 			Eventually(func() int {
 				runs, _ := sched.GetTaskRuns(task.ID, 10)
@@ -311,7 +314,7 @@ var _ = Describe("Scheduler", func() {
 			task.Status = scheduler.TaskStatusPaused
 			sched.CreateTask(task)
 
-			sched.Start()
+			// Scheduler is already started in BeforeEach
 
 			Consistently(func() int {
 				return len(executor.executedTasks)
@@ -339,13 +342,16 @@ var _ = Describe("Scheduler", func() {
 		})
 
 		It("should get tasks by agent", func() {
-			task1, _ := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeCron, "0 0 * * *")
-			task2, _ := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeCron, "0 0 * * *")
-			task3, _ := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeCron, "0 0 * * *")
+			task1, err := scheduler.NewTask("agent1", "prompt1", scheduler.ScheduleTypeCron, "0 0 * * *")
+			Expect(err).NotTo(HaveOccurred())
+			task2, err := scheduler.NewTask("agent2", "prompt2", scheduler.ScheduleTypeCron, "0 0 * * *")
+			Expect(err).NotTo(HaveOccurred())
+			task3, err := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeCron, "0 0 * * *")
+			Expect(err).NotTo(HaveOccurred())
 
-			sched.CreateTask(task1)
-			sched.CreateTask(task2)
-			sched.CreateTask(task3)
+			Expect(sched.CreateTask(task1)).To(Succeed())
+			Expect(sched.CreateTask(task2)).To(Succeed())
+			Expect(sched.CreateTask(task3)).To(Succeed())
 
 			agent1Tasks, err := sched.GetTasksByAgent("agent1")
 			Expect(err).NotTo(HaveOccurred())
