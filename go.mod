@@ -4,16 +4,20 @@ go 1.24.4
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
+	github.com/blevesearch/bleve/v2 v2.5.7
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/chasefleming/elem-go v0.30.0
 	github.com/dave-gray101/v2keyauth v0.0.0-20240624150259-c45d584d25e2
+	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
 	github.com/go-telegram/bot v1.17.0
 	github.com/gofiber/fiber/v2 v2.52.9
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
+	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/mudler/cogito v0.8.2-0.20260206153401-a5346975d42b
+	github.com/mudler/xlog v0.0.1
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
 	github.com/philippgille/chromem-go v0.7.0
@@ -37,7 +41,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.4.5 // indirect
 	github.com/bits-and-blooms/bitset v1.22.0 // indirect
-	github.com/blevesearch/bleve/v2 v2.5.7 // indirect
 	github.com/blevesearch/bleve_index_api v1.2.11 // indirect
 	github.com/blevesearch/geo v0.2.4 // indirect
 	github.com/blevesearch/go-faiss v1.0.26 // indirect
@@ -55,7 +58,6 @@ require (
 	github.com/blevesearch/zapx/v14 v14.4.2 // indirect
 	github.com/blevesearch/zapx/v15 v15.4.2 // indirect
 	github.com/blevesearch/zapx/v16 v16.2.8 // indirect
-	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/jsonschema-go v0.3.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
@@ -66,7 +68,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
-	github.com/mudler/xlog v0.0.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect

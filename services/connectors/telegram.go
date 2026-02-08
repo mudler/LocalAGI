@@ -589,6 +589,35 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 			}
 		}
 
+		// Handle PDFs from generate_pdf action (local file paths)
+		if pdfPaths, exists := state.Metadata[actions.MetadataPDFs]; exists {
+			for _, path := range xstrings.UniqueSlice(pdfPaths.([]string)) {
+				data, err := os.ReadFile(path)
+				if err != nil {
+					xlog.Error("Error reading PDF file", "path", path, "error", err)
+					continue
+				}
+
+				filename := filepath.Base(path)
+				if filename == "" || filename == "." {
+					filename = "document.pdf"
+				}
+
+				xlog.Debug("Sending PDF document", "filename", filename, "size", len(data))
+				_, err = t.bot.SendDocument(ctx, &bot.SendDocumentParams{
+					ChatID: chatID,
+					Document: &models.InputFileUpload{
+						Filename: filename,
+						Data:     bytes.NewReader(data),
+					},
+					Caption: "Generated PDF",
+				})
+				if err != nil {
+					xlog.Error("Error sending PDF", "error", err)
+				}
+			}
+		}
+
 		// Handle browser agent screenshots
 		// if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
 		// 	if historyStruct, ok := history.(*localoperator.StateHistory); ok {
