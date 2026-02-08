@@ -672,7 +672,7 @@ func (a *Agent) validateBuiltinTools(job *types.Job) {
 	}
 
 	// Get available actions
-	availableActions := a.availableActions()
+	availableActions := a.availableActions(job)
 
 	for _, tool := range builtinTools {
 		functionName := tool.Name
@@ -831,7 +831,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	if a.options.enableHUD {
-		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(), "")
+		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(job), "")
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
 			return

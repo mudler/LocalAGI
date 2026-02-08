@@ -94,7 +94,7 @@ func (m Messages) GetLatestUserMessage() *openai.ChatCompletionMessage {
 // getAvailableActionsForJob returns available actions including user-defined ones for a specific job
 func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 	// Start with regular available actions
-	baseActions := a.availableActions()
+	baseActions := a.availableActions(job)
 
 	// Add user-defined actions from the job
 	userTools := job.GetUserTools()
@@ -107,12 +107,11 @@ func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 	return baseActions
 }
 
-func (a *Agent) availableActions() types.Actions {
+func (a *Agent) availableActions(j *types.Job) types.Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
 
 	defaultActions := slices.Clone(a.options.userActions)
-
-	if a.options.initiateConversations && a.selfEvaluationInProgress { // && self-evaluation..
+	if j.Metadata["type"] == "scheduled" || (a.options.initiateConversations && a.selfEvaluationInProgress) { // && self-evaluation..
 		acts := append(defaultActions, action.NewConversation())
 		if a.options.enableHUD {
 			acts = append(acts, action.NewState())

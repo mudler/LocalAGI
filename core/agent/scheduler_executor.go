@@ -21,6 +21,7 @@ func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, 
 		types.WithReasoningCallback(e.agent.options.reasoningCallback),
 		types.WithResultCallback(e.agent.options.resultCallback),
 		types.WithContext(ctx),
+		types.WithMetadata(map[string]interface{}{"type": "scheduled"}),
 	)
 
 	// Add metadata to indicate this is a reminder
