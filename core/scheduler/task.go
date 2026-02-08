@@ -12,9 +12,8 @@ import (
 type TaskStatus string
 
 const (
-	TaskStatusActive  TaskStatus = "active"
-	TaskStatusPaused  TaskStatus = "paused"
-	TaskStatusDeleted TaskStatus = "deleted"
+	TaskStatusActive TaskStatus = "active"
+	TaskStatusPaused TaskStatus = "paused"
 )
 
 type ScheduleType string
@@ -79,8 +78,8 @@ func (t *Task) CalculateNextRun() error {
 	now := time.Now()
 
 	switch t.ScheduleType {
-	case ScheduleTypeCron:
-		parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	case ScheduleTypeCron, ScheduleTypeOnce:
+		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 		schedule, err := parser.Parse(t.ScheduleValue)
 		if err != nil {
 			return fmt.Errorf("invalid cron expression: %w", err)
@@ -92,18 +91,21 @@ func (t *Task) CalculateNextRun() error {
 		if err != nil {
 			return fmt.Errorf("invalid interval: %w", err)
 		}
+		if intervalMs <= 0 {
+			return fmt.Errorf("invalid interval: %d", intervalMs)
+		}
 		if t.LastRun != nil {
 			t.NextRun = t.LastRun.Add(time.Duration(intervalMs) * time.Millisecond)
 		} else {
 			t.NextRun = now.Add(time.Duration(intervalMs) * time.Millisecond)
 		}
 
-	case ScheduleTypeOnce:
-		nextRun, err := time.Parse(time.RFC3339, t.ScheduleValue)
-		if err != nil {
-			return fmt.Errorf("invalid timestamp: %w", err)
-		}
-		t.NextRun = nextRun
+	// case ScheduleTypeOnce:
+	// 	nextRun, err := time.Parse(time.RFC3339, t.ScheduleValue)
+	// 	if err != nil {
+	// 		return fmt.Errorf("invalid timestamp: %w", err)
+	// 	}
+	// 	t.NextRun = nextRun
 
 	default:
 		return fmt.Errorf("unknown schedule type: %s", t.ScheduleType)

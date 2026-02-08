@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -198,6 +199,9 @@ func (s *JSONStore) save() error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
+
+	basePath := filepath.Dir(s.filePath)
+	os.MkdirAll(basePath, 0755)
 
 	return os.WriteFile(s.filePath, data, 0644)
 }

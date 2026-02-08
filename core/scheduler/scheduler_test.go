@@ -265,10 +265,9 @@ var _ = Describe("Scheduler", func() {
 			Expect(runs).To(HaveLen(1))
 			Expect(runs[0].Status).To(Equal("success"))
 
-			// Verify one-time task was marked as deleted
-			updatedTask, err := sched.GetTask(task.ID)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(updatedTask.Status).To(Equal(scheduler.TaskStatusDeleted))
+			// Verify one-time task was deleted
+			_, err = sched.GetTask(task.ID)
+			Expect(err).To(HaveOccurred())
 		})
 
 		It("should execute recurring tasks multiple times", func() {

@@ -20,6 +20,7 @@ func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, 
 		types.WithText(fmt.Sprintf("I have a reminder for you: %s", prompt)),
 		types.WithReasoningCallback(e.agent.options.reasoningCallback),
 		types.WithResultCallback(e.agent.options.resultCallback),
+		types.WithContext(ctx),
 	)
 
 	// Add metadata to indicate this is a reminder
@@ -45,7 +46,10 @@ func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, 
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	default:
-		result := reminderJob.Result.WaitResult()
+		result, err := reminderJob.Result.WaitResult(ctx)
+		if err != nil {
+			return nil, err
+		}
 		if result.Error != nil {
 			return &scheduler.JobResult{
 				Response: "",

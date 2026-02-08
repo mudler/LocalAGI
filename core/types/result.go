@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"sync"
 
 	"github.com/mudler/cogito"
@@ -61,9 +62,13 @@ func (j *JobResult) SetResponse(response string) {
 }
 
 // WaitResult waits for the result of a job
-func (j *JobResult) WaitResult() *JobResult {
-	<-j.ready
+func (j *JobResult) WaitResult(ctx context.Context) (*JobResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-j.ready:
+	}
 	j.Lock()
 	defer j.Unlock()
-	return j
+	return j, nil
 }

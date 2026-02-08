@@ -124,7 +124,7 @@ func New(opts ...Option) (*Agent, error) {
 	// Initialize task scheduler for reminders
 	schedulerPath := options.schedulerStorePath
 	if schedulerPath == "" {
-		schedulerPath = "data/scheduled_tasks.json"
+		schedulerPath = "scheduled_tasks.json"
 	}
 
 	store, err := scheduler.NewJSONStore(schedulerPath)
@@ -139,7 +139,7 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)
-	a.sharedState.Scheduler = &schedulerWrapper{Scheduler: a.taskScheduler}
+	a.sharedState.Scheduler = a.taskScheduler
 	a.sharedState.AgentName = a.Character.Name
 	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)
 
@@ -243,7 +243,11 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 	}
 
 	a.Enqueue(j)
-	return j.Result.WaitResult()
+	result, err := j.Result.WaitResult(a.context.Context)
+	if err != nil {
+		return nil
+	}
+	return result
 }
 
 func (a *Agent) Enqueue(j *types.Job) {
@@ -292,13 +296,14 @@ func (a *Agent) TTS(ctx context.Context, text string) ([]byte, error) {
 var ErrContextCanceled = fmt.Errorf("context canceled")
 
 func (a *Agent) Stop() {
-	a.Lock()
-	defer a.Unlock()
 	xlog.Debug("Stopping agent", "agent", a.Character.Name)
 
 	// Stop the scheduler
 	a.taskScheduler.Stop()
 	xlog.Info("Task scheduler stopped")
+
+	a.Lock()
+	defer a.Unlock()
 
 	a.closeMCPServers()
 	a.context.Cancel()

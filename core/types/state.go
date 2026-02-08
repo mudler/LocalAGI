@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/core/conversations"
+	"github.com/mudler/LocalAGI/core/scheduler"
 )
 
 // Forward declaration to avoid circular import
 type TaskScheduler interface {
-	CreateTask(task interface{}) error
-	GetAllTasks() ([]interface{}, error)
-	GetTask(id string) (interface{}, error)
+	CreateTask(task *scheduler.Task) error
+	GetAllTasks() ([]*scheduler.Task, error)
+	GetTask(id string) (*scheduler.Task, error)
 	DeleteTask(id string) error
 	PauseTask(id string) error
 	ResumeTask(id string) error

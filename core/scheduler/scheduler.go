@@ -11,32 +11,36 @@ import (
 
 // Scheduler manages scheduled tasks
 type Scheduler struct {
-	store         TaskStore
-	executor      AgentExecutor
-	pollInterval  time.Duration
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
-	mu            sync.RWMutex
-	runningTasks  map[string]context.CancelFunc
+	store        TaskStore
+	executor     AgentExecutor
+	pollInterval time.Duration
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
+	mu           sync.RWMutex
+	runningTasks map[string]context.CancelFunc
 }
 
 // NewScheduler creates a new scheduler with the given store and executor
 func NewScheduler(store TaskStore, executor AgentExecutor, pollInterval time.Duration) *Scheduler {
-	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Scheduler{
 		store:        store,
 		executor:     executor,
 		pollInterval: pollInterval,
-		ctx:          ctx,
-		cancel:       cancel,
 		runningTasks: make(map[string]context.CancelFunc),
 	}
 }
 
 // Start begins the scheduler's polling loop
 func (s *Scheduler) Start() {
+	if s.ctx != nil {
+		xlog.Warn("Scheduler already started")
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.ctx = ctx
+	s.cancel = cancel
 	s.wg.Add(1)
 	go s.run()
 	xlog.Info("Task scheduler started", "poll_interval", s.pollInterval)
@@ -45,6 +49,8 @@ func (s *Scheduler) Start() {
 // Stop gracefully stops the scheduler
 func (s *Scheduler) Stop() {
 	s.cancel()
+	s.cancel = nil
+	s.ctx = nil
 	s.wg.Wait()
 	s.store.Close()
 	xlog.Info("Task scheduler stopped")
@@ -147,7 +153,9 @@ func (s *Scheduler) executeTask(task *Task) {
 
 	// For one-time tasks, mark as deleted
 	if task.ScheduleType == ScheduleTypeOnce {
-		task.Status = TaskStatusDeleted
+		if err := s.store.Delete(task.ID); err != nil {
+			xlog.Error("Failed to delete task", "task_id", task.ID, "error", err)
+		}
 	} else {
 		// Calculate next run
 		if err := task.CalculateNextRun(); err != nil {

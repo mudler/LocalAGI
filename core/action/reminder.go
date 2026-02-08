@@ -8,7 +8,6 @@ import (
 
 	"github.com/mudler/LocalAGI/core/scheduler"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/robfig/cron/v3"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -41,13 +40,6 @@ type RemoveReminderParams struct {
 func (a *ReminderAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := types.ReminderActionResponse{}
 	err := params.Unmarshal(&result)
-	if err != nil {
-		return types.ActionResult{}, err
-	}
-
-	// Validate the cron expression
-	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-	_, err = parser.Parse(result.CronExpr)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
@@ -89,12 +81,12 @@ func (a *ReminderAction) Run(ctx context.Context, sharedState *types.AgentShared
 }
 
 func (a *ListRemindersAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
-	tasksInterface, err := sharedState.Scheduler.GetAllTasks()
+	tasks, err := sharedState.Scheduler.GetAllTasks()
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 
-	if len(tasksInterface) == 0 {
+	if len(tasks) == 0 {
 		return types.ActionResult{
 			Result: "No reminders set",
 		}, nil
@@ -103,12 +95,7 @@ func (a *ListRemindersAction) Run(ctx context.Context, sharedState *types.AgentS
 	var result strings.Builder
 	result.WriteString("Current reminders:\n")
 
-	for i, taskInterface := range tasksInterface {
-		task, ok := taskInterface.(*scheduler.Task)
-		if !ok {
-			continue
-		}
-
+	for i, task := range tasks {
 		status := "one-time"
 		if task.ScheduleType == scheduler.ScheduleTypeCron || task.ScheduleType == scheduler.ScheduleTypeInterval {
 			status = "recurring"
@@ -125,7 +112,7 @@ func (a *ListRemindersAction) Run(ctx context.Context, sharedState *types.AgentS
 	return types.ActionResult{
 		Result: result.String(),
 		Metadata: map[string]interface{}{
-			"tasks": tasksInterface,
+			"tasks": tasks,
 		},
 	}, nil
 }
@@ -137,12 +124,12 @@ func (a *RemoveReminderAction) Run(ctx context.Context, sharedState *types.Agent
 		return types.ActionResult{}, err
 	}
 
-	tasksInterface, err := sharedState.Scheduler.GetAllTasks()
+	tasks, err := sharedState.Scheduler.GetAllTasks()
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 
-	if len(tasksInterface) == 0 {
+	if len(tasks) == 0 {
 		return types.ActionResult{
 			Result: "No reminders to remove",
 		}, nil
@@ -150,15 +137,11 @@ func (a *RemoveReminderAction) Run(ctx context.Context, sharedState *types.Agent
 
 	// Convert from 1-based index to 0-based
 	index := removeParams.Index - 1
-	if index < 0 || index >= len(tasksInterface) {
+	if index < 0 || index >= len(tasks) {
 		return types.ActionResult{}, fmt.Errorf("invalid reminder index: %d", removeParams.Index)
 	}
 
-	task, ok := tasksInterface[index].(*scheduler.Task)
-	if !ok {
-		return types.ActionResult{}, fmt.Errorf("invalid task type")
-	}
-
+	task := tasks[index]
 	err = sharedState.Scheduler.DeleteTask(task.ID)
 	if err != nil {
 		return types.ActionResult{}, err
@@ -195,7 +178,7 @@ func (a *ReminderAction) Definition() types.ActionDefinition {
 			},
 			"cron_expr": {
 				Type:        jsonschema.String,
-				Description: "Cron expression for scheduling (e.g. '0 0 * * *' for daily at midnight). Format: 'second minute hour day month weekday'",
+				Description: "Cron expression for scheduling (e.g. '0 0 * * *' for daily at midnight). Format: 'minute hour day month weekday'",
 			},
 			"is_recurring": {
 				Type:        jsonschema.Boolean,
