@@ -52,110 +52,49 @@ func (a *ReminderAction) Run(ctx context.Context, sharedState *types.AgentShared
 		return types.ActionResult{}, err
 	}
 
-	// Use the scheduler if available, otherwise fall back to legacy in-memory storage
-	if sharedState.Scheduler != nil {
-		// Create a scheduler task
-		scheduleType := scheduler.ScheduleTypeCron
-		if !result.IsRecurring {
-			scheduleType = scheduler.ScheduleTypeOnce
-		}
-		
-		task, err := scheduler.NewTask(
-			"reminder", // agent name (not used for reminders, but required)
-			result.Message,
-			scheduleType,
-			result.CronExpr,
-		)
-		if err != nil {
-			return types.ActionResult{}, err
-		}
-		
-		// Store task ID in metadata for tracking
-		task.Metadata["reminder_type"] = "user_created"
-		
-		err = sharedState.Scheduler.CreateTask(task)
-		if err != nil {
-			return types.ActionResult{}, err
-		}
-		
-		return types.ActionResult{
-			Result: fmt.Sprintf("Reminder set successfully (ID: %s)", task.ID),
-			Metadata: map[string]interface{}{
-				"task_id":   task.ID,
-				"message":   result.Message,
-				"next_run":  task.NextRun,
-				"recurring": result.IsRecurring,
-			},
-		}, nil
+	// Create a scheduler task
+	scheduleType := scheduler.ScheduleTypeCron
+	if !result.IsRecurring {
+		scheduleType = scheduler.ScheduleTypeOnce
 	}
-	
-	// Legacy in-memory storage (for backward compatibility)
-	now := time.Now()
-	schedule, _ := parser.Parse(result.CronExpr)
-	nextRun := schedule.Next(now)
-	
-	result.LastRun = now
-	result.NextRun = nextRun
-	
-	if sharedState.Reminders == nil {
-		sharedState.Reminders = make([]types.ReminderActionResponse, 0)
+
+	task, err := scheduler.NewTask(
+		"reminder", // agent name (not used for reminders, but required)
+		result.Message,
+		scheduleType,
+		result.CronExpr,
+	)
+	if err != nil {
+		return types.ActionResult{}, err
 	}
-	sharedState.Reminders = append(sharedState.Reminders, result)
+
+	// Store task ID in metadata for tracking
+	task.Metadata["reminder_type"] = "user_created"
+
+	err = sharedState.Scheduler.CreateTask(task)
+	if err != nil {
+		return types.ActionResult{}, err
+	}
 
 	return types.ActionResult{
-		Result: "Reminder set successfully",
+		Result: fmt.Sprintf("Reminder set successfully (ID: %s)", task.ID),
 		Metadata: map[string]interface{}{
-			"reminder": result,
+			"task_id":   task.ID,
+			"message":   result.Message,
+			"next_run":  task.NextRun,
+			"recurring": result.IsRecurring,
 		},
 	}, nil
+
 }
 
 func (a *ListRemindersAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
-	// Use scheduler if available
-	if sharedState.Scheduler != nil {
-		tasksInterface, err := sharedState.Scheduler.GetAllTasks()
-		if err != nil {
-			return types.ActionResult{}, err
-		}
-		
-		if len(tasksInterface) == 0 {
-			return types.ActionResult{
-				Result: "No reminders set",
-			}, nil
-		}
-		
-		var result strings.Builder
-		result.WriteString("Current reminders:\n")
-		
-		for i, taskInterface := range tasksInterface {
-			task, ok := taskInterface.(*scheduler.Task)
-			if !ok {
-				continue
-			}
-			
-			status := "one-time"
-			if task.ScheduleType == scheduler.ScheduleTypeCron || task.ScheduleType == scheduler.ScheduleTypeInterval {
-				status = "recurring"
-			}
-			
-			result.WriteString(fmt.Sprintf("%d. %s (Next run: %s, Status: %s, ID: %s)\n",
-				i+1,
-				task.Prompt,
-				task.NextRun.Format(time.RFC3339),
-				status,
-				task.ID))
-		}
-		
-		return types.ActionResult{
-			Result: result.String(),
-			Metadata: map[string]interface{}{
-				"tasks": tasksInterface,
-			},
-		}, nil
+	tasksInterface, err := sharedState.Scheduler.GetAllTasks()
+	if err != nil {
+		return types.ActionResult{}, err
 	}
-	
-	// Legacy in-memory storage
-	if sharedState.Reminders == nil || len(sharedState.Reminders) == 0 {
+
+	if len(tasksInterface) == 0 {
 		return types.ActionResult{
 			Result: "No reminders set",
 		}, nil
@@ -163,22 +102,30 @@ func (a *ListRemindersAction) Run(ctx context.Context, sharedState *types.AgentS
 
 	var result strings.Builder
 	result.WriteString("Current reminders:\n")
-	for i, reminder := range sharedState.Reminders {
+
+	for i, taskInterface := range tasksInterface {
+		task, ok := taskInterface.(*scheduler.Task)
+		if !ok {
+			continue
+		}
+
 		status := "one-time"
-		if reminder.IsRecurring {
+		if task.ScheduleType == scheduler.ScheduleTypeCron || task.ScheduleType == scheduler.ScheduleTypeInterval {
 			status = "recurring"
 		}
-		result.WriteString(fmt.Sprintf("%d. %s (Next run: %s, Status: %s)\n",
+
+		result.WriteString(fmt.Sprintf("%d. %s (Next run: %s, Status: %s, ID: %s)\n",
 			i+1,
-			reminder.Message,
-			reminder.NextRun.Format(time.RFC3339),
-			status))
+			task.Prompt,
+			task.NextRun.Format(time.RFC3339),
+			status,
+			task.ID))
 	}
 
 	return types.ActionResult{
 		Result: result.String(),
 		Metadata: map[string]interface{}{
-			"reminders": sharedState.Reminders,
+			"tasks": tasksInterface,
 		},
 	}, nil
 }
@@ -190,45 +137,12 @@ func (a *RemoveReminderAction) Run(ctx context.Context, sharedState *types.Agent
 		return types.ActionResult{}, err
 	}
 
-	// Use scheduler if available
-	if sharedState.Scheduler != nil {
-		tasksInterface, err := sharedState.Scheduler.GetAllTasks()
-		if err != nil {
-			return types.ActionResult{}, err
-		}
-		
-		if len(tasksInterface) == 0 {
-			return types.ActionResult{
-				Result: "No reminders to remove",
-			}, nil
-		}
-		
-		// Convert from 1-based index to 0-based
-		index := removeParams.Index - 1
-		if index < 0 || index >= len(tasksInterface) {
-			return types.ActionResult{}, fmt.Errorf("invalid reminder index: %d", removeParams.Index)
-		}
-		
-		task, ok := tasksInterface[index].(*scheduler.Task)
-		if !ok {
-			return types.ActionResult{}, fmt.Errorf("invalid task type")
-		}
-		
-		err = sharedState.Scheduler.DeleteTask(task.ID)
-		if err != nil {
-			return types.ActionResult{}, err
-		}
-		
-		return types.ActionResult{
-			Result: fmt.Sprintf("Removed reminder: %s", task.Prompt),
-			Metadata: map[string]interface{}{
-				"removed_task_id": task.ID,
-			},
-		}, nil
+	tasksInterface, err := sharedState.Scheduler.GetAllTasks()
+	if err != nil {
+		return types.ActionResult{}, err
 	}
-	
-	// Legacy in-memory storage
-	if sharedState.Reminders == nil || len(sharedState.Reminders) == 0 {
+
+	if len(tasksInterface) == 0 {
 		return types.ActionResult{
 			Result: "No reminders to remove",
 		}, nil
@@ -236,18 +150,24 @@ func (a *RemoveReminderAction) Run(ctx context.Context, sharedState *types.Agent
 
 	// Convert from 1-based index to 0-based
 	index := removeParams.Index - 1
-	if index < 0 || index >= len(sharedState.Reminders) {
+	if index < 0 || index >= len(tasksInterface) {
 		return types.ActionResult{}, fmt.Errorf("invalid reminder index: %d", removeParams.Index)
 	}
 
-	// Remove the reminder
-	removed := sharedState.Reminders[index]
-	sharedState.Reminders = append(sharedState.Reminders[:index], sharedState.Reminders[index+1:]...)
+	task, ok := tasksInterface[index].(*scheduler.Task)
+	if !ok {
+		return types.ActionResult{}, fmt.Errorf("invalid task type")
+	}
+
+	err = sharedState.Scheduler.DeleteTask(task.ID)
+	if err != nil {
+		return types.ActionResult{}, err
+	}
 
 	return types.ActionResult{
-		Result: fmt.Sprintf("Removed reminder: %s", removed.Message),
+		Result: fmt.Sprintf("Removed reminder: %s", task.Prompt),
 		Metadata: map[string]interface{}{
-			"removed_reminder": removed,
+			"removed_task_id": task.ID,
 		},
 	}, nil
 }
