@@ -1236,46 +1236,11 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 				obs.Name = "reminder"
 				obs.Icon = "bell"
 				a.observer.Update(*obs)
-				reminderJob.WithObserver(obs)
+				reminderJob.Obs = obs
 			}
 
 			// Send the job to the queue
 			a.jobQueue <- reminderJob
-		}
-	}
-			obs := a.observer.NewObservable()
-			obs.Name = "reminder"
-			obs.Icon = "bell"
-			a.observer.Update(*obs)
-			reminderJob.Obs = obs
-		}
-
-		// Process the reminder as a normal conversation
-		a.consumeJob(reminderJob, UserRole)
-
-		// After the reminder job is complete, ensure the user is notified
-		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
-			// Get the last assistant message from the conversation
-			var lastAssistantMsg *openai.ChatCompletionMessage
-			for i := len(reminderJob.Result.Conversation) - 1; i >= 0; i-- {
-				if reminderJob.Result.Conversation[i].Role == AssistantRole {
-					lastAssistantMsg = &reminderJob.Result.Conversation[i]
-					break
-				}
-			}
-
-			if lastAssistantMsg != nil && lastAssistantMsg.Content != "" {
-				// Send the reminder response to the user
-				msg := openai.ChatCompletionMessage{
-					Role:    "assistant",
-					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, lastAssistantMsg.Content),
-				}
-
-				go func(agent *Agent) {
-					xlog.Info("Sending reminder response to user", "agent", agent.Character.Name, "message", msg.Content)
-					agent.newConversations <- msg
-				}(a)
-			}
 		}
 	}
 

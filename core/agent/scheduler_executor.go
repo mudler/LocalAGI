@@ -30,7 +30,11 @@ func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, 
 
 	// Attach observable so UI can show reminder processing state
 	if e.agent.observer != nil {
-		reminderJob.WithObserver(e.agent.observer)
+		obs := e.agent.observer.NewObservable()
+		obs.Name = "reminder"
+		obs.Icon = "bell"
+		e.agent.observer.Update(*obs)
+		reminderJob.Obs = obs
 	}
 
 	// Send the job to be processed
@@ -40,15 +44,16 @@ func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, 
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-reminderJob.Done:
-		if reminderJob.Err != nil {
+	default:
+		result := reminderJob.Result.WaitResult()
+		if result.Error != nil {
 			return &scheduler.JobResult{
 				Response: "",
-				Error:    reminderJob.Err,
-			}, reminderJob.Err
+				Error:    result.Error,
+			}, result.Error
 		}
 		return &scheduler.JobResult{
-			Response: reminderJob.Result,
+			Response: result.Response,
 			Error:    nil,
 		}, nil
 	}
