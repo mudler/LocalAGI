@@ -77,7 +77,7 @@ func WithResultCallback(f func(ActionState)) JobOption {
 	}
 }
 
-func WithMetadata(metadata map[string]interface{}) JobOption {
+func WithMetadata(metadata map[string]any) JobOption {
 	return func(j *Job) {
 		j.Metadata = metadata
 	}

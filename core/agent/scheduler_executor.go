@@ -17,18 +17,16 @@ type agentSchedulerExecutor struct {
 func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, prompt string) (*scheduler.JobResult, error) {
 	// Create a job for the reminder
 	reminderJob := types.NewJob(
-		types.WithText(fmt.Sprintf("I have a reminder for you: %s", prompt)),
+		types.WithText(fmt.Sprintf("You need to execute the following task, by using the tools available to you. When the task is completed, you need to send a message to the user with send_message tool to inform them that the task is completed: %s", prompt)),
 		types.WithReasoningCallback(e.agent.options.reasoningCallback),
 		types.WithResultCallback(e.agent.options.resultCallback),
 		types.WithContext(ctx),
-		types.WithMetadata(map[string]interface{}{"type": "scheduled"}),
+		types.WithMetadata(map[string]any{
+			"message":     prompt,
+			"is_reminder": true,
+			"type":        "scheduled",
+		}),
 	)
-
-	// Add metadata to indicate this is a reminder
-	reminderJob.Metadata = map[string]interface{}{
-		"message":     prompt,
-		"is_reminder": true,
-	}
 
 	// Attach observable so UI can show reminder processing state
 	if e.agent.observer != nil {

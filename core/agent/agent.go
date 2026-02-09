@@ -891,6 +891,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				a.observer.Update(*job.Obs)
 			}
 		}),
+		cogito.DisableSinkState,
 		cogito.WithTools(
 			cogitoTools...,
 		),
