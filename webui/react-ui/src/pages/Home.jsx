@@ -59,9 +59,9 @@ function Home() {
       <div className="image-container">
         <img src="/app/logo_1.png" width="250" alt="LocalAGI Logo" />
       </div>
-      
+
       {/*<h1 className="dashboard-title">LocalAGI</h1>*/}
-      
+
       {/* Dashboard Stats */}
       <div className="dashboard-stats">
         <div className="stat-item">
@@ -87,7 +87,7 @@ function Home() {
             <p>View and manage your list of agents, including detailed profiles and statistics.</p>
           </div>
         </Link>
-        
+
         {/* Card for Create Agent */}
         <Link to="/create" className="card-link">
           <div className="card">
@@ -95,7 +95,7 @@ function Home() {
             <p>Create a new intelligent agent with custom behaviors, connectors, and actions.</p>
           </div>
         </Link>
-        
+
         {/* Card for Actions Playground */}
         <Link to="/actions-playground" className="card-link">
           <div className="card">
@@ -103,7 +103,7 @@ function Home() {
             <p>Explore and test available actions for your agents.</p>
           </div>
         </Link>
-        
+
         {/* Card for Group Create */}
         <Link to="/group-create" className="card-link">
           <div className="card">
@@ -122,32 +122,6 @@ function Home() {
 
       </div>
 
-      {stats.agents.length > 0 && (
-        <div className="recent-agents">
-          <h2>Your Agents</h2>
-          <div className="cards-container">
-            {stats.agents.map((agent) => (
-              <div key={agent} className="card">
-                <div className={`status-badge ${stats.status[agent] ? 'status-active' : 'status-paused'}`}>
-                  {stats.status[agent] ? 'Active' : 'Paused'}
-                </div>
-                <h2><i className="fas fa-robot"></i> {agent}</h2>
-                <div className="agent-actions">
-                  <Link to={`/talk/${agent}`} className="action-btn chat-btn">
-                    <i className="fas fa-comment"></i> Chat
-                  </Link>
-                  <Link to={`/settings/${agent}`} className="action-btn settings-btn">
-                    <i className="fas fa-cog"></i> Settings
-                  </Link>
-                  <Link to={`/status/${agent}`} className="action-btn status-btn">
-                    <i className="fas fa-chart-line"></i> Status
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

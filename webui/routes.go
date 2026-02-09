@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"path/filepath"
 
 	"github.com/dave-gray101/v2keyauth"
 	fiber "github.com/gofiber/fiber/v2"
@@ -26,13 +25,6 @@ import (
 var reactUI embed.FS
 
 func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
-
-	// Static avatars in a.pooldir/avatars
-	webapp.Use("/avatars", filesystem.New(filesystem.Config{
-		Root: http.Dir(filepath.Join(app.config.StateDir, "avatars")),
-		//	PathPrefix: "avatars",
-		Browse: true,
-	}))
 
 	if len(app.config.ApiKeys) > 0 {
 		kaConfig, err := GetKeyAuthConfig(app.config.ApiKeys)

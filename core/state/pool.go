@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -15,11 +14,8 @@ import (
 	. "github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/llm"
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/pkg/utils"
-	"github.com/sashabaranov/go-openai"
-	"github.com/sashabaranov/go-openai/jsonschema"
 
 	"github.com/mudler/xlog"
 )
@@ -34,7 +30,7 @@ type AgentPool struct {
 	agentStatus                                                   map[string]*Status
 	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel string
 	defaultTranscriptionModel, defaultTranscriptionLanguage       string
-	imageModel, localRAGAPI, localRAGKey, apiKey                  string
+	localRAGAPI, localRAGKey, apiKey                              string
 	availableActions                                              func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                                    func(*AgentConfig) []Connector
 	dynamicPrompt                                                 func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
@@ -74,7 +70,7 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, imageModel, apiURL, apiKey, directory string,
+	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, apiURL, apiKey, directory string,
 	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
@@ -92,7 +88,6 @@ func NewAgentPool(
 	if withLogs {
 		conversationPath = filepath.Join(directory, "conversations")
 	}
-
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
@@ -104,7 +99,6 @@ func NewAgentPool(
 			defaultTranscriptionModel:    defaultTranscriptionModel,
 			defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 			defaultTTSModel:              defaultTTSModel,
-			imageModel:                   imageModel,
 			localRAGAPI:                  LocalRAGAPI,
 			apiKey:                       apiKey,
 			agents:                       make(map[string]*Agent),
@@ -133,7 +127,6 @@ func NewAgentPool(
 		defaultTranscriptionModel:    defaultTranscriptionModel,
 		defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 		defaultTTSModel:              defaultTTSModel,
-		imageModel:                   imageModel,
 		apiKey:                       apiKey,
 		agents:                       make(map[string]*Agent),
 		managers:                     make(map[string]sse.Manager),
@@ -169,13 +162,6 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 	if err := a.save(); err != nil {
 		return err
 	}
-
-	go func(ac AgentConfig) {
-		// Create the agent avatar
-		if err := createAgentAvatar(a.apiURL, a.apiKey, a.defaultModel, a.imageModel, a.pooldir, ac); err != nil {
-			xlog.Error("Failed to create agent avatar", "error", err)
-		}
-	}(a.pool[name])
 
 	return a.startAgentWithConfig(name, a.pooldir, agentConfig, nil)
 }
@@ -227,84 +213,6 @@ func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
 	}
 
 	return nil
-}
-
-func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agent AgentConfig) error {
-	client := llm.NewClient(APIKey, APIURL+"/v1", "10m")
-
-	if imageModel == "" {
-		return fmt.Errorf("image model not set")
-	}
-
-	if model == "" {
-		return fmt.Errorf("default model not set")
-	}
-
-	imagePath := filepath.Join(avatarDir, "avatars", fmt.Sprintf("%s.png", agent.Name))
-	if _, err := os.Stat(imagePath); err == nil {
-		// Image already exists
-		xlog.Debug("Avatar already exists", "path", imagePath)
-		return nil
-	}
-
-	var results struct {
-		ImagePrompt string `json:"image_prompt"`
-	}
-
-	err := llm.GenerateTypedJSONWithGuidance(
-		context.Background(),
-		llm.NewClient(APIKey, APIURL, "10m"),
-		"Generate a prompt that I can use to create a random avatar for the bot '"+agent.Name+"', the description of the bot is: "+agent.Description,
-		model,
-		jsonschema.Definition{
-			Type: jsonschema.Object,
-			Properties: map[string]jsonschema.Definition{
-				"image_prompt": {
-					Type:        jsonschema.String,
-					Description: "The prompt to generate the image",
-				},
-			},
-			Required: []string{"image_prompt"},
-		}, &results)
-	if err != nil {
-		return fmt.Errorf("failed to generate image prompt: %w", err)
-	}
-
-	if results.ImagePrompt == "" {
-		xlog.Error("Failed to generate image prompt")
-		return fmt.Errorf("failed to generate image prompt")
-	}
-
-	req := openai.ImageRequest{
-		Prompt:         results.ImagePrompt,
-		Model:          imageModel,
-		Size:           openai.CreateImageSize256x256,
-		ResponseFormat: openai.CreateImageResponseFormatB64JSON,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
-	resp, err := client.CreateImage(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to generate image: %w", err)
-	}
-
-	if len(resp.Data) == 0 {
-		return fmt.Errorf("failed to generate image")
-	}
-
-	imageJson := resp.Data[0].B64JSON
-
-	os.MkdirAll(filepath.Join(avatarDir, "avatars"), 0755)
-
-	// Save the image to the agent directory
-	imageData, err := base64.StdEncoding.DecodeString(imageJson)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(imagePath, imageData, 0644)
 }
 
 func (a *AgentPool) List() []string {
@@ -730,9 +638,6 @@ func (a *AgentPool) Remove(name string) error {
 	a.stop(name)
 	delete(a.agents, name)
 	delete(a.pool, name)
-
-	// remove avatar
-	os.Remove(filepath.Join(a.pooldir, "avatars", fmt.Sprintf("%s.png", name)))
 
 	if err := a.save(); err != nil {
 		return err

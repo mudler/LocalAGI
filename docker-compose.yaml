@@ -9,7 +9,6 @@ services:
     command: 
     - ${MODEL_NAME:-gemma-3-4b-it-qat}
     - ${MULTIMODAL_MODEL:-gemma-3-4b-it-qat}
-    - ${IMAGE_MODEL:-Z-Image-Turbo}
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -115,7 +114,6 @@ services:
     environment:
       - LOCALAGI_MODEL=${MODEL_NAME:-gemma-3-4b-it-qat}
       - LOCALAGI_MULTIMODAL_MODEL=${MULTIMODAL_MODEL:-moondream2-20250414}
-      - LOCALAGI_IMAGE_MODEL=${IMAGE_MODEL:-Z-Image-Turbo}
       - LOCALAGI_LLM_API_URL=http://localai:8080
       #- LOCALAGI_LLM_API_KEY=sk-1234567890
       - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
