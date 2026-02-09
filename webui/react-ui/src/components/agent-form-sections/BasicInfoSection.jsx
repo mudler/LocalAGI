@@ -46,6 +46,7 @@ const BasicInfoSection = ({ formData, handleInputChange, isEdit, isGroupForm, me
       handleInputChange({
         target: {
           name,
+          type,
           value
         }
       });

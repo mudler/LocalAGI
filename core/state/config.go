@@ -3,12 +3,28 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 )
+
+// parseIntField parses an integer field that may be received as either a number or a string
+func parseIntField(value interface{}) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	case string:
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+	}
+	return 0
+}
 
 type ConnectorConfig struct {
 	Type   string `json:"type"` // e.g. Slack
@@ -451,6 +467,9 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 	aux := &struct {
 		*Alias
 		MCPSTDIOServersConfig interface{} `json:"mcp_stdio_servers"`
+		MaxEvaluationLoops    interface{} `json:"max_evaluation_loops"`
+		ParallelJobs          interface{} `json:"parallel_jobs"`
+		KnowledgeBaseResults  interface{} `json:"kb_results"`
 	}{
 		Alias: (*Alias)(a),
 	}
@@ -458,6 +477,11 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
+
+	// Parse integer fields that may come as strings
+	a.MaxEvaluationLoops = parseIntField(aux.MaxEvaluationLoops)
+	a.ParallelJobs = parseIntField(aux.ParallelJobs)
+	a.KnowledgeBaseResults = parseIntField(aux.KnowledgeBaseResults)
 
 	// Handle MCP STDIO servers configuration
 	if aux.MCPSTDIOServersConfig != nil {

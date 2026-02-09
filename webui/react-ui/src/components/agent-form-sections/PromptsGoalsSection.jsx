@@ -50,6 +50,7 @@ const PromptsGoalsSection = ({
       handleInputChange({
         target: {
           name,
+          type,
           value
         }
       });

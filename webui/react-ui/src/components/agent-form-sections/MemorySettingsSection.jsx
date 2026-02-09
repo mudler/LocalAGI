@@ -29,6 +29,7 @@ const MemorySettingsSection = ({ formData, handleInputChange, metadata }) => {
       handleInputChange({
         target: {
           name,
+          type,
           value
         }
       });
