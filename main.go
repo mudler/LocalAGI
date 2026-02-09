@@ -23,7 +23,6 @@ var stateDir = os.Getenv("LOCALAGI_STATE_DIR")
 var localRAG = os.Getenv("LOCALAGI_LOCALRAG_URL")
 var withLogs = os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
 var apiKeysEnv = os.Getenv("LOCALAGI_API_KEYS")
-var imageModel = os.Getenv("LOCALAGI_IMAGE_MODEL")
 var conversationDuration = os.Getenv("LOCALAGI_CONVERSATION_DURATION")
 var customActionsDir = os.Getenv("LOCALAGI_CUSTOM_ACTIONS_DIR")
 var sshBoxURL = os.Getenv("LOCALAGI_SSHBOX_URL")
@@ -64,7 +63,6 @@ func main() {
 		transcriptionModel,
 		transcriptionLanguage,
 		ttsModel,
-		imageModel,
 		apiURL,
 		apiKey,
 		stateDir,

@@ -548,15 +548,19 @@ a:hover {
 
 /* Status Badges */
 .status-badge {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
   padding: 0.25rem 0.75rem;
   border-radius: var(--radius-full);
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.card .status-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
 }
 
 .status-active,
@@ -683,32 +687,9 @@ a:hover {
 }
 
 /* Agents Grid */
-.agents-grid {
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 1.25rem;
-}
 
-@media (min-width: 768px) {
-  .agents-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
 
-@media (min-width: 1024px) {
-  .agents-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
 
-.recent-agents {
-  margin-top: 3rem;
-}
-
-.recent-agents h2 {
-  margin-bottom: 1.5rem;
-  text-align: center;
-}
 
 /* ===================================
    HOME PAGE
@@ -728,28 +709,7 @@ a:hover {
   transform: scale(1.02);
 }
 
-/* Avatar Placeholder */
-.avatar-placeholder {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-primary);
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-  border: 2px solid var(--color-primary-border);
-}
 
-.avatar-container {
-  margin-bottom: 1rem;
-}
-
-.placeholder-text {
-  z-index: 1;
-}
 
 /* ===================================
    FORMS & INPUTS
@@ -1530,5 +1490,86 @@ select.form-control {
 
   .chat-main {
     height: 400px;
+  }
+}
+
+/* ===================================
+   AGENTS TABLE
+   =================================== */
+
+.agents-table-container {
+  width: 100%;
+  overflow-x: auto;
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 2rem;
+}
+
+.agents-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  min-width: 800px;
+}
+
+.agents-table th {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.agents-table td {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  transition: background-color var(--duration-fast);
+}
+
+.agents-table tr:last-child td {
+  border-bottom: none;
+}
+
+.agents-table tr:hover td {
+  background-color: var(--color-primary-light);
+}
+
+.agent-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.agent-name-main {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 1.1rem;
+}
+
+.agent-table-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.agent-table-actions .action-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .agents-table-container {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 }

@@ -29,8 +29,7 @@ export default defineConfig(({ mode }) => {
         '/chat': backendUrl,
         '/status': backendUrl,
         '/action': backendUrl,
-        '/actions': backendUrl,
-        '/avatars': backendUrl
+        '/actions': backendUrl
       }
     }
   }
