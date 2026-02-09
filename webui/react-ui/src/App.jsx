@@ -22,19 +22,19 @@ function App() {
   return (
     <div className="app-container">
       {/* Navigation Menu */}
-      <nav className="main-nav" style={{ backgroundColor: 'var(--darker-bg)', borderBottom: '1px solid var(--medium-bg)', zIndex: 10 }}>
+      <nav className="main-nav">
         <div className="container">
           <div className="nav-content">
             <div className="logo-container">
-              {/* Logo with glow effect */}
+              {/* Logo */}
               <Link to="/" className="logo-link">
                 <div className="logo-image-container">
                   <img src="/app/logo_2.png" alt="Logo" className="logo-image" />
                 </div>
-                 {/* <span className="logo-text">LocalAGI</span> */}
+                {/* <span className="logo-text">LocalAGI</span> */}
               </Link>
             </div>
-            
+
             <div className="desktop-menu">
               <ul className="nav-links">
                 <li>
@@ -59,22 +59,22 @@ function App() {
                 </li>
               </ul>
             </div>
-            
+
             <div className="">
               <span className="status-indicator"></span>
               <span className="status-text">State: <span className="status-value">active</span></span>
             </div>
-            
+
             <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
               <i className="fas fa-bars"></i>
             </div>
           </div>
         </div>
       </nav>
-      
+
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="mobile-menu" style={{ backgroundColor: 'var(--darker-bg)', borderTop: '1px solid var(--medium-bg)' }}>
+        <div className="mobile-menu">
           <ul className="mobile-nav-links">
             <li>
               <Link to="/" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
@@ -99,21 +99,21 @@ function App() {
           </ul>
         </div>
       )}
-      
+
       {/* Toast Notification */}
       {toast.visible && (
         <div className={`toast ${toast.type}`}>
           <span>{toast.message}</span>
         </div>
       )}
-      
+
       {/* Main Content Area */}
       <main className="main-content">
         <div className="container">
           <Outlet context={{ showToast }} />
         </div>
       </main>
-      
+
     </div>
   )
 }
