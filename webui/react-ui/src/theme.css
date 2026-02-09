@@ -1,0 +1,105 @@
+/* LocalAGI Theme - CSS Variables System */
+/* Inspired by LocalAI's elegant professional design */
+
+:root {
+  /* Background Colors */
+  --color-bg-primary: #0F172A;      /* Deep navy background */
+  --color-bg-secondary: #1E293B;    /* Elevated surfaces */
+  --color-bg-tertiary: #1E293B;     /* Cards, panels */
+  --color-bg-overlay: rgba(15, 23, 42, 0.8); /* Modals, overlays */
+  
+  /* Brand Colors - Primary Palette */
+  --color-primary: #38BDF8;         /* Cyan - primary actions */
+  --color-primary-hover: #0EA5E9;   /* Darker cyan on hover */
+  --color-primary-active: #0284C7;  /* Active state */
+  --color-primary-text: #FFFFFF;    /* Text on primary background */
+  --color-primary-light: rgba(56, 189, 248, 0.08);
+  --color-primary-border: rgba(56, 189, 248, 0.15);
+  
+  /* Secondary Colors */
+  --color-secondary: #14B8A6;       /* Teal - secondary actions */
+  --color-secondary-hover: #0D9488;
+  --color-secondary-light: rgba(20, 184, 166, 0.1);
+  
+  /* Accent Colors */
+  --color-accent: #8B5CF6;          /* Purple - special states */
+  --color-accent-hover: #7C3AED;
+  --color-accent-light: rgba(139, 92, 246, 0.1);
+  --color-accent-purple: #A78BFA;   /* Light purple for gradients */
+  --color-accent-teal: #2DD4BF;     /* Light teal for gradients */
+  
+  /* Text Colors */
+  --color-text-primary: #E5E7EB;    /* Primary text */
+  --color-text-secondary: #94A3B8;  /* Secondary text */
+  --color-text-muted: #64748B;      /* Tertiary/muted text */
+  --color-text-disabled: #475569;   /* Disabled text */
+  --color-text-inverse: #0F172A;    /* Text on light backgrounds */
+  
+  /* Border Colors */
+  --color-border: rgba(148, 163, 184, 0.12);
+  --color-border-subtle: rgba(148, 163, 184, 0.08);
+  --color-border-strong: rgba(56, 189, 248, 0.2);
+  --color-border-focus: rgba(56, 189, 248, 0.3);
+  
+  /* Status Colors */
+  --color-success: #14B8A6;
+  --color-success-light: rgba(20, 184, 166, 0.1);
+  --color-warning: #F59E0B;
+  --color-warning-light: rgba(245, 158, 11, 0.1);
+  --color-error: #EF4444;
+  --color-error-light: rgba(239, 68, 68, 0.1);
+  --color-info: #38BDF8;
+  --color-info-light: rgba(56, 189, 248, 0.1);
+  
+  /* Gradient Definitions */
+  --gradient-primary: linear-gradient(135deg, #38BDF8 0%, #8B5CF6 50%, #14B8A6 100%);
+  --gradient-subtle: linear-gradient(135deg, rgba(56, 189, 248, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+  --gradient-text: linear-gradient(135deg, #38BDF8 0%, #8B5CF6 50%, #14B8A6 100%);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 0 1px rgba(56, 189, 248, 0.1), 0 0 8px rgba(56, 189, 248, 0.15);
+  
+  /* Animation Timing */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+  
+  /* Spacing Scale */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  /* Legacy Variable Mappings (for backward compatibility) */
+  --primary: var(--color-primary);
+  --secondary: var(--color-secondary);
+  --tertiary: var(--color-accent);
+  --dark-bg: var(--color-bg-primary);
+  --darker-bg: var(--color-bg-primary);
+  --medium-bg: var(--color-bg-secondary);
+  --light-bg: var(--color-bg-tertiary);
+  --text: var(--color-text-primary);
+  --border: var(--color-border);
+  --success: var(--color-success);
+  --danger: var(--color-error);
+  --warning: var(--color-warning);
+  --info: var(--color-info);
+  
+  /* Remove old glow effects - use subtle shadows instead */
+  --neon-glow: none;
+  --pink-glow: none;
+  --purple-glow: none;
+}
