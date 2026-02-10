@@ -30,6 +30,20 @@ const (
 	SystemRole    = "system"
 )
 
+// NoToolToCallArgs defines the arguments for the no_tool_to_call sink state tool
+type NoToolToCallArgs struct {
+	Reasoning string `json:"reasoning" description:"The reasoning for why no tool is being called"`
+}
+
+// NoToolToCallTool is a custom sink state tool that logs when no other tool is needed
+type NoToolToCallTool struct{}
+
+// Run executes the no_tool_to_call tool and logs a message
+func (t NoToolToCallTool) Run(args NoToolToCallArgs) (string, any, error) {
+	xlog.Info("No tool to call - agent decided no action was needed", "reasoning", args.Reasoning)
+	return fmt.Sprintf("No action needed: %s", args.Reasoning), nil, nil
+}
+
 type Agent struct {
 	sync.Mutex
 	options   *options
@@ -893,9 +907,16 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				a.observer.Update(*job.Obs)
 			}
 		}),
-		//cogito.DisableSinkState,
 		cogito.WithTools(
 			cogitoTools...,
+		),
+		cogito.WithSinkState(
+			cogito.NewToolDefinition(
+				NoToolToCallTool{},
+				NoToolToCallArgs{},
+				"no_tool_to_call",
+				"Called when no other tool is needed to respond to the user",
+			),
 		),
 		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
 			if a.observer != nil && obs != nil {
