@@ -73,12 +73,12 @@ func (i *IRC) Start(a *agent.Agent) {
 
 	if i.channel != "" {
 		// handle new conversations
-		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-			xlog.Debug("Subscriber(irc)", "message", ccm.Content)
+		a.AddSubscriber(func(ccm *types.ConversationMessage) {
+			xlog.Debug("Subscriber(irc)", "message", ccm.Message.Content)
 
 			// Split the response into multiple messages if it's too long
 			maxLength := 400 // Safe limit for most IRC servers
-			response := ccm.Content
+			response := ccm.Message.Content
 
 			// Handle multiline responses
 			lines := strings.Split(response, "\n")
@@ -109,7 +109,7 @@ func (i *IRC) Start(a *agent.Agent) {
 			a.SharedState().ConversationTracker.AddMessage(
 				fmt.Sprintf("irc:%s", i.channel),
 				openai.ChatCompletionMessage{
-					Content: ccm.Content,
+					Content: ccm.Message.Content,
 					Role:    "assistant",
 				},
 			)

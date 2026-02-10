@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -918,11 +919,68 @@ func (t *Telegram) Start(a *agent.Agent) {
 
 	if t.channelID != "" {
 		// handle new conversations
-		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-			xlog.Debug("Subscriber(telegram)", "message", ccm.Content)
+		a.AddSubscriber(func(ccm *types.ConversationMessage) {
+			xlog.Debug("Subscriber(telegram)", "message", ccm.Message.Content)
+
+			// First, handle any multimedia content from metadata
+			if ccm.Metadata != nil {
+				// Handle images from gen image actions
+				if imagesUrls, exists := ccm.Metadata[actions.MetadataImages]; exists {
+					for _, url := range xstrings.UniqueSlice(imagesUrls.([]string)) {
+						xlog.Debug("Sending photo from new conversation", "url", url)
+						chatID, _ := strconv.ParseInt(t.channelID, 10, 64)
+						if err := sendImageToTelegram(ctx, t.bot, chatID, url); err != nil {
+							xlog.Error("Error handling image", "error", err)
+						}
+					}
+				}
+
+				// Handle songs from generate_song action (local file paths)
+				if songPaths, exists := ccm.Metadata[actions.MetadataSongs]; exists {
+					for _, path := range xstrings.UniqueSlice(songPaths.([]string)) {
+						xlog.Debug("Sending song from new conversation", "path", path)
+						chatID, _ := strconv.ParseInt(t.channelID, 10, 64)
+						if err := sendSongToTelegram(ctx, t.bot, chatID, path); err != nil {
+							xlog.Error("Error sending song", "error", err)
+						}
+					}
+				}
+
+				// Handle PDFs from generate_pdf action (local file paths)
+				if pdfPaths, exists := ccm.Metadata[actions.MetadataPDFs]; exists {
+					for _, path := range xstrings.UniqueSlice(pdfPaths.([]string)) {
+						data, err := os.ReadFile(path)
+						if err != nil {
+							xlog.Error("Error reading PDF file", "path", path, "error", err)
+							continue
+						}
+
+						filename := filepath.Base(path)
+						if filename == "" || filename == "." {
+							filename = "document.pdf"
+						}
+
+						xlog.Debug("Sending PDF document from new conversation", "filename", filename, "size", len(data))
+						chatID, _ := strconv.ParseInt(t.channelID, 10, 64)
+						_, err = t.bot.SendDocument(ctx, &bot.SendDocumentParams{
+							ChatID: chatID,
+							Document: &models.InputFileUpload{
+								Filename: filename,
+								Data:     bytes.NewReader(data),
+							},
+							Caption: "Generated PDF",
+						})
+						if err != nil {
+							xlog.Error("Error sending PDF", "error", err)
+						}
+					}
+				}
+			}
+
+			// Then send the text message
 			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: t.channelID,
-				Text:   ccm.Content,
+				Text:   ccm.Message.Content,
 			})
 			if err != nil {
 				xlog.Error("Error sending message", "error", err)
@@ -932,7 +990,7 @@ func (t *Telegram) Start(a *agent.Agent) {
 			t.agent.SharedState().ConversationTracker.AddMessage(
 				fmt.Sprintf("telegram:%s", t.channelID),
 				openai.ChatCompletionMessage{
-					Content: ccm.Content,
+					Content: ccm.Message.Content,
 					Role:    "assistant",
 				},
 			)

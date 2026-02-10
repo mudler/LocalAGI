@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/sashabaranov/go-openai"
 )
 
 type Option func(*options) error
@@ -30,7 +29,7 @@ type options struct {
 	jobFilters                                                                                   types.JobFilters
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
 	stripThinkingTags                                                                            bool
-	kbAutoSearch                                                                                  bool
+	kbAutoSearch                                                                                 bool
 
 	canStopItself         bool
 	initiateConversations bool
@@ -70,7 +69,7 @@ type options struct {
 	mcpServers                  []MCPServer
 	mcpStdioServers             []MCPSTDIOServer
 	mcpPrepareScript            string
-	newConversationsSubscribers []func(openai.ChatCompletionMessage)
+	newConversationsSubscribers []func(*types.ConversationMessage)
 
 	observer     Observer
 	parallelJobs int
@@ -88,8 +87,8 @@ func defaultOptions() *options {
 		periodicRuns:          15 * time.Minute,
 		schedulerPollInterval: 30 * time.Second,
 		maxEvaluationLoops:    2,
-		enableEvaluation:   false,
-		kbAutoSearch:       true, // Default to true to maintain backward compatibility
+		enableEvaluation:      false,
+		kbAutoSearch:          true, // Default to true to maintain backward compatibility
 		LLMAPI: llmOptions{
 			APIURL:                "http://localhost:8080",
 			Model:                 "gpt-4",
@@ -210,7 +209,7 @@ func WithParallelJobs(jobs int) Option {
 	}
 }
 
-func WithNewConversationSubscriber(sub func(openai.ChatCompletionMessage)) Option {
+func WithNewConversationSubscriber(sub func(*types.ConversationMessage)) Option {
 	return func(o *options) error {
 		o.newConversationsSubscribers = append(o.newConversationsSubscribers, sub)
 		return nil

@@ -225,16 +225,16 @@ func (m *Matrix) Start(a *agent.Agent) {
 
 	if m.roomID != "" {
 		// handle new conversations
-		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-			xlog.Debug("Subscriber(matrix)", "message", ccm.Content)
-			_, err := m.client.SendText(context.Background(), id.RoomID(m.roomID), ccm.Content)
+		a.AddSubscriber(func(ccm *types.ConversationMessage) {
+			xlog.Debug("Subscriber(matrix)", "message", ccm.Message.Content)
+			_, err := m.client.SendText(context.Background(), id.RoomID(m.roomID), ccm.Message.Content)
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 			}
 			a.SharedState().ConversationTracker.AddMessage(
 				fmt.Sprintf("matrix:%s", m.roomID),
 				openai.ChatCompletionMessage{
-					Content: ccm.Content,
+					Content: ccm.Message.Content,
 					Role:    "assistant",
 				},
 			)

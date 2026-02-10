@@ -85,11 +85,11 @@ func (d *Discord) Start(a *agent.Agent) {
 
 	if d.defaultChannel != "" {
 		// handle new conversations
-		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-			xlog.Debug("Subscriber(discord)", "message", ccm.Content)
+		a.AddSubscriber(func(ccm *types.ConversationMessage) {
+			xlog.Debug("Subscriber(discord)", "message", ccm.Message.Content)
 
 			// Send the message to the default channel
-			_, err := dg.ChannelMessageSend(d.defaultChannel, ccm.Content)
+			_, err := dg.ChannelMessageSend(d.defaultChannel, ccm.Message.Content)
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error sending message: %v", err))
 			}
@@ -97,7 +97,7 @@ func (d *Discord) Start(a *agent.Agent) {
 			a.SharedState().ConversationTracker.AddMessage(
 				fmt.Sprintf("discord:%s", d.defaultChannel),
 				openai.ChatCompletionMessage{
-					Content: ccm.Content,
+					Content: ccm.Message.Content,
 					Role:    "assistant",
 				},
 			)

@@ -377,14 +377,14 @@ func (e *Email) Start(a *agent.Agent) {
 	go func() {
 		if e.defaultEmail != "" {
 			// handle new conversations
-			a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-				xlog.Debug("Subscriber(email)", "message", ccm.Content)
+			a.AddSubscriber(func(ccm *types.ConversationMessage) {
+				xlog.Debug("Subscriber(email)", "message", ccm.Message.Content)
 
 				// Send the message to the default email
 				e.sendMail(
 					e.defaultEmail,
 					"Message from LocalAGI",
-					ccm.Content,
+					ccm.Message.Content,
 					"",
 					"",
 					[]string{e.defaultEmail},
@@ -394,7 +394,7 @@ func (e *Email) Start(a *agent.Agent) {
 				a.SharedState().ConversationTracker.AddMessage(
 					fmt.Sprintf("email:%s", e.defaultEmail),
 					openai.ChatCompletionMessage{
-						Content: ccm.Content,
+						Content: ccm.Message.Content,
 						Role:    "assistant",
 					},
 				)
