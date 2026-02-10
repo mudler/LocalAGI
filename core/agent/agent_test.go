@@ -296,9 +296,9 @@ var _ = Describe("Agent test", func() {
 				WithModel(testModel),
 				WithLLMAPIKey(apiKeyURL),
 				WithTimeout("10m"),
-				WithNewConversationSubscriber(func(m openai.ChatCompletionMessage) {
+				WithNewConversationSubscriber(func(m *types.ConversationMessage) {
 					mu.Lock()
-					message = m
+					message = m.Message
 					mu.Unlock()
 				}),
 				WithActions(

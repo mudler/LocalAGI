@@ -788,12 +788,12 @@ func (t *Slack) Start(a *agent.Agent) {
 	if t.channelID != "" {
 		xlog.Debug(fmt.Sprintf("Listening for messages in channel %s", t.channelID))
 		// handle new conversations
-		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-			xlog.Debug("Subscriber(slack)", "message", ccm.Content)
+		a.AddSubscriber(func(ccm *types.ConversationMessage) {
+			xlog.Debug("Subscriber(slack)", "message", ccm.Message.Content)
 			_, _, err := api.PostMessage(t.channelID,
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(ccm.Content, true),
+				slack.MsgOptionText(ccm.Message.Content, true),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
 			)
 			if err != nil {
@@ -802,7 +802,7 @@ func (t *Slack) Start(a *agent.Agent) {
 			a.SharedState().ConversationTracker.AddMessage(
 				fmt.Sprintf("slack:%s", t.channelID),
 				openai.ChatCompletionMessage{
-					Content: ccm.Content,
+					Content: ccm.Message.Content,
 					Role:    "assistant",
 				},
 			)
