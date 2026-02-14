@@ -183,6 +183,11 @@ func RunCompaction(ctx context.Context, client *localrag.WrappedClient, period s
 
 // runCompactionTicker runs compaction on a schedule (daily/weekly/monthly). It stops when ctx is done.
 func runCompactionTicker(ctx context.Context, client *localrag.WrappedClient, config *AgentConfig, apiURL, apiKey, model string) {
+	// Run first compaction immediately on startup
+	if err := RunCompaction(ctx, client, config.KBCompactionInterval, config.KBCompactionSummarize, apiURL, apiKey, model); err != nil {
+		xlog.Warn("compaction ticker initial run failed", "collection", client.Collection(), "error", err)
+	}
+
 	interval := 24 * time.Hour
 	switch config.KBCompactionInterval {
 	case "weekly":

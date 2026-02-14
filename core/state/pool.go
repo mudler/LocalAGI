@@ -483,14 +483,6 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 	if config.EnableKnowledgeBase {
 		ragClient = localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)
 		opts = append(opts, WithRAGDB(ragClient), EnableKnowledgeBase)
-		if config.EnableKBCompaction {
-			interval := config.KBCompactionInterval
-			if interval == "" {
-				interval = "daily"
-			}
-			summarize := config.KBCompactionSummarize
-			opts = append(opts, EnableKBCompaction, WithKBCompactionInterval(interval), WithKBCompactionSummarize(summarize))
-		}
 		// Set KB auto search option (defaults to true for backward compatibility)
 		// For backward compatibility: if both new KB fields are false (zero values),
 		// assume this is an old config and default KBAutoSearch to true
