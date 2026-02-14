@@ -447,6 +447,10 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, EnableSummaryMemory)
 	}
 
+	if config.ConversationStorageMode != "" {
+		opts = append(opts, WithConversationStorageMode(ConversationStorageMode(config.ConversationStorageMode)))
+	}
+
 	if config.CanStopItself {
 		opts = append(opts, CanStopItself)
 	}

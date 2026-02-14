@@ -148,10 +148,34 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 			xlog.Error("Error storing into memory", "error", err)
 		}
 	} else {
-		for _, message := range conv {
-			if message.Role == "user" {
-				if err := a.options.ragdb.Store(message.Content); err != nil {
-					xlog.Error("Error storing into memory", "error", err)
+		// Use the conversation storage mode to determine what to store
+		switch a.options.conversationStorageMode {
+		case StoreWholeConversation:
+			// Store the entire conversation as a single block
+			if len(conv) > 0 {
+				convStr := Messages(conv).String()
+				if err := a.options.ragdb.Store(convStr); err != nil {
+					xlog.Error("Error storing whole conversation into memory", "error", err)
+				}
+			}
+		case StoreUserAndAssistant:
+			// Store user and assistant messages separately
+			for _, message := range conv {
+				if message.Role == "user" || message.Role == "assistant" {
+					if err := a.options.ragdb.Store(message.Content); err != nil {
+						xlog.Error("Error storing message into memory", "error", err, "role", message.Role)
+					}
+				}
+			}
+		case StoreUserOnly:
+			fallthrough
+		default:
+			// Store only user messages (default behavior)
+			for _, message := range conv {
+				if message.Role == "user" {
+					if err := a.options.ragdb.Store(message.Content); err != nil {
+						xlog.Error("Error storing into memory", "error", err)
+					}
 				}
 			}
 		}

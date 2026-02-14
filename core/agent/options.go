@@ -10,6 +10,18 @@ import (
 
 type Option func(*options) error
 
+// ConversationStorageMode defines how conversations are stored in the knowledge base
+type ConversationStorageMode string
+
+const (
+	// StoreUserOnly stores only user messages (default)
+	StoreUserOnly ConversationStorageMode = "user_only"
+	// StoreUserAndAssistant stores both user and assistant messages separately
+	StoreUserAndAssistant ConversationStorageMode = "user_and_assistant"
+	// StoreWholeConversation stores the entire conversation as a single block
+	StoreWholeConversation ConversationStorageMode = "whole_conversation"
+)
+
 type llmOptions struct {
 	APIURL                string
 	APIKey                string
@@ -31,6 +43,7 @@ type options struct {
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
 	stripThinkingTags                                                                            bool
 	kbAutoSearch                                                                                 bool
+	conversationStorageMode                                                                      ConversationStorageMode
 
 	canStopItself         bool
 	initiateConversations bool
@@ -86,11 +99,12 @@ func (o *options) SeparatedMultimodalModel() bool {
 func defaultOptions() *options {
 	return &options{
 		parallelJobs:          1,
-		periodicRuns:          15 * time.Minute,
-		schedulerPollInterval: 30 * time.Second,
-		maxEvaluationLoops:    2,
-		enableEvaluation:      false,
-		kbAutoSearch:          true, // Default to true to maintain backward compatibility
+		periodicRuns:            15 * time.Minute,
+		schedulerPollInterval:   30 * time.Second,
+		maxEvaluationLoops:      2,
+		enableEvaluation:        false,
+		kbAutoSearch:            true,               // Default to true to maintain backward compatibility
+		conversationStorageMode: StoreUserOnly, // Default to user-only for backward compatibility
 		LLMAPI: llmOptions{
 			APIURL:                "http://localhost:8080",
 			Model:                 "gpt-4",
@@ -265,6 +279,19 @@ var EnableLongTermMemory = func(o *options) error {
 func WithRAGDB(db RAGDB) Option {
 	return func(o *options) error {
 		o.ragdb = db
+		return nil
+	}
+}
+
+// WithConversationStorageMode sets how conversations are stored in the knowledge base
+func WithConversationStorageMode(mode ConversationStorageMode) Option {
+	return func(o *options) error {
+		switch mode {
+		case StoreUserOnly, StoreUserAndAssistant, StoreWholeConversation:
+			o.conversationStorageMode = mode
+		default:
+			o.conversationStorageMode = StoreUserOnly
+		}
 		return nil
 	}
 }

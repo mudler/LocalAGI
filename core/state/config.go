@@ -97,9 +97,10 @@ type AgentConfig struct {
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
 	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
-	LongTermMemory        bool   `json:"long_term_memory" form:"long_term_memory"`
-	SummaryLongTermMemory bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
-	ParallelJobs          int    `json:"parallel_jobs" form:"parallel_jobs"`
+	LongTermMemory          bool   `json:"long_term_memory" form:"long_term_memory"`
+	SummaryLongTermMemory   bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
+	ConversationStorageMode string `json:"conversation_storage_mode" form:"conversation_storage_mode"`
+	ParallelJobs            int    `json:"parallel_jobs" form:"parallel_jobs"`
 	StripThinkingTags     bool   `json:"strip_thinking_tags" form:"strip_thinking_tags"`
 	EnableEvaluation      bool   `json:"enable_evaluation" form:"enable_evaluation"`
 	MaxEvaluationLoops    int    `json:"max_evaluation_loops" form:"max_evaluation_loops"`
@@ -297,6 +298,19 @@ func NewAgentConfigMeta(
 				Type:         "checkbox",
 				DefaultValue: false,
 				HelpText:     "Inject knowledge base search and add actions as tools, allowing the agent to access its memory without manual configuration",
+				Tags:         config.Tags{Section: "MemorySettings"},
+			},
+			{
+				Name:         "conversation_storage_mode",
+				Label:        "Conversation Storage Mode",
+				Type:         "select",
+				DefaultValue: "user_only",
+				Options: []config.FieldOption{
+					{Value: "user_only", Label: "User Messages Only"},
+					{Value: "user_and_assistant", Label: "User and Assistant Messages"},
+					{Value: "whole_conversation", Label: "Whole Conversation as Block"},
+				},
+				HelpText:     "Controls what gets stored in the knowledge base: only user messages, user and assistant messages separately, or the entire conversation as a single block",
 				Tags:         config.Tags{Section: "MemorySettings"},
 			},
 			{
