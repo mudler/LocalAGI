@@ -1183,13 +1183,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
-	responseFragment, err := a.llm.Ask(job.GetContext(), fragment)
-	if err != nil {
-		job.Result.Finish(err)
-		return
-	}
-
-	result := a.cleanupLLMResponse(responseFragment.LastMessage().Content)
+	result := a.cleanupLLMResponse(fragment.LastMessage().Content)
 
 	conv = append(fragment.Messages, openai.ChatCompletionMessage{
 		Role:    "assistant",
