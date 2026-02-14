@@ -80,6 +80,8 @@ type AgentConfig struct {
 	RandomIdentity        bool   `json:"random_identity" form:"random_identity"`
 	InitiateConversations bool   `json:"initiate_conversations" form:"initiate_conversations"`
 	CanPlan               bool   `json:"enable_planning" form:"enable_planning"`
+	PlanReviewerModel     string `json:"plan_reviewer_model" form:"plan_reviewer_model"`
+	DisableSinkState      bool   `json:"disable_sink_state" form:"disable_sink_state"`
 	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
 	SchedulerPollInterval string `json:"scheduler_poll_interval" form:"scheduler_poll_interval"`
@@ -187,6 +189,13 @@ func NewAgentConfigMeta(
 			{
 				Name:         "tts_model",
 				Label:        "TTS Model",
+				Type:         "text",
+				DefaultValue: "",
+				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "plan_reviewer_model",
+				Label:        "Plan Reviewer Model",
 				Type:         "text",
 				DefaultValue: "",
 				Tags:         config.Tags{Section: "ModelSettings"},
@@ -380,6 +389,14 @@ func NewAgentConfigMeta(
 				Min:          1,
 				Step:         1,
 				HelpText:     "Number of concurrent tasks that can run in parallel",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "disable_sink_state",
+				Label:        "Disable Sink State",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Disable the sink state of the agent",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{

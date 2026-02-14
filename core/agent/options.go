@@ -15,6 +15,7 @@ type llmOptions struct {
 	APIKey                string
 	Model                 string
 	MultimodalModel       string
+	ReviewerModel         string
 	TranscriptionModel    string
 	TranscriptionLanguage string
 	TTSModel              string
@@ -36,6 +37,7 @@ type options struct {
 	forceReasoning        bool
 	enableGuidedTools     bool
 	canPlan               bool
+	disableSinkState      bool
 	characterfile         string
 	statefile             string
 	schedulerStorePath    string // Path to scheduler JSON storage file
@@ -224,6 +226,18 @@ var EnableInitiateConversations = func(o *options) error {
 var EnablePlanning = func(o *options) error {
 	o.canPlan = true
 	return nil
+}
+
+var DisableSinkState = func(o *options) error {
+	o.disableSinkState = true
+	return nil
+}
+
+var WithPlanReviewerLLM = func(model string) Option {
+	return func(o *options) error {
+		o.LLMAPI.ReviewerModel = model
+		return nil
+	}
 }
 
 // EnableStandaloneJob is an option to enable the agent

@@ -455,6 +455,14 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, EnablePlanning)
 	}
 
+	if config.PlanReviewerModel != "" {
+		opts = append(opts, WithPlanReviewerLLM(config.PlanReviewerModel))
+	}
+
+	if config.DisableSinkState {
+		opts = append(opts, DisableSinkState)
+	}
+
 	if config.InitiateConversations {
 		opts = append(opts, EnableInitiateConversations)
 	}

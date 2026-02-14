@@ -1122,6 +1122,14 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		if a.options.enableEvaluation {
 			cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlanReEvaluator)
 		}
+		if a.options.LLMAPI.ReviewerModel != "" {
+			llmClient := cogito.NewOpenAILLM(a.options.LLMAPI.ReviewerModel, a.options.LLMAPI.APIKey, a.options.LLMAPI.APIURL)
+			cogitoOpts = append(cogitoOpts, cogito.WithReviewerLLM(llmClient))
+		}
+	}
+
+	if a.options.disableSinkState {
+		cogitoOpts = append(cogitoOpts, cogito.DisableSinkState)
 	}
 
 	if a.options.forceReasoning {
