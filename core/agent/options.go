@@ -440,7 +440,7 @@ func WithRandomIdentity(guidance ...string) Option {
 
 func WithActions(actions ...types.Action) Option {
 	return func(o *options) error {
-		o.userActions = actions
+		o.userActions = append(o.userActions, actions...)
 		return nil
 	}
 }
