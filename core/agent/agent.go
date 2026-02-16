@@ -863,7 +863,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		err := server.Ping(a.context, &mcp.PingParams{})
 		if err != nil {
 			mcpNeedsInit = true
-			xlog.Error("Error pinging MCP server, will re-initialize MCP actions", "agent", err)
+			xlog.Error("Error pinging MCP server, will re-initialize MCP actions", "error", err)
 			break
 		}
 	}
