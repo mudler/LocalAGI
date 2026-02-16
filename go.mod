@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/modelcontextprotocol/go-sdk v1.1.0
-	github.com/mudler/cogito v0.9.1-0.20260216144443-c96e8ddc1157
+	github.com/mudler/cogito v0.9.1-0.20260216163119-07b624cc772f
 	github.com/mudler/xlog v0.0.1
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
