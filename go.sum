@@ -242,6 +242,8 @@ github.com/mudler/cogito v0.9.1-0.20260216144443-c96e8ddc1157 h1:M2Yx84QtKQrhMWl
 github.com/mudler/cogito v0.9.1-0.20260216144443-c96e8ddc1157/go.mod h1:6sfja3lcu2nWRzEc0wwqGNu/eCG3EWgij+8s7xyUeQ4=
 github.com/mudler/cogito v0.9.1-0.20260216163119-07b624cc772f h1:LkCJD11Mlx8ZyHoNRbpxbrw1Znl9GiFKjZbcXYwAKwk=
 github.com/mudler/cogito v0.9.1-0.20260216163119-07b624cc772f/go.mod h1:6sfja3lcu2nWRzEc0wwqGNu/eCG3EWgij+8s7xyUeQ4=
+github.com/mudler/cogito v0.9.1-0.20260216182842-e9820e6bf7b9 h1:Ek+fAIUt9v5tqBgPZ89QTgGXwOSZcCiElD37NkbdmSk=
+github.com/mudler/cogito v0.9.1-0.20260216182842-e9820e6bf7b9/go.mod h1:6sfja3lcu2nWRzEc0wwqGNu/eCG3EWgij+8s7xyUeQ4=
 github.com/mudler/xlog v0.0.1 h1:yR3/wszd3ZM6u1n96YITJZ4yUcDgqHSwvQmzUJa+8vg=
 github.com/mudler/xlog v0.0.1/go.mod h1:39f5vcd05Qd6GWKM8IjyHNQ7AmOx3ZM0YfhfIGhC18U=
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
