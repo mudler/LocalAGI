@@ -12,6 +12,7 @@ require (
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
 	github.com/go-telegram/bot v1.17.0
 	github.com/gofiber/fiber/v2 v2.52.9
+	github.com/gofiber/template/html/v2 v2.1.3
 	github.com/google/go-github/v69 v69.2.0
 	github.com/google/uuid v1.6.0
 	github.com/jung-kurt/gofpdf v1.16.2
@@ -58,6 +59,8 @@ require (
 	github.com/blevesearch/zapx/v14 v14.4.2 // indirect
 	github.com/blevesearch/zapx/v15 v15.4.2 // indirect
 	github.com/blevesearch/zapx/v16 v16.2.8 // indirect
+	github.com/gofiber/template v1.8.3 // indirect
+	github.com/gofiber/utils v1.1.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/jsonschema-go v0.3.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect

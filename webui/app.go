@@ -2,6 +2,7 @@ package webui
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,6 +27,8 @@ import (
 	"github.com/mudler/LocalAGI/core/state"
 
 	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/template/html/v2"
 )
 
 type (
@@ -36,12 +39,29 @@ type (
 	}
 )
 
+//go:embed public/*
+var staticFiles embed.FS
+
 func NewApp(opts ...Option) *App {
 	config := NewConfig(opts...)
 
 	// Initialize a new Fiber app
 	// Pass the engine to the Views
-	webapp := fiber.New(fiber.Config{})
+
+	// Create the engine using your embedded files
+	engine := html.NewFileSystem(http.FS(staticFiles), ".html")
+
+	// Pass the engine to Fiber when creating the app
+	webapp := fiber.New(fiber.Config{
+		Views: engine,
+	})
+
+	webapp.Use("/public", filesystem.New(filesystem.Config{
+		Root: http.FS(staticFiles),
+		// PathPrefix tells the middleware to look inside the embedded "public" folder
+		PathPrefix: "public",
+		Browse:     false, // Set to true if you want directory browsing
+	}))
 
 	a := &App{
 		config:      config,
