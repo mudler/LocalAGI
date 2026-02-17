@@ -1147,6 +1147,11 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		)
 	}
 
+	if a.options.forceReasoningTool {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithForceReasoningTool())
+	}
+
 	fragment, err = cogito.ExecuteTools(
 		a.llm, fragment,
 		cogitoOpts...,

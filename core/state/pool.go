@@ -531,6 +531,10 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
 	}
 
+	if config.EnableForceReasoningTool {
+		opts = append(opts, EnableForceReasoningTool)
+	}
+
 	xlog.Info("Starting agent", "name", name, "config", config)
 
 	agent, err := New(opts...)

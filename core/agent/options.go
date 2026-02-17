@@ -48,6 +48,7 @@ type options struct {
 	canStopItself         bool
 	initiateConversations bool
 	forceReasoning        bool
+	forceReasoningTool    bool
 	enableGuidedTools     bool
 	canPlan               bool
 	disableSinkState      bool
@@ -139,6 +140,11 @@ var EnableForceReasoning = func(o *options) error {
 
 var EnableGuidedTools = func(o *options) error {
 	o.enableGuidedTools = true
+	return nil
+}
+
+var EnableForceReasoningTool = func(o *options) error {
+	o.forceReasoningTool = true
 	return nil
 }
 
