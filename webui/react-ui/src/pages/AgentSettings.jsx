@@ -14,10 +14,10 @@ function AgentSettings() {
   // Update document title
   useEffect(() => {
     if (name) {
-      document.title = `Agent Settings: ${name} - LocalAGI`;
+      document.title = `${name} - Settings - LocalAGI`;
     }
     return () => {
-      document.title = 'LocalAGI'; // Reset title when component unmounts
+      document.title = 'LocalAGI';
     };
   }, [name]);
 
@@ -35,14 +35,12 @@ function AgentSettings() {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        // Fetch metadata from the dedicated endpoint
         const response = await agentApi.getAgentConfigMetadata();
         if (response) {
           setMetadata(response);
         }
       } catch (error) {
         console.error('Error fetching metadata:', error);
-        // Continue without metadata, the form will use default fields
       }
     };
 
@@ -52,11 +50,10 @@ function AgentSettings() {
   // Load agent data when component mounts
   useEffect(() => {
     if (agent) {
-      // Set form data from agent config
       setFormData({
         ...formData,
         ...agent,
-        name: name // Ensure name is set correctly
+        name: name
       });
     }
   }, [agent]);
@@ -110,7 +107,7 @@ function AgentSettings() {
     return (
       <div className="settings-container">
         <div className="loading">
-          <i className="fas fa-spinner fa-spin"></i>
+          <div className="loader" />
           <p>Loading agent settings...</p>
         </div>
       </div>
@@ -121,7 +118,7 @@ function AgentSettings() {
     return (
       <div className="settings-container">
         <div className="error">
-          <i className="fas fa-exclamation-triangle"></i>
+          <i className="fas fa-exclamation-triangle" />
           <p>{error}</p>
         </div>
       </div>
@@ -130,44 +127,47 @@ function AgentSettings() {
 
   return (
     <div className="settings-container">
+      {/* Page Header */}
       <header className="page-header">
-        <h1>
-          <i className="fas fa-cog"></i> Agent Settings - {name}
-        </h1>
+        <div className="header-title-section">
+          <div className="agent-title-wrapper">
+            <h1 className="agent-name">{name}</h1>
+            <span className={`status-badge ${agent?.active ? 'status-active' : 'status-paused'}`}>
+              {agent?.active ? 'Active' : 'Paused'}
+            </span>
+          </div>
+          <p className="agent-subtitle">Configure agent behavior, models, and connections</p>
+        </div>
+        
         <div className="header-actions">
           <button 
             className={`action-btn ${agent?.active ? 'warning' : 'success'}`}
             onClick={handleToggleStatus}
           >
-            {agent?.active ? (
-              <><i className="fas fa-pause"></i> Pause Agent</>
-            ) : (
-              <><i className="fas fa-play"></i> Start Agent</>
-            )}
+            <i className={`fas ${agent?.active ? 'fa-pause' : 'fa-play'}`} />
+            {agent?.active ? 'Pause Agent' : 'Start Agent'}
           </button>
           <button 
             className="action-btn delete-btn"
             onClick={handleDelete}
           >
-            <i className="fas fa-trash"></i> Delete Agent
+            <i className="fas fa-trash" />
+            Delete
           </button>
         </div>
       </header>
       
+      {/* Settings Content */}
       <div className="settings-content">
-        {/* Agent Configuration Form Section */}
-        <div className="section-box">
-          
-          <AgentForm 
-            isEdit={true}
-            formData={formData}
-            setFormData={setFormData}
-            onSubmit={handleSubmit}
-            loading={loading}
-            submitButtonText="Save Changes"
-            metadata={metadata}
-          />
-        </div>
+        <AgentForm 
+          isEdit={true}
+          formData={formData}
+          setFormData={setFormData}
+          onSubmit={handleSubmit}
+          loading={loading}
+          submitButtonText="Save Changes"
+          metadata={metadata}
+        />
       </div>
     </div>
   );

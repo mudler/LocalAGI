@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useTheme } from './contexts/ThemeContext'
+import ThemeToggle from './components/ThemeToggle'
 import './App.css'
 
 function App() {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
+  const { isReady } = useTheme();
 
   // Show toast notification
   const showToast = (message, type = 'success') => {
@@ -14,106 +18,109 @@ function App() {
     }, 3000);
   };
 
-  // Toggle mobile menu
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+  // Navigation items
+  const navItems = [
+    { path: '/', icon: 'fas fa-home', label: 'Home' },
+    { path: '/agents', icon: 'fas fa-users', label: 'Agents' },
+    { path: '/actions-playground', icon: 'fas fa-bolt', label: 'Actions' },
+    { path: '/group-create', icon: 'fas fa-users-cog', label: 'Groups' },
+  ];
+
+  // Check if route is active
+  const isActive = (path) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
   };
 
+  // Don't render until theme is ready
+  if (!isReady) {
+    return null;
+  }
+
   return (
-    <div className="app-container">
-      {/* Navigation Menu */}
-      <nav className="main-nav">
-        <div className="container">
-          <div className="nav-content">
-            <div className="logo-container">
-              {/* Logo */}
-              <Link to="/" className="logo-link">
-                <div className="logo-image-container">
-                  <img src="/app/logo_2.png" alt="Logo" className="logo-image" />
-                </div>
-                {/* <span className="logo-text">LocalAGI</span> */}
-              </Link>
-            </div>
-
-            <div className="desktop-menu">
-              <ul className="nav-links">
-                <li>
-                  <Link to="/" className="nav-link">
-                    <i className="fas fa-home mr-2"></i> Home
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/agents" className="nav-link">
-                    <i className="fas fa-users mr-2"></i> Agent List
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/actions-playground" className="nav-link">
-                    <i className="fas fa-bolt mr-2"></i> Actions Playground
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/group-create" className="nav-link">
-                    <i className="fas fa-users-cog mr-2"></i> Create Agent Group
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div className="">
-              <span className="status-indicator"></span>
-              <span className="status-text">State: <span className="status-value">active</span></span>
-            </div>
-
-            <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-              <i className="fas fa-bars"></i>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile Menu */}
+    <div className="app-layout">
+      {/* Mobile Overlay */}
       {mobileMenuOpen && (
-        <div className="mobile-menu">
-          <ul className="mobile-nav-links">
-            <li>
-              <Link to="/" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-                <i className="fas fa-home mr-2"></i> Home
-              </Link>
-            </li>
-            <li>
-              <Link to="/agents" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-                <i className="fas fa-users mr-2"></i> Agent List
-              </Link>
-            </li>
-            <li>
-              <Link to="/actions-playground" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-                <i className="fas fa-bolt mr-2"></i> Actions Playground
-              </Link>
-            </li>
-            <li>
-              <Link to="/group-create" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
-                <i className="fas fa-users-cog mr-2"></i> Create Agent Group
-              </Link>
-            </li>
-          </ul>
-        </div>
+        <div className="mobile-overlay" onClick={() => setMobileMenuOpen(false)} />
       )}
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+        {/* Sidebar Header - Logo Only */}
+        <div className="sidebar-header">
+          <Link to="/" className="sidebar-logo">
+            <img 
+              src="/app/logo_1.png" 
+              alt="LocalAGI" 
+              className="sidebar-logo-img"
+            />
+          </Link>
+        </div>
+
+        {/* Navigation */}
+        <nav className="sidebar-nav">
+          <ul className="nav-list">
+            {navItems.map((item) => (
+              <li key={item.path} className="nav-item">
+                <Link
+                  to={item.path}
+                  className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <span className="nav-icon">
+                    <i className={item.icon} />
+                  </span>
+                  <span className="nav-label">{item.label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* Sidebar Footer */}
+        <div className="sidebar-footer">
+          <div className="sidebar-status">
+            <span className="status-dot" />
+            <span className="status-text">
+              System <strong>Active</strong>
+            </span>
+          </div>
+          <ThemeToggle />
+        </div>
+      </aside>
+
+      {/* Main Area */}
+      <div className="main-area">
+        {/* Mobile Header */}
+        <header className="mobile-header">
+          <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <i className="fas fa-bars" />
+          </button>
+          <span className="mobile-title">LocalAGI</span>
+          <div className="mobile-spacer" />
+        </header>
+
+        {/* Main Content */}
+        <main className="main-content">
+          <div className="content-wrapper">
+            <Outlet context={{ showToast }} />
+          </div>
+        </main>
+      </div>
 
       {/* Toast Notification */}
       {toast.visible && (
         <div className={`toast ${toast.type}`}>
+          <i className={`fas ${
+            toast.type === 'success' ? 'fa-check-circle' : 
+            toast.type === 'error' ? 'fa-exclamation-circle' : 
+            'fa-info-circle'
+          }`} />
           <span>{toast.message}</span>
         </div>
       )}
-
-      {/* Main Content Area */}
-      <main className="main-content">
-        <div className="container">
-          <Outlet context={{ showToast }} />
-        </div>
-      </main>
-
     </div>
   )
 }
