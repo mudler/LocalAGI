@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: localrecall
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localrecall
+  namespace: localrecall
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localrecall
+  template:
+    metadata:
+      labels:
+        app: localrecall
+    spec:
+      containers:
+      - name: localrecall
+        image: mudler/localrecall:latest
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: localrecall-data
+          mountPath: "/var/lib/localrecall"
+      volumes:
+      - name: localrecall-data
+        persistentVolumeClaim:
+          claimName: localrecall-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localrecall
+  namespace: localrecall
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: localrecall
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: localrecall
+  namespace: localrecall
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: localrecall
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 75
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: localrecall-data
+  namespace: localrecall
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
