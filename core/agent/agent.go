@@ -15,6 +15,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/cogito"
+	"github.com/mudler/cogito/clients"
+
 	"github.com/mudler/xlog"
 
 	"github.com/mudler/LocalAGI/core/action"
@@ -89,7 +91,7 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL, options.timeout)
-	llmClient := cogito.NewOpenAILLM(options.LLMAPI.Model, options.LLMAPI.APIKey, options.LLMAPI.APIURL)
+	llmClient := clients.NewLocalAILLM(options.LLMAPI.Model, options.LLMAPI.APIKey, options.LLMAPI.APIURL)
 	c := context.Background()
 	if options.context != nil {
 		c = options.context
@@ -1123,7 +1125,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlanReEvaluator)
 		}
 		if a.options.LLMAPI.ReviewerModel != "" {
-			llmClient := cogito.NewOpenAILLM(a.options.LLMAPI.ReviewerModel, a.options.LLMAPI.APIKey, a.options.LLMAPI.APIURL)
+			llmClient := clients.NewLocalAILLM(a.options.LLMAPI.ReviewerModel, a.options.LLMAPI.APIKey, a.options.LLMAPI.APIURL)
 			cogitoOpts = append(cogitoOpts, cogito.WithReviewerLLM(llmClient))
 		}
 	}
