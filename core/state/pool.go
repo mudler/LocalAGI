@@ -369,11 +369,15 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		WithLLMAPIKey(effectiveAPIKey),
 		WithTimeout(a.timeout),
 		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
+			var actionName types.ActionDefinitionName
+			if state.Action != nil {
+				actionName = state.Action.Definition().Name
+			}
 			xlog.Info(
 				"Agent is thinking",
 				"agent", name,
 				"reasoning", state.Reasoning,
-				"action", state.Action.Definition().Name,
+				"action", actionName,
 				"params", state.Params,
 			)
 
@@ -405,12 +409,16 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 				"Calling agent result callback",
 			)
 
+			var actionName types.ActionDefinitionName
+			if state.ActionCurrentState.Action != nil {
+				actionName = state.ActionCurrentState.Action.Definition().Name
+			}
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
 			Parameters: %+v
 			Result: %s`,
 				state.Reasoning,
-				state.ActionCurrentState.Action.Definition().Name,
+				actionName,
 				state.ActionCurrentState.Params,
 				state.Result)
 			manager.Send(
