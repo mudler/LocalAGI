@@ -920,6 +920,15 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				"Called when no other tool is needed to respond to the user",
 			),
 		),
+		cogito.WithReasoningCallback(func(s string) {
+			xlog.Debug("Cogito reasoning callback", "status", s)
+			job.Callback(types.ActionCurrentState{
+				Job:       job,
+				Action:    nil,
+				Params:    types.ActionParams{},
+				Reasoning: s,
+			})
+		}),
 		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
 			if a.observer != nil && obs != nil {
 				obs := observables[t.ToolArguments.ID]
