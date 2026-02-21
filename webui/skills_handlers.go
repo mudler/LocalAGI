@@ -716,6 +716,10 @@ func (a *App) UpdateGitRepo(c *fiber.Ctx) error {
 		if r.ID == id {
 			found = i
 			if req.URL != "" {
+				parsedURL, err := url.Parse(req.URL)
+				if err != nil || parsedURL.Scheme == "" {
+					return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "invalid repository URL"})
+				}
 				repos[i].URL = req.URL
 				repos[i].Name = skillgit.ExtractRepoName(req.URL)
 			}
