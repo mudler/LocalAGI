@@ -126,6 +126,8 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - localagi_pool:/pool
+      # Optional: mount a host directory for skills (replaces the default state-dir/skills path)
+      # - ./skills:/pool/skills
 
 volumes:
   postgres_data:

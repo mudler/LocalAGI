@@ -17,8 +17,15 @@ import (
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/pkg/utils"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/xlog"
 )
+
+// SkillsProvider supplies the skills dynamic prompt and MCP session when skills are enabled for an agent.
+type SkillsProvider interface {
+	GetSkillsPrompt(config *AgentConfig) (DynamicPrompt, error)
+	GetMCPSession(ctx context.Context) (*mcp.ClientSession, error)
+}
 
 type AgentPool struct {
 	sync.Mutex
@@ -37,6 +44,7 @@ type AgentPool struct {
 	filters                                                       func(*AgentConfig) types.JobFilters
 	timeout                                                       string
 	conversationLogs                                              string
+	skillsService                                                 SkillsProvider
 }
 
 type Status struct {
@@ -78,6 +86,7 @@ func NewAgentPool(
 	filters func(*AgentConfig) types.JobFilters,
 	timeout string,
 	withLogs bool,
+	skillsService SkillsProvider,
 ) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
@@ -111,6 +120,7 @@ func NewAgentPool(
 			filters:                      filters,
 			timeout:                      timeout,
 			conversationLogs:             conversationPath,
+			skillsService:                skillsService,
 		}, nil
 	}
 
@@ -139,6 +149,7 @@ func NewAgentPool(
 		availableActions:             availableActions,
 		timeout:                      timeout,
 		conversationLogs:             conversationPath,
+		skillsService:                skillsService,
 	}, nil
 }
 
@@ -303,6 +314,11 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)(ctx, a)
+	if a.skillsService != nil && config.EnableSkills {
+		if prompt, err := a.skillsService.GetSkillsPrompt(config); err == nil && prompt != nil {
+			promptBlocks = append(promptBlocks, prompt)
+		}
+	}
 	actions := a.availableActions(config)(ctx, a)
 	filters := a.filters(config)
 	stateFile, characterFile := a.stateFiles(name)
@@ -485,6 +501,12 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 			opts = append(opts, WithRandomIdentity(config.IdentityGuidance))
 		} else {
 			opts = append(opts, WithRandomIdentity())
+		}
+	}
+
+	if a.skillsService != nil && config.EnableSkills {
+		if session, err := a.skillsService.GetMCPSession(ctx); err == nil && session != nil {
+			opts = append(opts, WithMCPSession(session))
 		}
 	}
 

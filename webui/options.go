@@ -4,11 +4,13 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/core/state"
+	"github.com/mudler/LocalAGI/services/skills"
 )
 
 type Config struct {
 	DefaultChunkSize          int
 	Pool                      *state.AgentPool
+	SkillsService             *skills.Service
 	ApiKeys                   []string
 	LLMAPIURL                 string
 	LLMAPIKey                 string
@@ -69,6 +71,12 @@ func WithCustomActionsDir(dir string) Option {
 func WithPool(pool *state.AgentPool) Option {
 	return func(c *Config) {
 		c.Pool = pool
+	}
+}
+
+func WithSkillsService(svc *skills.Service) Option {
+	return func(c *Config) {
+		c.SkillsService = svc
 	}
 }
 

@@ -211,13 +211,34 @@ func (a *Agent) initMCPActions() error {
 		generatedActions = append(generatedActions, actions...)
 	}
 
+	// Pre-connected MCP sessions (e.g. in-process skills server); already in a.mcpSessions after closeMCPServers()
+	for _, session := range a.options.extraMCPSessions {
+		actions, err := a.addTools(session)
+		if err != nil {
+			xlog.Error("Failed to add tools for extra MCP session", "error", err.Error())
+			continue
+		}
+		a.mcpSessions = append(a.mcpSessions, session)
+		generatedActions = append(generatedActions, actions...)
+	}
+
 	a.mcpActionDefinitions = generatedActions
 
 	return err
 }
 
 func (a *Agent) closeMCPServers() {
-	for _, s := range a.mcpSessions {
-		s.Close()
+	extraSet := make(map[*mcp.ClientSession]bool)
+	for _, e := range a.options.extraMCPSessions {
+		extraSet[e] = true
 	}
+	var keep []*mcp.ClientSession
+	for _, s := range a.mcpSessions {
+		if extraSet[s] {
+			keep = append(keep, s)
+		} else {
+			s.Close()
+		}
+	}
+	a.mcpSessions = keep
 }

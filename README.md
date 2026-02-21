@@ -18,7 +18,7 @@ Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-b
 
 Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
 
-**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. Create Agents with a couple of clicks, connect via MCP and give it skills with [skillserver](https://github.com/mudler/skillserver). Every agent exposes a complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
+**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. Create Agents with a couple of clicks, connect via MCP, and use built-in **Skills** (manage skills in the Web UI and enable them per agent). Every agent exposes a complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU). Skills follow the [skillserver](https://github.com/mudler/skillserver) format and can be created, imported, or synced from git.
 
 ## 🛡️ Take Back Your Privacy
 
@@ -39,6 +39,7 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 💾 **Memory Management**: Control memory usage with options for long-term and summary memory.
 - 🖼 **Multimodal Support**: Ready for vision, text, and more.
 - 🔧 **Extensible Custom Actions**: Easily script dynamic agent behaviors in Go (interpreted, no compilation!).
+- 📚 **Built-in Skills**: Manage reusable agent skills in the Web UI (create, edit, import/export, git sync). Enable "Skills" per agent to inject skill tools and the skill list into the agent.
 - 🛠 **Fully Customizable Models**: Use your own models or integrate seamlessly with [LocalAI](https://github.com/mudler/LocalAI).
 - 📊 **Observability**: Monitor agent status and view detailed observable updates in real-time.
 
@@ -195,7 +196,7 @@ Good (relatively small) models that have been tested are:
 - **✓ Flexible Model Integration**: Supports GGUF, GGML, and more thanks to [LocalAI](https://github.com/mudler/LocalAI).
 - **✓ Developer-Friendly**: Rich APIs and intuitive interfaces.
 - **✓ Effortless Setup**: Simple Docker compose setups and pre-built binaries.
-- **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, LocalAGI has it all.
+- **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, built-in Skills, LocalAGI has it all.
 
 ## 🌟 Screenshots
 
@@ -224,6 +225,7 @@ Explore detailed documentation including:
 - [REST API Documentation](#rest-api)
 - [Connector Configuration](#connectors)
 - [Agent Configuration](#agent-configuration-reference)
+- [Skills](#3-skills)
 
 ### Environment Configuration
 
@@ -241,6 +243,8 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
+
+Skills are stored in a fixed `skills` subdirectory under `LOCALAGI_STATE_DIR` (e.g. `/pool/skills` in Docker). Git repo config for skills lives in that directory. No extra environment variables are required.
 
 ## Installation Options
 
@@ -692,6 +696,16 @@ You can create MCP servers in any language that supports the MCP protocol and ad
 - **Documentation**: Provide clear descriptions for all tools exposed by your MCP server
 - **Testing**: Test your MCP servers independently before integrating with LocalAGI
 - **Resource Management**: Ensure your MCP servers properly clean up resources
+
+### 3. Skills
+
+LocalAGI includes built-in **Skills** management. Skills are reusable instructions and resources (scripts, references, assets) that agents can use when "Enable Skills" is turned on for that agent.
+
+- **Skills section (Web UI)**: Open **Skills** in the sidebar. Skills are stored under the state directory (`STATE_DIR/skills`). Create, edit, search, import, and export skills. You can also add git repositories to sync skills from.
+- **Per-agent**: In agent creation or settings, enable **Enable Skills** in Advanced Settings. The agent will receive a list of available skills in its context and have access to skill tools (list, read, search, resources) via the built-in skills MCP.
+- Skills use the same format as [skillserver](https://github.com/mudler/skillserver) (e.g. `SKILL.md` in a directory). You can export skills from LocalAGI and use them with the standalone skillserver, or import skills created elsewhere.
+
+In Docker, the state directory is persisted (`/pool`), so skills are stored in `/pool/skills`. To use a host folder for skills, mount it over that path in your compose file (e.g. `- ./my-skills:/pool/skills`).
 
 ### Development
 
