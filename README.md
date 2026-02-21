@@ -33,7 +33,7 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 🤖 **Advanced Agent Teaming**: Instantly create cooperative agent teams from a single prompt.
 - 📡 **Connectors**: Built-in integrations with Discord, Slack, Telegram, GitHub Issues, and IRC.
 - 🛠 **Comprehensive REST API**: Seamless integration into your workflows. Every agent created will support OpenAI Responses API out of the box.
-- 📚 **Short & Long-Term Memory**: Powered by [LocalRecall](https://github.com/mudler/LocalRecall).
+- 📚 **Short & Long-Term Memory**: Built-in knowledge base (RAG) for collections, file uploads, and semantic search. Manage collections in the Web UI under **Knowledge base**; agents with "Knowledge base" enabled use it automatically (implementation uses [LocalRecall](https://github.com/mudler/LocalRecall) libraries).
 - 🧠 **Planning & Reasoning**: Agents intelligently plan, reason, and adapt.
 - 🔄 **Periodic Tasks**: Schedule tasks with cron-like syntax.
 - 💾 **Memory Management**: Control memory usage with options for long-term and summary memory.
@@ -108,7 +108,7 @@ Still having issues? see this Youtube video: https://youtu.be/HtVwIxW3ePg
     </td>
     <td width="50%" valign="top">
       <h3><a href="https://github.com/mudler/LocalRecall">LocalRecall</a></h3>
-      <p>A REST-ful API and knowledge base management system that provides persistent memory and storage capabilities for AI agents.</p>
+      <p>A REST-ful API and knowledge base management system. LocalAGI embeds this functionality: the Web UI includes a <strong>Knowledge base</strong> section and the same collections API, so you no longer need to run LocalRecall separately.</p>
     </td>
   </tr>
 </table>
@@ -239,10 +239,12 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
+| `LOCALAGI_BASE_URL` | Optional base URL for the app (only relevant when using an external LocalRAG URL; not used for built-in knowledge base) |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
+
+For the built-in knowledge base, optional env (defaults use `LOCALAGI_STATE_DIR`): `COLLECTION_DB_PATH`, `FILE_ASSETS`, `VECTOR_ENGINE` (e.g. `chromem`, `postgres`), `EMBEDDING_MODEL`, `DATABASE_URL` (when `VECTOR_ENGINE=postgres`).
 
 Skills are stored in a fixed `skills` subdirectory under `LOCALAGI_STATE_DIR` (e.g. `/pool/skills` in Docker). Git repo config for skills lives in that directory. No extra environment variables are required.
 
@@ -741,7 +743,7 @@ export LOCALAGI_MODEL=gemma-3-4b-it-qat
 export LOCALAGI_MULTIMODAL_MODEL=moondream2-20250414
 export LOCALAGI_IMAGE_MODEL=sd-1.5-ggml
 export LOCALAGI_LLM_API_URL=http://localai:8080
-export LOCALAGI_LOCALRAG_URL=http://localrecall:8080
+# Knowledge base is built-in; no separate LocalRecall service needed
 export LOCALAGI_STATE_DIR=./pool
 export LOCALAGI_TIMEOUT=5m
 export LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
@@ -1045,7 +1047,7 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
+| `LOCALAGI_BASE_URL` | Optional base URL for built-in knowledge base (default `http://localhost:3000`) |
 | `LOCALAGI_SSHBOX_URL` | LocalAGI SSHBox URL, e.g. user:pass@ip:port |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |

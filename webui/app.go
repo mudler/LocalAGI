@@ -33,9 +33,10 @@ import (
 
 type (
 	App struct {
-		config *Config
+		config           *Config
 		*fiber.App
-		sharedState *internalTypes.AgentSharedState
+		sharedState      *internalTypes.AgentSharedState
+		collectionsState *collectionsState // set when RegisterCollectionRoutes runs; used for in-process RAG
 	}
 )
 

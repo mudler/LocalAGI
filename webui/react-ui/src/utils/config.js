@@ -62,5 +62,15 @@ export const API_CONFIG = {
     gitRepo: (id) => `/api/git-repos/${id}`,
     gitRepoSync: (id) => `/api/git-repos/${id}/sync`,
     gitRepoToggle: (id) => `/api/git-repos/${id}/toggle`,
+
+    // Collections / knowledge base (LocalRecall-compatible)
+    collections: '/api/collections',
+    collectionUpload: (name) => `/api/collections/${encodeURIComponent(name)}/upload`,
+    collectionEntries: (name) => `/api/collections/${encodeURIComponent(name)}/entries`,
+    collectionEntry: (name, entry) => `/api/collections/${encodeURIComponent(name)}/entries/${encodeURIComponent(entry)}`,
+    collectionSearch: (name) => `/api/collections/${encodeURIComponent(name)}/search`,
+    collectionReset: (name) => `/api/collections/${encodeURIComponent(name)}/reset`,
+    collectionDeleteEntry: (name) => `/api/collections/${encodeURIComponent(name)}/entry/delete`,
+    collectionSources: (name) => `/api/collections/${encodeURIComponent(name)}/sources`,
   }
 };

@@ -45,6 +45,15 @@ type AgentPool struct {
 	timeout                                                       string
 	conversationLogs                                              string
 	skillsService                                                 SkillsProvider
+	// internalRAGProvider is set when using embedded collections (no LocalRAG URL). Returns (RAGDB, KBCompactionClient, true) for agent name as collection.
+	internalRAGProvider func(collectionName string) (RAGDB, KBCompactionClient, bool)
+}
+
+// SetInternalRAGProvider sets the provider for in-process RAG when no LocalRAG URL is configured.
+func (a *AgentPool) SetInternalRAGProvider(fn func(collectionName string) (RAGDB, KBCompactionClient, bool)) {
+	a.Lock()
+	defer a.Unlock()
+	a.internalRAGProvider = fn
 }
 
 type Status struct {
@@ -510,27 +519,36 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		}
 	}
 
-	var ragClient *localrag.WrappedClient
+	var ragDB RAGDB
+	var compactionClient KBCompactionClient
 	if config.EnableKnowledgeBase {
-		ragClient = localrag.NewWrappedClient(effectiveLocalRAGAPI, effectiveLocalRAGKey, name)
-		opts = append(opts, WithRAGDB(ragClient), EnableKnowledgeBase)
-		// Set KB auto search option (defaults to true for backward compatibility)
-		// For backward compatibility: if both new KB fields are false (zero values),
-		// assume this is an old config and default KBAutoSearch to true
-		kbAutoSearch := config.KBAutoSearch
-		if !config.KBAutoSearch && !config.KBAsTools {
-			// Both new fields are false, likely an old config - default to true for backward compatibility
-			kbAutoSearch = true
-		}
-		opts = append(opts, WithKBAutoSearch(kbAutoSearch))
-		// Inject KB wrapper actions if enabled
-		if config.KBAsTools && ragClient != nil {
-			kbResults := config.KnowledgeBaseResults
-			if kbResults <= 0 {
-				kbResults = 5 // Default
+		// Prefer in-process RAG when no URL is set (no HTTP client).
+		if effectiveLocalRAGAPI == "" && a.internalRAGProvider != nil {
+			if db, comp, ok := a.internalRAGProvider(name); ok && db != nil {
+				ragDB = db
+				compactionClient = comp
 			}
-			searchAction, addAction := NewKBWrapperActions(ragClient, kbResults)
-			opts = append(opts, WithActions(searchAction, addAction))
+		}
+		if ragDB == nil && effectiveLocalRAGAPI != "" {
+			ragClient := localrag.NewWrappedClient(effectiveLocalRAGAPI, effectiveLocalRAGKey, name)
+			ragDB = ragClient
+			compactionClient = &wrappedClientCompactionAdapter{WrappedClient: ragClient}
+		}
+		if ragDB != nil {
+			opts = append(opts, WithRAGDB(ragDB), EnableKnowledgeBase)
+			kbAutoSearch := config.KBAutoSearch
+			if !config.KBAutoSearch && !config.KBAsTools {
+				kbAutoSearch = true
+			}
+			opts = append(opts, WithKBAutoSearch(kbAutoSearch))
+			if config.KBAsTools {
+				kbResults := config.KnowledgeBaseResults
+				if kbResults <= 0 {
+					kbResults = 5
+				}
+				searchAction, addAction := NewKBWrapperActions(ragDB, kbResults)
+				opts = append(opts, WithActions(searchAction, addAction))
+			}
 		}
 	}
 
@@ -582,8 +600,8 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		}
 	}()
 
-	if config.EnableKnowledgeBase && config.EnableKBCompaction && ragClient != nil {
-		go runCompactionTicker(ctx, ragClient, config, effectiveAPIURL, effectiveAPIKey, model)
+	if config.EnableKnowledgeBase && config.EnableKBCompaction && compactionClient != nil {
+		go runCompactionTicker(ctx, compactionClient, config, effectiveAPIURL, effectiveAPIKey, model)
 	}
 
 	xlog.Info("Starting connectors", "name", name, "config", config)

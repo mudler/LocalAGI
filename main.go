@@ -93,7 +93,7 @@ func main() {
 		panic(err)
 	}
 
-	// Create the application
+	// Create the application (this registers collection routes and sets up in-process RAG state)
 	app := webui.NewApp(
 		webui.WithPool(pool),
 		webui.WithSkillsService(skillsService),
@@ -105,6 +105,11 @@ func main() {
 		webui.WithCustomActionsDir(customActionsDir),
 		webui.WithStateDir(stateDir),
 	)
+
+	// When no LocalRAG URL is set, agents with knowledge base use in-process collections (no HTTP client).
+	if localRAG == "" {
+		pool.SetInternalRAGProvider(app.CollectionsRAGProvider())
+	}
 
 	// Start the agents
 	if err := pool.StartAll(); err != nil {

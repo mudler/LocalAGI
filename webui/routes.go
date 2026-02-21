@@ -212,6 +212,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Delete("/api/git-repos/:id", app.DeleteGitRepo)
 	webapp.Post("/api/git-repos/:id/sync", app.SyncGitRepo)
 	webapp.Post("/api/git-repos/:id/toggle", app.ToggleGitRepo)
+
+	// Collections / knowledge base API (LocalRecall-compatible)
+	app.RegisterCollectionRoutes(webapp, app.config)
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

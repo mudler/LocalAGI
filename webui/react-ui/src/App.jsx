@@ -24,6 +24,7 @@ function App() {
     { path: '/agents', icon: 'fas fa-users', label: 'Agents' },
     { path: '/actions-playground', icon: 'fas fa-bolt', label: 'Actions' },
     { path: '/skills', icon: 'fas fa-book', label: 'Skills' },
+    { path: '/knowledge', icon: 'fas fa-database', label: 'Knowledge base' },
     { path: '/group-create', icon: 'fas fa-users-cog', label: 'Groups' },
   ];
 
