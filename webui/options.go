@@ -1,10 +1,6 @@
 package webui
 
 import (
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mudler/LocalAGI/core/state"
@@ -32,58 +28,6 @@ type Config struct {
 	ChunkOverlap     int
 	CollectionAPIKeys []string
 	DatabaseURL      string
-}
-
-func collectionsDefaults(c *Config) {
-	if c.CollectionDBPath == "" {
-		c.CollectionDBPath = os.Getenv("COLLECTION_DB_PATH")
-		if c.CollectionDBPath == "" {
-			c.CollectionDBPath = filepath.Join(c.StateDir, "collections")
-		}
-	}
-	if c.FileAssets == "" {
-		c.FileAssets = os.Getenv("FILE_ASSETS")
-		if c.FileAssets == "" {
-			c.FileAssets = filepath.Join(c.StateDir, "assets")
-		}
-	}
-	if c.VectorEngine == "" {
-		c.VectorEngine = os.Getenv("VECTOR_ENGINE")
-		if c.VectorEngine == "" {
-			c.VectorEngine = "chromem"
-		}
-	}
-	if c.EmbeddingModel == "" {
-		c.EmbeddingModel = os.Getenv("EMBEDDING_MODEL")
-		if c.EmbeddingModel == "" {
-			c.EmbeddingModel = "granite-embedding-107m-multilingual"
-		}
-	}
-	if c.MaxChunkingSize == 0 {
-		if s := os.Getenv("MAX_CHUNKING_SIZE"); s != "" {
-			if n, err := strconv.Atoi(s); err == nil {
-				c.MaxChunkingSize = n
-			}
-		}
-		if c.MaxChunkingSize == 0 {
-			c.MaxChunkingSize = 400
-		}
-	}
-	if c.ChunkOverlap == 0 {
-		if s := os.Getenv("CHUNK_OVERLAP"); s != "" {
-			if n, err := strconv.Atoi(s); err == nil {
-				c.ChunkOverlap = n
-			}
-		}
-	}
-	if c.DatabaseURL == "" {
-		c.DatabaseURL = os.Getenv("DATABASE_URL")
-	}
-	if len(c.CollectionAPIKeys) == 0 {
-		if s := os.Getenv("API_KEYS"); s != "" {
-			c.CollectionAPIKeys = strings.Split(s, ",")
-		}
-	}
 }
 
 type Option func(*Config)
@@ -211,6 +155,5 @@ func NewConfig(opts ...Option) *Config {
 		DefaultChunkSize: 2048,
 	}
 	c.Apply(opts...)
-	collectionsDefaults(c)
 	return c
 }

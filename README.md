@@ -341,15 +341,16 @@ import (
     "github.com/mudler/LocalAGI/core/types"
 )
 
-// Create a new agent pool
+// Create a new agent pool (call pool.SetRAGProvider(...) for knowledge base; see main.go)
 pool, err := state.NewAgentPool(
     "default-model",           // default model name
     "default-multimodal-model", // default multimodal model
-    "image-model",            // image generation model
+    "transcription-model",     // default transcription model
+    "en",                     // default transcription language
+    "tts-model",              // default TTS model
     "http://localhost:8080",  // API URL
-    "your-api-key",          // API key
-    "./state",               // state directory
-    "http://localhost:8081", // LocalRAG API URL
+    "your-api-key",           // API key
+    "./state",                // state directory
     func(config *AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action {
         // Define available actions for agents
         return func(ctx context.Context, pool *AgentPool) []types.Action {
@@ -376,8 +377,9 @@ pool, err := state.NewAgentPool(
             // Add your custom filters here
         }
     },
-    "10m", // timeout
-    true,  // enable conversation logs
+    "10m",  // timeout
+    true,   // enable conversation logs
+    nil,    // skills service (optional)
 )
 
 // Create a new agent in the pool
