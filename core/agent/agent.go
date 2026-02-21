@@ -15,6 +15,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/cogito"
+	"github.com/mudler/cogito/clients"
+
 	"github.com/mudler/xlog"
 
 	"github.com/mudler/LocalAGI/core/action"
@@ -89,7 +91,7 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL, options.timeout)
-	llmClient := cogito.NewOpenAILLM(options.LLMAPI.Model, options.LLMAPI.APIKey, options.LLMAPI.APIURL)
+	llmClient := clients.NewLocalAILLM(options.LLMAPI.Model, options.LLMAPI.APIKey, options.LLMAPI.APIURL)
 	c := context.Background()
 	if options.context != nil {
 		c = options.context
@@ -902,9 +904,22 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	cogitoOpts := []cogito.Option{
 		cogito.WithMCPs(a.mcpSessions...),
+		cogito.WithTools(
+			cogitoTools...,
+		),
+		cogito.WithSinkState(
+			cogito.NewToolDefinition(
+				NoToolToCallTool{},
+				NoToolToCallArgs{},
+				"no_tool_to_call",
+				"Called when no other tool is needed to respond to the user",
+			),
+		),
 		cogito.WithReasoningCallback(func(s string) {
 			xlog.Debug("Cogito reasoning callback", "status", s)
-
+			if s == "" {
+				return
+			}
 			if a.observer != nil && job.Obs != nil {
 				job.Obs.AddProgress(
 					types.Progress{
@@ -921,18 +936,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					})
 				a.observer.Update(*job.Obs)
 			}
+			job.Callback(types.ActionCurrentState{
+				Job:       job,
+				Action:    nil,
+				Params:    types.ActionParams{},
+				Reasoning: s,
+			})
 		}),
-		cogito.WithTools(
-			cogitoTools...,
-		),
-		cogito.WithSinkState(
-			cogito.NewToolDefinition(
-				NoToolToCallTool{},
-				NoToolToCallArgs{},
-				"no_tool_to_call",
-				"Called when no other tool is needed to respond to the user",
-			),
-		),
 		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
 			if a.observer != nil && obs != nil {
 				obs := observables[t.ToolArguments.ID]
@@ -1138,11 +1148,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlanReEvaluator)
 		}
 		if a.options.LLMAPI.ReviewerModel != "" {
-			llmClient := cogito.NewOpenAILLM(a.options.LLMAPI.ReviewerModel, a.options.LLMAPI.APIKey, a.options.LLMAPI.APIURL)
+			llmClient := clients.NewLocalAILLM(a.options.LLMAPI.ReviewerModel, a.options.LLMAPI.APIKey, a.options.LLMAPI.APIURL)
 			cogitoOpts = append(cogitoOpts, cogito.WithReviewerLLM(llmClient))
 		}
 	}
 
+	// Important: DisableSinkState must be before WithForceReasoning()
 	if a.options.disableSinkState {
 		cogitoOpts = append(cogitoOpts, cogito.DisableSinkState)
 	}
@@ -1160,6 +1171,11 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			cogito.WithMaxAttempts(a.options.maxEvaluationLoops),
 			cogito.WithIterations(a.options.maxEvaluationLoops),
 		)
+	}
+
+	if a.options.forceReasoningTool {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithForceReasoningTool())
 	}
 
 	fragment, err = cogito.ExecuteTools(

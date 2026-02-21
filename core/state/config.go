@@ -74,36 +74,37 @@ type AgentConfig struct {
 	LocalRAGAPIKey        string `json:"local_rag_api_key" form:"local_rag_api_key"`
 	LastMessageDuration   string `json:"last_message_duration" form:"last_message_duration"`
 
-	Name                  string `json:"name" form:"name"`
-	HUD                   bool   `json:"hud" form:"hud"`
-	StandaloneJob         bool   `json:"standalone_job" form:"standalone_job"`
-	RandomIdentity        bool   `json:"random_identity" form:"random_identity"`
-	InitiateConversations bool   `json:"initiate_conversations" form:"initiate_conversations"`
-	CanPlan               bool   `json:"enable_planning" form:"enable_planning"`
-	PlanReviewerModel     string `json:"plan_reviewer_model" form:"plan_reviewer_model"`
-	DisableSinkState      bool   `json:"disable_sink_state" form:"disable_sink_state"`
-	IdentityGuidance      string `json:"identity_guidance" form:"identity_guidance"`
-	PeriodicRuns          string `json:"periodic_runs" form:"periodic_runs"`
-	SchedulerPollInterval string `json:"scheduler_poll_interval" form:"scheduler_poll_interval"`
-	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
-	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
-	EnableKBCompaction    bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
-	KBCompactionInterval  string `json:"kb_compaction_interval" form:"kb_compaction_interval"`
-	KBCompactionSummarize bool   `json:"kb_compaction_summarize" form:"kb_compaction_summarize"`
-	KBAutoSearch          bool   `json:"kb_auto_search" form:"kb_auto_search"`
-	KBAsTools             bool   `json:"kb_as_tools" form:"kb_as_tools"`
-	EnableReasoning       bool   `json:"enable_reasoning" form:"enable_reasoning"`
-	EnableGuidedTools     bool   `json:"enable_guided_tools" form:"enable_guided_tools"`
-	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
-	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
-	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
-	LongTermMemory          bool   `json:"long_term_memory" form:"long_term_memory"`
-	SummaryLongTermMemory   bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
-	ConversationStorageMode string `json:"conversation_storage_mode" form:"conversation_storage_mode"`
-	ParallelJobs            int    `json:"parallel_jobs" form:"parallel_jobs"`
-	StripThinkingTags     bool   `json:"strip_thinking_tags" form:"strip_thinking_tags"`
-	EnableEvaluation      bool   `json:"enable_evaluation" form:"enable_evaluation"`
-	MaxEvaluationLoops    int    `json:"max_evaluation_loops" form:"max_evaluation_loops"`
+	Name                     string `json:"name" form:"name"`
+	HUD                      bool   `json:"hud" form:"hud"`
+	StandaloneJob            bool   `json:"standalone_job" form:"standalone_job"`
+	RandomIdentity           bool   `json:"random_identity" form:"random_identity"`
+	InitiateConversations    bool   `json:"initiate_conversations" form:"initiate_conversations"`
+	CanPlan                  bool   `json:"enable_planning" form:"enable_planning"`
+	PlanReviewerModel        string `json:"plan_reviewer_model" form:"plan_reviewer_model"`
+	DisableSinkState         bool   `json:"disable_sink_state" form:"disable_sink_state"`
+	IdentityGuidance         string `json:"identity_guidance" form:"identity_guidance"`
+	PeriodicRuns             string `json:"periodic_runs" form:"periodic_runs"`
+	SchedulerPollInterval    string `json:"scheduler_poll_interval" form:"scheduler_poll_interval"`
+	PermanentGoal            string `json:"permanent_goal" form:"permanent_goal"`
+	EnableKnowledgeBase      bool   `json:"enable_kb" form:"enable_kb"`
+	EnableKBCompaction       bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
+	KBCompactionInterval     string `json:"kb_compaction_interval" form:"kb_compaction_interval"`
+	KBCompactionSummarize    bool   `json:"kb_compaction_summarize" form:"kb_compaction_summarize"`
+	KBAutoSearch             bool   `json:"kb_auto_search" form:"kb_auto_search"`
+	KBAsTools                bool   `json:"kb_as_tools" form:"kb_as_tools"`
+	EnableReasoning          bool   `json:"enable_reasoning" form:"enable_reasoning"`
+	EnableForceReasoningTool bool   `json:"enable_reasoning_tool" form:"enable_reasoning_tool"`
+	EnableGuidedTools        bool   `json:"enable_guided_tools" form:"enable_guided_tools"`
+	KnowledgeBaseResults     int    `json:"kb_results" form:"kb_results"`
+	CanStopItself            bool   `json:"can_stop_itself" form:"can_stop_itself"`
+	SystemPrompt             string `json:"system_prompt" form:"system_prompt"`
+	LongTermMemory           bool   `json:"long_term_memory" form:"long_term_memory"`
+	SummaryLongTermMemory    bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
+	ConversationStorageMode  string `json:"conversation_storage_mode" form:"conversation_storage_mode"`
+	ParallelJobs             int    `json:"parallel_jobs" form:"parallel_jobs"`
+	StripThinkingTags        bool   `json:"strip_thinking_tags" form:"strip_thinking_tags"`
+	EnableEvaluation         bool   `json:"enable_evaluation" form:"enable_evaluation"`
+	MaxEvaluationLoops       int    `json:"max_evaluation_loops" form:"max_evaluation_loops"`
 }
 
 type AgentConfigMeta struct {
@@ -310,8 +311,8 @@ func NewAgentConfigMeta(
 					{Value: "user_and_assistant", Label: "User and Assistant Messages"},
 					{Value: "whole_conversation", Label: "Whole Conversation as Block"},
 				},
-				HelpText:     "Controls what gets stored in the knowledge base: only user messages, user and assistant messages separately, or the entire conversation as a single block",
-				Tags:         config.Tags{Section: "MemorySettings"},
+				HelpText: "Controls what gets stored in the knowledge base: only user messages, user and assistant messages separately, or the entire conversation as a single block",
+				Tags:     config.Tags{Section: "MemorySettings"},
 			},
 			{
 				Name:         "system_prompt",
@@ -385,6 +386,14 @@ func NewAgentConfigMeta(
 				Type:         "checkbox",
 				DefaultValue: true,
 				HelpText:     "Enable agent to explain its reasoning process",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "enable_reasoning_tool",
+				Label:        "Enable Reasoning for tools",
+				Type:         "checkbox",
+				DefaultValue: true,
+				HelpText:     "Enable agent to reason more on tools",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{

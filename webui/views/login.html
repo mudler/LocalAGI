@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalAGI - Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg-primary: #0F172A;
+            --color-bg-secondary: #1E293B;
+            --color-primary: #38BDF8;
+            --color-primary-hover: #0EA5E9;
+            --color-primary-light: rgba(56, 189, 248, 0.08);
+            --color-text-primary: #E5E7EB;
+            --color-text-secondary: #94A3B8;
+            --color-text-muted: #64748B;
+            --color-text-inverse: #0F172A;
+            --color-border: rgba(148, 163, 184, 0.12);
+            --color-error: #EF4444;
+            --color-error-light: rgba(239, 68, 68, 0.1);
+            --color-success: #14B8A6;
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+            --radius-md: 6px;
+            --radius-xl: 12px;
+            --duration-fast: 150ms;
+            --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            padding: 2rem;
+        }
+
+        .login-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 0;
+        }
+
+        .login-background .bg-gradient {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at top left, rgba(56, 189, 248, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(56, 189, 248, 0.04) 0%, transparent 50%),
+                var(--color-bg-primary);
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .login-logo {
+            margin-bottom: 1.5rem;
+            text-align: center;
+            animation: fadeInDown 0.5s ease-out;
+        }
+
+        .login-logo img {
+            max-width: 180px;
+            height: auto;
+        }
+
+        .login-card {
+            width: 100%;
+            background-color: var(--color-bg-secondary);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-lg);
+            padding: 2rem;
+            animation: fadeInUp 0.5s ease-out 0.1s both;
+        }
+
+        .login-card-header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-card-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .login-card-header p {
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--color-text-secondary);
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 0.875rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--color-text-muted);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            background-color: var(--color-bg-primary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            color: var(--color-text-primary);
+            font-size: 0.95rem;
+            transition: all var(--duration-fast) var(--ease-default);
+        }
+
+        .form-group input::placeholder {
+            color: var(--color-text-muted);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px var(--color-primary-light);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--color-primary);
+            color: var(--color-text-inverse);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--duration-fast) var(--ease-default);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .login-button:hover {
+            background-color: var(--color-primary-hover);
+        }
+
+        .login-button:active {
+            transform: translateY(1px);
+        }
+
+        .login-button i {
+            transition: transform var(--duration-fast) var(--ease-default);
+        }
+
+        .login-button:hover i {
+            transform: translateX(3px);
+        }
+
+        .error-message {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background-color: var(--color-error-light);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius-md);
+            color: var(--color-error);
+            font-size: 0.875rem;
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            animation: shake 0.4s ease-out;
+        }
+
+        .login-footer {
+            margin-top: 1.5rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid var(--color-border);
+            text-align: center;
+        }
+
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--color-primary);
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .time-display {
+            color: var(--color-text-muted);
+            font-size: 0.75rem;
+        }
+
+        .time-display span {
+            color: var(--color-text-secondary);
+            font-family: monospace;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 1rem;
+            }
+            
+            .login-card {
+                padding: 1.5rem;
+            }
+            
+            .login-logo img {
+                max-width: 150px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-page">
+        <div class="login-background">
+            <div class="bg-gradient"></div>
+        </div>
+        
+        <div class="login-container">
+            <!-- Logo -->
+            <div class="login-logo">
+                <img src="/public/logo_1.png" alt="LocalAGI Logo" width="180">
+            </div>
+            
+            <!-- Auth Card -->
+            <div class="login-card">
+                <div class="login-card-header">
+                    <h2>Authorization Required</h2>
+                    <p>Please enter your access token to continue</p>
+                </div>
+                
+                <form id="login-form" onsubmit="login(); return false;">
+                    <div class="form-group">
+                        <label for="token">Access Token</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon"><i class="fas fa-key"></i></span>
+                            <input 
+                                type="password" 
+                                id="token" 
+                                name="token" 
+                                placeholder="Enter your token" 
+                                required
+                            />
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="login-button">
+                        <span>Login</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                    
+                    <div id="error-message" class="error-message"></div>
+                </form>
+                
+                <div class="login-footer">
+                    <div class="security-badge">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Instance is token protected</span>
+                    </div>
+                    <p class="time-display">Current time (UTC): <span id="current-time">{{.CurrentDate}}</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function login() {
+            var token = document.getElementById('token');
+            var errorMsg = document.getElementById('error-message');
+            var tokenValue = token.value.trim();
+            
+            if (!tokenValue) {
+                errorMsg.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please enter a valid token';
+                errorMsg.style.display = 'flex';
+                errorMsg.style.animation = 'none';
+                errorMsg.offsetHeight;
+                errorMsg.style.animation = 'shake 0.4s ease-out';
+                token.focus();
+                return;
+            }
+            
+            var date = new Date();
+            date.setTime(date.getTime() + (24 * 60 * 60 * 1000));
+            document.cookie = 'token=' + tokenValue + '; expires=' + date.toGMTString() + '; path=/';
+            
+            var button = document.querySelector('.login-button');
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Authenticating...</span>';
+            button.style.opacity = '0.8';
+            
+            setTimeout(function() {
+                window.location.reload();
+            }, 800);
+        }
+        
+        function updateCurrentTime() {
+            var timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                var now = new Date();
+                var year = now.getUTCFullYear();
+                var month = String(now.getUTCMonth() + 1).padStart(2, '0');
+                var day = String(now.getUTCDate()).padStart(2, '0');
+                var hours = String(now.getUTCHours()).padStart(2, '0');
+                var minutes = String(now.getUTCMinutes()).padStart(2, '0');
+                var seconds = String(now.getUTCSeconds()).padStart(2, '0');
+                timeElement.textContent = year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+            }
+        }
+        
+        updateCurrentTime();
+        setInterval(updateCurrentTime, 1000);
+    </script>
+</body>
+</html>

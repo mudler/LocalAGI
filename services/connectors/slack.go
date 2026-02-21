@@ -87,6 +87,11 @@ func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 			return true // Skip if we don't have a message to update
 		}
 
+		// Do not update if there is no new message to send
+		if state.Reasoning == "" {
+			return true
+		}
+
 		thought := thinkingMessage + "\n\n"
 		if state.Reasoning != "" {
 			thought += "Current thought process:\n" + state.Reasoning
@@ -514,9 +519,8 @@ func (t *Slack) handleChannelMessage(
 
 		xlog.Debug("After adding message to conversation tracker", "conversation", a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("slack:%s", t.channelID)))
 
-		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
-
-		replyWithPostMessage(res.Response, api, ev, postMessageParams, res)
+		convertedResponse := githubmarkdownconvertergo.Slack(res.Response)
+		replyWithPostMessage(convertedResponse, api, ev, postMessageParams, res)
 
 	}()
 }
@@ -531,7 +535,7 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 			_, _, err := api.PostMessage(ev.Channel,
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(message, true),
+				slack.MsgOptionText(message, false),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
 				slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, "")...),
 			)
@@ -543,7 +547,7 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 		_, _, err := api.PostMessage(ev.Channel,
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
-			slack.MsgOptionText(res.Response, true),
+			slack.MsgOptionText(finalResponse, false),
 			slack.MsgOptionPostMessageParameters(postMessageParams),
 			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, "")...),
 		//	slack.MsgOptionTS(ts),
@@ -554,7 +558,7 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 	}
 }
 
-func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackevents.AppMentionEvent, msgTs string, ts string, res *types.JobResult) {
+func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackevents.AppMentionEvent, msgTs string, ts string, postMessageParams slack.PostMessageParameters, res *types.JobResult) {
 	if len(finalResponse) > 3000 {
 		// split response in multiple messages, and update the first
 
@@ -565,7 +569,8 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			msgTs,
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
-			slack.MsgOptionText(messages[0], true),
+			slack.MsgOptionText(messages[0], false),
+			slack.MsgOptionPostMessageParameters(postMessageParams),
 			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, msgTs)...),
 		)
 		if err != nil {
@@ -579,7 +584,8 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			_, _, err = api.PostMessage(ev.Channel,
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(message, true),
+				slack.MsgOptionText(message, false),
+				slack.MsgOptionPostMessageParameters(postMessageParams),
 				slack.MsgOptionTS(ts),
 			)
 			if err != nil {
@@ -592,7 +598,8 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			msgTs,
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
-			slack.MsgOptionText(finalResponse, true),
+			slack.MsgOptionText(finalResponse, false),
+			slack.MsgOptionPostMessageParameters(postMessageParams),
 			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, msgTs)...),
 		)
 		if err != nil {
@@ -742,7 +749,7 @@ func (t *Slack) handleMention(
 
 		if res.Response == "" {
 			xlog.Debug(fmt.Sprintf("Empty response from agent"))
-			replyToUpdateMessage("there was an internal error. try again!", api, ev, msgTs, ts, res)
+			replyToUpdateMessage("there was an internal error. try again!", api, ev, msgTs, ts, postMessageParams, res)
 
 			// _, _, err := api.DeleteMessage(ev.Channel, msgTs)
 			// if err != nil {
@@ -757,12 +764,12 @@ func (t *Slack) handleMention(
 			xlog.Error(fmt.Sprintf("Error getting user info: %v", err))
 		}
 
-		// Format the final response
-		//finalResponse := githubmarkdownconvertergo.Slack(res.Response)
-		finalResponse := fmt.Sprintf("@%s %s", user.Name, res.Response)
+		// Format the final response (convert GitHub markdown to Slack mrkdwn)
+		convertedResponse := githubmarkdownconvertergo.Slack(res.Response)
+		finalResponse := fmt.Sprintf("@%s %s", user.Name, convertedResponse)
 		xlog.Debug("Send final response to slack", "response", finalResponse)
 
-		replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, res)
+		replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, postMessageParams, res)
 
 		// Clean up the placeholder map
 		t.placeholderMutex.Lock()
@@ -790,10 +797,11 @@ func (t *Slack) Start(a *agent.Agent) {
 		// handle new conversations
 		a.AddSubscriber(func(ccm *types.ConversationMessage) {
 			xlog.Debug("Subscriber(slack)", "message", ccm.Message.Content)
+			convertedContent := githubmarkdownconvertergo.Slack(ccm.Message.Content)
 			_, _, err := api.PostMessage(t.channelID,
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(ccm.Message.Content, true),
+				slack.MsgOptionText(convertedContent, false),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
 			)
 			if err != nil {

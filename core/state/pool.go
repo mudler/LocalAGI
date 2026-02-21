@@ -279,25 +279,26 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		config.SchedulerPollInterval = "30s"
 	}
 
-	// XXX: Why do we update the pool config from an Agent's config?
+	// Use agent-specific config when set, otherwise pool defaults. Do not update pool from agent config.
+	effectiveAPIURL := a.apiURL
 	if config.APIURL != "" {
-		a.apiURL = config.APIURL
+		effectiveAPIURL = config.APIURL
 	} else {
 		config.APIURL = a.apiURL
 	}
-
+	effectiveAPIKey := a.apiKey
 	if config.APIKey != "" {
-		a.apiKey = config.APIKey
+		effectiveAPIKey = config.APIKey
 	} else {
 		config.APIKey = a.apiKey
 	}
-
+	effectiveLocalRAGAPI := a.localRAGAPI
 	if config.LocalRAGURL != "" {
-		a.localRAGAPI = config.LocalRAGURL
+		effectiveLocalRAGAPI = config.LocalRAGURL
 	}
-
+	effectiveLocalRAGKey := a.localRAGKey
 	if config.LocalRAGAPIKey != "" {
-		a.localRAGKey = config.LocalRAGAPIKey
+		effectiveLocalRAGKey = config.LocalRAGAPIKey
 	}
 
 	connectors := a.connectors(config)
@@ -325,7 +326,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		"Creating agent",
 		"name", name,
 		"model", model,
-		"api_url", a.apiURL,
+		"api_url", effectiveAPIURL,
 		"actions", actionsLog,
 		"connectors", connectorLog,
 		"filters", filtersLog,
@@ -343,7 +344,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 	opts := []Option{
 		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
 		WithModel(model),
-		WithLLMAPIURL(a.apiURL),
+		WithLLMAPIURL(effectiveAPIURL),
 		WithContext(ctx),
 		WithMCPServers(config.MCPServers...),
 		WithTranscriptionModel(transcriptionModel),
@@ -365,14 +366,18 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		),
 		WithStateFile(stateFile),
 		WithCharacterFile(characterFile),
-		WithLLMAPIKey(a.apiKey),
+		WithLLMAPIKey(effectiveAPIKey),
 		WithTimeout(a.timeout),
 		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
+			var actionName types.ActionDefinitionName
+			if state.Action != nil {
+				actionName = state.Action.Definition().Name
+			}
 			xlog.Info(
 				"Agent is thinking",
 				"agent", name,
 				"reasoning", state.Reasoning,
-				"action", state.Action.Definition().Name,
+				"action", actionName,
 				"params", state.Params,
 			)
 
@@ -404,12 +409,16 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 				"Calling agent result callback",
 			)
 
+			var actionName types.ActionDefinitionName
+			if state.ActionCurrentState.Action != nil {
+				actionName = state.ActionCurrentState.Action.Definition().Name
+			}
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
 			Parameters: %+v
 			Result: %s`,
 				state.Reasoning,
-				state.ActionCurrentState.Action.Definition().Name,
+				actionName,
 				state.ActionCurrentState.Params,
 				state.Result)
 			manager.Send(
@@ -481,7 +490,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 
 	var ragClient *localrag.WrappedClient
 	if config.EnableKnowledgeBase {
-		ragClient = localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)
+		ragClient = localrag.NewWrappedClient(effectiveLocalRAGAPI, effectiveLocalRAGKey, name)
 		opts = append(opts, WithRAGDB(ragClient), EnableKnowledgeBase)
 		// Set KB auto search option (defaults to true for backward compatibility)
 		// For backward compatibility: if both new KB fields are false (zero values),
@@ -531,6 +540,10 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
 	}
 
+	if config.EnableForceReasoningTool {
+		opts = append(opts, EnableForceReasoningTool)
+	}
+
 	xlog.Info("Starting agent", "name", name, "config", config)
 
 	agent, err := New(opts...)
@@ -548,7 +561,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 	}()
 
 	if config.EnableKnowledgeBase && config.EnableKBCompaction && ragClient != nil {
-		go runCompactionTicker(ctx, ragClient, config, a.apiURL, a.apiKey, model)
+		go runCompactionTicker(ctx, ragClient, config, effectiveAPIURL, effectiveAPIKey, model)
 	}
 
 	xlog.Info("Starting connectors", "name", name, "config", config)

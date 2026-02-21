@@ -56,12 +56,6 @@ function Home() {
 
   return (
     <div>
-      <div className="image-container">
-        <img src="/app/logo_1.png" width="250" alt="LocalAGI Logo" />
-      </div>
-
-      {/*<h1 className="dashboard-title">LocalAGI</h1>*/}
-
       {/* Dashboard Stats */}
       <div className="dashboard-stats">
         <div className="stat-item">

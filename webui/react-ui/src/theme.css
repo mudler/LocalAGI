@@ -1,53 +1,40 @@
 /* LocalAGI Theme - CSS Variables System */
-/* Inspired by LocalAI's elegant professional design */
+/* Supports both Dark and Light themes */
 
+/* ===================================
+   BASE VARIABLES (Shared)
+   =================================== */
 :root {
-  /* Background Colors */
-  --color-bg-primary: #0F172A;      /* Deep navy background */
-  --color-bg-secondary: #1E293B;    /* Elevated surfaces */
-  --color-bg-tertiary: #1E293B;     /* Cards, panels */
-  --color-bg-overlay: rgba(15, 23, 42, 0.8); /* Modals, overlays */
-  
-  /* Brand Colors - Primary Palette */
-  --color-primary: #38BDF8;         /* Cyan - primary actions */
-  --color-primary-hover: #0EA5E9;   /* Darker cyan on hover */
-  --color-primary-active: #0284C7;  /* Active state */
-  --color-primary-text: #FFFFFF;    /* Text on primary background */
+  /* Brand Colors - Primary Palette (Consistent across themes) */
+  --color-primary: #38BDF8;
+  --color-primary-hover: #0EA5E9;
+  --color-primary-active: #0284C7;
+  --color-primary-text: #FFFFFF;
   --color-primary-light: rgba(56, 189, 248, 0.08);
   --color-primary-border: rgba(56, 189, 248, 0.15);
   
   /* Secondary Colors */
-  --color-secondary: #14B8A6;       /* Teal - secondary actions */
+  --color-secondary: #14B8A6;
   --color-secondary-hover: #0D9488;
   --color-secondary-light: rgba(20, 184, 166, 0.1);
   
   /* Accent Colors */
-  --color-accent: #8B5CF6;          /* Purple - special states */
+  --color-accent: #8B5CF6;
   --color-accent-hover: #7C3AED;
   --color-accent-light: rgba(139, 92, 246, 0.1);
-  --color-accent-purple: #A78BFA;   /* Light purple for gradients */
-  --color-accent-teal: #2DD4BF;     /* Light teal for gradients */
+  --color-accent-purple: #A78BFA;
+  --color-accent-teal: #2DD4BF;
   
-  /* Text Colors */
-  --color-text-primary: #E5E7EB;    /* Primary text */
-  --color-text-secondary: #94A3B8;  /* Secondary text */
-  --color-text-muted: #64748B;      /* Tertiary/muted text */
-  --color-text-disabled: #475569;   /* Disabled text */
-  --color-text-inverse: #0F172A;    /* Text on light backgrounds */
-  
-  /* Border Colors */
-  --color-border: rgba(148, 163, 184, 0.12);
-  --color-border-subtle: rgba(148, 163, 184, 0.08);
-  --color-border-strong: rgba(56, 189, 248, 0.2);
-  --color-border-focus: rgba(56, 189, 248, 0.3);
-  
-  /* Status Colors */
+  /* Status Colors (Consistent across themes) */
   --color-success: #14B8A6;
   --color-success-light: rgba(20, 184, 166, 0.1);
+  --color-success-dark: #0D9488;
   --color-warning: #F59E0B;
   --color-warning-light: rgba(245, 158, 11, 0.1);
+  --color-warning-dark: #D97706;
   --color-error: #EF4444;
   --color-error-light: rgba(239, 68, 68, 0.1);
+  --color-error-dark: #DC2626;
   --color-info: #38BDF8;
   --color-info-light: rgba(56, 189, 248, 0.1);
   
@@ -60,6 +47,7 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
   --shadow-glow: 0 0 0 1px rgba(56, 189, 248, 0.1), 0 0 8px rgba(56, 189, 248, 0.15);
   
   /* Animation Timing */
@@ -70,9 +58,9 @@
   
   /* Border Radius */
   --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
   
   /* Spacing Scale */
@@ -82,24 +70,95 @@
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
   --spacing-2xl: 3rem;
-
-  /* Legacy Variable Mappings (for backward compatibility) */
+  
+  /* Layout */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --header-height: 64px;
+  
+  /* Legacy Variable Mappings */
   --primary: var(--color-primary);
   --secondary: var(--color-secondary);
   --tertiary: var(--color-accent);
+  --success: var(--color-success);
+  --danger: var(--color-error);
+  --warning: var(--color-warning);
+  --info: var(--color-info);
+}
+
+/* ===================================
+   DARK THEME (Default)
+   =================================== */
+[data-theme="dark"],
+:root:not([data-theme]) {
+  /* Background Colors */
+  --color-bg-primary: #0F172A;
+  --color-bg-secondary: #1E293B;
+  --color-bg-tertiary: #334155;
+  --color-bg-elevated: #1E293B;
+  --color-bg-overlay: rgba(15, 23, 42, 0.8);
+  --color-bg-input: #0F172A;
+  
+  /* Text Colors */
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-text-disabled: #475569;
+  --color-text-inverse: #0F172A;
+  --color-text-placeholder: #64748B;
+  
+  /* Border Colors */
+  --color-border: rgba(148, 163, 184, 0.15);
+  --color-border-subtle: rgba(148, 163, 184, 0.08);
+  --color-border-strong: rgba(148, 163, 184, 0.25);
+  --color-border-focus: rgba(56, 189, 248, 0.4);
+  
+  /* Legacy mappings */
   --dark-bg: var(--color-bg-primary);
   --darker-bg: var(--color-bg-primary);
   --medium-bg: var(--color-bg-secondary);
   --light-bg: var(--color-bg-tertiary);
   --text: var(--color-text-primary);
   --border: var(--color-border);
-  --success: var(--color-success);
-  --danger: var(--color-error);
-  --warning: var(--color-warning);
-  --info: var(--color-info);
+}
+
+/* ===================================
+   LIGHT THEME
+   =================================== */
+[data-theme="light"] {
+  /* Background Colors - Warm off-white/cream palette */
+  --color-bg-primary: #F8F7F4;
+  --color-bg-secondary: #FFFFFF;
+  --color-bg-tertiary: #F1F0EC;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-overlay: rgba(255, 255, 255, 0.9);
+  --color-bg-input: #FFFFFF;
   
-  /* Remove old glow effects - use subtle shadows instead */
-  --neon-glow: none;
-  --pink-glow: none;
-  --purple-glow: none;
+  /* Text Colors */
+  --color-text-primary: #1E293B;
+  --color-text-secondary: #64748B;
+  --color-text-muted: #94A3B8;
+  --color-text-disabled: #CBD5E1;
+  --color-text-inverse: #FFFFFF;
+  --color-text-placeholder: #94A3B8;
+  
+  /* Border Colors */
+  --color-border: rgba(148, 163, 184, 0.25);
+  --color-border-subtle: rgba(148, 163, 184, 0.15);
+  --color-border-strong: rgba(148, 163, 184, 0.35);
+  --color-border-focus: rgba(56, 189, 248, 0.5);
+  
+  /* Adjusted shadows for light theme */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.08);
+  
+  /* Legacy mappings */
+  --dark-bg: var(--color-bg-secondary);
+  --darker-bg: var(--color-bg-tertiary);
+  --medium-bg: var(--color-bg-primary);
+  --light-bg: var(--color-bg-secondary);
+  --text: var(--color-text-primary);
+  --border: var(--color-border);
 }
