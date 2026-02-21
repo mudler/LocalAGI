@@ -16,7 +16,7 @@ COPY webui/react-ui/ ./
 # Build the React UI
 RUN bun run build
 
-# Use a temporary build image based on Golang 1.24-alpine
+# Use a temporary build image based on Golang 1.26-alpine
 FROM golang:1.26-alpine AS builder
 
 # Define argument for linker flags
