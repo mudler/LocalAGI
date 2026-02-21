@@ -1,7 +1,6 @@
 package webui
 
 import (
-	"crypto/subtle"
 	"fmt"
 	"net/url"
 	"strings"
@@ -17,17 +16,17 @@ type collectionList map[string]*rag.PersistentKB
 
 // collectionsState holds in-memory state for the collections API.
 type collectionsState struct {
-	mu              sync.RWMutex
-	collections     collectionList
-	sourceManager   *rag.SourceManager
+	mu               sync.RWMutex
+	collections      collectionList
+	sourceManager    *rag.SourceManager
 	ensureCollection func(name string) (*rag.PersistentKB, bool) // get-or-create for internal RAG (agent name as collection)
 }
 
 // APIResponse represents a standardized API response (LocalRecall contract).
 type collectionsAPIResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
+	Success bool                 `json:"success"`
+	Message string               `json:"message,omitempty"`
+	Data    interface{}          `json:"data,omitempty"`
 	Error   *collectionsAPIError `json:"error,omitempty"`
 }
 
@@ -64,25 +63,25 @@ func collectionsErrorResponse(code, message, details string) collectionsAPIRespo
 	}
 }
 
+// collectionsAPIKeyFromRequest returns the API key from the same sources as the main keyauth: Authorization, x-api-key, xi-api-key, cookie:token.
+func collectionsAPIKeyFromRequest(c *fiber.Ctx) string {
+	if v := c.Get("Authorization"); v != "" {
+		return strings.TrimPrefix(strings.TrimSpace(v), "Bearer ")
+	}
+	if v := c.Get("x-api-key"); v != "" {
+		return strings.TrimSpace(v)
+	}
+	if v := c.Get("xi-api-key"); v != "" {
+		return strings.TrimSpace(v)
+	}
+	if v := c.Cookies("token"); v != "" {
+		return v
+	}
+	return ""
+}
+
 // RegisterCollectionRoutes mounts /api/collections* routes. backend is either from NewInProcessCollectionsBackend or NewCollectionsBackendHTTP.
 func (app *App) RegisterCollectionRoutes(webapp *fiber.App, cfg *Config, backend CollectionsBackend) {
-	apiKeys := cfg.CollectionAPIKeys
-	if len(apiKeys) == 0 {
-		apiKeys = cfg.ApiKeys
-	}
-	if len(apiKeys) > 0 {
-		webapp.Use("/api/collections", func(c *fiber.Ctx) error {
-			apiKey := c.Get("Authorization")
-			apiKey = strings.TrimPrefix(apiKey, "Bearer ")
-			for _, validKey := range apiKeys {
-				if subtle.ConstantTimeCompare([]byte(apiKey), []byte(validKey)) == 1 {
-					return c.Next()
-				}
-			}
-			return c.Status(fiber.StatusUnauthorized).JSON(collectionsErrorResponse(errCodeUnauthorized, "Unauthorized", "Invalid or missing API key"))
-		})
-	}
-
 	webapp.Post("/api/collections", app.createCollection(backend))
 	webapp.Get("/api/collections", app.listCollections(backend))
 	webapp.Post("/api/collections/:name/upload", app.uploadFile(backend))

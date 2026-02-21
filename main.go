@@ -38,7 +38,6 @@ var embeddingModel = os.Getenv("EMBEDDING_MODEL")
 var maxChunkingSizeEnv = os.Getenv("MAX_CHUNKING_SIZE")
 var chunkOverlapEnv = os.Getenv("CHUNK_OVERLAP")
 var databaseURL = os.Getenv("DATABASE_URL")
-var collectionAPIKeysEnv = os.Getenv("API_KEYS")
 
 func init() {
 	if baseModel == "" {
@@ -94,10 +93,6 @@ func main() {
 	if apiKeysEnv != "" {
 		apiKeys = strings.Split(apiKeysEnv, ",")
 	}
-	collectionAPIKeys := []string{}
-	if collectionAPIKeysEnv != "" {
-		collectionAPIKeys = strings.Split(collectionAPIKeysEnv, ",")
-	}
 
 	// Skills service (optional: provides skills prompt and MCP when agents have EnableSkills)
 	skillsService, err := skills.NewService(stateDir)
@@ -152,7 +147,6 @@ func main() {
 		webui.WithMaxChunkingSize(maxChunkingSize),
 		webui.WithChunkOverlap(chunkOverlap),
 		webui.WithDatabaseURL(databaseURL),
-		webui.WithCollectionAPIKeys(collectionAPIKeys...),
 		webui.WithLocalRAGURL(localRAG),
 	)
 
