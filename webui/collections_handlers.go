@@ -3,19 +3,14 @@ package webui
 import (
 	"crypto/subtle"
 	"fmt"
-	"io"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mudler/localrecall/rag"
-	"github.com/mudler/localrecall/rag/sources"
 	"github.com/mudler/xlog"
-	"github.com/sashabaranov/go-openai"
 )
 
 type collectionList map[string]*rag.PersistentKB
@@ -69,78 +64,8 @@ func collectionsErrorResponse(code, message, details string) collectionsAPIRespo
 	}
 }
 
-func newVectorEngine(
-	vectorEngineType string,
-	llmClient *openai.Client,
-	apiURL, apiKey, collectionName, dbPath, fileAssets, embeddingModel, databaseURL string,
-	maxChunkSize, chunkOverlap int,
-) *rag.PersistentKB {
-	switch vectorEngineType {
-	case "chromem":
-		xlog.Info("Chromem collection", "collectionName", collectionName, "dbPath", dbPath)
-		return rag.NewPersistentChromeCollection(llmClient, collectionName, dbPath, fileAssets, embeddingModel, maxChunkSize, chunkOverlap)
-	case "localai":
-		xlog.Info("LocalAI collection", "collectionName", collectionName, "apiURL", apiURL)
-		return rag.NewPersistentLocalAICollection(llmClient, apiURL, apiKey, collectionName, dbPath, fileAssets, embeddingModel, maxChunkSize, chunkOverlap)
-	case "postgres":
-		if databaseURL == "" {
-			xlog.Error("DATABASE_URL is required for PostgreSQL engine")
-			return nil
-		}
-		xlog.Info("PostgreSQL collection", "collectionName", collectionName, "databaseURL", databaseURL)
-		return rag.NewPersistentPostgresCollection(llmClient, collectionName, dbPath, fileAssets, embeddingModel, maxChunkSize, chunkOverlap, databaseURL)
-	default:
-		xlog.Error("Unknown vector engine", "engine", vectorEngineType)
-		return nil
-	}
-}
-
-// RegisterCollectionRoutes mounts /api/collections* routes and initializes collections state.
-func (app *App) RegisterCollectionRoutes(webapp *fiber.App, cfg *Config) {
-	state := &collectionsState{
-		collections:   collectionList{},
-		sourceManager: rag.NewSourceManager(&sources.Config{}),
-	}
-
-	openaiConfig := openai.DefaultConfig(cfg.LLMAPIKey)
-	openaiConfig.BaseURL = cfg.LLMAPIURL
-	openAIClient := openai.NewClientWithConfig(openaiConfig)
-
-	// Ensure dirs exist
-	os.MkdirAll(cfg.CollectionDBPath, 0755)
-	os.MkdirAll(cfg.FileAssets, 0755)
-
-	// Load existing collections from disk
-	colls := rag.ListAllCollections(cfg.CollectionDBPath)
-	for _, c := range colls {
-		collection := newVectorEngine(cfg.VectorEngine, openAIClient, cfg.LLMAPIURL, cfg.LLMAPIKey, c, cfg.CollectionDBPath, cfg.FileAssets, cfg.EmbeddingModel, cfg.DatabaseURL, cfg.MaxChunkingSize, cfg.ChunkOverlap)
-		if collection != nil {
-			state.collections[c] = collection
-			state.sourceManager.RegisterCollection(c, collection)
-		}
-	}
-
-	// Get-or-create for internal RAG (agents use collection name = agent name)
-	state.ensureCollection = func(name string) (*rag.PersistentKB, bool) {
-		state.mu.Lock()
-		defer state.mu.Unlock()
-		if kb, ok := state.collections[name]; ok && kb != nil {
-			return kb, true
-		}
-		collection := newVectorEngine(cfg.VectorEngine, openAIClient, cfg.LLMAPIURL, cfg.LLMAPIKey, name, cfg.CollectionDBPath, cfg.FileAssets, cfg.EmbeddingModel, cfg.DatabaseURL, cfg.MaxChunkingSize, cfg.ChunkOverlap)
-		if collection == nil {
-			return nil, false
-		}
-		state.collections[name] = collection
-		state.sourceManager.RegisterCollection(name, collection)
-		return collection, true
-	}
-
-	state.sourceManager.Start()
-
-	app.collectionsState = state
-
-	// Optional API key middleware for /api/collections
+// RegisterCollectionRoutes mounts /api/collections* routes. backend is either from NewInProcessCollectionsBackend or NewCollectionsBackendHTTP.
+func (app *App) RegisterCollectionRoutes(webapp *fiber.App, cfg *Config, backend CollectionsBackend) {
 	apiKeys := cfg.CollectionAPIKeys
 	if len(apiKeys) == 0 {
 		apiKeys = cfg.ApiKeys
@@ -158,21 +83,33 @@ func (app *App) RegisterCollectionRoutes(webapp *fiber.App, cfg *Config) {
 		})
 	}
 
-	// Route handlers close over state and config
-	webapp.Post("/api/collections", app.createCollection(state, cfg, openAIClient))
-	webapp.Get("/api/collections", app.listCollections(cfg))
-	webapp.Post("/api/collections/:name/upload", app.uploadFile(state, cfg))
-	webapp.Get("/api/collections/:name/entries", app.listFiles(state))
-	webapp.Get("/api/collections/:name/entries/*", app.getEntryContent(state))
-	webapp.Post("/api/collections/:name/search", app.searchCollection(state))
-	webapp.Post("/api/collections/:name/reset", app.resetCollection(state))
-	webapp.Delete("/api/collections/:name/entry/delete", app.deleteEntryFromCollection(state))
-	webapp.Post("/api/collections/:name/sources", app.registerExternalSource(state))
-	webapp.Delete("/api/collections/:name/sources", app.removeExternalSource(state))
-	webapp.Get("/api/collections/:name/sources", app.listSources(state))
+	webapp.Post("/api/collections", app.createCollection(backend))
+	webapp.Get("/api/collections", app.listCollections(backend))
+	webapp.Post("/api/collections/:name/upload", app.uploadFile(backend))
+	webapp.Get("/api/collections/:name/entries", app.listFiles(backend))
+	webapp.Get("/api/collections/:name/entries/*", app.getEntryContent(backend))
+	webapp.Post("/api/collections/:name/search", app.searchCollection(backend))
+	webapp.Post("/api/collections/:name/reset", app.resetCollection(backend))
+	webapp.Delete("/api/collections/:name/entry/delete", app.deleteEntryFromCollection(backend))
+	webapp.Post("/api/collections/:name/sources", app.registerExternalSource(backend))
+	webapp.Delete("/api/collections/:name/sources", app.removeExternalSource(backend))
+	webapp.Get("/api/collections/:name/sources", app.listSources(backend))
 }
 
-func (app *App) createCollection(state *collectionsState, cfg *Config, client *openai.Client) func(c *fiber.Ctx) error {
+func collectionErrStatus(err error, collection string) int {
+	if err == nil {
+		return 0
+	}
+	if strings.Contains(err.Error(), "collection not found") {
+		return fiber.StatusNotFound
+	}
+	if strings.Contains(err.Error(), "entry not found") {
+		return fiber.StatusNotFound
+	}
+	return fiber.StatusInternalServerError
+}
+
+func (app *App) createCollection(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		var r struct {
 			Name string `json:"name"`
@@ -180,17 +117,9 @@ func (app *App) createCollection(state *collectionsState, cfg *Config, client *o
 		if err := c.BodyParser(&r); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeInvalidRequest, "Invalid request", err.Error()))
 		}
-
-		collection := newVectorEngine(cfg.VectorEngine, client, cfg.LLMAPIURL, cfg.LLMAPIKey, r.Name, cfg.CollectionDBPath, cfg.FileAssets, cfg.EmbeddingModel, cfg.DatabaseURL, cfg.MaxChunkingSize, cfg.ChunkOverlap)
-		if collection == nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to create collection", "unsupported or misconfigured vector engine"))
+		if err := backend.CreateCollection(r.Name); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to create collection", err.Error()))
 		}
-
-		state.mu.Lock()
-		state.collections[r.Name] = collection
-		state.sourceManager.RegisterCollection(r.Name, collection)
-		state.mu.Unlock()
-
 		return c.Status(fiber.StatusCreated).JSON(collectionsSuccessResponse("Collection created successfully", map[string]interface{}{
 			"name":       r.Name,
 			"created_at": time.Now().Format(time.RFC3339),
@@ -198,9 +127,12 @@ func (app *App) createCollection(state *collectionsState, cfg *Config, client *o
 	}
 }
 
-func (app *App) listCollections(cfg *Config) func(c *fiber.Ctx) error {
+func (app *App) listCollections(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		collectionsList := rag.ListAllCollections(cfg.CollectionDBPath)
+		collectionsList, err := backend.ListCollections()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to list collections", err.Error()))
+		}
 		return c.JSON(collectionsSuccessResponse("Collections retrieved successfully", map[string]interface{}{
 			"collections": collectionsList,
 			"count":       len(collectionsList),
@@ -208,22 +140,14 @@ func (app *App) listCollections(cfg *Config) func(c *fiber.Ctx) error {
 	}
 }
 
-func (app *App) uploadFile(state *collectionsState, cfg *Config) func(c *fiber.Ctx) error {
+func (app *App) uploadFile(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-		state.mu.RLock()
-		collection, exists := state.collections[name]
-		state.mu.RUnlock()
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
-		}
-
 		file, err := c.FormFile("file")
 		if err != nil {
 			xlog.Error("Failed to read file", err)
 			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeInvalidRequest, "Failed to read file", err.Error()))
 		}
-
 		f, err := file.Open()
 		if err != nil {
 			xlog.Error("Failed to open file", err)
@@ -231,31 +155,20 @@ func (app *App) uploadFile(state *collectionsState, cfg *Config) func(c *fiber.C
 		}
 		defer f.Close()
 
-		filePath := filepath.Join(cfg.FileAssets, file.Filename)
-		out, err := os.Create(filePath)
-		if err != nil {
-			xlog.Error("Failed to create file", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to create file", err.Error()))
-		}
-		defer out.Close()
-
-		_, err = io.Copy(out, f)
-		if err != nil {
-			xlog.Error("Failed to copy file", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to copy file", err.Error()))
-		}
-
-		if collection.EntryExists(file.Filename) {
+		if backend.EntryExists(name, file.Filename) {
 			xlog.Info("Entry already exists")
 			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeConflict, "Entry already exists", fmt.Sprintf("File '%s' has already been uploaded to collection '%s'", file.Filename, name)))
 		}
 
-		now := time.Now().Format(time.RFC3339)
-		if err := collection.Store(filePath, map[string]string{"created_at": now}); err != nil {
+		if err := backend.Upload(name, file.Filename, f); err != nil {
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+			}
 			xlog.Error("Failed to store file", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to store file", err.Error()))
 		}
 
+		now := time.Now().Format(time.RFC3339)
 		return c.JSON(collectionsSuccessResponse("File uploaded successfully", map[string]interface{}{
 			"filename":   file.Filename,
 			"collection": name,
@@ -264,17 +177,16 @@ func (app *App) uploadFile(state *collectionsState, cfg *Config) func(c *fiber.C
 	}
 }
 
-func (app *App) listFiles(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) listFiles(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-		state.mu.RLock()
-		collection, exists := state.collections[name]
-		state.mu.RUnlock()
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+		entries, err := backend.ListEntries(name)
+		if err != nil {
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to list entries", err.Error()))
 		}
-
-		entries := collection.ListDocuments()
 		return c.JSON(collectionsSuccessResponse("Entries retrieved successfully", map[string]interface{}{
 			"collection": name,
 			"entries":    entries,
@@ -284,7 +196,7 @@ func (app *App) listFiles(state *collectionsState) func(c *fiber.Ctx) error {
 }
 
 // getEntryContent handles GET /api/collections/:name/entries/:entry (Fiber uses * for the rest of path).
-func (app *App) getEntryContent(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) getEntryContent(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
 		entryParam := c.Params("*")
@@ -296,17 +208,13 @@ func (app *App) getEntryContent(state *collectionsState) func(c *fiber.Ctx) erro
 			entry = entryParam
 		}
 
-		state.mu.RLock()
-		collection, exists := state.collections[name]
-		state.mu.RUnlock()
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
-		}
-
-		content, chunkCount, err := collection.GetEntryFileContent(entry)
+		content, chunkCount, err := backend.GetEntryContent(name, entry)
 		if err != nil {
-			if strings.Contains(err.Error(), "entry not found") {
-				return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Entry not found", fmt.Sprintf("Entry '%s' does not exist in collection '%s'", entry, name)))
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				if strings.Contains(err.Error(), "entry not found") {
+					return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Entry not found", fmt.Sprintf("Entry '%s' does not exist in collection '%s'", entry, name)))
+				}
+				return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
 			}
 			if strings.Contains(err.Error(), "not implemented") || strings.Contains(err.Error(), "unsupported file type") {
 				return c.Status(fiber.StatusNotImplemented).JSON(collectionsErrorResponse(errCodeInternalError, "Not supported", err.Error()))
@@ -323,16 +231,9 @@ func (app *App) getEntryContent(state *collectionsState) func(c *fiber.Ctx) erro
 	}
 }
 
-func (app *App) searchCollection(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) searchCollection(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-		state.mu.RLock()
-		collection, exists := state.collections[name]
-		state.mu.RUnlock()
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
-		}
-
 		var r struct {
 			Query      string `json:"query"`
 			MaxResults int    `json:"max_results"`
@@ -341,16 +242,11 @@ func (app *App) searchCollection(state *collectionsState) func(c *fiber.Ctx) err
 			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeInvalidRequest, "Invalid request", err.Error()))
 		}
 
-		if r.MaxResults == 0 {
-			if len(collection.ListDocuments()) >= 5 {
-				r.MaxResults = 5
-			} else {
-				r.MaxResults = 1
-			}
-		}
-
-		results, err := collection.Search(r.Query, r.MaxResults)
+		results, err := backend.Search(name, r.Query, r.MaxResults)
 		if err != nil {
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to search collection", err.Error()))
 		}
 
@@ -363,24 +259,15 @@ func (app *App) searchCollection(state *collectionsState) func(c *fiber.Ctx) err
 	}
 }
 
-func (app *App) resetCollection(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) resetCollection(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-		state.mu.Lock()
-		collection, exists := state.collections[name]
-		if exists {
-			delete(state.collections, name)
-		}
-		state.mu.Unlock()
-
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
-		}
-
-		if err := collection.Reset(); err != nil {
+		if err := backend.Reset(name); err != nil {
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to reset collection", err.Error()))
 		}
-
 		return c.JSON(collectionsSuccessResponse("Collection reset successfully", map[string]interface{}{
 			"collection": name,
 			"reset_at":   time.Now().Format(time.RFC3339),
@@ -388,16 +275,9 @@ func (app *App) resetCollection(state *collectionsState) func(c *fiber.Ctx) erro
 	}
 }
 
-func (app *App) deleteEntryFromCollection(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) deleteEntryFromCollection(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-		state.mu.RLock()
-		collection, exists := state.collections[name]
-		state.mu.RUnlock()
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
-		}
-
 		var r struct {
 			Entry string `json:"entry"`
 		}
@@ -405,11 +285,14 @@ func (app *App) deleteEntryFromCollection(state *collectionsState) func(c *fiber
 			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeInvalidRequest, "Invalid request", err.Error()))
 		}
 
-		if err := collection.RemoveEntry(r.Entry); err != nil {
+		remainingEntries, err := backend.DeleteEntry(name, r.Entry)
+		if err != nil {
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to remove entry", err.Error()))
 		}
 
-		remainingEntries := collection.ListDocuments()
 		return c.JSON(collectionsSuccessResponse("Entry deleted successfully", map[string]interface{}{
 			"deleted_entry":     r.Entry,
 			"remaining_entries": remainingEntries,
@@ -418,16 +301,9 @@ func (app *App) deleteEntryFromCollection(state *collectionsState) func(c *fiber
 	}
 }
 
-func (app *App) registerExternalSource(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) registerExternalSource(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-		state.mu.RLock()
-		collection, exists := state.collections[name]
-		state.mu.RUnlock()
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
-		}
-
 		var r struct {
 			URL            string `json:"url"`
 			UpdateInterval int    `json:"update_interval"`
@@ -435,13 +311,14 @@ func (app *App) registerExternalSource(state *collectionsState) func(c *fiber.Ct
 		if err := c.BodyParser(&r); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeInvalidRequest, "Invalid request", err.Error()))
 		}
-
 		if r.UpdateInterval < 1 {
 			r.UpdateInterval = 60
 		}
 
-		state.sourceManager.RegisterCollection(name, collection)
-		if err := state.sourceManager.AddSource(name, r.URL, time.Duration(r.UpdateInterval)*time.Minute); err != nil {
+		if err := backend.AddSource(name, r.URL, r.UpdateInterval); err != nil {
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to register source", err.Error()))
 		}
 
@@ -453,10 +330,9 @@ func (app *App) registerExternalSource(state *collectionsState) func(c *fiber.Ct
 	}
 }
 
-func (app *App) removeExternalSource(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) removeExternalSource(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-
 		var r struct {
 			URL string `json:"url"`
 		}
@@ -464,7 +340,7 @@ func (app *App) removeExternalSource(state *collectionsState) func(c *fiber.Ctx)
 			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeInvalidRequest, "Invalid request", err.Error()))
 		}
 
-		if err := state.sourceManager.RemoveSource(name, r.URL); err != nil {
+		if err := backend.RemoveSource(name, r.URL); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to remove source", err.Error()))
 		}
 
@@ -475,22 +351,22 @@ func (app *App) removeExternalSource(state *collectionsState) func(c *fiber.Ctx)
 	}
 }
 
-func (app *App) listSources(state *collectionsState) func(c *fiber.Ctx) error {
+func (app *App) listSources(backend CollectionsBackend) func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		name := c.Params("name")
-		state.mu.RLock()
-		collection, exists := state.collections[name]
-		state.mu.RUnlock()
-		if !exists {
-			return c.Status(fiber.StatusNotFound).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+		srcs, err := backend.ListSources(name)
+		if err != nil {
+			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
+				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(collectionsErrorResponse(errCodeInternalError, "Failed to list sources", err.Error()))
 		}
 
-		srcs := collection.GetExternalSources()
 		sourcesList := make([]map[string]interface{}, 0, len(srcs))
 		for _, source := range srcs {
 			sourcesList = append(sourcesList, map[string]interface{}{
 				"url":             source.URL,
-				"update_interval": int(source.UpdateInterval.Minutes()),
+				"update_interval": source.UpdateInterval,
 				"last_update":     source.LastUpdate.Format(time.RFC3339),
 			})
 		}

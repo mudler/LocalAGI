@@ -153,6 +153,7 @@ func main() {
 		webui.WithChunkOverlap(chunkOverlap),
 		webui.WithDatabaseURL(databaseURL),
 		webui.WithCollectionAPIKeys(collectionAPIKeys...),
+		webui.WithLocalRAGURL(localRAG),
 	)
 
 	// Single RAG provider: HTTP client when URL set, in-process when not
