@@ -220,4 +220,6 @@ func (a *Agent) closeMCPServers() {
 	for _, s := range a.mcpSessions {
 		s.Close()
 	}
+
+	a.mcpSessions = []*mcp.ClientSession{}
 }

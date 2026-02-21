@@ -859,6 +859,21 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	availableActions := a.getAvailableActionsForJob(job)
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
+
+	mcpNeedsInit := false
+	for _, server := range a.mcpSessions {
+		err := server.Ping(a.context, &mcp.PingParams{})
+		if err != nil {
+			mcpNeedsInit = true
+			xlog.Error("Error pinging MCP server, will re-initialize MCP actions", "error", err)
+			break
+		}
+	}
+
+	if mcpNeedsInit {
+		a.initMCPActions()
+	}
+
 	allActions := append(availableActions, a.mcpActionDefinitions...)
 
 	obs := job.Obs
