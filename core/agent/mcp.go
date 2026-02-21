@@ -218,6 +218,7 @@ func (a *Agent) initMCPActions() error {
 			xlog.Error("Failed to add tools for extra MCP session", "error", err.Error())
 			continue
 		}
+		a.mcpSessions = append(a.mcpSessions, session)
 		generatedActions = append(generatedActions, actions...)
 	}
 
