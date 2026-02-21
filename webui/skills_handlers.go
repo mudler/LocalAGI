@@ -193,6 +193,13 @@ func (a *App) CreateSkill(c *fiber.Ctx) error {
 	}
 	skillsDir := fsManager.GetSkillsDir()
 	skillDir := filepath.Join(skillsDir, req.Name)
+
+	// Prevent overwriting an existing skill directory/content
+	if _, err := os.Stat(skillDir); err == nil {
+		return c.Status(http.StatusConflict).JSON(fiber.Map{"error": "skill already exists"})
+	} else if !os.IsNotExist(err) {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
 	if err := os.MkdirAll(skillDir, 0755); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
