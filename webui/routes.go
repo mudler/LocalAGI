@@ -17,6 +17,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/xlog"
 )
@@ -213,8 +214,17 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/api/git-repos/:id/sync", app.SyncGitRepo)
 	webapp.Post("/api/git-repos/:id/toggle", app.ToggleGitRepo)
 
-	// Collections / knowledge base API (LocalRecall-compatible)
-	app.RegisterCollectionRoutes(webapp, app.config)
+	// Collections / knowledge base API (LocalRecall-compatible). Same interface for in-process or remote.
+	var collectionsBackend CollectionsBackend
+	if app.config.LocalRAGURL != "" {
+		client := localrag.NewClient(app.config.LocalRAGURL, app.config.LLMAPIKey)
+		collectionsBackend = NewCollectionsBackendHTTP(client)
+	} else {
+		var state *collectionsState
+		collectionsBackend, state = NewInProcessCollectionsBackend(app.config)
+		app.collectionsState = state
+	}
+	app.RegisterCollectionRoutes(webapp, app.config, collectionsBackend)
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

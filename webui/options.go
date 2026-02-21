@@ -20,14 +20,16 @@ type Config struct {
 	ConversationStoreDuration time.Duration
 
 	// Collections / knowledge base (LocalRecall)
-	CollectionDBPath string
-	FileAssets       string
-	VectorEngine     string
-	EmbeddingModel   string
-	MaxChunkingSize  int
-	ChunkOverlap     int
-	CollectionAPIKeys []string
-	DatabaseURL      string
+	CollectionDBPath   string
+	FileAssets         string
+	VectorEngine       string
+	EmbeddingModel     string
+	MaxChunkingSize    int
+	ChunkOverlap       int
+	CollectionAPIKeys  []string
+	DatabaseURL        string
+	// LocalRAGURL when set uses HTTP backend for collections API; when empty uses in-process backend.
+	LocalRAGURL string
 }
 
 type Option func(*Config)
@@ -141,6 +143,12 @@ func WithCollectionAPIKeys(keys ...string) Option {
 func WithDatabaseURL(url string) Option {
 	return func(c *Config) {
 		c.DatabaseURL = url
+	}
+}
+
+func WithLocalRAGURL(url string) Option {
+	return func(c *Config) {
+		c.LocalRAGURL = url
 	}
 }
 
