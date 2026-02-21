@@ -27,6 +27,26 @@ type SkillsProvider interface {
 	GetMCPSession(ctx context.Context) (*mcp.ClientSession, error)
 }
 
+// RAGProvider returns a RAGDB and optional compaction client for a collection (e.g. agent name).
+// effectiveRAGURL/Key are pool/agent defaults; implementation may use them (HTTP) or ignore them (embedded).
+type RAGProvider func(collectionName, effectiveRAGURL, effectiveRAGKey string) (RAGDB, KBCompactionClient, bool)
+
+// NewHTTPRAGProvider returns a RAGProvider that uses the LocalRAG HTTP API. When effective URL/key are empty, baseURL/baseKey are used.
+func NewHTTPRAGProvider(baseURL, baseKey string) RAGProvider {
+	return func(collectionName, effectiveURL, effectiveKey string) (RAGDB, KBCompactionClient, bool) {
+		url := effectiveURL
+		if url == "" {
+			url = baseURL
+		}
+		key := effectiveKey
+		if key == "" {
+			key = baseKey
+		}
+		wc := localrag.NewWrappedClient(url, key, collectionName)
+		return wc, &wrappedClientCompactionAdapter{WrappedClient: wc}, true
+	}
+}
+
 type AgentPool struct {
 	sync.Mutex
 	file                                                          string
@@ -37,7 +57,8 @@ type AgentPool struct {
 	agentStatus                                                   map[string]*Status
 	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel string
 	defaultTranscriptionModel, defaultTranscriptionLanguage       string
-	localRAGAPI, localRAGKey, apiKey                              string
+	apiKey                                                        string
+	ragProvider                                                   RAGProvider
 	availableActions                                              func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                                    func(*AgentConfig) []Connector
 	dynamicPrompt                                                 func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
@@ -45,6 +66,13 @@ type AgentPool struct {
 	timeout                                                       string
 	conversationLogs                                              string
 	skillsService                                                 SkillsProvider
+}
+
+// SetRAGProvider sets the single RAG provider (HTTP or embedded). Must be called after pool creation.
+func (a *AgentPool) SetRAGProvider(fn RAGProvider) {
+	a.Lock()
+	defer a.Unlock()
+	a.ragProvider = fn
 }
 
 type Status struct {
@@ -79,7 +107,6 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 
 func NewAgentPool(
 	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, apiURL, apiKey, directory string,
-	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt,
@@ -108,7 +135,6 @@ func NewAgentPool(
 			defaultTranscriptionModel:    defaultTranscriptionModel,
 			defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 			defaultTTSModel:              defaultTTSModel,
-			localRAGAPI:                  LocalRAGAPI,
 			apiKey:                       apiKey,
 			agents:                       make(map[string]*Agent),
 			pool:                         make(map[string]AgentConfig),
@@ -143,7 +169,6 @@ func NewAgentPool(
 		agentStatus:                  map[string]*Status{},
 		pool:                         *poolData,
 		connectors:                   connectors,
-		localRAGAPI:                  LocalRAGAPI,
 		dynamicPrompt:                promptBlocks,
 		filters:                      filters,
 		availableActions:             availableActions,
@@ -303,14 +328,8 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 	} else {
 		config.APIKey = a.apiKey
 	}
-	effectiveLocalRAGAPI := a.localRAGAPI
-	if config.LocalRAGURL != "" {
-		effectiveLocalRAGAPI = config.LocalRAGURL
-	}
-	effectiveLocalRAGKey := a.localRAGKey
-	if config.LocalRAGAPIKey != "" {
-		effectiveLocalRAGKey = config.LocalRAGAPIKey
-	}
+	effectiveLocalRAGAPI := config.LocalRAGURL
+	effectiveLocalRAGKey := config.LocalRAGAPIKey
 
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)(ctx, a)
@@ -510,26 +529,27 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		}
 	}
 
-	var ragClient *localrag.WrappedClient
-	if config.EnableKnowledgeBase {
-		ragClient = localrag.NewWrappedClient(effectiveLocalRAGAPI, effectiveLocalRAGKey, name)
-		opts = append(opts, WithRAGDB(ragClient), EnableKnowledgeBase)
-		// Set KB auto search option (defaults to true for backward compatibility)
-		// For backward compatibility: if both new KB fields are false (zero values),
-		// assume this is an old config and default KBAutoSearch to true
+	var ragDB RAGDB
+	var compactionClient KBCompactionClient
+	if config.EnableKnowledgeBase && a.ragProvider != nil {
+		if db, comp, ok := a.ragProvider(name, effectiveLocalRAGAPI, effectiveLocalRAGKey); ok && db != nil {
+			ragDB = db
+			compactionClient = comp
+		}
+	}
+	if ragDB != nil {
+		opts = append(opts, WithRAGDB(ragDB), EnableKnowledgeBase)
 		kbAutoSearch := config.KBAutoSearch
 		if !config.KBAutoSearch && !config.KBAsTools {
-			// Both new fields are false, likely an old config - default to true for backward compatibility
 			kbAutoSearch = true
 		}
 		opts = append(opts, WithKBAutoSearch(kbAutoSearch))
-		// Inject KB wrapper actions if enabled
-		if config.KBAsTools && ragClient != nil {
+		if config.KBAsTools {
 			kbResults := config.KnowledgeBaseResults
 			if kbResults <= 0 {
-				kbResults = 5 // Default
+				kbResults = 5
 			}
-			searchAction, addAction := NewKBWrapperActions(ragClient, kbResults)
+			searchAction, addAction := NewKBWrapperActions(ragDB, kbResults)
 			opts = append(opts, WithActions(searchAction, addAction))
 		}
 	}
@@ -582,8 +602,8 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		}
 	}()
 
-	if config.EnableKnowledgeBase && config.EnableKBCompaction && ragClient != nil {
-		go runCompactionTicker(ctx, ragClient, config, effectiveAPIURL, effectiveAPIKey, model)
+	if config.EnableKnowledgeBase && config.EnableKBCompaction && compactionClient != nil {
+		go runCompactionTicker(ctx, compactionClient, config, effectiveAPIURL, effectiveAPIKey, model)
 	}
 
 	xlog.Info("Starting connectors", "name", name, "config", config)

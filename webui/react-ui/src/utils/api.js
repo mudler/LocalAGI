@@ -24,6 +24,16 @@ const buildUrl = (endpoint) => {
   return `${API_CONFIG.baseUrl}${endpoint.startsWith('/') ? endpoint.substring(1) : endpoint}`;
 };
 
+// Collections API returns { success, message, data, error }. Throw if !ok or !success.
+const handleCollectionsResponse = async (response) => {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.success === false) {
+    const msg = data.error?.message || data.error?.details || data.message || `API error: ${response.status}`;
+    throw new Error(msg);
+  }
+  return data;
+};
+
 // Helper function to convert ActionDefinition to FormFieldDefinition format
 const convertActionDefinitionToFields = (definition) => {
   if (!definition || !definition.Properties) {
@@ -429,5 +439,86 @@ export const skillsApi = {
   toggleGitRepo: async (id) => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepoToggle(id)), { method: 'POST' });
     return handleResponse(response);
+  },
+};
+
+// Collections / knowledge base API (LocalRecall-compatible)
+export const collectionsApi = {
+  list: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collections));
+    const data = await handleCollectionsResponse(response);
+    return data.data?.collections || [];
+  },
+  create: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collections), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ name }),
+    });
+    return handleCollectionsResponse(response);
+  },
+  upload: async (collectionName, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionUpload(collectionName)), {
+      method: 'POST',
+      body: form,
+    });
+    return handleCollectionsResponse(response);
+  },
+  listEntries: async (collectionName) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionEntries(collectionName)));
+    const data = await handleCollectionsResponse(response);
+    return data.data?.entries || [];
+  },
+  getEntryContent: async (collectionName, entry) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionEntry(collectionName, entry)));
+    const data = await handleCollectionsResponse(response);
+    return { content: data.data?.content ?? '', chunkCount: data.data?.chunk_count ?? 0, entry: data.data?.entry ?? entry };
+  },
+  search: async (collectionName, query, maxResults = 5) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionSearch(collectionName)), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ query, max_results: maxResults }),
+    });
+    const data = await handleCollectionsResponse(response);
+    return data.data?.results || [];
+  },
+  reset: async (collectionName) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionReset(collectionName)), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+    });
+    return handleCollectionsResponse(response);
+  },
+  deleteEntry: async (collectionName, entry) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionDeleteEntry(collectionName)), {
+      method: 'DELETE',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ entry }),
+    });
+    return handleCollectionsResponse(response);
+  },
+  listSources: async (collectionName) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionSources(collectionName)));
+    const data = await handleCollectionsResponse(response);
+    return data.data?.sources || [];
+  },
+  addSource: async (collectionName, url, updateIntervalMinutes = 60) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionSources(collectionName)), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ url, update_interval: updateIntervalMinutes }),
+    });
+    return handleCollectionsResponse(response);
+  },
+  removeSource: async (collectionName, url) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.collectionSources(collectionName)), {
+      method: 'DELETE',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ url }),
+    });
+    return handleCollectionsResponse(response);
   },
 };

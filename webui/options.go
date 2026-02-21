@@ -18,6 +18,16 @@ type Config struct {
 	StateDir                  string
 	CustomActionsDir          string
 	ConversationStoreDuration time.Duration
+
+	// Collections / knowledge base (LocalRecall)
+	CollectionDBPath string
+	FileAssets       string
+	VectorEngine     string
+	EmbeddingModel   string
+	MaxChunkingSize  int
+	ChunkOverlap     int
+	CollectionAPIKeys []string
+	DatabaseURL      string
 }
 
 type Option func(*Config)
@@ -83,6 +93,54 @@ func WithSkillsService(svc *skills.Service) Option {
 func WithApiKeys(keys ...string) Option {
 	return func(c *Config) {
 		c.ApiKeys = keys
+	}
+}
+
+func WithCollectionDBPath(path string) Option {
+	return func(c *Config) {
+		c.CollectionDBPath = path
+	}
+}
+
+func WithFileAssets(path string) Option {
+	return func(c *Config) {
+		c.FileAssets = path
+	}
+}
+
+func WithVectorEngine(engine string) Option {
+	return func(c *Config) {
+		c.VectorEngine = engine
+	}
+}
+
+func WithEmbeddingModel(model string) Option {
+	return func(c *Config) {
+		c.EmbeddingModel = model
+	}
+}
+
+func WithMaxChunkingSize(size int) Option {
+	return func(c *Config) {
+		c.MaxChunkingSize = size
+	}
+}
+
+func WithChunkOverlap(overlap int) Option {
+	return func(c *Config) {
+		c.ChunkOverlap = overlap
+	}
+}
+
+func WithCollectionAPIKeys(keys ...string) Option {
+	return func(c *Config) {
+		c.CollectionAPIKeys = keys
+	}
+}
+
+func WithDatabaseURL(url string) Option {
+	return func(c *Config) {
+		c.DatabaseURL = url
 	}
 }
 
