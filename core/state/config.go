@@ -99,6 +99,7 @@ type AgentConfig struct {
 	KnowledgeBaseResults     int    `json:"kb_results" form:"kb_results"`
 	CanStopItself            bool   `json:"can_stop_itself" form:"can_stop_itself"`
 	SystemPrompt             string `json:"system_prompt" form:"system_prompt"`
+	SkillsPrompt             string `json:"skills_prompt" form:"skills_prompt"`
 	LongTermMemory           bool   `json:"long_term_memory" form:"long_term_memory"`
 	SummaryLongTermMemory    bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
 	ConversationStorageMode  string `json:"conversation_storage_mode" form:"conversation_storage_mode"`
@@ -329,6 +330,14 @@ func NewAgentConfigMeta(
 				Type:         "textarea",
 				DefaultValue: "",
 				HelpText:     "Long-term objective for the agent to pursue",
+				Tags:         config.Tags{Section: "PromptsGoals"},
+			},
+			{
+				Name:         "skills_prompt",
+				Label:        "Skills Prompt",
+				Type:         "textarea",
+				DefaultValue: "",
+				HelpText:     "Optional instructions for using skills. Used when Enable Skills is on. If empty, default instructions are used.",
 				Tags:         config.Tags{Section: "PromptsGoals"},
 			},
 			{

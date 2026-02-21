@@ -7,6 +7,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/xlog"
 
 	skilldomain "github.com/mudler/skillserver/pkg/domain"
@@ -127,13 +128,18 @@ func (s *Service) GetManager() (skilldomain.SkillManager, error) {
 	return mgr, nil
 }
 
-// GetSkillsPrompt returns a DynamicPrompt that injects the available skills XML (or nil if no manager)
-func (s *Service) GetSkillsPrompt() (agent.DynamicPrompt, error) {
+// GetSkillsPrompt returns a DynamicPrompt that injects the available skills XML (or nil if no manager).
+// When config is non-nil and config.SkillsPrompt is set, that text is used as the intro; otherwise the default intro is used.
+func (s *Service) GetSkillsPrompt(config *state.AgentConfig) (agent.DynamicPrompt, error) {
 	mgr, err := s.GetManager()
 	if err != nil || mgr == nil {
 		return nil, err
 	}
-	return NewSkillsPrompt(mgr.ListSkills), nil
+	customIntro := ""
+	if config != nil && config.SkillsPrompt != "" {
+		customIntro = config.SkillsPrompt
+	}
+	return NewSkillsPrompt(mgr.ListSkills, customIntro), nil
 }
 
 // GetMCPSession returns a shared MCP client session connected to the in-process skillserver (starts on first use)

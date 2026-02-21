@@ -10,14 +10,18 @@ import (
 	skilldomain "github.com/mudler/skillserver/pkg/domain"
 )
 
+const defaultSkillsIntro = "You can use the following skills to help with the task.\nTo request the skill, you need to use the `request_skill` tool. The skill name is the name of the skill you want to use.\n"
+
 // skillsPrompt implements agent.DynamicPrompt and injects the available skills XML block
 type skillsPrompt struct {
-	listSkills func() ([]skilldomain.Skill, error)
+	listSkills  func() ([]skilldomain.Skill, error)
+	customIntro string
 }
 
-// NewSkillsPrompt returns a DynamicPrompt that renders the list of available skills as XML
-func NewSkillsPrompt(listSkills func() ([]skilldomain.Skill, error)) agent.DynamicPrompt {
-	return &skillsPrompt{listSkills: listSkills}
+// NewSkillsPrompt returns a DynamicPrompt that renders the list of available skills as XML.
+// If customIntro is non-empty, it is used as the intro before the skills list; otherwise the default intro is used.
+func NewSkillsPrompt(listSkills func() ([]skilldomain.Skill, error), customIntro string) agent.DynamicPrompt {
+	return &skillsPrompt{listSkills: listSkills, customIntro: customIntro}
 }
 
 func (p *skillsPrompt) Render(a *agent.Agent) (types.PromptResult, error) {
@@ -26,8 +30,11 @@ func (p *skillsPrompt) Render(a *agent.Agent) (types.PromptResult, error) {
 		return types.PromptResult{}, err
 	}
 	var sb strings.Builder
-	sb.WriteString("You can use the following skills to help with the task.\n")
-	sb.WriteString("To request the skill, you need to use the `request_skill` tool. The skill name is the name of the skill you want to use.\n")
+	intro := defaultSkillsIntro
+	if p.customIntro != "" {
+		intro = strings.TrimSpace(p.customIntro) + "\n"
+	}
+	sb.WriteString(intro)
 	sb.WriteString("<available_skills>\n")
 	for _, s := range skills {
 		name := s.ID

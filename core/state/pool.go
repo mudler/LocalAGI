@@ -23,7 +23,7 @@ import (
 
 // SkillsProvider supplies the skills dynamic prompt and MCP session when skills are enabled for an agent.
 type SkillsProvider interface {
-	GetSkillsPrompt() (DynamicPrompt, error)
+	GetSkillsPrompt(config *AgentConfig) (DynamicPrompt, error)
 	GetMCPSession(ctx context.Context) (*mcp.ClientSession, error)
 }
 
@@ -315,7 +315,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)(ctx, a)
 	if a.skillsService != nil && config.EnableSkills {
-		if prompt, err := a.skillsService.GetSkillsPrompt(); err == nil && prompt != nil {
+		if prompt, err := a.skillsService.GetSkillsPrompt(config); err == nil && prompt != nil {
 			promptBlocks = append(promptBlocks, prompt)
 		}
 	}
