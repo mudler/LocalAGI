@@ -386,10 +386,13 @@ func (a *App) ImportSkill(c *fiber.Ctx) error {
 	}
 	defer src.Close()
 	const maxArchiveSize = 50 * 1024 * 1024
-	archiveData := make([]byte, file.Size)
 	if file.Size > maxArchiveSize {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "archive too large"})
 	}
+	if file.Size <= 0 {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "invalid file size"})
+	}
+	archiveData := make([]byte, int(file.Size))
 	n, err := io.ReadFull(src, archiveData)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "failed to read file"})
