@@ -26,6 +26,8 @@ func (p *skillsPrompt) Render(a *agent.Agent) (types.PromptResult, error) {
 		return types.PromptResult{}, err
 	}
 	var sb strings.Builder
+	sb.WriteString("You can use the following skills to help with the task.\n")
+	sb.WriteString("To request the skill, you need to use the `request_skill` tool. The skill name is the name of the skill you want to use.\n")
 	sb.WriteString("<available_skills>\n")
 	for _, s := range skills {
 		name := s.ID

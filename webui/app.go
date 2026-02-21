@@ -385,7 +385,20 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			// Ask the agent for a response
 			response := agent.Ask(coreTypes.WithText(message))
 
-			if response.Error != nil {
+			if response == nil {
+				// Ask returned nil (e.g. context cancelled or WaitResult failed)
+				xlog.Error("Agent returned nil response", "agent", agentName)
+				errorData, err := json.Marshal(map[string]interface{}{
+					"error":     "agent request failed or was cancelled",
+					"timestamp": time.Now().Format(time.RFC3339),
+				})
+				if err != nil {
+					xlog.Error("Error marshaling error message", "error", err)
+				} else {
+					manager.Send(
+						sse.NewMessage(string(errorData)).WithEvent("json_error"))
+				}
+			} else if response.Error != nil {
 				// Send error message
 				xlog.Error("Error asking agent", "agent", agentName, "error", response.Error)
 				errorData, err := json.Marshal(map[string]interface{}{
