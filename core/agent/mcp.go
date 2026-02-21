@@ -211,9 +211,8 @@ func (a *Agent) initMCPActions() error {
 		generatedActions = append(generatedActions, actions...)
 	}
 
-	// Pre-connected MCP sessions (e.g. in-process skills server)
+	// Pre-connected MCP sessions (e.g. in-process skills server); already in a.mcpSessions after closeMCPServers()
 	for _, session := range a.options.extraMCPSessions {
-		a.mcpSessions = append(a.mcpSessions, session)
 		actions, err := a.addTools(session)
 		if err != nil {
 			xlog.Error("Failed to add tools for extra MCP session", "error", err.Error())
@@ -228,17 +227,17 @@ func (a *Agent) initMCPActions() error {
 }
 
 func (a *Agent) closeMCPServers() {
+	extraSet := make(map[*mcp.ClientSession]bool)
+	for _, e := range a.options.extraMCPSessions {
+		extraSet[e] = true
+	}
+	var keep []*mcp.ClientSession
 	for _, s := range a.mcpSessions {
-		// Do not close shared sessions (e.g. in-process skills MCP) so other agents can keep using them
-		isExtra := false
-		for _, e := range a.options.extraMCPSessions {
-			if e == s {
-				isExtra = true
-				break
-			}
-		}
-		if !isExtra {
+		if extraSet[s] {
+			keep = append(keep, s)
+		} else {
 			s.Close()
 		}
 	}
+	a.mcpSessions = keep
 }

@@ -16,7 +16,6 @@ function Skills() {
   const { showToast } = useOutletContext();
 
   const fetchSkills = async () => {
-    console.log('[Skills] fetchSkills: start');
     setLoading(true);
     setUnavailable(false);
     const timeoutMs = 15000;
@@ -31,14 +30,11 @@ function Skills() {
       if (searchQuery.trim()) {
         const data = await withTimeout(skillsApi.search(searchQuery.trim()));
         setSkills(Array.isArray(data) ? data : []);
-        console.log('[Skills] fetchSkills: search done', data?.length ?? 0, 'results');
       } else {
         const data = await withTimeout(skillsApi.list());
         setSkills(Array.isArray(data) ? data : []);
-        console.log('[Skills] fetchSkills: list done', data?.length ?? 0, 'skills');
       }
     } catch (err) {
-      console.warn('[Skills] fetchSkills: error', err.message);
       if (err.message?.includes('503') || err.message?.includes('skills')) {
         setUnavailable(true);
         setSkills([]);
@@ -48,7 +44,6 @@ function Skills() {
       }
     } finally {
       setLoading(false);
-      console.log('[Skills] fetchSkills: end');
     }
   };
 
@@ -105,19 +100,15 @@ function Skills() {
   };
 
   const loadGitRepos = async () => {
-    console.log('[Skills] loadGitRepos: start');
     setGitReposLoading(true);
     try {
       const list = await skillsApi.listGitRepos();
       setGitRepos(Array.isArray(list) ? list : []);
-      console.log('[Skills] loadGitRepos: done', list?.length ?? 0, 'repos');
     } catch (err) {
-      console.warn('[Skills] loadGitRepos: error', err.message);
       showToast(err.message || 'Failed to load Git repos', 'error');
       setGitRepos([]);
     } finally {
       setGitReposLoading(false);
-      console.log('[Skills] loadGitRepos: end');
     }
   };
 
@@ -129,18 +120,14 @@ function Skills() {
     e.preventDefault();
     const url = gitRepoUrl.trim();
     if (!url) return;
-    console.log('[Skills] addGitRepo: start', url);
     setGitReposAction('add');
     try {
       await skillsApi.addGitRepo(url);
-      console.log('[Skills] addGitRepo: API returned 201');
       setGitRepoUrl('');
       await loadGitRepos();
       fetchSkills();
       showToast('Git repo added and syncing', 'success');
-      console.log('[Skills] addGitRepo: end');
     } catch (err) {
-      console.warn('[Skills] addGitRepo: error', err.message);
       showToast(err.message || 'Failed to add repo', 'error');
     } finally {
       setGitReposAction(null);
@@ -148,17 +135,13 @@ function Skills() {
   };
 
   const syncGitRepo = async (id) => {
-    console.log('[Skills] syncGitRepo: start', id);
     setGitReposAction(id);
     try {
       await skillsApi.syncGitRepo(id);
-      console.log('[Skills] syncGitRepo: API returned');
       await loadGitRepos();
       fetchSkills();
       showToast('Repo synced', 'success');
-      console.log('[Skills] syncGitRepo: end');
     } catch (err) {
-      console.warn('[Skills] syncGitRepo: error', err.message);
       showToast(err.message || 'Sync failed', 'error');
     } finally {
       setGitReposAction(null);
