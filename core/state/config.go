@@ -95,6 +95,7 @@ type AgentConfig struct {
 	EnableReasoning          bool   `json:"enable_reasoning" form:"enable_reasoning"`
 	EnableForceReasoningTool bool   `json:"enable_reasoning_tool" form:"enable_reasoning_tool"`
 	EnableGuidedTools        bool   `json:"enable_guided_tools" form:"enable_guided_tools"`
+	EnableSkills             bool   `json:"enable_skills" form:"enable_skills"`
 	KnowledgeBaseResults     int    `json:"kb_results" form:"kb_results"`
 	CanStopItself            bool   `json:"can_stop_itself" form:"can_stop_itself"`
 	SystemPrompt             string `json:"system_prompt" form:"system_prompt"`
@@ -402,6 +403,14 @@ func NewAgentConfigMeta(
 				Type:         "checkbox",
 				DefaultValue: false,
 				HelpText:     "Filter tools through guidance using their descriptions; creates virtual guidelines when none exist",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "enable_skills",
+				Label:        "Enable Skills",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Inject available skills into the agent and expose skill tools (list, read, search, resources) via MCP",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{

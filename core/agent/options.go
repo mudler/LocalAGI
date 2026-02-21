@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/core/types"
 )
 
@@ -80,6 +81,7 @@ type options struct {
 	mcpServers                  []MCPServer
 	mcpStdioServers             []MCPSTDIOServer
 	mcpPrepareScript            string
+	extraMCPSessions            []*mcp.ClientSession
 	newConversationsSubscribers []func(*types.ConversationMessage)
 
 	observer     Observer
@@ -325,6 +327,14 @@ func WithCharacterFile(path string) Option {
 func WithPrompts(prompts ...DynamicPrompt) Option {
 	return func(o *options) error {
 		o.prompts = prompts
+		return nil
+	}
+}
+
+// WithMCPSession adds a pre-connected MCP client session (e.g. in-process skills MCP) to the agent.
+func WithMCPSession(session *mcp.ClientSession) Option {
+	return func(o *options) error {
+		o.extraMCPSessions = append(o.extraMCPSessions, session)
 		return nil
 	}
 }

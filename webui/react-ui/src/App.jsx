@@ -23,6 +23,7 @@ function App() {
     { path: '/', icon: 'fas fa-home', label: 'Home' },
     { path: '/agents', icon: 'fas fa-users', label: 'Agents' },
     { path: '/actions-playground', icon: 'fas fa-bolt', label: 'Actions' },
+    { path: '/skills', icon: 'fas fa-book', label: 'Skills' },
     { path: '/group-create', icon: 'fas fa-users-cog', label: 'Groups' },
   ];
 

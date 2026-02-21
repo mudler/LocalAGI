@@ -8,6 +8,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/services"
+	"github.com/mudler/LocalAGI/services/skills"
 	"github.com/mudler/LocalAGI/webui"
 )
 
@@ -56,6 +57,12 @@ func main() {
 		apiKeys = strings.Split(apiKeysEnv, ",")
 	}
 
+	// Skills service (optional: provides skills prompt and MCP when agents have EnableSkills)
+	skillsService, err := skills.NewService(stateDir)
+	if err != nil {
+		panic(err)
+	}
+
 	// Create the agent pool
 	pool, err := state.NewAgentPool(
 		baseModel,
@@ -80,6 +87,7 @@ func main() {
 		services.Filters,
 		timeout,
 		withLogs,
+		skillsService,
 	)
 	if err != nil {
 		panic(err)
@@ -88,6 +96,7 @@ func main() {
 	// Create the application
 	app := webui.NewApp(
 		webui.WithPool(pool),
+		webui.WithSkillsService(skillsService),
 		webui.WithConversationStoreduration(conversationDuration),
 		webui.WithApiKeys(apiKeys...),
 		webui.WithLLMAPIUrl(apiURL),

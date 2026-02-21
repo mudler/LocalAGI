@@ -293,3 +293,91 @@ export const statusApi = {
     return handleResponse(response);
   },
 };
+
+// Skills API (skills are stored under state dir / skills, not configurable)
+export const skillsApi = {
+  getConfig: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillsConfig));
+    return handleResponse(response);
+  },
+  list: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillsList));
+    return handleResponse(response);
+  },
+  search: async (q) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillsSearch(q)));
+    return handleResponse(response);
+  },
+  get: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skill(name)));
+    return handleResponse(response);
+  },
+  create: async (data) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillsList), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  update: async (name, data) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skill(name)), {
+      method: 'PUT',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  delete: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skill(name)), { method: 'DELETE' });
+    if (response.status === 204) return;
+    return handleResponse(response);
+  },
+  import: async (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillsImport), {
+      method: 'POST',
+      body: form,
+    });
+    return handleResponse(response);
+  },
+  exportUrl: (name) => buildUrl(API_CONFIG.endpoints.skillExport(name)),
+  listResources: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillResources(name)));
+    return handleResponse(response);
+  },
+  listGitRepos: async () => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepos));
+    return handleResponse(response);
+  },
+  addGitRepo: async (url) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepos), {
+      method: 'POST',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ url }),
+    });
+    return handleResponse(response);
+  },
+  updateGitRepo: async (id, data) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepo(id)), {
+      method: 'PUT',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+  deleteGitRepo: async (id) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepo(id)), { method: 'DELETE' });
+    if (response.status === 204) return;
+    return handleResponse(response);
+  },
+  syncGitRepo: async (id) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepoSync(id)), { method: 'POST' });
+    return handleResponse(response);
+  },
+  toggleGitRepo: async (id) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepoToggle(id)), { method: 'POST' });
+    return handleResponse(response);
+  },
+};
