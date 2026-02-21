@@ -57,7 +57,7 @@ export const API_CONFIG = {
     skillsImport: '/api/skills/import',
     skillExport: (name) => `/api/skills/export/${encodeURIComponent(name)}`,
     skillResources: (name) => `/api/skills/${encodeURIComponent(name)}/resources`,
-    skillResource: (name, path) => `/api/skills/${encodeURIComponent(name)}/resources/${path}`,
+    skillResource: (name, path) => `/api/skills/${encodeURIComponent(name)}/resources/${path.split('/').map(encodeURIComponent).join('/')}`,
     gitRepos: '/api/git-repos',
     gitRepo: (id) => `/api/git-repos/${id}`,
     gitRepoSync: (id) => `/api/git-repos/${id}/sync`,

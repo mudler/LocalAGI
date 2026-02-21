@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/mudler/LocalAGI/services/skills"
+	"github.com/mudler/xlog"
 	skilldomain "github.com/mudler/skillserver/pkg/domain"
 	skillgit "github.com/mudler/skillserver/pkg/git"
 )
@@ -107,6 +108,7 @@ func (a *App) ListSkills(c *fiber.Ctx) error {
 	}
 	list, err := mgr.ListSkills()
 	if err != nil {
+		xlog.Error("[skills] ListSkills: mgr.ListSkills failed", "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	out := make([]skillResponse, len(list))
@@ -651,14 +653,29 @@ func (a *App) AddGitRepo(c *fiber.Ctx) error {
 	if err := cm.SaveConfig(repos); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	svc.InvalidateManager()
-	// Sync the new repo (clone) using a one-off syncer
-	mgr, _ := svc.GetManager()
-	if mgr != nil {
-		syncer := skillgit.NewGitSyncer(dir, []string{req.URL}, mgr.RebuildIndex)
-		_ = syncer.Start()
+	// Do not invalidate here: the new repo is not cloned yet. Keep the current manager
+	// so ListSkills returns immediately and the sync goroutine gets the cache without contention.
+	urlToSync := req.URL
+	xlog.Info("[skills] AddGitRepo: repo saved, starting background sync", "url", urlToSync)
+	go func() {
+		xlog.Info("[skills] background sync: started", "url", urlToSync)
+		mgr, err := svc.GetManager()
+		if err != nil || mgr == nil {
+			xlog.Error("[skills] background sync: GetManager failed", "url", urlToSync, "error", err)
+			return
+		}
+		xlog.Info("[skills] background sync: got manager, running syncer", "url", urlToSync)
+		syncer := skillgit.NewGitSyncer(dir, []string{urlToSync}, mgr.RebuildIndex)
+		if err := syncer.Start(); err != nil {
+			xlog.Error("[skills] background sync: sync failed", "url", urlToSync, "error", err)
+			svc.RefreshManagerFromConfig()
+			return
+		}
 		syncer.Stop()
-	}
+		svc.RefreshManagerFromConfig()
+		xlog.Info("[skills] background sync: finished", "url", urlToSync)
+	}()
+	xlog.Info("[skills] AddGitRepo: returning 201 (sync in progress)")
 	return c.Status(http.StatusCreated).JSON(gitRepoResponse{ID: newRepo.ID, URL: newRepo.URL, Name: newRepo.Name, Enabled: newRepo.Enabled})
 }
 
@@ -704,7 +721,7 @@ func (a *App) UpdateGitRepo(c *fiber.Ctx) error {
 	if err := cm.SaveConfig(repos); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	svc.InvalidateManager()
+	svc.RefreshManagerFromConfig()
 	return c.JSON(gitRepoResponse{ID: repos[found].ID, URL: repos[found].URL, Name: repos[found].Name, Enabled: repos[found].Enabled})
 }
 
@@ -724,8 +741,11 @@ func (a *App) DeleteGitRepo(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	var newRepos []skillgit.GitRepoConfig
+	var repoName string
 	for _, r := range repos {
-		if r.ID != id {
+		if r.ID == id {
+			repoName = r.Name
+		} else {
 			newRepos = append(newRepos, r)
 		}
 	}
@@ -735,7 +755,13 @@ func (a *App) DeleteGitRepo(c *fiber.Ctx) error {
 	if err := cm.SaveConfig(newRepos); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
-	svc.InvalidateManager()
+	if repoName != "" {
+		repoDir := filepath.Join(dir, repoName)
+		if err := os.RemoveAll(repoDir); err != nil {
+			xlog.Warn("[skills] DeleteGitRepo: failed to remove repo directory", "dir", repoDir, "error", err)
+		}
+	}
+	svc.RefreshManagerFromConfig()
 	return c.SendStatus(http.StatusNoContent)
 }
 
@@ -764,16 +790,26 @@ func (a *App) SyncGitRepo(c *fiber.Ctx) error {
 	if url == "" {
 		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "repository not found"})
 	}
+	xlog.Info("[skills] SyncGitRepo: requested", "id", id, "url", url)
 	mgr, err := svc.GetManager()
 	if err != nil || mgr == nil {
+		xlog.Error("[skills] SyncGitRepo: GetManager failed", "id", id, "error", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "manager not ready"})
 	}
-	syncer := skillgit.NewGitSyncer(dir, []string{url}, mgr.RebuildIndex)
-	if err := syncer.Start(); err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-	}
-	syncer.Stop()
-	return c.JSON(fiber.Map{"status": "ok"})
+	go func() {
+		xlog.Info("[skills] SyncGitRepo: background sync started", "id", id, "url", url)
+		syncer := skillgit.NewGitSyncer(dir, []string{url}, mgr.RebuildIndex)
+		if err := syncer.Start(); err != nil {
+			xlog.Error("[skills] SyncGitRepo: background sync failed", "id", id, "error", err)
+			svc.RefreshManagerFromConfig()
+			return
+		}
+		syncer.Stop()
+		svc.RefreshManagerFromConfig()
+		xlog.Info("[skills] SyncGitRepo: background sync finished", "id", id)
+	}()
+	xlog.Info("[skills] SyncGitRepo: returning 200 (sync in progress)")
+	return c.JSON(fiber.Map{"status": "ok", "message": "Sync started in background"})
 }
 
 func (a *App) ToggleGitRepo(c *fiber.Ctx) error {
@@ -797,7 +833,7 @@ func (a *App) ToggleGitRepo(c *fiber.Ctx) error {
 			if err := cm.SaveConfig(repos); err != nil {
 				return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 			}
-			svc.InvalidateManager()
+			svc.RefreshManagerFromConfig()
 			return c.JSON(gitRepoResponse{ID: repos[i].ID, URL: repos[i].URL, Name: repos[i].Name, Enabled: repos[i].Enabled})
 		}
 	}

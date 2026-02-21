@@ -19,11 +19,12 @@ const SkillsDirName = "skills"
 
 // Service manages the skills directory (fixed at stateDir/skills), lazy SkillManager, dynamic prompt, and in-process MCP session
 type Service struct {
-	stateDir string
-	mu       sync.Mutex
-	manager  skilldomain.SkillManager
-	mcpSrv   *skillmcp.Server
-	session  *mcp.ClientSession
+	stateDir  string
+	mu        sync.Mutex
+	createMu  sync.Mutex // serializes manager creation so only one createManager() runs at a time
+	manager   skilldomain.SkillManager
+	mcpSrv    *skillmcp.Server
+	session   *mcp.ClientSession
 }
 
 // NewService creates a skills service. Skills are stored under stateDir/skills.
@@ -38,20 +39,40 @@ func (s *Service) GetSkillsDir() string {
 	return filepath.Join(s.stateDir, SkillsDirName)
 }
 
-// InvalidateManager clears the cached manager (e.g. after git repo config change) so next use reloads from disk
-func (s *Service) InvalidateManager() {
+// RefreshManagerFromConfig updates the existing manager's git repo list and rebuilds the index
+// (same as skillserver: UpdateGitRepos + RebuildIndex in place). Does nothing if no manager exists yet.
+// Call this when git repo config changes instead of invalidating; avoids blocking ListSkills on full recreate.
+func (s *Service) RefreshManagerFromConfig() {
+	skillsDir := s.GetSkillsDir()
+	cm := skillgit.NewConfigManager(skillsDir)
+	repos, err := cm.LoadConfig()
+	if err != nil {
+		xlog.Warn("[skills] RefreshManagerFromConfig: could not load config", "error", err)
+		return
+	}
+	gitRepoNames := make([]string, 0, len(repos))
+	for _, r := range repos {
+		if r.Enabled && r.Name != "" {
+			gitRepoNames = append(gitRepoNames, r.Name)
+		}
+	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.manager = nil
-	s.mcpSrv = nil
-	s.session = nil
+	mgr := s.manager
+	s.mu.Unlock()
+	if mgr == nil {
+		return
+	}
+	if fm, ok := mgr.(*skilldomain.FileSystemManager); ok {
+		fm.UpdateGitRepos(gitRepoNames)
+		if err := mgr.RebuildIndex(); err != nil {
+			xlog.Warn("[skills] RefreshManagerFromConfig: RebuildIndex failed", "error", err)
+		}
+	}
 }
 
-// getManagerLocked returns the SkillManager, lazily creating it; caller must hold s.mu
-func (s *Service) getManagerLocked() (skilldomain.SkillManager, error) {
-	if s.manager != nil {
-		return s.manager, nil
-	}
+// createManager builds a new SkillManager (reads config and calls NewFileSystemManager).
+// Must be called without holding s.mu because NewFileSystemManager runs RebuildIndex() which is slow.
+func (s *Service) createManager() (skilldomain.SkillManager, error) {
 	skillsDir := s.GetSkillsDir()
 	gitRepos := []string{}
 	cm := skillgit.NewConfigManager(skillsDir)
@@ -69,22 +90,46 @@ func (s *Service) getManagerLocked() (skilldomain.SkillManager, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.manager = mgr
-	return s.manager, nil
+	return mgr, nil
 }
 
-// GetManager returns the SkillManager if the skills dir is set, otherwise nil
+// GetManager returns the SkillManager if the skills dir is set, otherwise nil.
+// Manager creation is serialized (createMu) so only one createManager() runs at a time,
+// avoiding concurrent RebuildIndex and filesystem contention.
 func (s *Service) GetManager() (skilldomain.SkillManager, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.getManagerLocked()
+	if s.manager != nil {
+		mgr := s.manager
+		s.mu.Unlock()
+		return mgr, nil
+	}
+	s.mu.Unlock()
+
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
+
+	s.mu.Lock()
+	if s.manager != nil {
+		mgr := s.manager
+		s.mu.Unlock()
+		return mgr, nil
+	}
+	s.mu.Unlock()
+
+	mgr, err := s.createManager()
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	s.manager = mgr
+	s.mu.Unlock()
+	return mgr, nil
 }
 
 // GetSkillsPrompt returns a DynamicPrompt that injects the available skills XML (or nil if no manager)
 func (s *Service) GetSkillsPrompt() (agent.DynamicPrompt, error) {
-	s.mu.Lock()
-	mgr, err := s.getManagerLocked()
-	s.mu.Unlock()
+	mgr, err := s.GetManager()
 	if err != nil || mgr == nil {
 		return nil, err
 	}
@@ -99,10 +144,18 @@ func (s *Service) GetMCPSession(ctx context.Context) (*mcp.ClientSession, error)
 		s.mu.Unlock()
 		return sess, nil
 	}
-	mgr, err := s.getManagerLocked()
+	s.mu.Unlock()
+
+	mgr, err := s.GetManager()
 	if err != nil || mgr == nil {
-		s.mu.Unlock()
 		return nil, err
+	}
+
+	s.mu.Lock()
+	if s.session != nil {
+		sess := s.session
+		s.mu.Unlock()
+		return sess, nil
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	s.mcpSrv = skillmcp.NewServer(mgr)

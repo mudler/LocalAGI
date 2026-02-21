@@ -347,6 +347,56 @@ export const skillsApi = {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.skillResources(name)));
     return handleResponse(response);
   },
+  getResource: async (name, path, { json = false } = {}) => {
+    const url = buildUrl(API_CONFIG.endpoints.skillResource(name, path)) + (json ? '?encoding=base64' : '');
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to get resource: ${response.status}`);
+    }
+    if (json) return response.json();
+    const ct = response.headers.get('content-type') || '';
+    if (ct.includes('application/json')) return response.json();
+    if (ct.includes('text/') || ct.includes('application/javascript')) return response.text();
+    return response.blob();
+  },
+  createResource: async (name, path, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('path', path);
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillResources(name)), {
+      method: 'POST',
+      body: form,
+      credentials: 'same-origin',
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to create resource: ${response.status}`);
+    }
+    return response.json();
+  },
+  updateResource: async (name, path, content) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillResource(name, path)), {
+      method: 'PUT',
+      headers: API_CONFIG.headers,
+      body: JSON.stringify({ content }),
+      credentials: 'same-origin',
+    });
+    if (response.status !== 204) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to update resource: ${response.status}`);
+    }
+  },
+  deleteResource: async (name, path) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.skillResource(name, path)), {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    if (response.status !== 204) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Failed to delete resource: ${response.status}`);
+    }
+  },
   listGitRepos: async () => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.gitRepos));
     return handleResponse(response);

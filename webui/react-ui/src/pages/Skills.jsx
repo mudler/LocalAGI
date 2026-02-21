@@ -16,26 +16,39 @@ function Skills() {
   const { showToast } = useOutletContext();
 
   const fetchSkills = async () => {
+    console.log('[Skills] fetchSkills: start');
     setLoading(true);
     setUnavailable(false);
+    const timeoutMs = 15000;
+    const withTimeout = (p) =>
+      Promise.race([
+        p,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
+        ),
+      ]);
     try {
       if (searchQuery.trim()) {
-        const data = await skillsApi.search(searchQuery.trim());
+        const data = await withTimeout(skillsApi.search(searchQuery.trim()));
         setSkills(Array.isArray(data) ? data : []);
+        console.log('[Skills] fetchSkills: search done', data?.length ?? 0, 'results');
       } else {
-        const data = await skillsApi.list();
+        const data = await withTimeout(skillsApi.list());
         setSkills(Array.isArray(data) ? data : []);
+        console.log('[Skills] fetchSkills: list done', data?.length ?? 0, 'skills');
       }
     } catch (err) {
+      console.warn('[Skills] fetchSkills: error', err.message);
       if (err.message?.includes('503') || err.message?.includes('skills')) {
         setUnavailable(true);
         setSkills([]);
       } else {
-        showToast('Failed to load skills', 'error');
+        showToast(err.message || 'Failed to load skills', 'error');
         setSkills([]);
       }
     } finally {
       setLoading(false);
+      console.log('[Skills] fetchSkills: end');
     }
   };
 
@@ -92,15 +105,19 @@ function Skills() {
   };
 
   const loadGitRepos = async () => {
+    console.log('[Skills] loadGitRepos: start');
     setGitReposLoading(true);
     try {
       const list = await skillsApi.listGitRepos();
       setGitRepos(Array.isArray(list) ? list : []);
+      console.log('[Skills] loadGitRepos: done', list?.length ?? 0, 'repos');
     } catch (err) {
+      console.warn('[Skills] loadGitRepos: error', err.message);
       showToast(err.message || 'Failed to load Git repos', 'error');
       setGitRepos([]);
     } finally {
       setGitReposLoading(false);
+      console.log('[Skills] loadGitRepos: end');
     }
   };
 
@@ -112,14 +129,18 @@ function Skills() {
     e.preventDefault();
     const url = gitRepoUrl.trim();
     if (!url) return;
+    console.log('[Skills] addGitRepo: start', url);
     setGitReposAction('add');
     try {
       await skillsApi.addGitRepo(url);
+      console.log('[Skills] addGitRepo: API returned 201');
       setGitRepoUrl('');
       await loadGitRepos();
       fetchSkills();
       showToast('Git repo added and syncing', 'success');
+      console.log('[Skills] addGitRepo: end');
     } catch (err) {
+      console.warn('[Skills] addGitRepo: error', err.message);
       showToast(err.message || 'Failed to add repo', 'error');
     } finally {
       setGitReposAction(null);
@@ -127,13 +148,17 @@ function Skills() {
   };
 
   const syncGitRepo = async (id) => {
+    console.log('[Skills] syncGitRepo: start', id);
     setGitReposAction(id);
     try {
       await skillsApi.syncGitRepo(id);
+      console.log('[Skills] syncGitRepo: API returned');
       await loadGitRepos();
       fetchSkills();
       showToast('Repo synced', 'success');
+      console.log('[Skills] syncGitRepo: end');
     } catch (err) {
+      console.warn('[Skills] syncGitRepo: error', err.message);
       showToast(err.message || 'Sync failed', 'error');
     } finally {
       setGitReposAction(null);
@@ -168,7 +193,10 @@ function Skills() {
       <div className="page skills-page">
         <header className="page-header">
           <h1>Skills</h1>
-          <p className="page-description">Skills service is not available.</p>
+          <p className="page-description">Skills service is not available or the index is rebuilding. Try again in a moment.</p>
+          <button type="button" className="btn btn-primary" onClick={() => { setUnavailable(false); fetchSkills(); }}>
+            Retry
+          </button>
         </header>
       </div>
     );
@@ -177,30 +205,31 @@ function Skills() {
   return (
     <div className="page skills-page">
       <header className="page-header">
-        <h1>Skills</h1>
-        <p className="page-description">Manage agent skills (reusable instructions and resources). Skills are stored under the state directory. Create or import skills, and enable &quot;Enable Skills&quot; per agent to give them access.</p>
+        <div>
+          <h1>Skills</h1>
+          <p className="page-description">Manage agent skills (reusable instructions and resources). Skills are stored under the state directory. Create or import skills, and enable &quot;Enable Skills&quot; per agent to give them access.</p>
+        </div>
+        <div className="header-actions" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="text"
+            className="input"
+            placeholder="Search skills..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '220px' }}
+          />
+          <Link to="/skills/new" className="action-btn success">
+            <i className="fas fa-plus" /> New skill
+          </Link>
+          <label className="action-btn" style={{ margin: 0, cursor: 'pointer' }}>
+            <input type="file" accept=".tar.gz" onChange={handleImport} disabled={importing} style={{ display: 'none' }} />
+            {importing ? 'Importing...' : <><i className="fas fa-file-import" /> Import</>}
+          </label>
+          <button type="button" className="action-btn" onClick={() => setShowGitRepos((v) => !v)}>
+            <i className="fas fa-code-branch" /> Git Repos
+          </button>
+        </div>
       </header>
-
-      <div className="toolbar" style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          className="input"
-          placeholder="Search skills..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ width: '220px' }}
-        />
-        <Link to="/skills/new" className="btn btn-primary">
-          <i className="fas fa-plus" /> New skill
-        </Link>
-        <label className="btn btn-secondary" style={{ margin: 0 }}>
-          <input type="file" accept=".tar.gz" onChange={handleImport} disabled={importing} style={{ display: 'none' }} />
-          {importing ? 'Importing...' : <><i className="fas fa-file-import" /> Import</>}
-        </label>
-        <button type="button" className="btn btn-secondary" onClick={() => setShowGitRepos((v) => !v)}>
-          <i className="fas fa-code-branch" /> Git Repos
-        </button>
-      </div>
 
       {showGitRepos && (
         <div className="section-box" style={{ marginBottom: '1.5rem' }}>
@@ -219,7 +248,7 @@ function Skills() {
               onChange={(e) => setGitRepoUrl(e.target.value)}
               style={{ flex: '1', minWidth: '200px' }}
             />
-            <button type="submit" className="btn btn-primary" disabled={gitReposAction === 'add'}>
+            <button type="submit" className="action-btn success" disabled={gitReposAction === 'add'}>
               {gitReposAction === 'add' ? 'Adding...' : 'Add repo'}
             </button>
           </form>
@@ -237,13 +266,13 @@ function Skills() {
                     {!r.enabled && <span className="badge" style={{ marginLeft: '0.5rem' }}>Disabled</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => syncGitRepo(r.id)} disabled={gitReposAction === r.id}>
+                    <button type="button" className="action-btn" onClick={() => syncGitRepo(r.id)} disabled={gitReposAction === r.id}>
                       {gitReposAction === r.id ? 'Syncing...' : <><i className="fas fa-sync-alt" /> Sync</>}
                     </button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => toggleGitRepo(r.id)} title={r.enabled ? 'Disable' : 'Enable'}>
+                    <button type="button" className="action-btn" onClick={() => toggleGitRepo(r.id)} title={r.enabled ? 'Disable' : 'Enable'}>
                       <i className={`fas fa-toggle-${r.enabled ? 'on' : 'off'}`} />
                     </button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => deleteGitRepo(r.id)} title="Remove repo">
+                    <button type="button" className="action-btn delete-btn" onClick={() => deleteGitRepo(r.id)} title="Remove repo">
                       <i className="fas fa-trash" />
                     </button>
                   </div>
@@ -259,7 +288,7 @@ function Skills() {
       ) : skills.length === 0 ? (
         <div className="card">
           <p>No skills found. Create a skill or import one.</p>
-          <Link to="/skills/new" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>Create skill</Link>
+          <Link to="/skills/new" className="action-btn success" style={{ marginTop: '0.5rem' }}>Create skill</Link>
         </div>
       ) : (
         <div className="skills-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
@@ -272,21 +301,19 @@ function Skills() {
               <p style={{ margin: '0 0 0.75rem 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
                 {s.description || 'No description'}
               </p>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <Link to={`/skills/edit/${encodeURIComponent(s.name)}`} className="btn btn-secondary btn-sm">
-                  Edit
-                </Link>
+              <div className="agent-table-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {!s.readOnly && (
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => deleteSkill(s.name)}>
-                    Delete
+                  <Link to={`/skills/edit/${encodeURIComponent(s.name)}`} className="action-btn" title="Edit skill">
+                    <i className="fas fa-edit" /> Edit
+                  </Link>
+                )}
+                {!s.readOnly && (
+                  <button type="button" className="action-btn delete-btn" onClick={() => deleteSkill(s.name)} title="Delete skill">
+                    <i className="fas fa-trash" /> Delete
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => exportSkill(s.name)}
-                >
-                  Export
+                <button type="button" className="action-btn" onClick={() => exportSkill(s.name)} title="Export as .tar.gz">
+                  <i className="fas fa-download" /> Export
                 </button>
               </div>
             </div>
