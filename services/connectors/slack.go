@@ -87,6 +87,11 @@ func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 			return true // Skip if we don't have a message to update
 		}
 
+		// Do not update if there is no new message to send
+		if state.Reasoning == "" {
+			return true
+		}
+
 		thought := thinkingMessage + "\n\n"
 		if state.Reasoning != "" {
 			thought += "Current thought process:\n" + state.Reasoning

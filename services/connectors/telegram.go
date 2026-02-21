@@ -451,6 +451,11 @@ func (t *Telegram) AgentReasoningCallback() func(state types.ActionCurrentState)
 			return true // Skip if we don't have a message to update
 		}
 
+		// Do not update if there is no new message to send
+		if state.Reasoning == "" {
+			return true
+		}
+
 		thought := telegramThinkingMessage + "\n\n"
 		if state.Reasoning != "" {
 			thought += "Current thought process:\n" + state.Reasoning

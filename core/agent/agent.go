@@ -889,9 +889,22 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	cogitoOpts := []cogito.Option{
 		cogito.WithMCPs(a.mcpSessions...),
+		cogito.WithTools(
+			cogitoTools...,
+		),
+		cogito.WithSinkState(
+			cogito.NewToolDefinition(
+				NoToolToCallTool{},
+				NoToolToCallArgs{},
+				"no_tool_to_call",
+				"Called when no other tool is needed to respond to the user",
+			),
+		),
 		cogito.WithReasoningCallback(func(s string) {
 			xlog.Debug("Cogito reasoning callback", "status", s)
-
+			if s == "" {
+				return
+			}
 			if a.observer != nil && job.Obs != nil {
 				job.Obs.AddProgress(
 					types.Progress{
@@ -908,20 +921,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					})
 				a.observer.Update(*job.Obs)
 			}
-		}),
-		cogito.WithTools(
-			cogitoTools...,
-		),
-		cogito.WithSinkState(
-			cogito.NewToolDefinition(
-				NoToolToCallTool{},
-				NoToolToCallArgs{},
-				"no_tool_to_call",
-				"Called when no other tool is needed to respond to the user",
-			),
-		),
-		cogito.WithReasoningCallback(func(s string) {
-			xlog.Debug("Cogito reasoning callback", "status", s)
 			job.Callback(types.ActionCurrentState{
 				Job:       job,
 				Action:    nil,
