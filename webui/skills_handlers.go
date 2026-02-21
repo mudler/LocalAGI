@@ -392,7 +392,10 @@ func (a *App) ImportSkill(c *fiber.Ctx) error {
 	if err := mgr.RebuildIndex(); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to rebuild index"})
 	}
-	skill, _ := mgr.ReadSkill(skillName)
+	skill, err := mgr.ReadSkill(skillName)
+	if err != nil || skill == nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to read imported skill"})
+	}
 	return c.Status(http.StatusCreated).JSON(skillToResponse(*skill))
 }
 
