@@ -294,7 +294,10 @@ func (a *App) UpdateSkill(c *fiber.Ctx) error {
 	if err := mgr.RebuildIndex(); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to rebuild index"})
 	}
-	skill, _ := mgr.ReadSkill(name)
+	skill, err := mgr.ReadSkill(name)
+	if err != nil || skill == nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "failed to read updated skill"})
+	}
 	return c.JSON(skillToResponse(*skill))
 }
 
