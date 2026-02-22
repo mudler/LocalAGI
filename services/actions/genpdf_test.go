@@ -161,4 +161,52 @@ var _ = Describe("GenPDFAction", func() {
 		// Should be in the tmpDir, not in /etc
 		Expect(filepath.Dir(paths[0])).To(Equal(tmpDir))
 	})
+
+	It("generates PDF with markdown content and renders structure", func() {
+		content := "# Section\n\n**Bold** and *italic* and `code`.\n\n- Item one\n- Item two"
+		result, err := action.Run(ctx, sharedState, types.ActionParams{
+			"content": content,
+		})
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.Result).To(ContainSubstring("PDF generated and saved to:"))
+		paths := result.Metadata[actions.MetadataPDFs].([]string)
+		Expect(paths).To(HaveLen(1))
+		Expect(paths[0]).To(BeAnExistingFile())
+		info, err := os.Stat(paths[0])
+		Expect(err).ToNot(HaveOccurred())
+		Expect(info.Size()).To(BeNumerically(">", 0))
+	})
+
+	It("generates PDF with special characters", func() {
+		content := "Café, \"quotes\", 2–3"
+		result, err := action.Run(ctx, sharedState, types.ActionParams{
+			"content": content,
+		})
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.Result).To(ContainSubstring("PDF generated and saved to:"))
+		paths := result.Metadata[actions.MetadataPDFs].([]string)
+		Expect(paths).To(HaveLen(1))
+		Expect(paths[0]).To(BeAnExistingFile())
+		info, err := os.Stat(paths[0])
+		Expect(err).ToNot(HaveOccurred())
+		Expect(info.Size()).To(BeNumerically(">", 0))
+	})
+
+	It("generates PDF with markdown table", func() {
+		content := "| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |"
+		result, err := action.Run(ctx, sharedState, types.ActionParams{
+			"content": content,
+		})
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.Result).To(ContainSubstring("PDF generated and saved to:"))
+		paths := result.Metadata[actions.MetadataPDFs].([]string)
+		Expect(paths).To(HaveLen(1))
+		Expect(paths[0]).To(BeAnExistingFile())
+		info, err := os.Stat(paths[0])
+		Expect(err).ToNot(HaveOccurred())
+		Expect(info.Size()).To(BeNumerically(">", 0))
+	})
 })

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gomarkdown/markdown/ast"
+	"github.com/gomarkdown/markdown/parser"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -83,17 +85,24 @@ func (a *GenPDFAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 	// Create PDF
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
+	tr := pdf.UnicodeTranslatorFromDescriptor("")
 
 	// Add title if provided
 	if result.Title != "" {
 		pdf.SetFont("Arial", "B", 16)
-		pdf.MultiCell(0, 10, result.Title, "", "", false)
+		pdf.MultiCell(0, 10, tr(result.Title), "", "", false)
 		pdf.Ln(5)
 	}
 
-	// Add content
+	// Add content: parse as markdown and render, or fall back to plain text
 	pdf.SetFont("Arial", "", 12)
-	pdf.MultiCell(0, 10, result.Content, "", "", false)
+	p := parser.NewWithExtensions(parser.CommonExtensions)
+	doc := p.Parse([]byte(result.Content))
+	if doc != nil && ast.GetFirstChild(doc) != nil {
+		renderMarkdownToPDF(pdf, tr, doc)
+	} else {
+		pdf.MultiCell(0, 10, tr(result.Content), "", "", false)
+	}
 
 	// Save PDF
 	savedPath := filepath.Join(a.outputDir, filename)
@@ -120,7 +129,7 @@ func (a *GenPDFAction) Definition() types.ActionDefinition {
 			},
 			"content": {
 				Type:        jsonschema.String,
-				Description: "Text content to include in the PDF document",
+				Description: "Text or Markdown content to include in the PDF (headings, bold, lists, code blocks, etc. are rendered)",
 			},
 			"filename": {
 				Type:        jsonschema.String,
