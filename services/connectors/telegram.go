@@ -22,6 +22,7 @@ import (
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
+	"github.com/mudler/LocalAGI/services/connectors/common"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
 	"github.com/mudler/xlog"
@@ -41,6 +42,7 @@ type Telegram struct {
 	// To track placeholder messages
 	placeholders     map[string]int // map[jobUUID]messageID
 	placeholderMutex sync.RWMutex
+	jobStatus        map[string]*common.StatusAccumulator // map[jobUUID]accumulator
 
 	// Track active jobs for cancellation
 	activeJobs      map[int64][]*types.Job // map[chatID]bool to track if a chat has active processing
@@ -306,9 +308,10 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 		}
 		t.activeJobsMutex.Unlock()
 
-		// Clean up the placeholder map
+		// Clean up the placeholder map and job status
 		t.placeholderMutex.Lock()
 		delete(t.placeholders, jobUUID)
+		delete(t.jobStatus, jobUUID)
 		t.placeholderMutex.Unlock()
 	}()
 
@@ -423,21 +426,48 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 
 func (t *Telegram) AgentResultCallback() func(state types.ActionState) {
 	return func(state types.ActionState) {
-		// Mark the job as completed when we get the final result
-		if state.ActionCurrentState.Job != nil && state.ActionCurrentState.Job.Metadata != nil {
-			if chatID, ok := state.ActionCurrentState.Job.Metadata["chatID"].(int64); ok && chatID != 0 {
-				t.activeJobsMutex.Lock()
-				delete(t.activeJobs, chatID)
-				t.activeJobsMutex.Unlock()
-			}
+		job := state.ActionCurrentState.Job
+		if job == nil || job.Metadata == nil {
+			return
 		}
+		chatID, ok := job.Metadata["chatID"].(int64)
+		if !ok || chatID == 0 {
+			return
+		}
+
+		// Update placeholder with tool result if still in progress
+		t.placeholderMutex.Lock()
+		msgID, exists := t.placeholders[job.UUID]
+		if exists && msgID != 0 && t.bot != nil {
+			acc, ok := t.jobStatus[job.UUID]
+			if !ok {
+				acc = common.NewStatusAccumulator()
+				t.jobStatus[job.UUID] = acc
+			}
+			acc.AppendToolResult(common.ActionDisplayName(state.Action), state.Result)
+			thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
+			t.placeholderMutex.Unlock()
+			_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
+				ChatID:    chatID,
+				MessageID: msgID,
+				Text:      thought,
+			})
+			if err != nil {
+				xlog.Error("Error updating tool result message", "error", err)
+			}
+			t.placeholderMutex.Lock()
+		}
+		t.placeholderMutex.Unlock()
+
+		t.activeJobsMutex.Lock()
+		delete(t.activeJobs, chatID)
+		t.activeJobsMutex.Unlock()
 	}
 }
 
 func (t *Telegram) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
 	return func(state types.ActionCurrentState) bool {
-		// Check if we have a placeholder message for this job
-		t.placeholderMutex.RLock()
+		t.placeholderMutex.Lock()
 		msgID, exists := t.placeholders[state.Job.UUID]
 		chatID := int64(0)
 		if state.Job.Metadata != nil {
@@ -445,23 +475,30 @@ func (t *Telegram) AgentReasoningCallback() func(state types.ActionCurrentState)
 				chatID = ch
 			}
 		}
-		t.placeholderMutex.RUnlock()
-
 		if !exists || msgID == 0 || chatID == 0 || t.bot == nil {
-			return true // Skip if we don't have a message to update
-		}
-
-		// Do not update if there is no new message to send
-		if state.Reasoning == "" {
+			t.placeholderMutex.Unlock()
 			return true
 		}
 
-		thought := telegramThinkingMessage + "\n\n"
-		if state.Reasoning != "" {
-			thought += "Current thought process:\n" + state.Reasoning
+		if state.Reasoning == "" && state.Action == nil {
+			t.placeholderMutex.Unlock()
+			return true
 		}
 
-		// Update the placeholder message with the current reasoning
+		acc, ok := t.jobStatus[state.Job.UUID]
+		if !ok {
+			acc = common.NewStatusAccumulator()
+			t.jobStatus[state.Job.UUID] = acc
+		}
+		if state.Reasoning != "" {
+			acc.AppendReasoning(state.Reasoning)
+		}
+		if state.Action != nil {
+			acc.AppendToolCall(common.ActionDisplayName(state.Action), state.Params.String())
+		}
+		thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
+		t.placeholderMutex.Unlock()
+
 		_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
 			ChatID:    chatID,
 			MessageID: msgID,
@@ -777,9 +814,10 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		}
 		t.activeJobsMutex.Unlock()
 
-		// Clean up the placeholder map
+		// Clean up the placeholder map and job status
 		t.placeholderMutex.Lock()
 		delete(t.placeholders, jobUUID)
+		delete(t.jobStatus, jobUUID)
 		t.placeholderMutex.Unlock()
 	}()
 
@@ -1021,6 +1059,7 @@ func NewTelegramConnector(config map[string]string) (*Telegram, error) {
 		Token:        token,
 		admins:       admins,
 		placeholders: make(map[string]int),
+		jobStatus:    make(map[string]*common.StatusAccumulator),
 		activeJobs:   make(map[int64][]*types.Job),
 		channelID:    config["channel_id"],
 		groupMode:    config["group_mode"] == "true",

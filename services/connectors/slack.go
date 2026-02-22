@@ -18,6 +18,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/services/connectors/common"
 
 	"github.com/slack-go/slack/socketmode"
 
@@ -36,6 +37,7 @@ type Slack struct {
 	// To track placeholder messages
 	placeholders     map[string]string // map[jobUUID]messageTS
 	placeholderMutex sync.RWMutex
+	jobStatus        map[string]*common.StatusAccumulator // map[jobUUID]accumulator
 	apiClient        *slack.Client
 
 	// Track active jobs for cancellation
@@ -53,15 +55,40 @@ func NewSlack(config map[string]string) *Slack {
 		channelID:    config["channelID"],
 		channelMode:  config["channelMode"] == "true",
 		placeholders: make(map[string]string),
+		jobStatus:    make(map[string]*common.StatusAccumulator),
 		activeJobs:   make(map[string][]*types.Job),
 	}
 }
 
 func (t *Slack) AgentResultCallback() func(state types.ActionState) {
 	return func(state types.ActionState) {
-		// Mark the job as completed when we get the final result
-		if state.ActionCurrentState.Job != nil && state.ActionCurrentState.Job.Metadata != nil {
-			if channel, ok := state.ActionCurrentState.Job.Metadata["channel"].(string); ok && channel != "" {
+		// Update placeholder with tool result if still in progress
+		job := state.ActionCurrentState.Job
+		if job != nil && job.Metadata != nil {
+			if channel, ok := job.Metadata["channel"].(string); ok && channel != "" {
+				t.placeholderMutex.Lock()
+				msgTs, exists := t.placeholders[job.UUID]
+				if exists && msgTs != "" && t.apiClient != nil {
+					acc, ok := t.jobStatus[job.UUID]
+					if !ok {
+						acc = common.NewStatusAccumulator()
+						t.jobStatus[job.UUID] = acc
+					}
+					acc.AppendToolResult(common.ActionDisplayName(state.Action), state.Result)
+					thought := acc.BuildMessage(thinkingMessage, 3000)
+					t.placeholderMutex.Unlock()
+					t.placeholderMutex.Unlock()
+					_, _, _, err := t.apiClient.UpdateMessage(
+						channel,
+						msgTs,
+						slack.MsgOptionText(githubmarkdownconvertergo.Slack(thought), false),
+					)
+					if err != nil {
+						xlog.Error(fmt.Sprintf("Error updating tool result message: %v", err))
+					}
+					t.placeholderMutex.Lock()
+				}
+				t.placeholderMutex.Unlock()
 				t.activeJobsMutex.Lock()
 				delete(t.activeJobs, channel)
 				t.activeJobsMutex.Unlock()
@@ -73,7 +100,7 @@ func (t *Slack) AgentResultCallback() func(state types.ActionState) {
 func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
 	return func(state types.ActionCurrentState) bool {
 		// Check if we have a placeholder message for this job
-		t.placeholderMutex.RLock()
+		t.placeholderMutex.Lock()
 		msgTs, exists := t.placeholders[state.Job.UUID]
 		channel := ""
 		if state.Job.Metadata != nil {
@@ -81,23 +108,31 @@ func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 				channel = ch
 			}
 		}
-		t.placeholderMutex.RUnlock()
-
 		if !exists || msgTs == "" || channel == "" || t.apiClient == nil {
-			return true // Skip if we don't have a message to update
-		}
-
-		// Do not update if there is no new message to send
-		if state.Reasoning == "" {
+			t.placeholderMutex.Unlock()
 			return true
 		}
 
-		thought := thinkingMessage + "\n\n"
-		if state.Reasoning != "" {
-			thought += "Current thought process:\n" + state.Reasoning
+		// Update when we have reasoning or a tool call to show
+		if state.Reasoning == "" && state.Action == nil {
+			t.placeholderMutex.Unlock()
+			return true
 		}
 
-		// Update the placeholder message with the current reasoning
+		acc, ok := t.jobStatus[state.Job.UUID]
+		if !ok {
+			acc = common.NewStatusAccumulator()
+			t.jobStatus[state.Job.UUID] = acc
+		}
+		if state.Reasoning != "" {
+			acc.AppendReasoning(state.Reasoning)
+		}
+		if state.Action != nil {
+			acc.AppendToolCall(common.ActionDisplayName(state.Action), state.Params.String())
+		}
+		thought := acc.BuildMessage(thinkingMessage, 3000)
+		t.placeholderMutex.Unlock()
+
 		_, _, _, err := t.apiClient.UpdateMessage(
 			channel,
 			msgTs,
@@ -763,9 +798,10 @@ func (t *Slack) handleMention(
 
 		replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, postMessageParams, res)
 
-		// Clean up the placeholder map
+		// Clean up the placeholder map and job status
 		t.placeholderMutex.Lock()
 		delete(t.placeholders, jobUUID)
+		delete(t.jobStatus, jobUUID)
 		t.placeholderMutex.Unlock()
 	}()
 }
