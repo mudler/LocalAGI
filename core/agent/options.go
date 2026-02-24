@@ -57,7 +57,8 @@ type options struct {
 	mcpPrepareScript            string
 	newConversationsSubscribers []func(openai.ChatCompletionMessage)
 
-	observer     Observer
+	observer               Observer
+	innerMonologueTemplate string
 	parallelJobs int
 }
 
@@ -383,4 +384,13 @@ func WithObserver(observer Observer) Option {
 var EnableStripThinkingTags = func(o *options) error {
 	o.stripThinkingTags = true
 	return nil
+}
+
+// WithInnerMonologueTemplate sets a custom inner monologue template
+// The template can use {{.Task}} to inject the task description when used by scheduler
+func WithInnerMonologueTemplate(templ string) Option {
+	return func(o *options) error {
+		o.innerMonologueTemplate = templ
+		return nil
+	}
 }

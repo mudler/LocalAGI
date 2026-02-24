@@ -22,6 +22,8 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 
 	"github.com/mudler/LocalAGI/pkg/xlog"
+
+	"github.com/mudler/LocalAGI/services/skills"
 )
 
 type AgentPool struct {
@@ -365,6 +367,18 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)
+
+	// Add skills prompt if enabled
+	if config.EnableSkills {
+		skillPrompt := skills.NewSkillsPrompt(
+			func() []skills.Skill {
+				return []skills.Skill{}
+			},
+			config.SkillsPrompt,
+			config.SkillsTemplate,
+		)
+		promptBlocks = append(promptBlocks, skillPrompt)
+	}
 	actions := a.availableActions(config)(ctx, a)
 	stateFile, characterFile := a.stateFiles(name)
 
@@ -442,6 +456,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 			return true
 		}),
 		WithSystemPrompt(config.SystemPrompt),
+		WithInnerMonologueTemplate(config.InnerMonologueTemplate),
 		WithMultimodalModel(multimodalModel),
 		WithAgentResultCallback(func(state types.ActionState) {
 			a.Lock()

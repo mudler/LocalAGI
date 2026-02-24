@@ -60,10 +60,14 @@ type AgentConfig struct {
 	PermanentGoal         string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase   bool   `json:"enable_kb" form:"enable_kb"`
 	EnableReasoning       bool   `json:"enable_reasoning" form:"enable_reasoning"`
+	EnableSkills               bool   `json:"enable_skills" form:"enable_skills"`
 	KnowledgeBaseResults  int    `json:"kb_results" form:"kb_results"`
 	LoopDetectionSteps    int    `json:"loop_detection_steps" form:"loop_detection_steps"`
 	CanStopItself         bool   `json:"can_stop_itself" form:"can_stop_itself"`
 	SystemPrompt          string `json:"system_prompt" form:"system_prompt"`
+	SkillsPrompt               string `json:"skills_prompt" form:"skills_prompt"`
+	SkillsTemplate              string `json:"skills_template" form:"skills_template"`
+	InnerMonologueTemplate     string `json:"inner_monologue_template" form:"inner_monologue_template"`
 	LongTermMemory        bool   `json:"long_term_memory" form:"long_term_memory"`
 	SummaryLongTermMemory bool   `json:"summary_long_term_memory" form:"summary_long_term_memory"`
 	ParallelJobs          int    `json:"parallel_jobs" form:"parallel_jobs"`
