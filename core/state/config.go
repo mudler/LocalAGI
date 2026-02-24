@@ -254,7 +254,7 @@ func NewAgentConfigMeta(
 				Name:         "enable_reasoning",
 				Label:        "Enable Reasoning",
 				Type:         "checkbox",
-				DefaultValue: true,
+				DefaultValue: false,
 				HelpText:     "Enable agent to explain its reasoning process",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
