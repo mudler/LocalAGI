@@ -57,7 +57,9 @@ type options struct {
 	mcpPrepareScript            string
 	newConversationsSubscribers []func(openai.ChatCompletionMessage)
 
-	observer     Observer
+	observer              Observer
+	innerMonologueTemplate string
+	skillPromptTemplate   string
 	parallelJobs int
 }
 
@@ -383,4 +385,23 @@ func WithObserver(observer Observer) Option {
 var EnableStripThinkingTags = func(o *options) error {
 	o.stripThinkingTags = true
 	return nil
+}
+
+// WithInnerMonologueTemplate sets a custom inner monologue template for recurring tasks.
+// The template should include {{.Task}} placeholder which will be replaced with the task description.
+func WithInnerMonologueTemplate(templ string) Option {
+	return func(o *options) error {
+		o.innerMonologueTemplate = templ
+		return nil
+	}
+}
+
+// WithSkillPromptTemplate sets a custom skill prompt template.
+// The template has access to {{.Skills}} (slice of Skill) and {{.Intro}}.
+// If not set, a default template mimicking the current XML behavior is used.
+func WithSkillPromptTemplate(templ string) Option {
+	return func(o *options) error {
+		o.skillPromptTemplate = templ
+		return nil
+	}
 }

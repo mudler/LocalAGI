@@ -144,3 +144,25 @@ Available Tools:
 {{if .Reasoning}}Previous Reasoning: {{.Reasoning}}{{end}}`
 
 const reEvalTemplate = pickActionTemplate
+
+// RenderInnerMonologueTemplate renders the inner monologue template with the task injected.
+// If customTemplate is empty, uses the default innerMonologueTemplate.
+func RenderInnerMonologueTemplate(customTemplate, task string) (string, error) {
+	tmpl := innerMonologueTemplate
+	if customTemplate != "" {
+		tmpl = customTemplate
+	}
+
+	template, err := template.New("innerMonologue").Parse(tmpl)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	err = template.Execute(&buf, struct{ Task string }{Task: task})
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
+}
