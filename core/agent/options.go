@@ -71,10 +71,10 @@ type options struct {
 
 	prompts []DynamicPrompt
 
-	systemPrompt         string
+	systemPrompt           string
 	innerMonologueTemplate string
-	skillPromptTemplate     string
-	schedulerTaskTemplate string
+	skillPromptTemplate    string
+	schedulerTaskTemplate  string
 
 	// callbacks
 	reasoningCallback func(types.ActionCurrentState) bool
@@ -104,16 +104,6 @@ func (o *options) SeparatedMultimodalModel() bool {
 	return o.LLMAPI.MultimodalModel != "" && o.LLMAPI.Model != o.LLMAPI.MultimodalModel
 }
 
-
-// SkillPromptTemplate returns the custom skill prompt template
-func (o *options) SkillPromptTemplate() string {
-	return o.skillPromptTemplate
-}
-
-// SchedulerTaskTemplate returns the custom scheduler task template
-func (o *options) SchedulerTaskTemplate() string {
-	return o.schedulerTaskTemplate
-}
 func defaultOptions() *options {
 	return &options{
 		parallelJobs:            1,

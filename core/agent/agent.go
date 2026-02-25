@@ -180,11 +180,6 @@ func (a *Agent) SharedState() *types.AgentSharedState {
 	return a.sharedState
 }
 
-// Options returns the agent options
-func (a *Agent) Options() *options {
-	return a.options
-}
-
 func (a *Agent) startNewConversationsConsumer() {
 	go func() {
 		for {

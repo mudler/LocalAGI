@@ -3,6 +3,7 @@ package skills
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -18,8 +19,8 @@ const defaultSkillsIntro = "You can use the following skills to help with the ta
 const defaultSkillsTemplate = defaultSkillsIntro + `<available_skills>
 {{range .Skills}}
   <skill>
-    <name>{{.Name}}</name>
-    <description>{{.Description}}</description>
+    <name>{{escapeXML .Name}}</name>
+    <description>{{escapeXML .Description}}</description>
   </skill>
 {{end}}
 </available_skills>`
@@ -33,7 +34,7 @@ type Skill struct {
 
 // skillsPrompt implements agent.DynamicPrompt and injects the available skills XML block
 type skillsPrompt struct {
-	listSkills    func() ([]skilldomain.Skill, error)
+	listSkills     func() ([]skilldomain.Skill, error)
 	customTemplate string
 }
 
@@ -42,24 +43,6 @@ type skillsPrompt struct {
 // Otherwise, the default template is used (mimics current XML behavior).
 func NewSkillsPrompt(listSkills func() ([]skilldomain.Skill, error), customTemplate string) agent.DynamicPrompt {
 	return &skillsPrompt{listSkills: listSkills, customTemplate: customTemplate}
-}
-
-// NewSkillsPromptFromAgent returns a DynamicPrompt that gets skills from the agent
-// and uses the agent's skillPromptTemplate option if set, otherwise uses the default template.
-func NewSkillsPromptFromAgent(a *agent.Agent) agent.DynamicPrompt {
-	template := ""
-	if a != nil && a.Options() != nil {
-		template = a.Options().SkillPromptTemplate()
-	}
-	// We need to get skills from the agent's MCP sessions or skill service
-	// For now, return a basic implementation
-	return &skillsPrompt{
-		listSkills: func() ([]skilldomain.Skill, error) {
-			// This will be populated from the agent's skill service
-			return []skilldomain.Skill{}, nil
-		},
-		customTemplate: template,
-	}
 }
 
 func (p *skillsPrompt) Render(a *agent.Agent) (types.PromptResult, error) {
@@ -89,7 +72,9 @@ func (p *skillsPrompt) Render(a *agent.Agent) (types.PromptResult, error) {
 	}
 
 	// Parse and execute the template
-	tmpl, err := template.New("skillsPrompt").Funcs(sprig.FuncMap()).Parse(templ)
+	tmpl, err := template.New("skillsPrompt").Funcs(template.FuncMap{
+		"escapeXML": escapeXML,
+	}).Funcs(sprig.FuncMap()).Parse(templ)
 	if err != nil {
 		return types.PromptResult{}, fmt.Errorf("failed to parse skills template: %w", err)
 	}
@@ -109,4 +94,13 @@ func (p *skillsPrompt) Render(a *agent.Agent) (types.PromptResult, error) {
 
 func (p *skillsPrompt) Role() string {
 	return "system"
+}
+
+func escapeXML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
+	return s
 }

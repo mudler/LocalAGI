@@ -441,7 +441,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		}),
 		WithSystemPrompt(config.SystemPrompt),
 		WithInnerMonologueTemplate(config.InnerMonologueTemplate),
-			WithSchedulerTaskTemplate(config.SchedulerTaskTemplate),
+		WithSchedulerTaskTemplate(config.SchedulerTaskTemplate),
 		WithMultimodalModel(multimodalModel),
 		WithLastMessageDuration(config.LastMessageDuration),
 		WithAgentResultCallback(func(state types.ActionState) {
