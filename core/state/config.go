@@ -358,7 +358,7 @@ func NewAgentConfigMeta(
 					Label:        "Scheduler Task Template",
 					Type:         "textarea",
 					DefaultValue: "",
-					HelpText:     "Prompt used for scheduled/recurring tasks. If empty, the default inner monologue template is used with the task injected.",
+					HelpText:     "Template for scheduled/recurring tasks. Use {{.Task}} to reference the task. Example: \"Execute: {{.Task}}\". If empty, the default inner monologue template is used with the task injected.",
 					Tags:         config.Tags{Section: "PromptsGoals"},
 				},
 			{
