@@ -78,6 +78,26 @@ Remember to:
 - Be proactive in addressing potential issues
 - Maintain awareness of your current state and goals`
 
+// RenderInnerMonologueTemplate renders the inner monologue template with optional custom template.
+// If customTemplate is provided, it will be rendered with {{.Task}} placeholder.
+// Otherwise, returns the default innerMonologueTemplate.
+func RenderInnerMonologueTemplate(customTemplate string, task string) (string, error) {
+	if customTemplate == "" {
+		return innerMonologueTemplate, nil
+	}
+
+	tmpl, err := templateBase("innerMonologue", customTemplate)
+	if err != nil {
+		return "", err
+	}
+
+	return templateExecute(tmpl, struct {
+		Task string
+	}{
+		Task: task,
+	})
+}
+
 const hudTemplate = `{{with .HUD }}{{if .ShowCharacter}}You are an AI assistant with a distinct personality and character traits that influence your responses and actions.
 {{if .Character.Name}}Name: {{.Character.Name}}
 {{end}}{{if .Character.Age}}Age: {{.Character.Age}}

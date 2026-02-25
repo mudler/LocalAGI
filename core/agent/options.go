@@ -73,6 +73,8 @@ type options struct {
 
 	systemPrompt         string
 	innerMonologueTemplate string
+	skillPromptTemplate     string
+	schedulerTaskTemplate string
 
 	// callbacks
 	reasoningCallback func(types.ActionCurrentState) bool
@@ -102,6 +104,16 @@ func (o *options) SeparatedMultimodalModel() bool {
 	return o.LLMAPI.MultimodalModel != "" && o.LLMAPI.Model != o.LLMAPI.MultimodalModel
 }
 
+
+// SkillPromptTemplate returns the custom skill prompt template
+func (o *options) SkillPromptTemplate() string {
+	return o.skillPromptTemplate
+}
+
+// SchedulerTaskTemplate returns the custom scheduler task template
+func (o *options) SchedulerTaskTemplate() string {
+	return o.schedulerTaskTemplate
+}
 func defaultOptions() *options {
 	return &options{
 		parallelJobs:            1,
@@ -315,6 +327,14 @@ func WithSystemPrompt(prompt string) Option {
 func WithInnerMonologueTemplate(template string) Option {
 	return func(o *options) error {
 		o.innerMonologueTemplate = template
+		return nil
+	}
+}
+
+// WithSkillPromptTemplate sets the template for rendering skills in the prompt. If empty, the default template is used.
+func WithSkillPromptTemplate(template string) Option {
+	return func(o *options) error {
+		o.skillPromptTemplate = template
 		return nil
 	}
 }
@@ -566,6 +586,15 @@ func WithKBAutoSearch(enabled bool) Option {
 func WithSchedulerStorePath(path string) Option {
 	return func(o *options) error {
 		o.schedulerStorePath = path
+		return nil
+	}
+}
+
+// WithSchedulerTaskTemplate sets the prompt used for scheduled/recurring tasks run by the scheduler.
+// If empty, the default inner monologue template is used with the task injected.
+func WithSchedulerTaskTemplate(template string) Option {
+	return func(o *options) error {
+		o.schedulerTaskTemplate = template
 		return nil
 	}
 }
