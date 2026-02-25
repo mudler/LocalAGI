@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/modelcontextprotocol/go-sdk v1.2.0
-	github.com/mudler/cogito v0.9.2-0.20260223101954-070948df04f7
+	github.com/mudler/cogito v0.9.2-0.20260225234859-b76691637703
 	github.com/mudler/localrecall v0.5.4
 	github.com/mudler/skillserver v0.0.5-0.20260221145827-0639a82c8f49
 	github.com/mudler/xlog v0.0.5
