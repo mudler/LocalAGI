@@ -85,6 +85,7 @@ type AgentConfig struct {
 	IdentityGuidance           string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns               string `json:"periodic_runs" form:"periodic_runs"`
 	SchedulerPollInterval      string `json:"scheduler_poll_interval" form:"scheduler_poll_interval"`
+	SchedulerTaskTemplate   string `json:"scheduler_task_template" form:"scheduler_task_template"`
 	PermanentGoal              string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase        bool   `json:"enable_kb" form:"enable_kb"`
 	EnableKBCompaction         bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
@@ -352,6 +353,14 @@ func NewAgentConfigMeta(
 				HelpText:     "Prompt used for periodic/standalone runs when the agent evaluates what to do next. If empty, the default autonomous agent instructions are used.",
 				Tags:         config.Tags{Section: "PromptsGoals"},
 			},
+				{
+					Name:         "scheduler_task_template",
+					Label:        "Scheduler Task Template",
+					Type:         "textarea",
+					DefaultValue: "",
+					HelpText:     "Template for scheduled/recurring tasks. Use {{.Task}} to reference the task. Example: \"Execute: {{.Task}}\". If empty, the default inner monologue template is used with the task injected.",
+					Tags:         config.Tags{Section: "PromptsGoals"},
+				},
 			{
 				Name:         "standalone_job",
 				Label:        "Standalone Job",

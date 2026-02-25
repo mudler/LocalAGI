@@ -71,8 +71,10 @@ type options struct {
 
 	prompts []DynamicPrompt
 
-	systemPrompt         string
+	systemPrompt           string
 	innerMonologueTemplate string
+	skillPromptTemplate    string
+	schedulerTaskTemplate  string
 
 	// callbacks
 	reasoningCallback func(types.ActionCurrentState) bool
@@ -315,6 +317,14 @@ func WithSystemPrompt(prompt string) Option {
 func WithInnerMonologueTemplate(template string) Option {
 	return func(o *options) error {
 		o.innerMonologueTemplate = template
+		return nil
+	}
+}
+
+// WithSkillPromptTemplate sets the template for rendering skills in the prompt. If empty, the default template is used.
+func WithSkillPromptTemplate(template string) Option {
+	return func(o *options) error {
+		o.skillPromptTemplate = template
 		return nil
 	}
 }
@@ -566,6 +576,15 @@ func WithKBAutoSearch(enabled bool) Option {
 func WithSchedulerStorePath(path string) Option {
 	return func(o *options) error {
 		o.schedulerStorePath = path
+		return nil
+	}
+}
+
+// WithSchedulerTaskTemplate sets the prompt used for scheduled/recurring tasks run by the scheduler.
+// If empty, the default inner monologue template is used with the task injected.
+func WithSchedulerTaskTemplate(template string) Option {
+	return func(o *options) error {
+		o.schedulerTaskTemplate = template
 		return nil
 	}
 }

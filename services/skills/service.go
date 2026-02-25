@@ -135,11 +135,11 @@ func (s *Service) GetSkillsPrompt(config *state.AgentConfig) (agent.DynamicPromp
 	if err != nil || mgr == nil {
 		return nil, err
 	}
-	customIntro := ""
+	customTemplate := ""
 	if config != nil && config.SkillsPrompt != "" {
-		customIntro = config.SkillsPrompt
+		customTemplate = config.SkillsPrompt
 	}
-	return NewSkillsPrompt(mgr.ListSkills, customIntro), nil
+	return NewSkillsPrompt(mgr.ListSkills, customTemplate), nil
 }
 
 // GetMCPSession returns a shared MCP client session connected to the in-process skillserver (starts on first use)

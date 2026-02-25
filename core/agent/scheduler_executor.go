@@ -15,9 +15,29 @@ type agentSchedulerExecutor struct {
 
 // Execute processes a scheduled task by creating a job for the agent
 func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, prompt string) (*scheduler.JobResult, error) {
-	// Create a job for the reminder
+	// Render the scheduler task template - if custom template is set, it will include {{.Task}}
+	// If no custom scheduler template is set, fall back to default inner monologue template
+	innerMonologue := fmt.Sprintf("You need to execute the following task, by using the tools available to you. When the task is completed, you need to send a message to the user with send_message tool to inform them that the task is completed: %s", prompt)
+
+	if e.agent.options.schedulerTaskTemplate != "" {
+		tmpl, err := templateBase("taskTemplate", e.agent.options.schedulerTaskTemplate)
+		if err != nil {
+			return nil, fmt.Errorf("failed to render scheduler task template: %w", err)
+		}
+
+		innerMonologue, err = templateExecute(tmpl, struct {
+			Task string
+		}{
+			Task: prompt,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to render scheduler task template: %w", err)
+		}
+	}
+
+	// Create a job for the reminder with the rendered inner monologue
 	reminderJob := types.NewJob(
-		types.WithText(fmt.Sprintf("You need to execute the following task, by using the tools available to you. When the task is completed, you need to send a message to the user with send_message tool to inform them that the task is completed: %s", prompt)),
+		types.WithText(innerMonologue),
 		types.WithReasoningCallback(e.agent.options.reasoningCallback),
 		types.WithResultCallback(e.agent.options.resultCallback),
 		types.WithContext(ctx),
