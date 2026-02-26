@@ -88,7 +88,9 @@ type options struct {
 	extraMCPSessions            []*mcp.ClientSession
 	newConversationsSubscribers []func(*types.ConversationMessage)
 
-	observer     Observer
+	observer             Observer
+	enableAutoCompaction   bool
+	autoCompactionThreshold int
 	parallelJobs int
 
 	lastMessageDuration time.Duration
@@ -585,6 +587,18 @@ func WithSchedulerStorePath(path string) Option {
 func WithSchedulerTaskTemplate(template string) Option {
 	return func(o *options) error {
 		o.schedulerTaskTemplate = template
+		return nil
+	}
+}
+
+var EnableAutoCompaction = func(o *options) error {
+	o.enableAutoCompaction = true
+	return nil
+}
+
+func WithAutoCompactionThreshold(threshold int) Option {
+	return func(o *options) error {
+		o.autoCompactionThreshold = threshold
 		return nil
 	}
 }

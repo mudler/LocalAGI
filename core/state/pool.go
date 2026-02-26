@@ -578,6 +578,14 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, EnableStripThinkingTags)
 	}
 
+	if config.EnableAutoCompaction {
+		opts = append(opts, EnableAutoCompaction)
+	}
+
+	if config.AutoCompactionThreshold > 0 {
+		opts = append(opts, WithAutoCompactionThreshold(config.AutoCompactionThreshold))
+	}
+
 	if config.KnowledgeBaseResults > 0 {
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
