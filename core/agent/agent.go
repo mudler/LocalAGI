@@ -1228,6 +1228,11 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			cogito.WithForceReasoningTool())
 	}
 
+	if a.options.enableAutoCompaction {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithCompactionThreshold(a.options.autoCompactionThreshold))
+	}
+
 	if a.options.maxAttempts > 1 {
 		cogitoOpts = append(cogitoOpts, cogito.WithMaxAttempts(a.options.maxAttempts))
 		cogitoOpts = append(cogitoOpts, cogito.WithMaxRetries(a.options.maxAttempts))
