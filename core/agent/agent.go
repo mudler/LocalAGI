@@ -392,7 +392,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 				xlog.Error("Error rendering template", "error", err)
 			}
 
-			content, err = templateExecute(promptTemplate, struct{}{})
+			content, err = templateExecute(promptTemplate, CommonTemplateData{AgentName: a.Character.Name})
 			if err != nil {
 				xlog.Error("Error executing template", "error", err)
 				content = message.Content
@@ -451,7 +451,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 				xlog.Error("Error rendering template", "error", err)
 			}
 
-			content, err = templateExecute(promptTemplate, struct{}{})
+			content, err = templateExecute(promptTemplate, CommonTemplateData{AgentName: a.Character.Name})
 			if err != nil {
 				xlog.Error("Error executing template", "error", err)
 				content = a.options.systemPrompt

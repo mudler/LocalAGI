@@ -25,9 +25,10 @@ func (e *agentSchedulerExecutor) Execute(ctx context.Context, agentName string, 
 			return nil, fmt.Errorf("failed to render scheduler task template: %w", err)
 		}
 
-		innerMonologue, err = templateExecute(tmpl, struct {
-			Task string
-		}{
+		innerMonologue, err = templateExecute(tmpl, &InnerMonologueTemplateData{
+			CommonTemplateData: CommonTemplateData{
+				AgentName: agentName,
+			},
 			Task: prompt,
 		})
 		if err != nil {
