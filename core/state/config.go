@@ -85,7 +85,7 @@ type AgentConfig struct {
 	IdentityGuidance           string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns               string `json:"periodic_runs" form:"periodic_runs"`
 	SchedulerPollInterval      string `json:"scheduler_poll_interval" form:"scheduler_poll_interval"`
-	SchedulerTaskTemplate      string `json:"scheduler_task_template" form:"scheduler_task_template"`
+	SchedulerTaskTemplate   string `json:"scheduler_task_template" form:"scheduler_task_template"`
 	PermanentGoal              string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase        bool   `json:"enable_kb" form:"enable_kb"`
 	EnableKBCompaction         bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
@@ -115,6 +115,11 @@ type AgentConfig struct {
 	EnableAutoCompaction       bool   `json:"enable_auto_compaction" form:"enable_auto_compaction"`
 	AutoCompactionThreshold    int    `json:"auto_compaction_threshold" form:"auto_compaction_threshold"`
 }
+
+type AgentConfigMeta struct {
+	Filters        []config.FieldGroup
+	Fields         []config.Field
+	Connectors     []config.FieldGroup
 	Actions        []config.FieldGroup
 	DynamicPrompts []config.FieldGroup
 	MCPServers     []config.Field
@@ -501,8 +506,6 @@ func NewAgentConfigMeta(
 				Tags:         config.Tags{Section: "ModelSettings"},
 			},
 			{
-
-			{
 				Name:         "enable_auto_compaction",
 				Label:        "Enable Auto Compaction",
 				Type:         "checkbox",
@@ -520,10 +523,41 @@ func NewAgentConfigMeta(
 				HelpText:     "Number of tokens to trigger automatic compaction",
 				Tags:         config.Tags{Section: "ModelSettings"},
 			},
+			{
+				Name:         "enable_evaluation",
+				Label:        "Enable Evaluation",
+				Type:         "checkbox",
+				DefaultValue: false,
+				HelpText:     "Enable automatic evaluation of agent responses to ensure they meet user requirements",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "max_evaluation_loops",
+				Label:        "Max Evaluation Loops",
+				Type:         "number",
+				DefaultValue: 2,
+				Min:          1,
 				Step:         1,
-				HelpText:     "Number of tokens to trigger automatic compaction",
-				Tags:         config.Tags{Section: "ModelSettings"},
->>>>>>> 2f929ea (feat: add automatic compaction settings to agent config)
+				HelpText:     "Maximum number of evaluation loops to perform when addressing gaps in responses",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "max_attempts",
+				Label:        "Max Attempts",
+				Type:         "number",
+				DefaultValue: 1,
+				Min:          1,
+				Step:         1,
+				HelpText:     "Number of attempts on failure before surfacing the error to the user (1 = no retries)",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "last_message_duration",
+				Label:        "Last Message Duration",
+				Type:         "text",
+				DefaultValue: "5m",
+				HelpText:     "Duration for the last message to be considered in the conversation",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 		},
 		MCPServers: []config.Field{
