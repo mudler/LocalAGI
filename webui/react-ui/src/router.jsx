@@ -9,6 +9,9 @@ import ActionsPlayground from './pages/ActionsPlayground';
 import GroupCreate from './pages/GroupCreate';
 import AgentStatus from './pages/AgentStatus';
 import ImportAgent from './pages/ImportAgent';
+import Skills from './pages/Skills';
+import SkillEdit from './pages/SkillEdit';
+import Knowledge from './pages/Knowledge';
 
 // Get the base URL from Vite's environment variables or default to '/app/'
 const BASE_URL = import.meta.env.BASE_URL || '/app';
@@ -54,6 +57,22 @@ export const router = createBrowserRouter([
       {
         path: 'status/:name',
         element: <AgentStatus />
+      },
+      {
+        path: 'skills',
+        element: <Skills />
+      },
+      {
+        path: 'skills/new',
+        element: <SkillEdit />
+      },
+      {
+        path: 'skills/edit/:name',
+        element: <SkillEdit />
+      },
+      {
+        path: 'knowledge',
+        element: <Knowledge />
       }
     ]
   }

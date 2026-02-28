@@ -31,7 +31,7 @@ func (j *JobResult) SetResult(text ActionState) {
 	j.State = append(j.State, text)
 }
 
-// SetResult sets the result of a job
+// Finish marks the job as done and closes the ready channel.
 func (j *JobResult) Finish(e error) {
 	j.Lock()
 	j.Error = e

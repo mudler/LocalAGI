@@ -10,6 +10,15 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+type CommonTemplateData struct {
+	AgentName string
+}
+
+type InnerMonologueTemplateData struct {
+	CommonTemplateData
+	Task string
+}
+
 func templateBase(templateName, templatetext string) (*template.Template, error) {
 	return template.New(templateName).Funcs(sprig.FuncMap()).Parse(templatetext)
 }

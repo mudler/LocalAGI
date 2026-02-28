@@ -17,6 +17,11 @@ type Observer interface {
 	ClearHistory()
 }
 
+// historyRingSize is the number of observables kept in the ring buffer. When full,
+// the oldest entry is overwritten. The UI builds a tree from parent_id; if a parent
+// is evicted before its children, those children will appear as roots or be omitted.
+const historyRingSize = 500
+
 type SSEObserver struct {
 	agent   string
 	maxID   int32
@@ -32,7 +37,7 @@ func NewSSEObserver(agent string, manager sse.Manager) *SSEObserver {
 		agent:   agent,
 		maxID:   1,
 		manager: manager,
-		history: make([]types.Observable, 100),
+		history: make([]types.Observable, historyRingSize),
 	}
 }
 
@@ -92,6 +97,6 @@ func (s *SSEObserver) ClearHistory() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.history = make([]types.Observable, 100)
+	s.history = make([]types.Observable, historyRingSize)
 	s.historyLast = 0
 }

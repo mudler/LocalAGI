@@ -4,11 +4,13 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/core/state"
+	"github.com/mudler/LocalAGI/services/skills"
 )
 
 type Config struct {
 	DefaultChunkSize          int
 	Pool                      *state.AgentPool
+	SkillsService             *skills.Service
 	ApiKeys                   []string
 	LLMAPIURL                 string
 	LLMAPIKey                 string
@@ -16,6 +18,17 @@ type Config struct {
 	StateDir                  string
 	CustomActionsDir          string
 	ConversationStoreDuration time.Duration
+
+	// Collections / knowledge base (LocalRecall)
+	CollectionDBPath string
+	FileAssets       string
+	VectorEngine     string
+	EmbeddingModel   string
+	MaxChunkingSize  int
+	ChunkOverlap     int
+	DatabaseURL      string
+	// LocalRAGURL when set uses HTTP backend for collections API; when empty uses in-process backend.
+	LocalRAGURL string
 }
 
 type Option func(*Config)
@@ -72,9 +85,63 @@ func WithPool(pool *state.AgentPool) Option {
 	}
 }
 
+func WithSkillsService(svc *skills.Service) Option {
+	return func(c *Config) {
+		c.SkillsService = svc
+	}
+}
+
 func WithApiKeys(keys ...string) Option {
 	return func(c *Config) {
 		c.ApiKeys = keys
+	}
+}
+
+func WithCollectionDBPath(path string) Option {
+	return func(c *Config) {
+		c.CollectionDBPath = path
+	}
+}
+
+func WithFileAssets(path string) Option {
+	return func(c *Config) {
+		c.FileAssets = path
+	}
+}
+
+func WithVectorEngine(engine string) Option {
+	return func(c *Config) {
+		c.VectorEngine = engine
+	}
+}
+
+func WithEmbeddingModel(model string) Option {
+	return func(c *Config) {
+		c.EmbeddingModel = model
+	}
+}
+
+func WithMaxChunkingSize(size int) Option {
+	return func(c *Config) {
+		c.MaxChunkingSize = size
+	}
+}
+
+func WithChunkOverlap(overlap int) Option {
+	return func(c *Config) {
+		c.ChunkOverlap = overlap
+	}
+}
+
+func WithDatabaseURL(url string) Option {
+	return func(c *Config) {
+		c.DatabaseURL = url
+	}
+}
+
+func WithLocalRAGURL(url string) Option {
+	return func(c *Config) {
+		c.LocalRAGURL = url
 	}
 }
 

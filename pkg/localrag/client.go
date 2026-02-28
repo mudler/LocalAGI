@@ -516,3 +516,105 @@ func (c *Client) Store(collection, filePath string) error {
 
 	return nil
 }
+
+// SourceInfo represents an external source for a collection (LocalRecall API contract).
+type SourceInfo struct {
+	URL            string `json:"url"`
+	UpdateInterval int    `json:"update_interval"` // minutes
+	LastUpdate     string `json:"last_update"`      // RFC3339
+}
+
+// AddSource registers an external source for a collection.
+func (c *Client) AddSource(collection, url string, updateIntervalMinutes int) error {
+	reqURL := fmt.Sprintf("%s/api/collections/%s/sources", c.BaseURL, collection)
+	var body struct {
+		URL            string `json:"url"`
+		UpdateInterval int    `json:"update_interval"`
+	}
+	body.URL = url
+	body.UpdateInterval = updateIntervalMinutes
+	if body.UpdateInterval < 1 {
+		body.UpdateInterval = 60
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return parseAPIError(resp, b, "failed to add source")
+	}
+	return nil
+}
+
+// RemoveSource removes an external source from a collection.
+func (c *Client) RemoveSource(collection, url string) error {
+	reqURL := fmt.Sprintf("%s/api/collections/%s/sources", c.BaseURL, collection)
+	payload, err := json.Marshal(map[string]string{"url": url})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodDelete, reqURL, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	c.addAuthHeader(req)
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return parseAPIError(resp, b, "failed to remove source")
+	}
+	return nil
+}
+
+// ListSources returns external sources for a collection.
+func (c *Client) ListSources(collection string) ([]SourceInfo, error) {
+	reqURL := fmt.Sprintf("%s/api/collections/%s/sources", c.BaseURL, collection)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.addAuthHeader(req)
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, body, "failed to list sources")
+	}
+	var wrap apiResponse
+	if err := json.Unmarshal(body, &wrap); err != nil || !wrap.Success {
+		if wrap.Error != nil {
+			return nil, errors.New(wrap.Error.Message)
+		}
+		return nil, fmt.Errorf("invalid response: %w", err)
+	}
+	var data struct {
+		Sources []SourceInfo `json:"sources"`
+	}
+	if err := json.Unmarshal(wrap.Data, &data); err != nil {
+		return nil, err
+	}
+	return data.Sources, nil
+}

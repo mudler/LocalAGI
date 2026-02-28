@@ -17,8 +17,35 @@ import (
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/pkg/utils"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/xlog"
 )
+
+// SkillsProvider supplies the skills dynamic prompt and MCP session when skills are enabled for an agent.
+type SkillsProvider interface {
+	GetSkillsPrompt(config *AgentConfig) (DynamicPrompt, error)
+	GetMCPSession(ctx context.Context) (*mcp.ClientSession, error)
+}
+
+// RAGProvider returns a RAGDB and optional compaction client for a collection (e.g. agent name).
+// effectiveRAGURL/Key are pool/agent defaults; implementation may use them (HTTP) or ignore them (embedded).
+type RAGProvider func(collectionName, effectiveRAGURL, effectiveRAGKey string) (RAGDB, KBCompactionClient, bool)
+
+// NewHTTPRAGProvider returns a RAGProvider that uses the LocalRAG HTTP API. When effective URL/key are empty, baseURL/baseKey are used.
+func NewHTTPRAGProvider(baseURL, baseKey string) RAGProvider {
+	return func(collectionName, effectiveURL, effectiveKey string) (RAGDB, KBCompactionClient, bool) {
+		url := effectiveURL
+		if url == "" {
+			url = baseURL
+		}
+		key := effectiveKey
+		if key == "" {
+			key = baseKey
+		}
+		wc := localrag.NewWrappedClient(url, key, collectionName)
+		return wc, &wrappedClientCompactionAdapter{WrappedClient: wc}, true
+	}
+}
 
 type AgentPool struct {
 	sync.Mutex
@@ -30,13 +57,22 @@ type AgentPool struct {
 	agentStatus                                                   map[string]*Status
 	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel string
 	defaultTranscriptionModel, defaultTranscriptionLanguage       string
-	localRAGAPI, localRAGKey, apiKey                              string
+	apiKey                                                        string
+	ragProvider                                                   RAGProvider
 	availableActions                                              func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                                    func(*AgentConfig) []Connector
 	dynamicPrompt                                                 func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
 	filters                                                       func(*AgentConfig) types.JobFilters
 	timeout                                                       string
 	conversationLogs                                              string
+	skillsService                                                 SkillsProvider
+}
+
+// SetRAGProvider sets the single RAG provider (HTTP or embedded). Must be called after pool creation.
+func (a *AgentPool) SetRAGProvider(fn RAGProvider) {
+	a.Lock()
+	defer a.Unlock()
+	a.ragProvider = fn
 }
 
 type Status struct {
@@ -71,13 +107,13 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 
 func NewAgentPool(
 	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, apiURL, apiKey, directory string,
-	LocalRAGAPI string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt,
 	filters func(*AgentConfig) types.JobFilters,
 	timeout string,
 	withLogs bool,
+	skillsService SkillsProvider,
 ) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
@@ -99,7 +135,6 @@ func NewAgentPool(
 			defaultTranscriptionModel:    defaultTranscriptionModel,
 			defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 			defaultTTSModel:              defaultTTSModel,
-			localRAGAPI:                  LocalRAGAPI,
 			apiKey:                       apiKey,
 			agents:                       make(map[string]*Agent),
 			pool:                         make(map[string]AgentConfig),
@@ -111,12 +146,23 @@ func NewAgentPool(
 			filters:                      filters,
 			timeout:                      timeout,
 			conversationLogs:             conversationPath,
+			skillsService:                skillsService,
 		}, nil
 	}
 
 	poolData, err := loadPoolFromFile(poolfile)
 	if err != nil {
-		return nil, err
+		bakPath := poolfile + ".bak"
+		poolData, err = loadPoolFromFile(bakPath)
+		if err != nil {
+			xlog.Warn("Pool file invalid and backup missing or invalid, starting with empty pool", "poolfile", poolfile, "error", err)
+			poolData = &AgentPoolData{}
+		} else {
+			xlog.Info("Recovered pool from backup, repairing main file", "poolfile", poolfile)
+			if repairData, _ := json.MarshalIndent(poolData, "", "  "); len(repairData) > 0 {
+				_ = os.WriteFile(poolfile, repairData, 0644)
+			}
+		}
 	}
 	return &AgentPool{
 		file:                         poolfile,
@@ -133,12 +179,12 @@ func NewAgentPool(
 		agentStatus:                  map[string]*Status{},
 		pool:                         *poolData,
 		connectors:                   connectors,
-		localRAGAPI:                  LocalRAGAPI,
 		dynamicPrompt:                promptBlocks,
 		filters:                      filters,
 		availableActions:             availableActions,
 		timeout:                      timeout,
 		conversationLogs:             conversationPath,
+		skillsService:                skillsService,
 	}, nil
 }
 
@@ -172,21 +218,21 @@ func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
 
 	oldAgent := a.agents[name]
 	var o *types.Observable
-	obs := oldAgent.Observer()
-	if obs != nil {
-		o = obs.NewObservable()
-		o.Name = "Restarting Agent"
-		o.Icon = "sync"
-		o.Creation = &types.Creation{}
-		obs.Update(*o)
+	var obs Observer
+	if oldAgent != nil {
+		obs = oldAgent.Observer()
+		if obs != nil {
+			o = obs.NewObservable()
+			o.Name = "Restarting Agent"
+			o.Icon = "sync"
+			o.Creation = &types.Creation{}
+			obs.Update(*o)
+		}
+		stateFile, characterFile := a.stateFiles(name)
+		os.Remove(stateFile)
+		os.Remove(characterFile)
+		oldAgent.Stop()
 	}
-
-	stateFile, characterFile := a.stateFiles(name)
-
-	os.Remove(stateFile)
-	os.Remove(characterFile)
-
-	oldAgent.Stop()
 
 	a.pool[name] = *agentConfig
 	delete(a.agents, name)
@@ -292,17 +338,16 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 	} else {
 		config.APIKey = a.apiKey
 	}
-	effectiveLocalRAGAPI := a.localRAGAPI
-	if config.LocalRAGURL != "" {
-		effectiveLocalRAGAPI = config.LocalRAGURL
-	}
-	effectiveLocalRAGKey := a.localRAGKey
-	if config.LocalRAGAPIKey != "" {
-		effectiveLocalRAGKey = config.LocalRAGAPIKey
-	}
+	effectiveLocalRAGAPI := config.LocalRAGURL
+	effectiveLocalRAGKey := config.LocalRAGAPIKey
 
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)(ctx, a)
+	if a.skillsService != nil && config.EnableSkills {
+		if prompt, err := a.skillsService.GetSkillsPrompt(config); err == nil && prompt != nil {
+			promptBlocks = append(promptBlocks, prompt)
+		}
+	}
 	actions := a.availableActions(config)(ctx, a)
 	filters := a.filters(config)
 	stateFile, characterFile := a.stateFiles(name)
@@ -395,6 +440,8 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 			return true
 		}),
 		WithSystemPrompt(config.SystemPrompt),
+		WithInnerMonologueTemplate(config.InnerMonologueTemplate),
+		WithSchedulerTaskTemplate(config.SchedulerTaskTemplate),
 		WithMultimodalModel(multimodalModel),
 		WithLastMessageDuration(config.LastMessageDuration),
 		WithAgentResultCallback(func(state types.ActionState) {
@@ -488,26 +535,33 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		}
 	}
 
-	var ragClient *localrag.WrappedClient
-	if config.EnableKnowledgeBase {
-		ragClient = localrag.NewWrappedClient(effectiveLocalRAGAPI, effectiveLocalRAGKey, name)
-		opts = append(opts, WithRAGDB(ragClient), EnableKnowledgeBase)
-		// Set KB auto search option (defaults to true for backward compatibility)
-		// For backward compatibility: if both new KB fields are false (zero values),
-		// assume this is an old config and default KBAutoSearch to true
+	if a.skillsService != nil && config.EnableSkills {
+		if session, err := a.skillsService.GetMCPSession(ctx); err == nil && session != nil {
+			opts = append(opts, WithMCPSession(session))
+		}
+	}
+
+	var ragDB RAGDB
+	var compactionClient KBCompactionClient
+	if config.EnableKnowledgeBase && a.ragProvider != nil {
+		if db, comp, ok := a.ragProvider(name, effectiveLocalRAGAPI, effectiveLocalRAGKey); ok && db != nil {
+			ragDB = db
+			compactionClient = comp
+		}
+	}
+	if ragDB != nil {
+		opts = append(opts, WithRAGDB(ragDB), EnableKnowledgeBase)
 		kbAutoSearch := config.KBAutoSearch
 		if !config.KBAutoSearch && !config.KBAsTools {
-			// Both new fields are false, likely an old config - default to true for backward compatibility
 			kbAutoSearch = true
 		}
 		opts = append(opts, WithKBAutoSearch(kbAutoSearch))
-		// Inject KB wrapper actions if enabled
-		if config.KBAsTools && ragClient != nil {
+		if config.KBAsTools {
 			kbResults := config.KnowledgeBaseResults
 			if kbResults <= 0 {
-				kbResults = 5 // Default
+				kbResults = 5
 			}
-			searchAction, addAction := NewKBWrapperActions(ragClient, kbResults)
+			searchAction, addAction := NewKBWrapperActions(ragDB, kbResults)
 			opts = append(opts, WithActions(searchAction, addAction))
 		}
 	}
@@ -524,6 +578,14 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, EnableStripThinkingTags)
 	}
 
+	if config.EnableAutoCompaction {
+		opts = append(opts, EnableAutoCompaction)
+	}
+
+	if config.AutoCompactionThreshold > 0 {
+		opts = append(opts, WithAutoCompactionThreshold(config.AutoCompactionThreshold))
+	}
+
 	if config.KnowledgeBaseResults > 0 {
 		opts = append(opts, EnableKnowledgeBaseWithResults(config.KnowledgeBaseResults))
 	}
@@ -532,12 +594,26 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, WithParallelJobs(config.ParallelJobs))
 	}
 
+	if config.CancelPreviousOnNewMessage != nil {
+		opts = append(opts, WithCancelPreviousOnNewMessage(*config.CancelPreviousOnNewMessage))
+	} else {
+		opts = append(opts, WithCancelPreviousOnNewMessage(true))
+	}
+
 	if config.EnableEvaluation {
 		opts = append(opts, EnableEvaluation())
 	}
 
 	if config.MaxEvaluationLoops > 0 {
 		opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
+	}
+
+	if config.MaxAttempts > 0 {
+		opts = append(opts, WithMaxAttempts(config.MaxAttempts))
+	}
+
+	if config.LoopDetection > 0 {
+		opts = append(opts, WithLoopDetection(config.LoopDetection))
 	}
 
 	if config.EnableForceReasoningTool {
@@ -560,8 +636,8 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		}
 	}()
 
-	if config.EnableKnowledgeBase && config.EnableKBCompaction && ragClient != nil {
-		go runCompactionTicker(ctx, ragClient, config, effectiveAPIURL, effectiveAPIKey, model)
+	if config.EnableKnowledgeBase && config.EnableKBCompaction && compactionClient != nil {
+		go runCompactionTicker(ctx, compactionClient, config, effectiveAPIURL, effectiveAPIKey, model)
 	}
 
 	xlog.Info("Starting connectors", "name", name, "config", config)
@@ -673,7 +749,21 @@ func (a *AgentPool) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(a.file, data, 0644)
+	tmpPath := a.file + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, a.file); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	bakPath := a.file + ".bak"
+	if err := os.WriteFile(bakPath, data, 0644); err != nil {
+		// best-effort; main file is already good
+		xlog.Warn("Failed to write pool backup", "path", bakPath, "error", err)
+	}
+	return nil
 }
 
 func (a *AgentPool) GetAgent(name string) *Agent {

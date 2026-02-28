@@ -15,6 +15,33 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+// KBCompactionClient is the interface used by compaction. It can be implemented by the HTTP RAG client adapter or by the in-process collection adapter.
+type KBCompactionClient interface {
+	Collection() string
+	ListEntries() ([]string, error)
+	GetEntryContent(entry string) (content string, chunkCount int, err error)
+	Store(filePath string) error
+	DeleteEntry(entry string) error
+}
+
+// wrappedClientCompactionAdapter adapts *localrag.WrappedClient to KBCompactionClient.
+type wrappedClientCompactionAdapter struct {
+	*localrag.WrappedClient
+}
+
+func (a *wrappedClientCompactionAdapter) ListEntries() ([]string, error) {
+	return a.Client.ListEntries(a.Collection())
+}
+
+func (a *wrappedClientCompactionAdapter) Store(filePath string) error {
+	return a.Client.Store(a.Collection(), filePath)
+}
+
+func (a *wrappedClientCompactionAdapter) DeleteEntry(entry string) error {
+	_, err := a.Client.DeleteEntry(a.Collection(), entry)
+	return err
+}
+
 // datePrefixRegex matches YYYY-MM-DD at the start of a filename (e.g. 2006-01-02-15-04-05-hash.txt).
 var datePrefixRegex = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})`)
 
@@ -102,9 +129,9 @@ func (s *openAISummarizer) Summarize(ctx context.Context, content string) (strin
 }
 
 // RunCompaction runs one compaction pass: list entries, group by period, for each group fetch content, optionally summarize, store result, delete originals.
-func RunCompaction(ctx context.Context, client *localrag.WrappedClient, period string, summarize bool, apiURL, apiKey, model string) error {
+func RunCompaction(ctx context.Context, client KBCompactionClient, period string, summarize bool, apiURL, apiKey, model string) error {
 	collection := client.Collection()
-	entries, err := client.Client.ListEntries(collection)
+	entries, err := client.ListEntries()
 	if err != nil {
 		return fmt.Errorf("list entries: %w", err)
 	}
@@ -164,7 +191,7 @@ func RunCompaction(ctx context.Context, client *localrag.WrappedClient, period s
 			xlog.Warn("compaction: write temp file failed", "error", err)
 			continue
 		}
-		if err := client.Client.Store(collection, tmpPath); err != nil {
+		if err := client.Store(tmpPath); err != nil {
 			os.RemoveAll(tmpDir)
 			xlog.Warn("compaction: store failed", "key", key, "error", err)
 			continue
@@ -172,7 +199,7 @@ func RunCompaction(ctx context.Context, client *localrag.WrappedClient, period s
 		os.RemoveAll(tmpDir)
 
 		for _, entry := range groupEntries {
-			if _, err := client.Client.DeleteEntry(collection, entry); err != nil {
+			if err := client.DeleteEntry(entry); err != nil {
 				xlog.Warn("compaction: delete entry failed", "entry", entry, "error", err)
 			}
 		}
@@ -182,7 +209,7 @@ func RunCompaction(ctx context.Context, client *localrag.WrappedClient, period s
 }
 
 // runCompactionTicker runs compaction on a schedule (daily/weekly/monthly). It stops when ctx is done.
-func runCompactionTicker(ctx context.Context, client *localrag.WrappedClient, config *AgentConfig, apiURL, apiKey, model string) {
+func runCompactionTicker(ctx context.Context, client KBCompactionClient, config *AgentConfig, apiURL, apiKey, model string) {
 	// Run first compaction immediately on startup
 	if err := RunCompaction(ctx, client, config.KBCompactionInterval, config.KBCompactionSummarize, apiURL, apiKey, model); err != nil {
 		xlog.Warn("compaction ticker initial run failed", "collection", client.Collection(), "error", err)

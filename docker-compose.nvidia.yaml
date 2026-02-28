@@ -17,25 +17,15 @@ services:
               count: 1
               capabilities: [gpu]
 
+  postgres:
+    extends:
+      file: docker-compose.yaml
+      service: postgres
+
   dind:
     extends:
       file: docker-compose.yaml
       service: dind
-
-  localrecall-postgres:
-    extends:
-      file: docker-compose.yaml
-      service: localrecall-postgres
-
-  localrecall:
-    extends:
-      file: docker-compose.yaml
-      service: localrecall
-
-  localrecall-healthcheck:
-    extends:
-      file: docker-compose.yaml
-      service: localrecall-healthcheck
 
   localagi:
     extends:

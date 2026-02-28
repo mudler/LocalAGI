@@ -9,6 +9,11 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+// MetadataKeyConversationID is the job metadata key for per-conversation identity.
+// When set (e.g. "slack:CHANNEL_ID", "telegram:CHAT_ID"), the agent may cancel the
+// currently running job for that conversation before enqueueing a new one.
+const MetadataKeyConversationID = "conversation_id"
+
 // Job is a request to the agent to do something
 type Job struct {
 	// The job is a request to the agent to do something

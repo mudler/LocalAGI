@@ -93,25 +93,6 @@ func (m *Matrix) AgentReasoningCallback() func(state types.ActionCurrentState) b
 	}
 }
 
-// cancelActiveJobForRoom cancels any active job for the given room
-func (m *Matrix) cancelActiveJobForRoom(roomID string) {
-	m.activeJobsMutex.RLock()
-	ctxs, exists := m.activeJobs[roomID]
-	m.activeJobsMutex.RUnlock()
-
-	if exists {
-		xlog.Info(fmt.Sprintf("Cancelling active job for room: %s", roomID))
-
-		// Mark the job as inactive
-		m.activeJobsMutex.Lock()
-		for _, c := range ctxs {
-			c.Cancel()
-		}
-		delete(m.activeJobs, roomID)
-		m.activeJobsMutex.Unlock()
-	}
-}
-
 func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 	if m.roomID != evt.RoomID.String() && m.roomMode { // If we have a roomID and it's not the same as the event room
 		// Skip messages from other rooms
@@ -136,9 +117,6 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 		return
 	}
 
-	// Cancel any active job for this room before starting a new one
-	m.cancelActiveJobForRoom(evt.RoomID.String())
-
 	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("matrix:%s", evt.RoomID.String()))
 
 	message := evt.Content.AsMessage().Body
@@ -159,9 +137,10 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 
 		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
 
-		// Add room to metadata for tracking
+		// Add room and conversation_id for tracking and cancel-previous-on-new-message
 		metadata := map[string]any{
-			"room": evt.RoomID.String(),
+			"room":                          evt.RoomID.String(),
+			types.MetadataKeyConversationID: "matrix:" + evt.RoomID.String(),
 		}
 		agentOptions = append(agentOptions, types.WithMetadata(metadata))
 

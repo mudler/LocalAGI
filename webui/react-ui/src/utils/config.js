@@ -48,5 +48,29 @@ export const API_CONFIG = {
     
     // Status endpoint
     status: (name) => `/status/${name}`,
+
+    // Skills endpoints
+    skillsConfig: '/api/skills/config',
+    skillsList: '/api/skills',
+    skillsSearch: (q) => `/api/skills/search?q=${encodeURIComponent(q)}`,
+    skill: (name) => `/api/skills/${encodeURIComponent(name)}`,
+    skillsImport: '/api/skills/import',
+    skillExport: (name) => `/api/skills/export/${encodeURIComponent(name)}`,
+    skillResources: (name) => `/api/skills/${encodeURIComponent(name)}/resources`,
+    skillResource: (name, path) => `/api/skills/${encodeURIComponent(name)}/resources/${path.split('/').map(encodeURIComponent).join('/')}`,
+    gitRepos: '/api/git-repos',
+    gitRepo: (id) => `/api/git-repos/${id}`,
+    gitRepoSync: (id) => `/api/git-repos/${id}/sync`,
+    gitRepoToggle: (id) => `/api/git-repos/${id}/toggle`,
+
+    // Collections / knowledge base (LocalRecall-compatible)
+    collections: '/api/collections',
+    collectionUpload: (name) => `/api/collections/${encodeURIComponent(name)}/upload`,
+    collectionEntries: (name) => `/api/collections/${encodeURIComponent(name)}/entries`,
+    collectionEntry: (name, entry) => `/api/collections/${encodeURIComponent(name)}/entries/${encodeURIComponent(entry)}`,
+    collectionSearch: (name) => `/api/collections/${encodeURIComponent(name)}/search`,
+    collectionReset: (name) => `/api/collections/${encodeURIComponent(name)}/reset`,
+    collectionDeleteEntry: (name) => `/api/collections/${encodeURIComponent(name)}/entry/delete`,
+    collectionSources: (name) => `/api/collections/${encodeURIComponent(name)}/sources`,
   }
 };
