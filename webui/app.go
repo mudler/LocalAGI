@@ -589,7 +589,17 @@ func (a *App) Responses(pool *state.AgentPool, tracker *conversations.Conversati
 		}
 
 		agentName := request.Model
-		messages := append(conv, request.ToChatCompletionMessages()...)
+		newMessages := request.ToChatCompletionMessages()
+		messages := append(conv, newMessages...)
+
+		// Continuing a thread (previous_response_id) without any new user/tool message causes
+		// the job to end with an assistant message, which backends with enable_thinking reject.
+		// Require at least one new message when continuing so we never send assistant-final conv.
+		if previousResponseID != "" && len(conv) > 0 && len(newMessages) == 0 {
+			return c.Status(http.StatusBadRequest).JSON(types.ResponseBody{
+				Error: "previous_response_id was set but no new input was sent; send at least one user or tool message when continuing a conversation",
+			})
+		}
 
 		agent := pool.GetAgent(agentName)
 		if agent == nil {
