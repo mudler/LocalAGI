@@ -916,6 +916,24 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 	conv = Messages(conv).mergeLeadingSystemMessages(selfEvalContent, hudContent)
 
+	// Backends with enable_thinking (e.g. vLLM) reject requests where the last message is
+	// assistant (treated as "assistant response prefill"). We can end with assistant when:
+	// - Web/API: client sends previous_response_id but no new input (ToChatCompletionMessages()
+	//   is empty), so messages = GetConversation(id) which was saved after the last reply and
+	//   ends with assistant.
+	// - Connectors: if they pass a thread that was stored ending with assistant and no new
+	//   user message is appended in that code path.
+	// - Periodic/scheduler jobs always use WithText(...) so they append a user message; they
+	//   do not end with assistant.
+	// Normalize so we never send a request that ends with assistant (avoids enable_thinking
+	// error); callers should ideally always append a new user message when continuing a thread.
+	if len(conv) > 0 && conv[len(conv)-1].Role == AssistantRole {
+		conv = append(conv, openai.ChatCompletionMessage{
+			Role:    UserRole,
+			Content: " ",
+		})
+	}
+
 	fragment := cogito.NewFragment(conv...)
 
 	availableActions := a.getAvailableActionsForJob(job)
