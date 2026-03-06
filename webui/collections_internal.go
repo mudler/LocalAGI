@@ -145,11 +145,12 @@ func (a *internalCompactionAdapter) DeleteEntry(entry string) error {
 	return kb.RemoveEntry(entry)
 }
 
-// CollectionsRAGProvider returns a provider that the pool can use when no LocalRAG URL is set.
-// It returns (RAGDB, KBCompactionClient, true) for a collection name, creating the collection on first use if needed.
-func (app *App) CollectionsRAGProvider() func(collectionName string) (agent.RAGDB, state.KBCompactionClient, bool) {
+// CollectionsRAGProviderFromState returns a RAG provider function from a CollectionsState.
+// This is the standalone version that does not require the webui App. External consumers
+// (e.g. LocalAI) can call NewInProcessCollectionsBackend to get the state, then pass it here.
+func CollectionsRAGProviderFromState(cs *CollectionsState) func(collectionName string) (agent.RAGDB, state.KBCompactionClient, bool) {
 	return func(collectionName string) (agent.RAGDB, state.KBCompactionClient, bool) {
-		if app.collectionsState == nil {
+		if cs == nil {
 			return nil, nil, false
 		}
 		name := strings.TrimSpace(strings.ToLower(collectionName))
@@ -157,10 +158,10 @@ func (app *App) CollectionsRAGProvider() func(collectionName string) (agent.RAGD
 			return nil, nil, false
 		}
 		var kb *rag.PersistentKB
-		app.collectionsState.mu.RLock()
-		kb, ok := app.collectionsState.collections[name]
-		ensure := app.collectionsState.ensureCollection
-		app.collectionsState.mu.RUnlock()
+		cs.mu.RLock()
+		kb, ok := cs.collections[name]
+		ensure := cs.ensureCollection
+		cs.mu.RUnlock()
 		if !ok || kb == nil {
 			if ensure == nil {
 				xlog.Debug("internal RAG: no ensureCollection", "collection", name)
@@ -177,4 +178,10 @@ func (app *App) CollectionsRAGProvider() func(collectionName string) (agent.RAGD
 		compAdapter := &internalCompactionAdapter{collection: name, kb: kb}
 		return ragAdapter, compAdapter, true
 	}
+}
+
+// CollectionsRAGProvider returns a provider that the pool can use when no LocalRAG URL is set.
+// It delegates to CollectionsRAGProviderFromState using the App's internal collectionsState.
+func (app *App) CollectionsRAGProvider() func(collectionName string) (agent.RAGDB, state.KBCompactionClient, bool) {
+	return CollectionsRAGProviderFromState(app.collectionsState)
 }

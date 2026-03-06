@@ -36,7 +36,7 @@ type (
 		config           *Config
 		*fiber.App
 		sharedState      *internalTypes.AgentSharedState
-		collectionsState *collectionsState // set when RegisterCollectionRoutes runs; used for in-process RAG
+		collectionsState *CollectionsState // set when RegisterCollectionRoutes runs; used for in-process RAG
 	}
 )
 

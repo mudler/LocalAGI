@@ -41,7 +41,7 @@ func newVectorEngine(
 
 // collectionsBackendInProcess implements CollectionsBackend using in-process state.
 type collectionsBackendInProcess struct {
-	state        *collectionsState
+	state        *CollectionsState
 	cfg          *Config
 	openAIClient *openai.Client
 }
@@ -206,10 +206,11 @@ func (b *collectionsBackendInProcess) EntryExists(collection, entry string) bool
 }
 
 // NewInProcessCollectionsBackend creates in-process state (load from disk, start sourceManager) and returns
-// a CollectionsBackend and the state. The caller should set app.collectionsState = state for RAG provider.
-func NewInProcessCollectionsBackend(cfg *Config) (CollectionsBackend, *collectionsState) {
-	state := &collectionsState{
-		collections:   collectionList{},
+// a CollectionsBackend and the CollectionsState. The caller can use CollectionsRAGProviderFromState
+// to create a RAG provider from the state.
+func NewInProcessCollectionsBackend(cfg *Config) (CollectionsBackend, *CollectionsState) {
+	state := &CollectionsState{
+		collections:   CollectionList{},
 		sourceManager: rag.NewSourceManager(&sources.Config{}),
 	}
 

@@ -12,12 +12,15 @@ import (
 	"github.com/mudler/xlog"
 )
 
-type collectionList map[string]*rag.PersistentKB
+// CollectionList maps collection names to their persistent knowledge bases.
+type CollectionList map[string]*rag.PersistentKB
 
-// collectionsState holds in-memory state for the collections API.
-type collectionsState struct {
+// CollectionsState holds in-memory state for the collections API.
+// Exported so that external consumers (e.g. LocalAI) can use NewInProcessCollectionsBackend
+// and CollectionsRAGProviderFromState without going through the webui App.
+type CollectionsState struct {
 	mu               sync.RWMutex
-	collections      collectionList
+	collections      CollectionList
 	sourceManager    *rag.SourceManager
 	ensureCollection func(name string) (*rag.PersistentKB, bool) // get-or-create for internal RAG (agent name as collection)
 }
