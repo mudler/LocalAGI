@@ -61,9 +61,10 @@ type Agent struct {
 
 	newConversations chan *types.ConversationMessage
 
-	mcpSessions []*mcp.ClientSession
-	// only contains the MCP action definitions for observables
-	mcpActionDefinitions types.Actions
+	mcpClient         *mcp.Client
+	mcpSessions       []*mcp.ClientSession
+	mcpServerSessions map[*MCPServer]*mcp.ClientSession
+	mcpSessionActions map[*mcp.ClientSession]types.Actions
 
 	subscriberMutex        sync.Mutex
 	newMessagesSubscribers []func(*types.ConversationMessage)
@@ -114,6 +115,9 @@ func New(opts ...Option) (*Agent, error) {
 		newMessagesSubscribers:   options.newConversationsSubscribers,
 		sharedState:              types.NewAgentSharedState(options.lastMessageDuration),
 		currentJobByConversation: make(map[string]*types.Job),
+		mcpClient:                mcp.NewClient(&mcp.Implementation{Name: "LocalAI", Version: "v1.0.0"}, nil),
+		mcpServerSessions:        make(map[*MCPServer]*mcp.ClientSession),
+		mcpSessionActions:        make(map[*mcp.ClientSession]types.Actions),
 	}
 
 	// Initialize observer if provided
@@ -934,7 +938,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	availableActions := a.getAvailableActionsForJob(job)
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
-	allActions := append(availableActions, a.mcpActionDefinitions...)
+
+	a.mcpStreamableClientHealthCheck()
+
+	allActions := availableActions
+	for _, session := range a.mcpSessions {
+		allActions = append(allActions, a.mcpSessionActions[session]...)
+	}
 
 	obs := job.Obs
 
@@ -952,9 +962,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	var finishErr error
 
 	var observables = make(map[string]*types.Observable)
+	var mcpSessions = append(a.mcpSessions, a.options.extraMCPSessions...)
 
 	cogitoOpts := []cogito.Option{
-		cogito.WithMCPs(a.mcpSessions...),
+		cogito.WithMCPs(mcpSessions...),
 		cogito.WithTools(
 			cogitoTools...,
 		),
