@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -176,25 +178,21 @@ func attachmentsFromMetadataOnly(metadata map[string]interface{}) (attachments [
 		return nil
 	}
 	if urls, exists := metadata[actions.MetadataUrls]; exists {
-		if sl, ok := urls.([]string); ok {
-			for _, url := range xstrings.UniqueSlice(sl) {
-				attachments = append(attachments, slack.Attachment{
-					Title:     "URL",
-					TitleLink: url,
-					Text:      url,
-				})
-			}
+		for _, url := range xstrings.UniqueSlice(stringSliceFromMetadata(urls)) {
+			attachments = append(attachments, slack.Attachment{
+				Title:     "URL",
+				TitleLink: url,
+				Text:      url,
+			})
 		}
 	}
 	if imagesUrls, exists := metadata[actions.MetadataImages]; exists {
-		if sl, ok := imagesUrls.([]string); ok {
-			for _, url := range xstrings.UniqueSlice(sl) {
-				attachments = append(attachments, slack.Attachment{
-					Title:     "Image",
-					TitleLink: url,
-					ImageURL:  url,
-				})
-			}
+		for _, url := range xstrings.UniqueSlice(stringSliceFromMetadata(imagesUrls)) {
+			attachments = append(attachments, slack.Attachment{
+				Title:     "Image",
+				TitleLink: url,
+				ImageURL:  url,
+			})
 		}
 	}
 	return attachments
@@ -295,6 +293,39 @@ func uploadFilesFromMetadata(metadata map[string]interface{}, api *slack.Client,
 			}
 		}
 	}
+	// Handle generated images (download from URL and upload as file, so temporary URLs like DALL-E are preserved)
+	if imageUrls, exists := metadata[actions.MetadataImages]; exists {
+		sl := stringSliceFromMetadata(imageUrls)
+		for _, imgURL := range xstrings.UniqueSlice(sl) {
+			resp, err := http.Get(imgURL)
+			if err != nil {
+				xlog.Error("Error downloading image for Slack upload", "url", imgURL, "error", err)
+				continue
+			}
+			data, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				xlog.Error("Error reading image body for Slack upload", "url", imgURL, "error", err)
+				continue
+			}
+			if len(data) == 0 {
+				xlog.Error("Empty image body for Slack upload", "url", imgURL)
+				continue
+			}
+			_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+				Reader:          bytes.NewReader(data),
+				FileSize:        len(data),
+				ThreadTimestamp: threadTs,
+				Channel:         channelID,
+				Filename:        "image.png",
+				Title:           "Generated image",
+				InitialComment:  "Generated image",
+			})
+			if err != nil {
+				xlog.Error("Slack UploadFileV2 failed for image", "error", err, "url", imgURL)
+			}
+		}
+	}
 }
 
 // attachmentsAndUploadsFromMetadata returns link/image attachments and uploads files (songs, PDFs)
@@ -327,16 +358,6 @@ func uploadJobResultFiles(res *types.JobResult, api *slack.Client, channelID, th
 	for _, state := range res.State {
 		uploadFilesFromMetadata(state.Metadata, api, channelID, threadTs)
 	}
-}
-
-func generateAttachmentsFromJobResponse(j *types.JobResult, api *slack.Client, channelID, ts string) (attachments []slack.Attachment) {
-	if j == nil {
-		return nil
-	}
-	for _, state := range j.State {
-		attachments = append(attachments, attachmentsAndUploadsFromMetadata(state.Metadata, api, channelID, ts)...)
-	}
-	return attachments
 }
 
 // ImageData represents a single image with its metadata
@@ -641,7 +662,9 @@ func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackeven
 
 func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackevents.AppMentionEvent, msgTs string, ts string, postMessageParams slack.PostMessageParameters, res *types.JobResult) {
 	attachments := attachmentsFromJobResponseOnly(res)
-	uploadJobResultFiles(res, api, ev.Channel, msgTs)
+	// Use the thread root timestamp (ts), not the placeholder reply timestamp (msgTs).
+	// Slack API: "Never use a reply's ts value; use its parent instead."
+	uploadJobResultFiles(res, api, ev.Channel, ts)
 	if len(finalResponse) > 3000 {
 		messages := xstrings.SplitParagraph(finalResponse, 3000)
 
