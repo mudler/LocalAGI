@@ -220,7 +220,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		client := localrag.NewClient(app.config.LocalRAGURL, app.config.LLMAPIKey)
 		collectionsBackend = NewCollectionsBackendHTTP(client)
 	} else {
-		var state *collectionsState
+		var state *CollectionsState
 		collectionsBackend, state = NewInProcessCollectionsBackend(app.config)
 		app.collectionsState = state
 	}

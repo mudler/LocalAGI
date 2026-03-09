@@ -4,23 +4,11 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/mudler/localrecall/rag"
 	"github.com/mudler/xlog"
 )
-
-type collectionList map[string]*rag.PersistentKB
-
-// collectionsState holds in-memory state for the collections API.
-type collectionsState struct {
-	mu               sync.RWMutex
-	collections      collectionList
-	sourceManager    *rag.SourceManager
-	ensureCollection func(name string) (*rag.PersistentKB, bool) // get-or-create for internal RAG (agent name as collection)
-}
 
 // APIResponse represents a standardized API response (LocalRecall contract).
 type collectionsAPIResponse struct {
