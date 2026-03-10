@@ -138,44 +138,43 @@ func validateConfig(config *state.AgentConfig) error {
 // startStandaloneAgent creates and runs a single agent using the pool,
 // without starting the web server.
 func startStandaloneAgent(name string, config *state.AgentConfig) error {
-	// Resolve defaults from environment variables
-	model := envOrDefault("LOCALAGI_MODEL", config.Model)
-	apiURL := envOrDefault("LOCALAGI_LLM_API_URL", config.APIURL)
-	apiKey := envOrDefault("LOCALAGI_LLM_API_KEY", config.APIKey)
-	multimodalModel := envOrDefault("LOCALAGI_MULTIMODAL_MODEL", config.MultimodalModel)
-	transcriptionModel := envOrDefault("LOCALAGI_TRANSCRIPTION_MODEL", config.TranscriptionModel)
-	transcriptionLanguage := envOrDefault("LOCALAGI_TRANSCRIPTION_LANGUAGE", config.TranscriptionLanguage)
-	ttsModel := envOrDefault("LOCALAGI_TTS_MODEL", config.TTSModel)
-	timeout := envOrDefault("LOCALAGI_TIMEOUT", "5m")
-	stateDir := envOrDefault("LOCALAGI_STATE_DIR", "")
-	localRAG := os.Getenv("LOCALAGI_LOCALRAG_URL")
-	customActionsDir := os.Getenv("LOCALAGI_CUSTOM_ACTIONS_DIR")
-	sshBoxURL := os.Getenv("LOCALAGI_SSHBOX_URL")
+	// Load all environment variables
+	env := LoadEnv()
 
-	if model == "" {
+	if env.Model == "" {
+		env.Model = config.Model
+	}
+	if env.LLMAPIURL == "" {
+		env.LLMAPIURL = config.APIURL
+	}
+	if env.LLMAPIKey == "" {
+		env.LLMAPIKey = config.APIKey
+	}
+
+	if env.Model == "" {
 		return fmt.Errorf("model not set: provide 'model' in config or set LOCALAGI_MODEL")
 	}
-	if apiURL == "" {
+	if env.LLMAPIURL == "" {
 		return fmt.Errorf("API URL not set: provide 'api_url' in config or set LOCALAGI_LLM_API_URL")
 	}
 
-	if stateDir == "" {
+	if env.StateDir == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
-		stateDir = filepath.Join(cwd, "pool")
+		env.StateDir = filepath.Join(cwd, "pool")
 	}
-	os.MkdirAll(stateDir, 0755)
+	os.MkdirAll(env.StateDir, 0755)
 
 	// Override config with resolved values
-	config.Model = model
-	config.APIURL = apiURL
-	config.APIKey = apiKey
-	config.MultimodalModel = multimodalModel
-	config.TranscriptionModel = transcriptionModel
-	config.TranscriptionLanguage = transcriptionLanguage
-	config.TTSModel = ttsModel
+	config.Model = env.Model
+	config.APIURL = env.LLMAPIURL
+	config.APIKey = env.LLMAPIKey
+	config.MultimodalModel = env.MultimodalModel
+	config.TranscriptionModel = env.TranscriptionModel
+	config.TranscriptionLanguage = env.TranscriptionLanguage
+	config.TTSModel = env.TTSModel
 
 	if config.PeriodicRuns == "" {
 		config.PeriodicRuns = "10m"
@@ -185,35 +184,35 @@ func startStandaloneAgent(name string, config *state.AgentConfig) error {
 	}
 
 	// Initialize skills service
-	skillsService, err := skills.NewService(stateDir)
+	skillsService, err := skills.NewService(env.StateDir)
 	if err != nil {
 		return fmt.Errorf("failed to initialize skills service: %w", err)
 	}
 
 	// Build service factories
 	actionsFactory := services.Actions(map[string]string{
-		services.ActionConfigSSHBoxURL: sshBoxURL,
-		services.ConfigStateDir:        stateDir,
-		services.CustomActionsDir:      customActionsDir,
+		services.ActionConfigSSHBoxURL: env.SSHBoxURL,
+		services.ConfigStateDir:        env.StateDir,
+		services.CustomActionsDir:      env.CustomActionsDir,
 	})
 	dynamicPromptsFactory := services.DynamicPrompts(map[string]string{
-		services.ConfigStateDir:   stateDir,
-		services.CustomActionsDir: customActionsDir,
+		services.ConfigStateDir:   env.StateDir,
+		services.CustomActionsDir: env.CustomActionsDir,
 	})
 
 	// Create the pool and use it to start the agent
 	pool, err := state.NewAgentPool(
-		model, multimodalModel, transcriptionModel, transcriptionLanguage, ttsModel,
-		apiURL, apiKey, stateDir,
+		env.Model, env.MultimodalModel, env.TranscriptionModel, env.TranscriptionLanguage, env.TTSModel,
+		env.LLMAPIURL, env.LLMAPIKey, env.StateDir,
 		actionsFactory, services.Connectors, dynamicPromptsFactory, services.Filters,
-		timeout, false, skillsService,
+		env.Timeout, false, skillsService,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create agent pool: %w", err)
 	}
 
-	if localRAG != "" {
-		pool.SetRAGProvider(state.NewHTTPRAGProvider(localRAG, apiKey))
+	if env.LocalRAGURL != "" {
+		pool.SetRAGProvider(state.NewHTTPRAGProvider(env.LocalRAGURL, env.LLMAPIKey))
 	}
 
 	// Start the agent via the pool (handles all option building, connectors, etc.)
@@ -226,7 +225,7 @@ func startStandaloneAgent(name string, config *state.AgentConfig) error {
 		return fmt.Errorf("agent %q was not found after starting", name)
 	}
 
-	fmt.Fprintf(os.Stderr, "Starting agent %q (model: %s, api: %s)\n", name, model, apiURL)
+	fmt.Fprintf(os.Stderr, "Starting agent %q (model: %s, api: %s)\n", name, env.Model, env.LLMAPIURL)
 	fmt.Fprintf(os.Stderr, "Press Ctrl+C to stop\n")
 
 	// Wait for interrupt
@@ -241,12 +240,4 @@ func startStandaloneAgent(name string, config *state.AgentConfig) error {
 	time.Sleep(2 * time.Second)
 
 	return nil
-}
-
-// envOrDefault returns the environment variable value if set, otherwise the fallback.
-func envOrDefault(envKey, fallback string) string {
-	if v := os.Getenv(envKey); v != "" {
-		return v
-	}
-	return fallback
 }

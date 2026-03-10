@@ -4,8 +4,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/state"
@@ -27,106 +25,65 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	baseModel := os.Getenv("LOCALAGI_MODEL")
-	multimodalModel := os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
-	transcriptionModel := os.Getenv("LOCALAGI_TRANSCRIPTION_MODEL")
-	transcriptionLanguage := os.Getenv("LOCALAGI_TRANSCRIPTION_LANGUAGE")
-	ttsModel := os.Getenv("LOCALAGI_TTS_MODEL")
-	apiURL := os.Getenv("LOCALAGI_LLM_API_URL")
-	apiKey := os.Getenv("LOCALAGI_LLM_API_KEY")
-	timeout := os.Getenv("LOCALAGI_TIMEOUT")
-	stateDir := os.Getenv("LOCALAGI_STATE_DIR")
-	localRAG := os.Getenv("LOCALAGI_LOCALRAG_URL")
-	withLogs := os.Getenv("LOCALAGI_ENABLE_CONVERSATIONS_LOGGING") == "true"
-	apiKeysEnv := os.Getenv("LOCALAGI_API_KEYS")
-	conversationDuration := os.Getenv("LOCALAGI_CONVERSATION_DURATION")
-	customActionsDir := os.Getenv("LOCALAGI_CUSTOM_ACTIONS_DIR")
-	sshBoxURL := os.Getenv("LOCALAGI_SSHBOX_URL")
+	// Load all environment variables
+	env := LoadEnv()
 
-	collectionDBPath := os.Getenv("COLLECTION_DB_PATH")
-	fileAssets := os.Getenv("FILE_ASSETS")
-	vectorEngine := os.Getenv("VECTOR_ENGINE")
-	embeddingModel := os.Getenv("EMBEDDING_MODEL")
-	maxChunkingSizeEnv := os.Getenv("MAX_CHUNKING_SIZE")
-	chunkOverlapEnv := os.Getenv("CHUNK_OVERLAP")
-	databaseURL := os.Getenv("DATABASE_URL")
-
-	if baseModel == "" {
+	if env.Model == "" {
 		return cmd.Help()
 	}
-	if apiURL == "" {
+	if env.LLMAPIURL == "" {
 		return cmd.Help()
 	}
-	if timeout == "" {
-		timeout = "5m"
-	}
-	if stateDir == "" {
+
+	if env.StateDir == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return err
 		}
-		stateDir = filepath.Join(cwd, "pool")
+		env.StateDir = filepath.Join(cwd, "pool")
 	}
 
-	os.MkdirAll(stateDir, 0755)
+	os.MkdirAll(env.StateDir, 0755)
 
-	if collectionDBPath == "" {
-		collectionDBPath = filepath.Join(stateDir, "collections")
+	if env.CollectionDBPath == "" {
+		env.CollectionDBPath = filepath.Join(env.StateDir, "collections")
 	}
-	if fileAssets == "" {
-		fileAssets = filepath.Join(stateDir, "assets")
-	}
-	if vectorEngine == "" {
-		vectorEngine = "chromem"
-	}
-	if embeddingModel == "" {
-		embeddingModel = "granite-embedding-107m-multilingual"
-	}
-	maxChunkingSize := 400
-	if maxChunkingSizeEnv != "" {
-		if n, err := strconv.Atoi(maxChunkingSizeEnv); err == nil {
-			maxChunkingSize = n
-		}
-	}
-	chunkOverlap := 0
-	if chunkOverlapEnv != "" {
-		if n, err := strconv.Atoi(chunkOverlapEnv); err == nil {
-			chunkOverlap = n
-		}
+	if env.FileAssets == "" {
+		env.FileAssets = filepath.Join(env.StateDir, "assets")
 	}
 
-	apiKeys := []string{}
-	if apiKeysEnv != "" {
-		apiKeys = strings.Split(apiKeysEnv, ",")
+	apiKeys := env.APIKeys
+	if len(apiKeys) == 0 {
+		apiKeys = []string{}
 	}
 
-	skillsService, err := skills.NewService(stateDir)
+	skillsService, err := skills.NewService(env.StateDir)
 	if err != nil {
 		return err
 	}
 
 	pool, err := state.NewAgentPool(
-		baseModel,
-		multimodalModel,
-		transcriptionModel,
-		transcriptionLanguage,
-		ttsModel,
-		apiURL,
-		apiKey,
-		stateDir,
+		env.Model,
+		env.MultimodalModel,
+		env.TranscriptionModel,
+		env.TranscriptionLanguage,
+		env.TTSModel,
+		env.LLMAPIURL,
+		env.LLMAPIKey,
+		env.StateDir,
 		services.Actions(map[string]string{
-			services.ActionConfigSSHBoxURL: sshBoxURL,
-			services.ConfigStateDir:        stateDir,
-			services.CustomActionsDir:      customActionsDir,
+			services.ActionConfigSSHBoxURL: env.SSHBoxURL,
+			services.ConfigStateDir:        env.StateDir,
+			services.CustomActionsDir:      env.CustomActionsDir,
 		}),
 		services.Connectors,
 		services.DynamicPrompts(map[string]string{
-			services.ConfigStateDir:   stateDir,
-			services.CustomActionsDir: customActionsDir,
+			services.ConfigStateDir:   env.StateDir,
+			services.CustomActionsDir: env.CustomActionsDir,
 		}),
 		services.Filters,
-		timeout,
-		withLogs,
+		env.Timeout,
+		env.EnableConversationsLogging,
 		skillsService,
 	)
 	if err != nil {
@@ -136,25 +93,25 @@ func runServe(cmd *cobra.Command, args []string) error {
 	app := webui.NewApp(
 		webui.WithPool(pool),
 		webui.WithSkillsService(skillsService),
-		webui.WithConversationStoreduration(conversationDuration),
+		webui.WithConversationStoreduration(env.ConversationDuration),
 		webui.WithApiKeys(apiKeys...),
-		webui.WithLLMAPIUrl(apiURL),
-		webui.WithLLMAPIKey(apiKey),
-		webui.WithLLMModel(baseModel),
-		webui.WithCustomActionsDir(customActionsDir),
-		webui.WithStateDir(stateDir),
-		webui.WithCollectionDBPath(collectionDBPath),
-		webui.WithFileAssets(fileAssets),
-		webui.WithVectorEngine(vectorEngine),
-		webui.WithEmbeddingModel(embeddingModel),
-		webui.WithMaxChunkingSize(maxChunkingSize),
-		webui.WithChunkOverlap(chunkOverlap),
-		webui.WithDatabaseURL(databaseURL),
-		webui.WithLocalRAGURL(localRAG),
+		webui.WithLLMAPIUrl(env.LLMAPIURL),
+		webui.WithLLMAPIKey(env.LLMAPIKey),
+		webui.WithLLMModel(env.Model),
+		webui.WithCustomActionsDir(env.CustomActionsDir),
+		webui.WithStateDir(env.StateDir),
+		webui.WithCollectionDBPath(env.CollectionDBPath),
+		webui.WithFileAssets(env.FileAssets),
+		webui.WithVectorEngine(env.VectorEngine),
+		webui.WithEmbeddingModel(env.EmbeddingModel),
+		webui.WithMaxChunkingSize(env.MaxChunkingSize),
+		webui.WithChunkOverlap(env.ChunkOverlap),
+		webui.WithDatabaseURL(env.DatabaseURL),
+		webui.WithLocalRAGURL(env.LocalRAGURL),
 	)
 
-	if localRAG != "" {
-		pool.SetRAGProvider(state.NewHTTPRAGProvider(localRAG, apiKey))
+	if env.LocalRAGURL != "" {
+		pool.SetRAGProvider(state.NewHTTPRAGProvider(env.LocalRAGURL, env.LLMAPIKey))
 	} else {
 		embedded := app.CollectionsRAGProvider()
 		pool.SetRAGProvider(func(collectionName, _, _ string) (agent.RAGDB, state.KBCompactionClient, bool) {
