@@ -13,7 +13,8 @@ var rootCmd = &cobra.Command{
 	Long:  "LocalAGI is a self-hosted AI Agent platform that allows running autonomous agents with various connectors, actions, and tools.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// If no subcommand is provided, default to serving the web server
-		return cmd.Help()
+		// This ensures the container starts the web server by default
+		return serveCmd.RunE(cmd, args)
 	},
 }
 
