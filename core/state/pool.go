@@ -806,9 +806,3 @@ func (a *AgentPool) GetManager(name string) sse.Manager {
 	return a.managers[name]
 }
 
-// GetRAGProvider returns the configured RAG provider, if any.
-func (a *AgentPool) GetRAGProvider() RAGProvider {
-	a.Lock()
-	defer a.Unlock()
-	return a.ragProvider
-}
