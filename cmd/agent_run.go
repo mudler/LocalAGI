@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mudler/LocalAGI/core/state"
+	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/LocalAGI/services/skills"
 	"github.com/spf13/cobra"
@@ -17,6 +18,7 @@ import (
 
 var (
 	configFile string
+	prompt     string
 )
 
 var agentRunCmd = &cobra.Command{
@@ -27,9 +29,10 @@ var agentRunCmd = &cobra.Command{
 Two modes are supported:
   1. Run an agent by name from the registry (pool.json):
        local-agi agent run my-agent
-
   2. Run an agent from a JSON config file:
        local-agi agent run --config agent.json
+  3. Run an agent in foreground mode with a prompt:
+       local-agi agent run my-agent --prompt "Your question here"
 
 The agent runs in the foreground until interrupted (Ctrl+C).`,
 	Args: cobra.MaximumNArgs(1),
@@ -38,6 +41,7 @@ The agent runs in the foreground until interrupted (Ctrl+C).`,
 
 func init() {
 	agentRunCmd.Flags().StringVarP(&configFile, "config", "c", "", "path to agent JSON config file")
+	agentRunCmd.Flags().StringVarP(&prompt, "prompt", "p", "", "run in foreground mode with the given prompt and exit after response")
 }
 
 func runAgent(cmd *cobra.Command, args []string) error {
@@ -46,7 +50,115 @@ func runAgent(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// If --prompt is provided, run in foreground mode
+	if prompt != "" {
+		return runAgentForeground(agentName, agentConfig, prompt)
+	}
+
 	return startStandaloneAgent(agentName, agentConfig)
+}
+
+// runAgentForeground runs an agent in foreground mode with a single prompt,
+// prints the response, and exits.
+func runAgentForeground(agentName string, agentConfig *state.AgentConfig, promptText string) error {
+	// Load all environment variables
+	env := LoadEnv()
+
+	if env.Model == "" {
+		env.Model = agentConfig.Model
+	}
+	if env.LLMAPIURL == "" {
+		env.LLMAPIURL = agentConfig.APIURL
+	}
+	if env.LLMAPIKey == "" {
+		env.LLMAPIKey = agentConfig.APIKey
+	}
+
+	if env.Model == "" {
+		return fmt.Errorf("model not set: provide 'model' in config or set LOCALAGI_MODEL")
+	}
+	if env.LLMAPIURL == "" {
+		return fmt.Errorf("API URL not set: provide 'api_url' in config or set LOCALAGI_LLM_API_URL")
+	}
+
+	if env.StateDir == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get working directory: %w", err)
+		}
+		env.StateDir = filepath.Join(cwd, "pool")
+	}
+	os.MkdirAll(env.StateDir, 0755)
+
+	// Override config with resolved values
+	agentConfig.Model = env.Model
+	agentConfig.APIURL = env.LLMAPIURL
+	agentConfig.APIKey = env.LLMAPIKey
+	agentConfig.MultimodalModel = env.MultimodalModel
+	agentConfig.TranscriptionModel = env.TranscriptionModel
+	agentConfig.TranscriptionLanguage = env.TranscriptionLanguage
+	agentConfig.TTSModel = env.TTSModel
+
+	// Initialize skills service
+	skillsService, err := skills.NewService(env.StateDir)
+	if err != nil {
+		return fmt.Errorf("failed to initialize skills service: %w", err)
+	}
+
+	// Build service factories
+	actionsFactory := services.Actions(map[string]string{
+		services.ActionConfigSSHBoxURL: env.SSHBoxURL,
+		services.ConfigStateDir:        env.StateDir,
+		services.CustomActionsDir:      env.CustomActionsDir,
+	})
+	dynamicPromptsFactory := services.DynamicPrompts(map[string]string{
+		services.ConfigStateDir:   env.StateDir,
+		services.CustomActionsDir: env.CustomActionsDir,
+	})
+
+	// Create the pool
+	pool, err := state.NewAgentPool(
+		env.Model, env.MultimodalModel, env.TranscriptionModel, env.TranscriptionLanguage, env.TTSModel,
+		env.LLMAPIURL, env.LLMAPIKey, env.StateDir,
+		actionsFactory, services.Connectors, dynamicPromptsFactory, services.Filters,
+		env.Timeout, false, skillsService,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create agent pool: %w", err)
+	}
+
+	if env.LocalRAGURL != "" {
+		pool.SetRAGProvider(state.NewHTTPRAGProvider(env.LocalRAGURL, env.LLMAPIKey))
+	}
+
+	// Start the agent
+	if err := pool.StartAgentStandalone(agentName, agentConfig); err != nil {
+		return fmt.Errorf("failed to start agent: %w", err)
+	}
+
+	a := pool.GetAgent(agentName)
+	if a == nil {
+		return fmt.Errorf("agent %q was not found after starting", agentName)
+	}
+
+	fmt.Fprintf(os.Stderr, "Running agent %q in foreground mode with prompt...\n", agentName)
+
+	// Execute Ask with the prompt using WithText option
+	result := a.Ask(types.WithText(promptText))
+
+	// Print the result
+	if result.Error != "" {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", result.Error)
+		pool.Stop(agentName)
+		return fmt.Errorf("agent error: %s", result.Error)
+	}
+
+	// Print the response
+	fmt.Println(result.Text)
+
+	// Clean up
+	pool.Stop(agentName)
+	return nil
 }
 
 // resolveAgentConfig determines the agent name and config from either
