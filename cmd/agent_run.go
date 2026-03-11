@@ -147,14 +147,14 @@ func runAgentForeground(agentName string, agentConfig *state.AgentConfig, prompt
 	result := a.Ask(types.WithText(promptText))
 
 	// Print the result
-	if result.Error != "" {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", result.Error)
+	if result.Error != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", result.Error.Error())
 		pool.Stop(agentName)
-		return fmt.Errorf("agent error: %s", result.Error)
+		return fmt.Errorf("agent error: %s", result.Error.Error())
 	}
 
 	// Print the response
-	fmt.Println(result.Text)
+	fmt.Println(result.Response)
 
 	// Clean up
 	pool.Stop(agentName)
