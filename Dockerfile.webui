@@ -61,4 +61,4 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /work/localagi /localagi
 
 # Define the command that will be run when the container is started
-ENTRYPOINT ["/localagi"]
+ENTRYPOINT ["/localagi", "serve"]

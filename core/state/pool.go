@@ -193,6 +193,14 @@ func replaceInvalidChars(s string) string {
 	return strings.ReplaceAll(s, " ", "_")
 }
 
+// StartAgentStandalone starts an agent without saving it to the pool registry.
+// It is intended for running a single agent from the CLI without the web server.
+func (a *AgentPool) StartAgentStandalone(name string, agentConfig *AgentConfig) error {
+	a.Lock()
+	defer a.Unlock()
+	return a.startAgentWithConfig(name, a.pooldir, agentConfig, nil)
+}
+
 // CreateAgent adds a new agent to the pool
 // and starts it.
 // It also saves the state to the file.
@@ -797,3 +805,4 @@ func (a *AgentPool) GetManager(name string) sse.Manager {
 	defer a.Unlock()
 	return a.managers[name]
 }
+
