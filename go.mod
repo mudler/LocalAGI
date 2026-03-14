@@ -17,8 +17,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/modelcontextprotocol/go-sdk v1.2.0
-	github.com/mudler/cogito v0.9.3
-	github.com/mudler/localrecall v0.5.4
+	github.com/mudler/cogito v0.9.2-0.20260225234859-b76691637703
+	github.com/mudler/localrecall v0.5.9-0.20260314221856-96d63875cc47
 	github.com/mudler/skillserver v0.0.5-0.20260221145827-0639a82c8f49
 	github.com/mudler/xlog v0.0.5
 	github.com/onsi/ginkgo/v2 v2.27.5
@@ -27,6 +27,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/slack-go/slack v0.17.3
+	github.com/spf13/cobra v1.10.2
 	github.com/thoj/go-ircevent v0.0.0-20210723090443-73e444401d64
 	github.com/tmc/langchaingo v0.1.14
 	github.com/traefik/yaegi v0.16.1
@@ -95,7 +96,6 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
-	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect

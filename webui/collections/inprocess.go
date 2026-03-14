@@ -195,6 +195,16 @@ func (b *backendInProcess) ListSources(collection string) ([]SourceInfo, error) 
 	return out, nil
 }
 
+func (b *backendInProcess) GetEntryFilePath(collection, entry string) (string, error) {
+	b.state.Mu.RLock()
+	kb, exists := b.state.Collections[collection]
+	b.state.Mu.RUnlock()
+	if !exists {
+		return "", fmt.Errorf("collection not found: %s", collection)
+	}
+	return kb.GetEntryFilePath(entry)
+}
+
 func (b *backendInProcess) EntryExists(collection, entry string) bool {
 	b.state.Mu.RLock()
 	kb, exists := b.state.Collections[collection]
