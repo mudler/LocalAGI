@@ -7,6 +7,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/cogito"
 )
 
 type Option func(*options) error
@@ -100,6 +101,9 @@ type options struct {
 
 	// maxAttempts: on ExecuteTools failure, retry up to this many times before surfacing the error to the user (1 = no retries).
 	maxAttempts int
+
+	// streamCallback receives streaming events from cogito during final answer generation.
+	streamCallback func(cogito.StreamEvent)
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -599,6 +603,15 @@ var EnableAutoCompaction = func(o *options) error {
 func WithAutoCompactionThreshold(threshold int) Option {
 	return func(o *options) error {
 		o.autoCompactionThreshold = threshold
+		return nil
+	}
+}
+
+// WithStreamCallback sets a callback to receive streaming events from cogito
+// during final answer generation. This enables live token-by-token delivery.
+func WithStreamCallback(fn func(cogito.StreamEvent)) Option {
+	return func(o *options) error {
+		o.streamCallback = fn
 		return nil
 	}
 }

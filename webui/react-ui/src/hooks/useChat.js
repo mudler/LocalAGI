@@ -11,11 +11,15 @@ export function useChat(agentName) {
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
+  const [streamReasoning, setStreamReasoning] = useState('');
+  const [streamContent, setStreamContent] = useState('');
+  const [streamToolCalls, setStreamToolCalls] = useState([]);
   const processedMessageIds = useRef(new Set());
+  const processedStreamIds = useRef(new Set());
   const localMessageContents = useRef(new Set()); // Track locally added message contents
-  
+
   // Use SSE hook to receive real-time messages
-  const { messages: sseMessages, statusUpdates, errorMessages, isConnected } = useSSE(agentName);
+  const { messages: sseMessages, statusUpdates, errorMessages, streamEvents, isConnected } = useSSE(agentName);
   
   // Process SSE messages into chat messages
   useEffect(() => {

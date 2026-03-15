@@ -1250,6 +1250,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		cogitoOpts = append(cogitoOpts, cogito.WithMaxRetries(a.options.maxAttempts))
 	}
 
+	if a.options.streamCallback != nil {
+		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(a.options.streamCallback))
+	}
+
 	fragment, err = cogito.ExecuteTools(
 		a.llm, fragment,
 		cogitoOpts...,
