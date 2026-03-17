@@ -35,6 +35,9 @@ type Backend interface {
 	RemoveSource(collection, url string) error
 	ListSources(collection string) ([]SourceInfo, error)
 	EntryExists(collection, entry string) bool
+	// GetEntryFilePath returns the filesystem path of the stored file for the
+	// given entry. This is used to serve the original uploaded binary file.
+	GetEntryFilePath(collection, entry string) (string, error)
 }
 
 // Config holds the configuration for the in-process collections backend.

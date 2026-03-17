@@ -11,11 +11,15 @@ export function useChat(agentName) {
   const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
+  const [streamReasoning, setStreamReasoning] = useState('');
+  const [streamContent, setStreamContent] = useState('');
+  const [streamToolCalls, setStreamToolCalls] = useState([]);
   const processedMessageIds = useRef(new Set());
+  const processedStreamIds = useRef(new Set());
   const localMessageContents = useRef(new Set()); // Track locally added message contents
-  
+
   // Use SSE hook to receive real-time messages
-  const { messages: sseMessages, statusUpdates, errorMessages, isConnected } = useSSE(agentName);
+  const { messages: sseMessages, statusUpdates, errorMessages, streamEvents, isConnected } = useSSE(agentName);
   
   // Process SSE messages into chat messages
   useEffect(() => {
@@ -75,8 +79,14 @@ export function useChat(agentName) {
         
         if (statusData.status === 'processing') {
           setSending(true);
+          setStreamReasoning('');
+          setStreamContent('');
+          setStreamToolCalls([]);
         } else if (statusData.status === 'completed') {
           setSending(false);
+          setStreamReasoning('');
+          setStreamContent('');
+          setStreamToolCalls([]);
         }
       } catch (err) {
         console.error('Error processing status update:', err);
@@ -101,6 +111,42 @@ export function useChat(agentName) {
       console.error('Error processing error message:', err);
     }
   }, [errorMessages]);
+
+  // Process stream events (reasoning, content, tool_call, done)
+  useEffect(() => {
+    if (!streamEvents || streamEvents.length === 0) return;
+
+    const latestEvent = streamEvents[streamEvents.length - 1];
+    if (processedStreamIds.current.has(latestEvent.id)) return;
+    processedStreamIds.current.add(latestEvent.id);
+
+    const data = latestEvent.content;
+    if (data.type === 'reasoning') {
+      setStreamReasoning(prev => prev + (data.content || ''));
+    } else if (data.type === 'content') {
+      setStreamContent(prev => prev + (data.content || ''));
+    } else if (data.type === 'tool_call') {
+      const name = data.tool_name || '';
+      const args = data.tool_args || '';
+      if (name) {
+        // Reset reasoning and content when a new tool call starts —
+        // each iteration gets its own thinking block
+        setStreamReasoning('');
+        setStreamContent('');
+      }
+      setStreamToolCalls(prev => {
+        if (name) {
+          return [...prev, { name, args }];
+        }
+        if (prev.length === 0) return prev;
+        const updated = [...prev];
+        updated[updated.length - 1] = { ...updated[updated.length - 1], args: updated[updated.length - 1].args + args };
+        return updated;
+      });
+    } else if (data.type === 'done') {
+      // Stream complete — content finalized by json_message event
+    }
+  }, [streamEvents]);
 
   // Send a message to the agent
   const sendMessage = useCallback(async (content) => {
@@ -160,6 +206,9 @@ export function useChat(agentName) {
     sending,
     error,
     isConnected,
+    streamReasoning,
+    streamContent,
+    streamToolCalls,
     sendMessage,
     clearChat,
     clearError,

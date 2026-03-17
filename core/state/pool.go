@@ -12,12 +12,13 @@ import (
 	"time"
 
 	. "github.com/mudler/LocalAGI/core/agent"
-	"github.com/mudler/LocalAGI/core/sse"
+	sseLib "github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/pkg/utils"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mudler/cogito"
 	"github.com/mudler/xlog"
 )
 
@@ -53,7 +54,7 @@ type AgentPool struct {
 	pooldir                                                       string
 	pool                                                          AgentPoolData
 	agents                                                        map[string]*Agent
-	managers                                                      map[string]sse.Manager
+	managers                                                      map[string]sseLib.Manager
 	agentStatus                                                   map[string]*Status
 	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel string
 	defaultTranscriptionModel, defaultTranscriptionLanguage       string
@@ -139,7 +140,7 @@ func NewAgentPool(
 			agents:                       make(map[string]*Agent),
 			pool:                         make(map[string]AgentConfig),
 			agentStatus:                  make(map[string]*Status),
-			managers:                     make(map[string]sse.Manager),
+			managers:                     make(map[string]sseLib.Manager),
 			connectors:                   connectors,
 			availableActions:             availableActions,
 			dynamicPrompt:                promptBlocks,
@@ -175,7 +176,7 @@ func NewAgentPool(
 		defaultTTSModel:              defaultTTSModel,
 		apiKey:                       apiKey,
 		agents:                       make(map[string]*Agent),
-		managers:                     make(map[string]sse.Manager),
+		managers:                     make(map[string]sseLib.Manager),
 		agentStatus:                  map[string]*Status{},
 		pool:                         *poolData,
 		connectors:                   connectors,
@@ -291,11 +292,11 @@ func (a *AgentPool) GetStatusHistory(name string) *Status {
 }
 
 func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConfig, obs Observer) error {
-	var manager sse.Manager
+	var manager sseLib.Manager
 	if m, ok := a.managers[name]; ok {
 		manager = m
 	} else {
-		manager = sse.NewManager(5)
+		manager = sseLib.NewManager(5)
 	}
 	ctx := context.Background()
 	model := a.defaultModel
@@ -435,7 +436,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 			)
 
 			manager.Send(
-				sse.NewMessage(
+				sseLib.NewMessage(
 					fmt.Sprintf(`Thinking: %s`, utils.HTMLify(state.Reasoning)),
 				).WithEvent("status"),
 			)
@@ -477,7 +478,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 				state.ActionCurrentState.Params,
 				state.Result)
 			manager.Send(
-				sse.NewMessage(
+				sseLib.NewMessage(
 					utils.HTMLify(
 						text,
 					),
@@ -628,6 +629,40 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, EnableForceReasoningTool)
 	}
 
+	// Wire cogito streaming events into the SSE manager for live token delivery
+	opts = append(opts, WithStreamCallback(func(ev cogito.StreamEvent) {
+		switch ev.Type {
+		case cogito.StreamEventReasoning:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "reasoning",
+				"content":   ev.Content,
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		case cogito.StreamEventContent:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "content",
+				"content":   ev.Content,
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		case cogito.StreamEventToolCall:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "tool_call",
+				"tool_name": ev.ToolName,
+				"tool_args": ev.ToolArgs,
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		case cogito.StreamEventDone:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "done",
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		}
+	}))
+
 	xlog.Info("Starting agent", "name", name, "config", config)
 
 	agent, err := New(opts...)
@@ -657,7 +692,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 	go func() {
 		for {
 			time.Sleep(1 * time.Second) // Send a message every seconds
-			manager.Send(sse.NewMessage(
+			manager.Send(sseLib.NewMessage(
 				utils.HTMLify(agent.State().String()),
 			).WithEvent("hud"))
 		}
@@ -800,7 +835,7 @@ func (a *AgentPool) GetConfig(name string) *AgentConfig {
 	return &agent
 }
 
-func (a *AgentPool) GetManager(name string) sse.Manager {
+func (a *AgentPool) GetManager(name string) sseLib.Manager {
 	a.Lock()
 	defer a.Unlock()
 	return a.managers[name]
