@@ -142,11 +142,6 @@ func (app *App) uploadFile(backend CollectionsBackend) func(c *fiber.Ctx) error 
 		}
 		defer f.Close()
 
-		if backend.EntryExists(name, file.Filename) {
-			xlog.Info("Entry already exists")
-			return c.Status(fiber.StatusBadRequest).JSON(collectionsErrorResponse(errCodeConflict, "Entry already exists", fmt.Sprintf("File '%s' has already been uploaded to collection '%s'", file.Filename, name)))
-		}
-
 		if err := backend.Upload(name, file.Filename, f); err != nil {
 			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
 				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))

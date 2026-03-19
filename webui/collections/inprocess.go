@@ -71,17 +71,25 @@ func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reade
 	if !exists {
 		return fmt.Errorf("collection not found: %s", collection)
 	}
-	filePath := filepath.Join(b.cfg.FileAssets, filename)
-	out, err := os.Create(filePath)
+	// Write to a temp file; kb.Store will copy it into the correct UUID
+	// subdirectory under the collection's asset dir.
+	tmpDir, err := os.MkdirTemp("", "localagi-upload")
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-	if _, err := io.Copy(out, fileBody); err != nil {
+	defer os.RemoveAll(tmpDir)
+	tmpPath := filepath.Join(tmpDir, filename)
+	out, err := os.Create(tmpPath)
+	if err != nil {
 		return err
 	}
+	if _, err := io.Copy(out, fileBody); err != nil {
+		out.Close()
+		return err
+	}
+	out.Close()
 	now := time.Now().Format(time.RFC3339)
-	return kb.Store(filePath, map[string]string{"created_at": now})
+	return kb.Store(tmpPath, map[string]string{"created_at": now})
 }
 
 func (b *backendInProcess) ListEntries(collection string) ([]string, error) {
@@ -91,7 +99,12 @@ func (b *backendInProcess) ListEntries(collection string) ([]string, error) {
 	if !exists {
 		return nil, fmt.Errorf("collection not found: %s", collection)
 	}
-	return kb.ListDocuments(), nil
+	keys := kb.ListDocuments()
+	entries := make([]string, len(keys))
+	for i, k := range keys {
+		entries[i] = filepath.Base(k)
+	}
+	return entries, nil
 }
 
 func (b *backendInProcess) GetEntryContent(collection, entry string) (string, int, error) {
@@ -112,8 +125,8 @@ func (b *backendInProcess) Search(collection, query string, maxResults int) ([]S
 		return nil, fmt.Errorf("collection not found: %s", collection)
 	}
 	if maxResults <= 0 {
-		entries := kb.ListDocuments()
-		if len(entries) >= 5 {
+		keys := kb.ListDocuments()
+		if len(keys) >= 5 {
 			maxResults = 5
 		} else {
 			maxResults = 1
@@ -158,7 +171,12 @@ func (b *backendInProcess) DeleteEntry(collection, entry string) ([]string, erro
 	if err := kb.RemoveEntry(entry); err != nil {
 		return nil, err
 	}
-	return kb.ListDocuments(), nil
+	keys := kb.ListDocuments()
+	entries := make([]string, len(keys))
+	for i, k := range keys {
+		entries[i] = filepath.Base(k)
+	}
+	return entries, nil
 }
 
 func (b *backendInProcess) AddSource(collection, url string, intervalMin int) error {

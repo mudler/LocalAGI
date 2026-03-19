@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/localrecall/rag"
@@ -107,7 +108,12 @@ func (a *internalCompactionAdapter) ListEntries() ([]string, error) {
 	if kb == nil {
 		return nil, fmt.Errorf("collection not available")
 	}
-	return kb.ListDocuments(), nil
+	keys := kb.ListDocuments()
+	entries := make([]string, len(keys))
+	for i, k := range keys {
+		entries[i] = filepath.Base(k)
+	}
+	return entries, nil
 }
 
 func (a *internalCompactionAdapter) GetEntryContent(entry string) (content string, chunkCount int, err error) {

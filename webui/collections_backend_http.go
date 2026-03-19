@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -112,6 +113,10 @@ func (b *collectionsBackendHTTP) ListSources(collection string) ([]CollectionSou
 		})
 	}
 	return out, nil
+}
+
+func (b *collectionsBackendHTTP) GetEntryFilePath(collection, entry string) (string, error) {
+	return "", fmt.Errorf("GetEntryFilePath is not supported via HTTP backend")
 }
 
 func (b *collectionsBackendHTTP) EntryExists(collection, entry string) bool {
