@@ -34,7 +34,8 @@ func (a *wrappedClientCompactionAdapter) ListEntries() ([]string, error) {
 }
 
 func (a *wrappedClientCompactionAdapter) Store(filePath string) error {
-	return a.Client.Store(a.Collection(), filePath)
+	_, err := a.Client.Store(a.Collection(), filePath)
+	return err
 }
 
 func (a *wrappedClientCompactionAdapter) DeleteEntry(entry string) error {

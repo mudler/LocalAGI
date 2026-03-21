@@ -284,9 +284,13 @@ func (c *Client) ListEntries(collection string) ([]string, error) {
 
 	var data struct {
 		Entries []string `json:"entries"`
+		Keys    []string `json:"keys"`
 	}
 	if err := json.Unmarshal(wrap.Data, &data); err != nil {
 		return nil, err
+	}
+	if len(data.Keys) > 0 {
+		return data.Keys, nil
 	}
 	return data.Entries, nil
 }
