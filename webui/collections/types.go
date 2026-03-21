@@ -25,7 +25,7 @@ type SourceInfo struct {
 type Backend interface {
 	ListCollections() ([]string, error)
 	CreateCollection(name string) error
-	Upload(collection, filename string, fileBody io.Reader) error
+	Upload(collection, filename string, fileBody io.Reader) (string, error)
 	ListEntries(collection string) ([]string, error)
 	GetEntryContent(collection, entry string) (content string, chunkCount int, err error)
 	Search(collection, query string, maxResults int) ([]SearchResult, error)

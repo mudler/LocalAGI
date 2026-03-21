@@ -30,25 +30,29 @@ func (b *collectionsBackendHTTP) CreateCollection(name string) error {
 	return b.client.CreateCollection(name)
 }
 
-func (b *collectionsBackendHTTP) Upload(collection, filename string, fileBody io.Reader) error {
+func (b *collectionsBackendHTTP) Upload(collection, filename string, fileBody io.Reader) (string, error) {
 	tmpDir, err := os.MkdirTemp("", "localagi-upload")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer os.RemoveAll(tmpDir)
 	tmpPath := filepath.Join(tmpDir, filename)
 	out, err := os.Create(tmpPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := io.Copy(out, fileBody); err != nil {
 		out.Close()
-		return err
+		return "", err
 	}
 	if err := out.Close(); err != nil {
-		return err
+		return "", err
 	}
-	return b.client.Store(collection, tmpPath)
+	key, err := b.client.Store(collection, tmpPath)
+	if err != nil {
+		return "", err
+	}
+	return key, nil
 }
 
 func (b *collectionsBackendHTTP) ListEntries(collection string) ([]string, error) {

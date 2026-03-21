@@ -93,7 +93,8 @@ func (c *WrappedClient) Store(s string) error {
 	}
 
 	defer os.Remove(f)
-	return c.Client.Store(c.collection, f)
+	_, err = c.Client.Store(c.collection, f)
+	return err
 }
 
 // GetEntryContent returns the full file content (no chunk overlap) and the number of chunks for the entry.
@@ -467,13 +468,13 @@ func (c *Client) Reset(collection string) error {
 	return nil
 }
 
-// Store uploads a file to a collection
-func (c *Client) Store(collection, filePath string) error {
+// Store uploads a file to a collection and returns the assigned entry key.
+func (c *Client) Store(collection, filePath string) (string, error) {
 	url := fmt.Sprintf("%s/api/collections/%s/upload", c.BaseURL, collection)
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 
@@ -482,22 +483,22 @@ func (c *Client) Store(collection, filePath string) error {
 
 	part, err := writer.CreateFormFile("file", file.Name())
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	_, err = io.Copy(part, file)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = writer.Close()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, url, body)
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	c.addAuthHeader(req)
@@ -505,16 +506,24 @@ func (c *Client) Store(collection, filePath string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return parseAPIError(resp, body, "failed to upload file")
+		return "", parseAPIError(resp, body, "failed to upload file")
 	}
 
-	return nil
+	var result struct {
+		Status   string `json:"status"`
+		Filename string `json:"filename"`
+		Key      string `json:"key"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", nil // upload succeeded, can't parse key
+	}
+	return result.Key, nil
 }
 
 // SourceInfo represents an external source for a collection (LocalRecall API contract).

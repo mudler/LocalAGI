@@ -47,7 +47,8 @@ func (a *internalRAGAdapter) Store(s string) error {
 		return err
 	}
 	meta := map[string]string{"created_at": t.Format(time.RFC3339)}
-	return kb.Store(f, meta)
+	_, err = kb.Store(f, meta)
+	return err
 }
 
 func (a *internalRAGAdapter) Reset() error {
@@ -134,7 +135,8 @@ func (a *internalCompactionAdapter) Store(filePath string) error {
 		return fmt.Errorf("collection not available")
 	}
 	meta := map[string]string{"created_at": time.Now().Format(time.RFC3339)}
-	return kb.Store(filePath, meta)
+	_, err := kb.Store(filePath, meta)
+	return err
 }
 
 func (a *internalCompactionAdapter) DeleteEntry(entry string) error {

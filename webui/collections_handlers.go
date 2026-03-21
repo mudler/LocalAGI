@@ -142,7 +142,7 @@ func (app *App) uploadFile(backend CollectionsBackend) func(c *fiber.Ctx) error 
 		}
 		defer f.Close()
 
-		if err := backend.Upload(name, file.Filename, f); err != nil {
+		if _, err := backend.Upload(name, file.Filename, f); err != nil {
 			if status := collectionErrStatus(err, name); status == fiber.StatusNotFound {
 				return c.Status(status).JSON(collectionsErrorResponse(errCodeNotFound, "Collection not found", fmt.Sprintf("Collection '%s' does not exist", name)))
 			}

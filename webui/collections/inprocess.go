@@ -64,28 +64,28 @@ func (b *backendInProcess) CreateCollection(name string) error {
 	return nil
 }
 
-func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reader) error {
+func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reader) (string, error) {
 	b.state.Mu.RLock()
 	kb, exists := b.state.Collections[collection]
 	b.state.Mu.RUnlock()
 	if !exists {
-		return fmt.Errorf("collection not found: %s", collection)
+		return "", fmt.Errorf("collection not found: %s", collection)
 	}
 	// Write to a temp file; kb.Store will copy it into the correct UUID
 	// subdirectory under the collection's asset dir.
 	tmpDir, err := os.MkdirTemp("", "localagi-upload")
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer os.RemoveAll(tmpDir)
 	tmpPath := filepath.Join(tmpDir, filename)
 	out, err := os.Create(tmpPath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := io.Copy(out, fileBody); err != nil {
 		out.Close()
-		return err
+		return "", err
 	}
 	out.Close()
 	now := time.Now().Format(time.RFC3339)
@@ -99,12 +99,7 @@ func (b *backendInProcess) ListEntries(collection string) ([]string, error) {
 	if !exists {
 		return nil, fmt.Errorf("collection not found: %s", collection)
 	}
-	keys := kb.ListDocuments()
-	entries := make([]string, len(keys))
-	for i, k := range keys {
-		entries[i] = filepath.Base(k)
-	}
-	return entries, nil
+	return kb.ListDocuments(), nil
 }
 
 func (b *backendInProcess) GetEntryContent(collection, entry string) (string, int, error) {
@@ -172,11 +167,7 @@ func (b *backendInProcess) DeleteEntry(collection, entry string) ([]string, erro
 		return nil, err
 	}
 	keys := kb.ListDocuments()
-	entries := make([]string, len(keys))
-	for i, k := range keys {
-		entries[i] = filepath.Base(k)
-	}
-	return entries, nil
+	return keys, nil
 }
 
 func (b *backendInProcess) AddSource(collection, url string, intervalMin int) error {
