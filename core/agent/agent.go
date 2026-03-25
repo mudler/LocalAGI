@@ -182,7 +182,6 @@ func (a *Agent) SharedState() *types.AgentSharedState {
 
 // SetStreamCallback sets (or replaces) the stream callback on a live agent.
 // This allows callers to wire streaming events after agent creation,
-// e.g. in distributed mode where the callback routes to NATS.
 func (a *Agent) SetStreamCallback(fn func(cogito.StreamEvent)) {
 	a.options.streamCallback = fn
 }
@@ -254,7 +253,7 @@ func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 // AskDirect executes a job synchronously without requiring Run() to be active.
 // Unlike Ask/Execute which enqueue to the internal jobQueue (consumed by Run()),
 // AskDirect calls consumeJob directly. This enables stateless execution where
-// the caller manages the event loop (e.g., NATS-based distributed execution).
+// the caller manages the event loop
 func (a *Agent) AskDirect(opts ...types.JobOption) *types.JobResult {
 	xlog.Debug("Agent AskDirect()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
 	defer func() {
@@ -1063,6 +1062,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			if s == "" {
 				return
 			}
+			// Forward reasoning to stream callback
+			if a.options.streamCallback != nil {
+				a.options.streamCallback(cogito.StreamEvent{
+					Type:    cogito.StreamEventReasoning,
+					Content: s,
+				})
+			}
 			if a.observer != nil && job.Obs != nil {
 				job.Obs.AddProgress(
 					types.Progress{
@@ -1152,6 +1158,19 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					return cogito.ToolCallDecision{
 						Approved: false,
 					}
+				}
+
+				// Forward tool selection to stream callback
+				if a.options.streamCallback != nil {
+					toolName := tc.Name
+					if chosenAction != nil {
+						toolName = chosenAction.Definition().Name.String()
+					}
+					a.options.streamCallback(cogito.StreamEvent{
+						Type:     cogito.StreamEventToolCall,
+						ToolName: toolName,
+						ToolArgs: fmt.Sprintf("%v", tc.Arguments),
+					})
 				}
 
 				if a.observer != nil && job.Obs != nil {
