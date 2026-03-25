@@ -180,6 +180,13 @@ func (a *Agent) SharedState() *types.AgentSharedState {
 	return a.sharedState
 }
 
+// StartConversationConsumer starts the goroutine that dispatches new conversation
+// messages to subscribers. This must be called when using AskDirect() without Run(),
+// otherwise the ConversationAction handler will deadlock on the newConversations channel.
+func (a *Agent) StartConversationConsumer() {
+	a.startNewConversationsConsumer()
+}
+
 func (a *Agent) startNewConversationsConsumer() {
 	go func() {
 		for {

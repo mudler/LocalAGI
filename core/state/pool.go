@@ -856,6 +856,10 @@ func (a *AgentPool) createAgentWithoutRun(name, pooldir string, config *AgentCon
 	a.agents[name] = agent
 	a.managers[name] = manager
 
+	// Start the conversation consumer so ConversationAction doesn't deadlock.
+	// This is normally started by Run(), but we skip Run() in distributed mode.
+	agent.StartConversationConsumer()
+
 	xlog.Info("Agent created (no Run)", "name", name)
 	return nil
 }
