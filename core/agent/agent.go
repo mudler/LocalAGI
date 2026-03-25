@@ -180,6 +180,13 @@ func (a *Agent) SharedState() *types.AgentSharedState {
 	return a.sharedState
 }
 
+// SetStreamCallback sets (or replaces) the stream callback on a live agent.
+// This allows callers to wire streaming events after agent creation,
+// e.g. in distributed mode where the callback routes to NATS.
+func (a *Agent) SetStreamCallback(fn func(cogito.StreamEvent)) {
+	a.options.streamCallback = fn
+}
+
 // StartConversationConsumer starts the goroutine that dispatches new conversation
 // messages to subscribers. This must be called when using AskDirect() without Run(),
 // otherwise the ConversationAction handler will deadlock on the newConversations channel.
