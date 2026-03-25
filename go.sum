@@ -305,6 +305,8 @@ github.com/mudler/cogito v0.9.5-0.20260315222927-63abdec7189b h1:A74T2Lauvg61Kod
 github.com/mudler/cogito v0.9.5-0.20260315222927-63abdec7189b/go.mod h1:6sfja3lcu2nWRzEc0wwqGNu/eCG3EWgij+8s7xyUeQ4=
 github.com/mudler/localrecall v0.5.9-0.20260321003356-422f3b1fff45 h1:+zTrbYk70wHrtvpsO2k7gMPvHYnWYCnXNxAtMex+7yg=
 github.com/mudler/localrecall v0.5.9-0.20260321003356-422f3b1fff45/go.mod h1:/d2bG9H8G/HzsnXTTQl2bOD+ui74XwpeiSDJ+2gdkGc=
+github.com/mudler/localrecall v0.5.9-0.20260321005011-810084e9369b h1:XeAnOEOOSKMfS5XNGpRTltQgjKCinho0V4uAhrgxN7Q=
+github.com/mudler/localrecall v0.5.9-0.20260321005011-810084e9369b/go.mod h1:xuPtgL9zUyiQLmspYzO3kaboYrGbWmwi8BQPt1aCAcs=
 github.com/mudler/skillserver v0.0.5-0.20260221145827-0639a82c8f49 h1:dAF1ALXqqapRZo80x56BIBBcPrPbRNerbd66rdyO8J4=
 github.com/mudler/skillserver v0.0.5-0.20260221145827-0639a82c8f49/go.mod h1:z3yFhcL9bSykmmh6xgGu0hyoItd4CnxgtWMEWw8uFJU=
 github.com/mudler/xlog v0.0.5 h1:2unBuVC5rNGhCC86UaA94TElWFml80NL5XLK+kAmNuU=

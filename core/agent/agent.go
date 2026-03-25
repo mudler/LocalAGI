@@ -237,6 +237,84 @@ func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 	))
 }
 
+// AskDirect executes a job synchronously without requiring Run() to be active.
+// Unlike Ask/Execute which enqueue to the internal jobQueue (consumed by Run()),
+// AskDirect calls consumeJob directly. This enables stateless execution where
+// the caller manages the event loop (e.g., NATS-based distributed execution).
+func (a *Agent) AskDirect(opts ...types.JobOption) *types.JobResult {
+	xlog.Debug("Agent AskDirect()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
+	defer func() {
+		xlog.Debug("Agent AskDirect finished", "agent", a.Character.Name)
+	}()
+
+	j := types.NewJob(
+		append(
+			opts,
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)...,
+	)
+
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "job"
+		obs.Icon = "plug"
+		a.observer.Update(*obs)
+		j.Obs = obs
+
+		if len(j.ConversationHistory) > 0 {
+			m := j.ConversationHistory[len(j.ConversationHistory)-1]
+			j.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
+			a.observer.Update(*j.Obs)
+		}
+
+		j.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
+			if a.observer == nil {
+				return
+			}
+			if j.Obs.Completion == nil {
+				j.Obs.Completion = &types.Completion{}
+			}
+			j.Obs.Completion.Conversation = ccm
+			if j.Result.Error != nil {
+				j.Obs.Completion.Error = j.Result.Error.Error()
+			}
+			a.observer.Update(*j.Obs)
+		})
+	}
+
+	a.consumeJob(j, UserRole)
+	return j.Result
+}
+
+// AskDirectSystem is like AskDirect but executes with SystemRole,
+// used for periodic autonomous runs and scheduled tasks.
+func (a *Agent) AskDirectSystem(opts ...types.JobOption) *types.JobResult {
+	xlog.Debug("Agent AskDirectSystem()", "agent", a.Character.Name)
+	defer func() {
+		xlog.Debug("Agent AskDirectSystem finished", "agent", a.Character.Name)
+	}()
+
+	j := types.NewJob(
+		append(
+			opts,
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)...,
+	)
+
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "standalone"
+		obs.Icon = "clock"
+		a.observer.Update(*obs)
+		j.Obs = obs
+	}
+
+	a.consumeJob(j, SystemRole)
+	return j.Result
+}
+
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Execute(j *types.Job) *types.JobResult {
