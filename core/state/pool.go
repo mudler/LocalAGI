@@ -755,6 +755,111 @@ func (a *AgentPool) Start(name string) error {
 	return fmt.Errorf("agent %s not found", name)
 }
 
+// CreateOnly creates the agent instance without calling Run().
+// This is used in distributed mode where the agent is executed statelessly
+// via AskDirect() — the persistent Run() loop is not needed.
+func (a *AgentPool) CreateOnly(name string) error {
+	a.Lock()
+	defer a.Unlock()
+	if _, ok := a.agents[name]; ok {
+		return nil // already created
+	}
+	if config, ok := a.pool[name]; ok {
+		return a.createAgentWithoutRun(name, a.pooldir, &config)
+	}
+	return fmt.Errorf("agent %s not found", name)
+}
+
+// createAgentWithoutRun is like startAgentWithConfig but skips Run(), connectors, and HUD.
+func (a *AgentPool) createAgentWithoutRun(name, pooldir string, config *AgentConfig) error {
+	var manager sseLib.Manager
+	if m, ok := a.managers[name]; ok {
+		manager = m
+	} else {
+		manager = sseLib.NewManager(5)
+	}
+	ctx := context.Background()
+	model := a.defaultModel
+	multimodalModel := a.defaultMultimodalModel
+	transcriptionModel := a.defaultTranscriptionModel
+	transcriptionLanguage := a.defaultTranscriptionLanguage
+	ttsModel := a.defaultTTSModel
+
+	if config.MultimodalModel != "" {
+		multimodalModel = config.MultimodalModel
+	}
+	if config.TranscriptionModel != "" {
+		transcriptionModel = config.TranscriptionModel
+	}
+	if config.TranscriptionLanguage != "" {
+		transcriptionLanguage = config.TranscriptionLanguage
+	}
+	if config.TTSModel != "" {
+		ttsModel = config.TTSModel
+	}
+	if config.Model != "" {
+		model = config.Model
+	} else {
+		config.Model = model
+	}
+
+	effectiveAPIURL := a.apiURL
+	if config.APIURL != "" {
+		effectiveAPIURL = config.APIURL
+	} else {
+		config.APIURL = a.apiURL
+	}
+	effectiveAPIKey := a.apiKey
+	if config.APIKey != "" {
+		effectiveAPIKey = config.APIKey
+	} else {
+		config.APIKey = a.apiKey
+	}
+
+	promptBlocks := a.dynamicPrompt(config)(ctx, a)
+	if a.skillsService != nil && config.EnableSkills {
+		if prompt, err := a.skillsService.GetSkillsPrompt(config); err == nil && prompt != nil {
+			promptBlocks = append(promptBlocks, prompt)
+		}
+	}
+	actions := a.availableActions(config)(ctx, a)
+	stateFile, characterFile := a.stateFiles(name)
+
+	obs := NewSSEObserver(name, manager)
+
+	opts := []Option{
+		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
+		WithModel(model),
+		WithLLMAPIURL(effectiveAPIURL),
+		WithContext(ctx),
+		WithTranscriptionModel(transcriptionModel),
+		WithTranscriptionLanguage(transcriptionLanguage),
+		WithTTSModel(ttsModel),
+		WithPrompts(promptBlocks...),
+		WithActions(actions...),
+		WithObserver(obs),
+		WithMultimodalModel(multimodalModel),
+		WithCharacterFile(characterFile),
+		WithStateFile(stateFile),
+		WithSystemPrompt(config.SystemPrompt),
+	}
+	if effectiveAPIKey != "" {
+		opts = append(opts, WithLLMAPIKey(effectiveAPIKey))
+	}
+	xlog.Info("Creating agent (no Run)", "name", name, "model", model, "api_url", effectiveAPIURL)
+
+	agent, err := New(opts...)
+	if err != nil {
+		return err
+	}
+
+	a.agents[name] = agent
+	a.managers[name] = manager
+
+	xlog.Info("Agent created (no Run)", "name", name)
+	return nil
+}
+
 func (a *AgentPool) stateFiles(name string) (string, string) {
 	stateFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.state.json", name))
 	characterFile := filepath.Join(a.pooldir, fmt.Sprintf("%s.character.json", name))
