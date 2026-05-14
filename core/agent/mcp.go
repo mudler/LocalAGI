@@ -139,42 +139,17 @@ func newBearerTokenRoundTripper(token string, base http.RoundTripper) http.Round
 func (a *Agent) initMCPActions() error {
 	a.closeMCPServers() // Make sure we stop all previous servers if any is active
 
-	a.mcpActionDefinitions = nil
 	var err error
 
-	generatedActions := types.Actions{}
-	client := mcp.NewClient(&mcp.Implementation{Name: "LocalAI", Version: "v1.0.0"}, nil)
-
-	// Connect to a server over stdin/stdout.
+	client := a.mcpClient
 
 	// MCP HTTP Servers
-	for _, mcpServer := range a.options.mcpServers {
-		// Create HTTP client with custom roundtripper for bearer token injection
-		httpclient := &http.Client{
-			Timeout:   360 * time.Second,
-			Transport: newBearerTokenRoundTripper(mcpServer.Token, http.DefaultTransport),
-		}
-
-		streamableTransport := &mcp.StreamableClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
-		session, err := client.Connect(a.context, streamableTransport, nil)
+	for i := range a.options.mcpServers {
+		mcpServer := &a.options.mcpServers[i]
+		err := a.startStreamableClientTransport(mcpServer, client)
 		if err != nil {
-			xlog.Error("Failed to connect to MCP server via StreamableClientTransport", "server", mcpServer, "error", err.Error())
-
-			sseTransport := &mcp.SSEClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
-			session, err = client.Connect(a.context, sseTransport, nil)
-			if err != nil {
-				xlog.Error("Failed to connect to MCP server via SSEClientTransport", "server", mcpServer, "error", err.Error())
-				continue
-			}
+			xlog.Error("Failed to start MCP session", "server", mcpServer, "error", err.Error())
 		}
-		a.mcpSessions = append(a.mcpSessions, session)
-
-		xlog.Debug("Adding tools for MCP server", "server", mcpServer)
-		actions, err := a.addTools(session)
-		if err != nil {
-			xlog.Error("Failed to add tools for MCP server", "server", mcpServer, "error", err.Error())
-		}
-		generatedActions = append(generatedActions, actions...)
 	}
 
 	// MCP STDIO Servers
@@ -201,44 +176,108 @@ func (a *Agent) initMCPActions() error {
 			xlog.Error("Failed to connect to MCP server", "server", mcpStdioServer, "error", err.Error())
 			continue
 		}
-		a.mcpSessions = append(a.mcpSessions, session)
 
 		xlog.Debug("Adding tools for MCP server (stdio)", "server", mcpStdioServer)
 		actions, err := a.addTools(session)
 		if err != nil {
+			session.Close()
 			xlog.Error("Failed to add tools for MCP server", "server", mcpStdioServer, "error", err.Error())
+			continue
 		}
-		generatedActions = append(generatedActions, actions...)
+		a.mcpSessions = append(a.mcpSessions, session)
+		a.mcpSessionActions[session] = actions
 	}
 
-	// Pre-connected MCP sessions (e.g. in-process skills server); already in a.mcpSessions after closeMCPServers()
 	for _, session := range a.options.extraMCPSessions {
 		actions, err := a.addTools(session)
 		if err != nil {
 			xlog.Error("Failed to add tools for extra MCP session", "error", err.Error())
 			continue
 		}
-		a.mcpSessions = append(a.mcpSessions, session)
-		generatedActions = append(generatedActions, actions...)
+		// Pre-connected sessions are not added to mcpSessions because Agent doesn't manage their lifecycle - but we still want to add their actions
+		a.mcpSessionActions[session] = actions
 	}
-
-	a.mcpActionDefinitions = generatedActions
 
 	return err
 }
 
 func (a *Agent) closeMCPServers() {
-	extraSet := make(map[*mcp.ClientSession]bool)
-	for _, e := range a.options.extraMCPSessions {
-		extraSet[e] = true
+	for _, session := range a.mcpSessions {
+		session.Close()
 	}
-	var keep []*mcp.ClientSession
-	for _, s := range a.mcpSessions {
-		if extraSet[s] {
-			keep = append(keep, s)
+
+	clear(a.mcpSessionActions)
+	clear(a.mcpSessions)
+	clear(a.mcpServerSessions)
+}
+
+func (a *Agent) startStreamableClientTransport(mcpServer *MCPServer, client *mcp.Client) error {
+	// Create HTTP client with custom roundtripper for bearer token injection
+	httpclient := &http.Client{
+		Timeout:   360 * time.Second,
+		Transport: newBearerTokenRoundTripper(mcpServer.Token, http.DefaultTransport),
+	}
+
+	xlog.Debug("Connecting to MCP server", "server", mcpServer)
+	streamableTransport := &mcp.StreamableClientTransport{HTTPClient: httpclient, Endpoint: mcpServer.URL}
+	session, err := client.Connect(a.context, streamableTransport, nil)
+	if err != nil {
+		xlog.Error("Failed to connect to MCP server", "server", mcpServer.URL, "error", err.Error())
+		return fmt.Errorf("Failed to connect to MCP server: %w", err)
+	}
+
+	xlog.Debug("Adding tools for MCP server", "server", mcpServer)
+	actions, err := a.addTools(session)
+	if err != nil {
+		session.Close()
+		xlog.Error("Failed to add tools for MCP server", "server", mcpServer, "error", err.Error())
+		return fmt.Errorf("Failed to add tools for MCP server: %w", err)
+	}
+
+	a.mcpSessions = append(a.mcpSessions, session)
+	a.mcpSessionActions[session] = actions
+	a.mcpServerSessions[mcpServer] = session
+	return nil
+}
+
+func (a *Agent) closeStreamableClientTransport(mcpServer *MCPServer) {
+	if session, ok := a.mcpServerSessions[mcpServer]; ok {
+		xlog.Debug("Closing MCP server session", "server", mcpServer.URL)
+		session.Close()
+		delete(a.mcpServerSessions, mcpServer)
+		delete(a.mcpSessionActions, session)
+
+		var newSessions []*mcp.ClientSession
+		for _, s := range a.mcpSessions {
+			if s != session {
+				newSessions = append(newSessions, s)
+			}
+		}
+		a.mcpSessions = newSessions
+	} else {
+		xlog.Warn("No session found for MCP server during close", "server", mcpServer.URL)
+	}
+}
+
+func (a *Agent) mcpStreamableClientHealthCheck() {
+	for i := range a.options.mcpServers {
+		mcpServer := &a.options.mcpServers[i]
+		if session, ok := a.mcpServerSessions[mcpServer]; ok {
+			err := session.Ping(a.context, &mcp.PingParams{})
+			if err != nil {
+				xlog.Warn("Error pinging MCP server, will reconnect", "server", mcpServer.URL, "error", err)
+				a.closeStreamableClientTransport(mcpServer)
+				err := a.startStreamableClientTransport(mcpServer, a.mcpClient)
+				if err != nil {
+					xlog.Error("Failed to reconnect MCP server", "server", mcpServer, "error", err.Error())
+				}
+			}
 		} else {
-			s.Close()
+			xlog.Warn("No session found for MCP server during health check, will try to connect", "server", mcpServer.URL)
+			err := a.startStreamableClientTransport(mcpServer, a.mcpClient)
+			if err != nil {
+				xlog.Error("Failed to connect MCP server", "server", mcpServer, "error", err.Error())
+			}
 		}
 	}
-	a.mcpSessions = keep
 }
