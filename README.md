@@ -239,7 +239,8 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_BASE_URL` | Optional base URL for the app (only relevant when using an external LocalRAG URL; not used for built-in knowledge base) |
+| `LOCALAGI_LOCALRAG_URL` | Optional URL when using an external LocalRAG URL; not used for built-in knowledge base |
+| `LOCALAGI_BASE_URL` | Optional base URL for the app (defaults to ":3000") |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
@@ -1049,7 +1050,8 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_BASE_URL` | Optional base URL for built-in knowledge base (default `http://localhost:3000`) |
+| `LOCALAGI_LOCALRAG_URL` | Optional URL when using an external LocalRAG URL; not used for built-in knowledge base |
+| `LOCALAGI_BASE_URL` | Optional base URL for the app (defaults to ":3000") |
 | `LOCALAGI_SSHBOX_URL` | LocalAGI SSHBox URL, e.g. user:pass@ip:port |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |

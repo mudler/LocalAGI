@@ -123,6 +123,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	log.Fatal(app.Listen(":3000"))
+	log.Fatal(app.Listen(env.LocalAGIURL))
 	return nil
 }
