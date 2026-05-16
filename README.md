@@ -26,6 +26,10 @@ Are you tired of AI wrappers calling out to cloud APIs, risking your privacy? So
 
 LocalAGI ensures your data stays exactly where you want it—on your hardware. No API keys, no cloud subscriptions, no compromise.
 
+## ❓ FAQ
+
+For common questions about LocalAGI, installation, models, and troubleshooting, see the [FAQ documentation](./docs/FAQ.md).
+
 ## 🌟 Key Features
 
 - 🎛 **No-Code Agents**: Easy-to-configure multiple agents via Web UI.
