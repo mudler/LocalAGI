@@ -18,7 +18,7 @@ require (
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/modelcontextprotocol/go-sdk v1.2.0
 	github.com/mudler/cogito v0.9.5-0.20260315222927-63abdec7189b
-	github.com/mudler/localrecall v0.6.3-0.20260606070048-9a3b3321a9cd
+	github.com/mudler/localrecall v0.6.3-0.20260618142827-d0073dd5dc32
 	github.com/mudler/skillserver v0.0.5-0.20260221145827-0639a82c8f49
 	github.com/mudler/xlog v0.0.5
 	github.com/onsi/ginkgo/v2 v2.28.1
