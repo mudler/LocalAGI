@@ -1,0 +1,27 @@
+{
+  "colony_id": "localagi",
+  "colony_name": "LocalAGI",
+  "role": "colony",
+  "archetype": "body",
+  "layer": 3,
+  "entity": "BODY (The Swarm)",
+  "description": "Self-hostable AI agent platform — the physical executor and workflow engine of the hive",
+  "hive": "sovereign-hive",
+  "queen": "https://github.com/TehutiRaEl/-sovereign-hive-meta",
+  "repo": "https://github.com/TehutiRaEl/LocalAGI",
+  "guilds": ["swarm", "workflow", "agent"],
+  "health_endpoint": "/colony/health",
+  "manifest_endpoint": "/colony/manifest",
+  "agents": ["task-executor", "skill-manager", "knowledge-agent", "integration-agent"],
+  "capabilities": ["agent-orchestration", "skill-lifecycle", "rag-knowledge", "mcp-support", "local-llm"],
+  "stack": "Go",
+  "mission": "BODY of the Trinity — enacts, executes, embodies decisions. Your AI. Your Hardware. Your Rules.",
+  "constitution_version": "2.0.0",
+  "soul_source": "https://raw.githubusercontent.com/TehutiRaEl/-sovereign-hive-meta/main/soul.md",
+  "hierarchy": {
+    "born": "first",
+    "trinity_role": "body",
+    "kemetic_analog": "Ptah",
+    "offline_state": "more efficient, more direct, less dilution"
+  }
+}

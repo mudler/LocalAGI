@@ -17,6 +17,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/pkg/colony"
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/xlog"
@@ -225,6 +226,8 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		app.collectionsState = state
 	}
 	app.RegisterCollectionRoutes(webapp, app.config, collectionsBackend)
+
+	colony.RegisterFiberRoutes(webapp)
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

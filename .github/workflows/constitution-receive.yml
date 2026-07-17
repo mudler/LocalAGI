@@ -1,0 +1,59 @@
+name: Constitution Receive
+
+# Pulls the canonical constitution from the Queen when she announces a
+# change. The Queen is THEHIVE: its root soul.md is the source of truth,
+# dispatched by THEHIVE/.github/workflows/constitution-sync.yml.
+# (Previous version pointed at a Queen repo that was never created.)
+
+on:
+  repository_dispatch:
+    types: [constitution_update]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-constitution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Download soul.md from Queen (THEHIVE) with backoff
+        run: |
+          QUEEN_URL="https://raw.githubusercontent.com/TehutiRaEl/THEHIVE/main/soul.md"
+          DELAY=2
+          for attempt in 1 2 3 4 5; do
+            if curl -fsSL "$QUEEN_URL" -o /tmp/soul_new.md; then
+              echo "Downloaded on attempt $attempt"
+              break
+            fi
+            [ "$attempt" = 5 ] && { echo "Queen unreachable after 5 attempts"; exit 1; }
+            sleep $DELAY; DELAY=$((DELAY * 2))
+          done
+
+      - name: Verify hash against dispatch payload
+        if: github.event_name == 'repository_dispatch'
+        run: |
+          expected="${{ github.event.client_payload.soul_md_hash }}"
+          actual=$(sha256sum /tmp/soul_new.md | cut -d' ' -f1)
+          if [ -n "$expected" ] && [ "$expected" != "$actual" ]; then
+            echo "Hash mismatch! Queen announced $expected, downloaded $actual"
+            exit 1
+          fi
+          echo "Hash verified: $actual"
+
+      - name: Commit if changed
+        run: |
+          if [ ! -f soul.md ] || ! diff -q /tmp/soul_new.md soul.md > /dev/null 2>&1; then
+            cp /tmp/soul_new.md soul.md
+            git config user.name "hive-bot"
+            git config user.email "hive-bot@sovereign-hive"
+            git add soul.md
+            git commit -m "chore: sync constitution from Queen THEHIVE [skip ci]"
+            git push
+          else
+            echo "Constitution already up to date"
+          fi

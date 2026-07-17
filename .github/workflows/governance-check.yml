@@ -1,0 +1,30 @@
+name: Governance Advisory Check
+on:
+  pull_request:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  advisory:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: "Check PR title for [ROLE: ...] tag"
+        run: |
+          MSG="${{ github.event.pull_request.title }}"
+          if ! echo "$MSG" | grep -qE '\[ROLE: [^]]+\]'; then
+            echo "::warning::PR title is missing a [ROLE: <Role Title>] tag. See docs/GOVERNANCE.md."
+          fi
+      - name: Scan for likely secrets (shaped strings, not bare words)
+        run: |
+          git diff "origin/${{ github.base_ref }}...HEAD" -- . | grep -nE '(api[_-]?key|secret|token)["\x27]?\s*[:=]\s*["\x27][A-Za-z0-9_-]{16,}["\x27]' && \
+            echo "::warning::Possible secret-shaped value in diff. Please verify nothing sensitive was committed." || true
+      - name: Flag code changes without doc updates
+        run: |
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if echo "$CHANGED" | grep -qE '\.go$' && ! echo "$CHANGED" | grep -qE '(docs/|README|\.md$)'; then
+            echo "::warning::Code changed with no docs/README update. Confirm this is intentional."
+          fi
+          exit 0

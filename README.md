@@ -1,3 +1,11 @@
+<!--
+  Sovereign Hive Colony | colony_id: localagi | role: colony | archetype: body
+  layer: 3 (BODY — The Swarm) | entity: BODY (The Swarm) | guilds: swarm, workflow, agent
+  Queen: THEHIVE :8080 | Port: 8080 | constitution: soul.md
+-->
+
+> **Sovereign Hive** — Body colony (The Swarm) · Layer 3 · Port 8080 · [Colony Endpoints](#hive-integration)
+
 <p align="center">
   <img src="./webui/react-ui/public/logo_1.png" alt="LocalAGI Logo" width="220"/>
 </p>
