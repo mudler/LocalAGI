@@ -28,8 +28,13 @@ type telegramRichMessageDraft struct {
 }
 
 type telegramRichMessage struct {
-	ChatID      int64                    `json:"chat_id"`
-	RichMessage telegramInputRichMessage `json:"rich_message"`
+	ChatID          int64                    `json:"chat_id"`
+	RichMessage     telegramInputRichMessage `json:"rich_message"`
+	ReplyParameters *telegramReplyParameters `json:"reply_parameters,omitempty"`
+}
+
+type telegramReplyParameters struct {
+	MessageID int `json:"message_id"`
 }
 
 type telegramAPIError struct {

@@ -27,6 +27,15 @@ func TestTelegramFormatMarkdownV2(t *testing.T) {
 	}
 }
 
+func TestTelegramFormatMarkdownV2PreservesInlineCode(t *testing.T) {
+	t.Parallel()
+	got := telegramMarkdownV2("Use `a\\b` and `x` now.")
+	want := "Use `a\\\\b` and `x` now\\."
+	if got != want {
+		t.Fatalf("telegramMarkdownV2() = %q, want %q", got, want)
+	}
+}
+
 func TestTelegramFormatPlainText(t *testing.T) {
 	t.Parallel()
 

@@ -433,3 +433,31 @@ func TestTelegramStreamLongPrivateFinalFallsBackWithoutLosingOrReorderingChunks(
 		t.Fatalf("plain fallback chunks lost or reordered: %#v", plainChunks)
 	}
 }
+
+func TestTelegramStreamNativeDraftHeartbeatAndClose(t *testing.T) {
+	api := &telegramStreamAPI{}
+	s := newTelegramStreamSessionWithHeartbeat(context.Background(), api, 42, true, telegramStreamDelivery{}, 20*time.Millisecond)
+	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) >= 2 })
+	drafts, _ := api.snapshot()
+	if drafts[0].DraftID != drafts[1].DraftID || drafts[0].RichMessage.Markdown != drafts[1].RichMessage.Markdown {
+		t.Fatalf("heartbeats changed draft: %#v", drafts[:2])
+	}
+	s.Close()
+	n := len(drafts)
+	time.Sleep(50 * time.Millisecond)
+	after, _ := api.snapshot()
+	if len(after) != n {
+		t.Fatalf("heartbeat continued after close: %d -> %d", n, len(after))
+	}
+}
+
+func TestTelegramStreamGroupDoesNotHeartbeat(t *testing.T) {
+	var calls atomic.Int32
+	s := newTelegramStreamSessionWithHeartbeat(context.Background(), &telegramStreamAPI{}, -1, false, telegramStreamDelivery{editPreview: func(context.Context, int64, string) error { calls.Add(1); return nil }}, 20*time.Millisecond)
+	defer s.Close()
+	waitTelegramStream(t, func() bool { return calls.Load() == 1 })
+	time.Sleep(60 * time.Millisecond)
+	if calls.Load() != 1 {
+		t.Fatalf("group heartbeat calls = %d", calls.Load())
+	}
+}

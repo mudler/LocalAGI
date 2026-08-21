@@ -2,7 +2,11 @@ package connectors
 
 import (
 	"context"
+	"errors"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -29,11 +33,14 @@ func TestTelegramExecutesTrackedJobIdentity(t *testing.T) {
 type recordingTelegramBot struct {
 	sends, edits []models.ParseMode
 	texts        []string
+	sendParams   []*bot.SendMessageParams
+	deleted      []int
 	nextID       int
 }
 
 func (b *recordingTelegramBot) SendMessage(_ context.Context, p *bot.SendMessageParams) (*models.Message, error) {
 	b.sends = append(b.sends, p.ParseMode)
+	b.sendParams = append(b.sendParams, p)
 	b.texts = append(b.texts, p.Text)
 	b.nextID++
 	return &models.Message{ID: b.nextID}, nil
@@ -43,8 +50,128 @@ func (b *recordingTelegramBot) EditMessageText(_ context.Context, p *bot.EditMes
 	b.texts = append(b.texts, p.Text)
 	return &models.Message{ID: p.MessageID}, nil
 }
-func (b *recordingTelegramBot) DeleteMessage(context.Context, *bot.DeleteMessageParams) (bool, error) {
+func (b *recordingTelegramBot) DeleteMessage(_ context.Context, p *bot.DeleteMessageParams) (bool, error) {
+	b.deleted = append(b.deleted, p.MessageID)
 	return true, nil
+}
+
+func TestTelegramDeliveryClearResetsPlaceholderAndFallbackSendsAfterRich(t *testing.T) {
+	tg := &Telegram{placeholders: map[string]int{}}
+	b := &recordingTelegramBot{nextID: 10}
+	d := tg.telegramDelivery(t.Context(), b, -1, 7, "job", 10)
+	if err := d.clearPreview(t.Context(), -1); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.finalMarkdown(t.Context(), -1, []string{"later"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(b.deleted) != 1 || len(b.edits) != 0 || len(b.sends) != 1 {
+		t.Fatalf("deleted/edits/sends = %v/%d/%d", b.deleted, len(b.edits), len(b.sends))
+	}
+	if b.sendParams[0].ReplyParameters == nil || b.sendParams[0].ReplyParameters.MessageID != 7 {
+		t.Fatalf("fallback reply = %#v", b.sendParams[0].ReplyParameters)
+	}
+	if b.sendParams[0].LinkPreviewOptions == nil || b.sendParams[0].LinkPreviewOptions.IsDisabled == nil || !*b.sendParams[0].LinkPreviewOptions.IsDisabled {
+		t.Fatalf("link previews not disabled: %#v", b.sendParams[0])
+	}
+}
+
+func TestTelegramStreamingJobUsesTrackedJobContext(t *testing.T) {
+	api := &telegramStreamAPI{}
+	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
+	if session.parentCtx != job.GetContext() {
+		t.Fatal("session does not use tracked job context")
+	}
+	job.Cancel()
+	select {
+	case <-session.done:
+	case <-time.After(time.Second):
+		t.Fatal("job cancellation did not stop session")
+	}
+}
+
+type cancellingTelegramAPI struct{ started chan struct{} }
+
+func (a *cancellingTelegramAPI) sendRichMessageDraft(ctx context.Context, _ telegramRichMessageDraft) error {
+	close(a.started)
+	<-ctx.Done()
+	return ctx.Err()
+}
+func (*cancellingTelegramAPI) sendRichMessage(context.Context, telegramRichMessage) error { return nil }
+
+func TestTelegramTrackedJobCancellationAbortsInflightDraftRequest(t *testing.T) {
+	api := &cancellingTelegramAPI{started: make(chan struct{})}
+	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
+	select {
+	case <-api.started:
+	case <-time.After(time.Second):
+		t.Fatal("draft request did not start")
+	}
+	job.Cancel()
+	select {
+	case <-session.done:
+	case <-time.After(time.Second):
+		t.Fatal("in-flight request was not cancelled")
+	}
+}
+
+type orderedTelegramAPI struct {
+	mu     sync.Mutex
+	events *[]string
+	calls  int
+}
+
+func (*orderedTelegramAPI) sendRichMessageDraft(context.Context, telegramRichMessageDraft) error {
+	return nil
+}
+func (a *orderedTelegramAPI) sendRichMessage(_ context.Context, m telegramRichMessage) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.calls++
+	*a.events = append(*a.events, "rich:"+m.RichMessage.Markdown)
+	if a.calls == 2 {
+		return errors.New("rejected")
+	}
+	return nil
+}
+
+type orderedTelegramBot struct {
+	recordingTelegramBot
+	events *[]string
+}
+
+func (b *orderedTelegramBot) SendMessage(ctx context.Context, p *bot.SendMessageParams) (*models.Message, error) {
+	*b.events = append(*b.events, "send:"+p.Text)
+	return b.recordingTelegramBot.SendMessage(ctx, p)
+}
+func (b *orderedTelegramBot) DeleteMessage(ctx context.Context, p *bot.DeleteMessageParams) (bool, error) {
+	*b.events = append(*b.events, "delete")
+	return b.recordingTelegramBot.DeleteMessage(ctx, p)
+}
+
+func TestTelegramMixedRichFallbackUsesRealDeliveryInOrder(t *testing.T) {
+	var events []string
+	tg := &Telegram{placeholders: map[string]int{"job": 10}}
+	b := &orderedTelegramBot{recordingTelegramBot: recordingTelegramBot{nextID: 10}, events: &events}
+	delivery := tg.telegramDelivery(t.Context(), b, -1, 7, "job", 10)
+	api := &orderedTelegramAPI{events: &events}
+	s := telegramFinalSession(t.Context(), api, -1, false, delivery)
+	answer := strings.Repeat("a", telegramMaxMessageLength) + "second"
+	if err := s.deliverFinal(answer, nil); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"delete", "rich:" + strings.Repeat("a", telegramMaxMessageLength), "rich:second", "send:second"}
+	if len(events) != len(want) {
+		t.Fatalf("events = %#v, want %#v", events, want)
+	}
+	for i := range want {
+		if events[i] != want[i] {
+			t.Fatalf("events = %#v, want %#v", events, want)
+		}
+	}
+	if len(b.edits) != 0 {
+		t.Fatalf("fallback edited old placeholder: %#v", b.edits)
+	}
 }
 
 func TestTelegramDeliveryCreatesLazyPlaceholderWithoutIdenticalEditAndUsesMarkdownV2(t *testing.T) {

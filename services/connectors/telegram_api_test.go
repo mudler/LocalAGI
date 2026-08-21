@@ -69,7 +69,8 @@ func TestTelegramAPISendsRichMessageWithoutLinkPreviewField(t *testing.T) {
 			t.Errorf("payload unexpectedly contains link_preview_options: %#v", payload)
 		}
 		want := map[string]any{
-			"chat_id": float64(-1001),
+			"chat_id":          float64(-1001),
+			"reply_parameters": map[string]any{"message_id": float64(55)},
 			"rich_message": map[string]any{
 				"markdown": "[docs](https://example.com)",
 			},
@@ -83,13 +84,33 @@ func TestTelegramAPISendsRichMessageWithoutLinkPreviewField(t *testing.T) {
 
 	api := newTelegramHTTPAPI("token", server.Client(), server.URL)
 	err := api.sendRichMessage(context.Background(), telegramRichMessage{
-		ChatID: -1001,
+		ChatID:          -1001,
+		ReplyParameters: &telegramReplyParameters{MessageID: 55},
 		RichMessage: telegramInputRichMessage{
 			Markdown: "[docs](https://example.com)",
 		},
 	})
 	if err != nil {
 		t.Fatalf("sendRichMessage() error = %v", err)
+	}
+}
+
+func TestTelegramAPIRichMessageOmitsReplyParametersWhenUnset(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := payload["reply_parameters"]; ok {
+			t.Fatalf("private payload has reply_parameters: %#v", payload)
+		}
+		_, _ = w.Write([]byte(`{"ok":true,"result":true}`))
+	}))
+	defer server.Close()
+	api := newTelegramHTTPAPI("token", server.Client(), server.URL)
+	if err := api.sendRichMessage(t.Context(), telegramRichMessage{ChatID: 1, RichMessage: telegramInputRichMessage{Markdown: "ok"}}); err != nil {
+		t.Fatal(err)
 	}
 }
 

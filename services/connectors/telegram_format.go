@@ -51,6 +51,10 @@ func telegramMarkdownV2Text(text string) string {
 		tokens = append(tokens, value)
 		return fmt.Sprintf("\x00%d\x00", len(tokens)-1)
 	}
+	inlineCodePattern := regexp.MustCompile("`([^`\\n]+)`")
+	text = inlineCodePattern.ReplaceAllStringFunc(text, func(match string) string {
+		return protect("`" + escapeTelegramCode(strings.TrimSuffix(strings.TrimPrefix(match, "`"), "`")) + "`")
+	})
 
 	text = telegramLinkPattern.ReplaceAllStringFunc(text, func(match string) string {
 		groups := telegramLinkPattern.FindStringSubmatch(match)

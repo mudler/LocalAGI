@@ -11,12 +11,14 @@ import (
 )
 
 const telegramStreamInterval = 400 * time.Millisecond
+const telegramDraftHeartbeatInterval = 25 * time.Second
 
 type telegramStreamDelivery struct {
 	editPreview   func(context.Context, int64, string) error
 	finalMarkdown func(context.Context, int64, []string) error
 	finalPlain    func(context.Context, int64, []string) error
 	clearPreview  func(context.Context, int64) error
+	replyTo       int
 }
 
 type telegramStreamCommand struct {
@@ -27,13 +29,14 @@ type telegramStreamCommand struct {
 }
 
 type telegramStreamSession struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	api      telegramAPI
-	chatID   int64
-	private  bool
-	draftID  int64
-	delivery telegramStreamDelivery
+	ctx       context.Context
+	cancel    context.CancelFunc
+	api       telegramAPI
+	chatID    int64
+	private   bool
+	parentCtx context.Context
+	draftID   int64
+	delivery  telegramStreamDelivery
 
 	mu              sync.Mutex
 	content         string
@@ -45,18 +48,24 @@ type telegramStreamSession struct {
 	wake            chan struct{}
 	command         chan telegramStreamCommand
 	done            chan struct{}
+	heartbeat       time.Duration
+	lastDraftAt     time.Time
 }
 
 var telegramDraftSequence atomic.Int64
 
 func newTelegramStreamSession(parent context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery) *telegramStreamSession {
+	return newTelegramStreamSessionWithHeartbeat(parent, api, chatID, private, delivery, telegramDraftHeartbeatInterval)
+}
+
+func newTelegramStreamSessionWithHeartbeat(parent context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery, heartbeat time.Duration) *telegramStreamSession {
 	ctx, cancel := context.WithCancel(parent)
 	draftID := telegramDraftSequence.Add(1)
 	if draftID == 0 {
 		draftID = telegramDraftSequence.Add(1)
 	}
 	s := &telegramStreamSession{
-		ctx: ctx, cancel: cancel, api: api, chatID: chatID, private: private,
+		ctx: ctx, parentCtx: parent, cancel: cancel, api: api, chatID: chatID, private: private, heartbeat: heartbeat,
 		draftID: draftID, delivery: delivery, wake: make(chan struct{}, 1),
 		command: make(chan telegramStreamCommand), done: make(chan struct{}), dirty: true, thinkingPending: true,
 	}
@@ -175,9 +184,13 @@ func (s *telegramStreamSession) run() {
 	schedulePending := func() {
 		s.mu.Lock()
 		dirty := s.dirty
+		lastDraftAt := s.lastDraftAt
 		s.mu.Unlock()
 		if !dirty {
 			finishFlushes()
+			if s.private && !lastDraftAt.IsZero() && s.heartbeat > 0 {
+				schedule(lastDraftAt.Add(s.heartbeat))
+			}
 			return
 		}
 		when := nextPreview
@@ -235,6 +248,11 @@ func (s *telegramStreamSession) run() {
 			schedulePending()
 		case <-timerC:
 			timerC = nil
+			s.mu.Lock()
+			if s.private && !s.dirty && !s.lastDraftAt.IsZero() && s.heartbeat > 0 {
+				s.dirty = true
+			}
+			s.mu.Unlock()
 			s.signal()
 		}
 	}
@@ -307,6 +325,9 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 	}
 	if err == nil {
 		s.mu.Lock()
+		if s.private {
+			s.lastDraftAt = time.Now()
+		}
 		if thinking {
 			s.thinkingPending = false
 		}
@@ -320,18 +341,24 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 
 func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) error {
 	formatted := telegramFormatResponse(markdown, urls, telegramMaxMessageLength)
+	if s.delivery.clearPreview != nil {
+		if err := s.delivery.clearPreview(s.ctx, s.chatID); err != nil {
+			return err
+		}
+	}
 	failedAt := -1
 	for i, chunk := range formatted {
-		if err := s.api.sendRichMessage(s.ctx, telegramRichMessage{ChatID: s.chatID, RichMessage: telegramInputRichMessage{Markdown: chunk}}); err == nil {
+		final := telegramRichMessage{ChatID: s.chatID, RichMessage: telegramInputRichMessage{Markdown: chunk}}
+		if !s.private && s.delivery.replyTo != 0 {
+			final.ReplyParameters = &telegramReplyParameters{MessageID: s.delivery.replyTo}
+		}
+		if err := s.api.sendRichMessage(s.ctx, final); err == nil {
 			continue
 		}
 		failedAt = i
 		break
 	}
 	if failedAt < 0 {
-		if s.delivery.clearPreview != nil {
-			return s.delivery.clearPreview(s.ctx, s.chatID)
-		}
 		return nil
 	}
 	remaining := formatted[failedAt:]
