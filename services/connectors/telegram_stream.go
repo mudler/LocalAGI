@@ -65,7 +65,6 @@ func newTelegramStreamSession(parent context.Context, api telegramAPI, chatID in
 
 func (s *telegramStreamSession) Accept(event cogito.StreamEvent) {
 	if event.Type == cogito.StreamEventDone {
-		_ = s.Flush()
 		return
 	}
 	if event.Type != cogito.StreamEventContent || event.Content == "" {
@@ -131,6 +130,7 @@ func (s *telegramStreamSession) run() {
 	var timerC <-chan time.Time
 	var nextPreview time.Time
 	var retryUntil time.Time
+	var flushWaiters []chan error
 	stopTimer := func() {
 		if timer != nil && !timer.Stop() {
 			select {
@@ -154,6 +154,32 @@ func (s *telegramStreamSession) run() {
 		timerC = timer.C
 	}
 	defer stopTimer()
+	finishFlushes := func() {
+		s.mu.Lock()
+		dirty := s.dirty
+		s.mu.Unlock()
+		if dirty {
+			return
+		}
+		for _, waiter := range flushWaiters {
+			waiter <- nil
+		}
+		flushWaiters = nil
+	}
+	schedulePending := func() {
+		s.mu.Lock()
+		dirty := s.dirty
+		s.mu.Unlock()
+		if !dirty {
+			finishFlushes()
+			return
+		}
+		when := nextPreview
+		if retryUntil.After(when) {
+			when = retryUntil
+		}
+		schedule(when)
+	}
 
 	for {
 		select {
@@ -162,12 +188,16 @@ func (s *telegramStreamSession) run() {
 		case command := <-s.command:
 			if command.kind == 1 {
 				if !time.Now().Before(retryUntil) {
-					_, retry := s.deliverPreview()
+					attempted, retry := s.deliverPreview()
+					if attempted {
+						nextPreview = time.Now().Add(telegramStreamInterval)
+					}
 					if retry > 0 {
 						retryUntil = time.Now().Add(retry)
 					}
 				}
-				command.done <- nil
+				flushWaiters = append(flushWaiters, command.done)
+				schedulePending()
 			} else {
 				command.done <- s.deliverFinal(command.markdown, command.urls)
 			}
@@ -187,8 +217,8 @@ func (s *telegramStreamSession) run() {
 			}
 			if retry > 0 {
 				retryUntil = time.Now().Add(retry)
-				schedule(retryUntil)
 			}
+			schedulePending()
 		case <-timerC:
 			timerC = nil
 			s.signal()

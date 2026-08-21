@@ -110,10 +110,13 @@ func TestTelegramStreamAlwaysDeliversThinkingBeforeImmediateContent(t *testing.T
 	defer s.Close()
 	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "immediate"})
 
-	waitTelegramStream(t, func() bool { drafts, _ := api.snapshot(); return len(drafts) == 1 })
+	waitTelegramStream(t, func() bool { drafts, _ := api.snapshot(); return len(drafts) == 2 })
 	drafts, _ := api.snapshot()
 	if got := drafts[0].RichMessage.Markdown; got != telegramThinkingMessage {
 		t.Fatalf("initial draft = %q, want thinking draft", got)
+	}
+	if got := drafts[1].RichMessage.Markdown; got != "immediate" {
+		t.Fatalf("content draft = %q, want immediate content without another event", got)
 	}
 }
 
@@ -236,6 +239,49 @@ func TestTelegramStreamFlushDeliversPendingContentBeforeReturning(t *testing.T) 
 	}
 	if got := drafts[1].RichMessage.Markdown; got != "pending answer" {
 		t.Fatalf("flushed preview = %q, want pending answer", got)
+	}
+}
+
+func TestTelegramStreamFlushWaitsForRetryAndDeliversPendingContent(t *testing.T) {
+	api := &telegramStreamAPI{draftErr: func(i int) error {
+		if i == 2 {
+			return &telegramAPIError{ErrorCode: 429, RetryAfter: 1}
+		}
+		return nil
+	}}
+	s := newTelegramStreamSession(context.Background(), api, 5, true, telegramStreamDelivery{})
+	defer s.Close()
+	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 1 })
+
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "pending after retry"})
+	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 2 })
+	if err := s.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	drafts, _ := api.snapshot()
+	if len(drafts) != 3 {
+		t.Fatalf("drafts when Flush returned = %d, want retry delivered", len(drafts))
+	}
+	if got := drafts[2].RichMessage.Markdown; got != "pending after retry" {
+		t.Fatalf("retried preview = %q, want pending content", got)
+	}
+}
+
+func TestTelegramStreamDoneEventIsNonblocking(t *testing.T) {
+	api := &telegramStreamAPI{block: 500 * time.Millisecond}
+	s := newTelegramStreamSession(context.Background(), api, 5, true, telegramStreamDelivery{})
+	defer s.Close()
+	waitTelegramStream(t, func() bool { return api.inCall.Load() == 1 })
+
+	returned := make(chan struct{})
+	go func() {
+		s.Accept(cogito.StreamEvent{Type: cogito.StreamEventDone})
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Done event blocked on stream delivery")
 	}
 }
 
