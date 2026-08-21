@@ -3,6 +3,7 @@ package connectors
 import (
 	"context"
 	"errors"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -94,6 +95,22 @@ func TestTelegramStreamPrivateUsesStableDraftAndRateLimitsSerializedCalls(t *tes
 	}
 }
 
+func TestTelegramStreamAlwaysDeliversThinkingBeforeImmediateContent(t *testing.T) {
+	previous := runtime.GOMAXPROCS(1)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
+
+	api := &telegramStreamAPI{}
+	s := newTelegramStreamSession(context.Background(), api, 42, true, telegramStreamDelivery{})
+	defer s.Close()
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "immediate"})
+
+	waitTelegramStream(t, func() bool { drafts, _ := api.snapshot(); return len(drafts) == 1 })
+	drafts, _ := api.snapshot()
+	if got := drafts[0].RichMessage.Markdown; got != telegramThinkingMessage {
+		t.Fatalf("initial draft = %q, want thinking draft", got)
+	}
+}
+
 func TestTelegramStreamRetryAfterRetainsLatestPreview(t *testing.T) {
 	api := &telegramStreamAPI{draftErr: func(i int) error {
 		if i == 2 {
@@ -171,13 +188,18 @@ func TestTelegramStreamFlushAndFinalizePromptlyBypassPreviewRetry(t *testing.T) 
 	}
 }
 
-func TestTelegramStreamCancelAndCloseStopLaterDelivery(t *testing.T) {
+func TestTelegramStreamCancelAndCloseStopPendingThrottledDelivery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	api := &telegramStreamAPI{}
 	s := newTelegramStreamSession(ctx, api, 7, true, telegramStreamDelivery{})
 	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 1 })
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "pending"})
+	time.Sleep(100 * time.Millisecond)
+	if drafts, _ := api.snapshot(); len(drafts) != 1 {
+		t.Fatalf("drafts before throttle elapsed = %d, want 1", len(drafts))
+	}
+
 	cancel()
-	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "never"})
 	s.Close()
 	drafts, _ := api.snapshot()
 	time.Sleep(500 * time.Millisecond)

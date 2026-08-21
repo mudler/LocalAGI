@@ -34,14 +34,15 @@ type telegramStreamSession struct {
 	draftID  int64
 	delivery telegramStreamDelivery
 
-	mu      sync.Mutex
-	content string
-	version uint64
-	dirty   bool
-	closed  bool
-	wake    chan struct{}
-	command chan telegramStreamCommand
-	done    chan struct{}
+	mu              sync.Mutex
+	content         string
+	version         uint64
+	dirty           bool
+	thinkingPending bool
+	closed          bool
+	wake            chan struct{}
+	command         chan telegramStreamCommand
+	done            chan struct{}
 }
 
 var telegramDraftSequence atomic.Int64
@@ -55,7 +56,7 @@ func newTelegramStreamSession(parent context.Context, api telegramAPI, chatID in
 	s := &telegramStreamSession{
 		ctx: ctx, cancel: cancel, api: api, chatID: chatID, private: private,
 		draftID: draftID, delivery: delivery, wake: make(chan struct{}, 1),
-		command: make(chan telegramStreamCommand), done: make(chan struct{}), dirty: true,
+		command: make(chan telegramStreamCommand), done: make(chan struct{}), dirty: true, thinkingPending: true,
 	}
 	go s.run()
 	s.signal()
@@ -195,21 +196,24 @@ func (s *telegramStreamSession) run() {
 	}
 }
 
-func (s *telegramStreamSession) previewSnapshot() (string, uint64, bool) {
+func (s *telegramStreamSession) previewSnapshot() (string, uint64, bool, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.dirty {
-		return "", 0, false
+		return "", 0, false, false
+	}
+	if s.thinkingPending {
+		return telegramThinkingMessage, s.version, true, true
 	}
 	text := s.content
 	if text == "" {
 		text = telegramThinkingMessage
 	}
-	return text, s.version, true
+	return text, s.version, true, false
 }
 
 func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
-	text, version, ok := s.previewSnapshot()
+	text, version, ok, thinking := s.previewSnapshot()
 	if !ok {
 		return false, 0
 	}
@@ -231,7 +235,10 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 	}
 	if err == nil {
 		s.mu.Lock()
-		if s.version == version {
+		if thinking {
+			s.thinkingPending = false
+		}
+		if s.version == version && (!thinking || version == 0) {
 			s.dirty = false
 		}
 		s.mu.Unlock()
