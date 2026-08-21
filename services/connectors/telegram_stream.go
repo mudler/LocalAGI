@@ -373,9 +373,7 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) error {
 	formatted := telegramFormatResponse(markdown, urls, telegramMaxMessageLength)
 	if s.delivery.clearPreview != nil {
-		if err := s.delivery.clearPreview(s.finalCtx, s.chatID); err != nil {
-			return err
-		}
+		_ = s.delivery.clearPreview(s.finalCtx, s.chatID)
 	}
 	failedAt := -1
 	for i, chunk := range formatted {

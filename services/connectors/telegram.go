@@ -90,10 +90,10 @@ func telegramExecuteJob(executor telegramJobExecutor, job *types.Job) *types.Job
 	return executor.Execute(job)
 }
 
-func (t *Telegram) telegramDelivery(ctx context.Context, b telegramMessageBot, chatID int64, replyTo int, jobUUID string, initialMessageID int) telegramStreamDelivery {
+func (t *Telegram) telegramDelivery(_ context.Context, b telegramMessageBot, chatID int64, replyTo int, jobUUID string, initialMessageID int) telegramStreamDelivery {
 	var mu sync.Mutex
 	messageID := initialMessageID
-	ensurePlaceholder := func(text string, mode models.ParseMode) (int, bool, error) {
+	ensurePlaceholder := func(ctx context.Context, text string, mode models.ParseMode) (int, bool, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		if messageID != 0 {
@@ -115,10 +115,10 @@ func (t *Telegram) telegramDelivery(ctx context.Context, b telegramMessageBot, c
 		t.placeholderMutex.Unlock()
 		return messageID, true, nil
 	}
-	sendChunks := func(chunks []string, mode models.ParseMode) error {
+	sendChunks := func(ctx context.Context, chunks []string, mode models.ParseMode) error {
 		for i, chunk := range chunks {
 			if i == 0 {
-				if id, created, err := ensurePlaceholder(chunk, mode); err != nil {
+				if id, created, err := ensurePlaceholder(ctx, chunk, mode); err != nil {
 					return err
 				} else if !created {
 					disabled := true
@@ -145,8 +145,8 @@ func (t *Telegram) telegramDelivery(ctx context.Context, b telegramMessageBot, c
 		return nil
 	}
 	return telegramStreamDelivery{
-		editPreview: func(_ context.Context, _ int64, text string) error {
-			id, created, err := ensurePlaceholder(text, "")
+		editPreview: func(ctx context.Context, _ int64, text string) error {
+			id, created, err := ensurePlaceholder(ctx, text, "")
 			if err != nil {
 				return err
 			}
@@ -157,13 +157,13 @@ func (t *Telegram) telegramDelivery(ctx context.Context, b telegramMessageBot, c
 			_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{ChatID: chatID, MessageID: id, Text: text, LinkPreviewOptions: &models.LinkPreviewOptions{IsDisabled: &disabled}})
 			return err
 		},
-		finalMarkdown: func(_ context.Context, _ int64, chunks []string) error {
-			return sendChunks(chunks, models.ParseModeMarkdown)
+		finalMarkdown: func(ctx context.Context, _ int64, chunks []string) error {
+			return sendChunks(ctx, chunks, models.ParseModeMarkdown)
 		},
-		finalPlain: func(_ context.Context, _ int64, chunks []string) error {
-			return sendChunks(chunks, "")
+		finalPlain: func(ctx context.Context, _ int64, chunks []string) error {
+			return sendChunks(ctx, chunks, "")
 		},
-		clearPreview: func(_ context.Context, _ int64) error {
+		clearPreview: func(ctx context.Context, _ int64) error {
 			mu.Lock()
 			id := messageID
 			messageID = 0

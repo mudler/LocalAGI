@@ -39,6 +39,19 @@ type recordingTelegramBot struct {
 	nextID       int
 }
 
+type contextBlockingTelegramBot struct {
+	recordingTelegramBot
+	started  chan struct{}
+	returned chan struct{}
+}
+
+func (b *contextBlockingTelegramBot) EditMessageText(ctx context.Context, _ *bot.EditMessageTextParams) (*models.Message, error) {
+	close(b.started)
+	<-ctx.Done()
+	close(b.returned)
+	return nil, ctx.Err()
+}
+
 func (b *recordingTelegramBot) SendMessage(_ context.Context, p *bot.SendMessageParams) (*models.Message, error) {
 	b.sends = append(b.sends, p.ParseMode)
 	b.sendParams = append(b.sendParams, p)
@@ -88,6 +101,31 @@ func TestTelegramStreamingJobCancellationStillAllowsFinalDelivery(t *testing.T) 
 	_, finals := api.snapshot()
 	if len(finals) != 1 || finals[0].RichMessage.Markdown != "completed answer" {
 		t.Fatalf("finals = %#v, want persistent completed answer", finals)
+	}
+}
+
+func TestTelegramDeliveryPreviewCancellationAbortsInflightLegacyEdit(t *testing.T) {
+	tg := &Telegram{placeholders: map[string]int{"job": 10}}
+	b := &contextBlockingTelegramBot{
+		started:  make(chan struct{}),
+		returned: make(chan struct{}),
+	}
+	delivery := tg.telegramDelivery(context.Background(), b, -1, 7, "job", 10)
+	job, session := telegramNewJobWithStream(t.Context(), &telegramStreamAPI{}, -1, false, delivery, nil, "job", nil)
+	defer session.Close()
+
+	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "working"})
+	select {
+	case <-b.started:
+	case <-time.After(time.Second):
+		t.Fatal("legacy preview edit did not start")
+	}
+
+	job.Cancel()
+	select {
+	case <-b.returned:
+	case <-time.After(time.Second):
+		t.Fatal("preview cancellation did not unblock the legacy edit")
 	}
 }
 
@@ -281,5 +319,21 @@ func TestTelegramGroupFinalAttemptsRichBeforeFallback(t *testing.T) {
 	_, finals := api.snapshot()
 	if len(finals) != 1 || finals[0].RichMessage.Markdown != "**answer**" {
 		t.Fatalf("rich finals = %#v, want raw Markdown attempted once", finals)
+	}
+}
+
+func TestTelegramFinalDeliveryContinuesAfterPreviewCleanupFailure(t *testing.T) {
+	api := &telegramStreamAPI{}
+	session := telegramFinalSession(t.Context(), api, -42, false, telegramStreamDelivery{
+		clearPreview: func(context.Context, int64) error {
+			return errors.New("delete failed")
+		},
+	})
+	if err := session.deliverFinal("persistent answer", nil); err != nil {
+		t.Fatalf("deliverFinal after cleanup failure: %v", err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 1 || finals[0].RichMessage.Markdown != "persistent answer" {
+		t.Fatalf("finals = %#v, want persistent answer", finals)
 	}
 }
