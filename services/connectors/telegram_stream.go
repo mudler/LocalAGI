@@ -16,6 +16,7 @@ type telegramStreamDelivery struct {
 	editPreview   func(context.Context, int64, string) error
 	finalMarkdown func(context.Context, int64, []string) error
 	finalPlain    func(context.Context, int64, []string) error
+	clearPreview  func(context.Context, int64) error
 }
 
 type telegramStreamCommand struct {
@@ -282,39 +283,25 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 
 func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) error {
 	formatted := telegramFormatResponse(markdown, urls, telegramMaxMessageLength)
-	if s.private {
-		for _, chunk := range formatted {
-			if err := s.api.sendRichMessage(s.ctx, telegramRichMessage{ChatID: s.chatID, RichMessage: telegramInputRichMessage{Markdown: chunk}}); err == nil {
+	usedFallback := false
+	for _, chunk := range formatted {
+		if err := s.api.sendRichMessage(s.ctx, telegramRichMessage{ChatID: s.chatID, RichMessage: telegramInputRichMessage{Markdown: chunk}}); err == nil {
+			continue
+		}
+		usedFallback = true
+		if s.delivery.finalMarkdown != nil {
+			if err := s.delivery.finalMarkdown(s.ctx, s.chatID, []string{telegramMarkdownV2(chunk)}); err == nil {
 				continue
 			}
-			if s.delivery.finalMarkdown != nil {
-				if err := s.delivery.finalMarkdown(s.ctx, s.chatID, []string{telegramMarkdownV2(chunk)}); err == nil {
-					continue
-				}
-			}
-			if s.delivery.finalPlain != nil {
-				if err := s.delivery.finalPlain(s.ctx, s.chatID, []string{telegramPlainText(chunk)}); err != nil {
-					return err
-				}
+		}
+		if s.delivery.finalPlain != nil {
+			if err := s.delivery.finalPlain(s.ctx, s.chatID, []string{telegramPlainText(chunk)}); err != nil {
+				return err
 			}
 		}
-		return nil
 	}
-	markdownV2 := make([]string, len(formatted))
-	for i := range formatted {
-		markdownV2[i] = telegramMarkdownV2(formatted[i])
-	}
-	if s.delivery.finalMarkdown != nil {
-		if err := s.delivery.finalMarkdown(s.ctx, s.chatID, markdownV2); err == nil {
-			return nil
-		}
-	}
-	plain := make([]string, len(formatted))
-	for i := range formatted {
-		plain[i] = telegramPlainText(formatted[i])
-	}
-	if s.delivery.finalPlain != nil {
-		return s.delivery.finalPlain(s.ctx, s.chatID, plain)
+	if !usedFallback && s.delivery.clearPreview != nil {
+		return s.delivery.clearPreview(s.ctx, s.chatID)
 	}
 	return nil
 }

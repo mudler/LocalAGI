@@ -14,6 +14,8 @@
 
 Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/LocalAGI_bot)
 
+Telegram response streaming is enabled by default (`"streaming": "true"`). Private chats use native rich drafts, while groups progressively edit a placeholder. Set `"streaming": "false"` to suppress previews; final responses still use rich Markdown with MarkdownV2 and plain-text fallbacks.
+
 </div>
 
 Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
