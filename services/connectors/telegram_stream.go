@@ -233,6 +233,10 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 	} else if s.delivery.editPreview != nil {
 		err = s.delivery.editPreview(s.ctx, s.chatID, text)
 	}
+	var apiErr *telegramAPIError
+	if errors.As(err, &apiErr) && apiErr.RetryAfter > 0 {
+		return true, time.Duration(apiErr.RetryAfter) * time.Second
+	}
 	if err == nil {
 		s.mu.Lock()
 		if thinking {
@@ -248,10 +252,23 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 
 func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) error {
 	formatted := telegramFormatResponse(markdown, urls, telegramMaxMessageLength)
-	if s.private && len(formatted) == 1 {
-		if err := s.api.sendRichMessage(s.ctx, telegramRichMessage{ChatID: s.chatID, RichMessage: telegramInputRichMessage{Markdown: formatted[0]}}); err == nil {
-			return nil
+	if s.private {
+		for _, chunk := range formatted {
+			if err := s.api.sendRichMessage(s.ctx, telegramRichMessage{ChatID: s.chatID, RichMessage: telegramInputRichMessage{Markdown: chunk}}); err == nil {
+				continue
+			}
+			if s.delivery.finalMarkdown != nil {
+				if err := s.delivery.finalMarkdown(s.ctx, s.chatID, []string{telegramMarkdownV2(chunk)}); err == nil {
+					continue
+				}
+			}
+			if s.delivery.finalPlain != nil {
+				if err := s.delivery.finalPlain(s.ctx, s.chatID, []string{telegramPlainText(chunk)}); err != nil {
+					return err
+				}
+			}
 		}
+		return nil
 	}
 	markdownV2 := make([]string, len(formatted))
 	for i := range formatted {

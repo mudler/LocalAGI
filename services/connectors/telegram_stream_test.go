@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,6 +18,7 @@ type telegramStreamAPI struct {
 	drafts   []telegramRichMessageDraft
 	finals   []telegramRichMessage
 	draftErr func(int) error
+	finalErr func(int) error
 	inCall   atomic.Int32
 	maxCalls atomic.Int32
 	block    time.Duration
@@ -47,7 +49,11 @@ func (a *telegramStreamAPI) sendRichMessage(_ context.Context, final telegramRic
 	}
 	a.mu.Lock()
 	a.finals = append(a.finals, final)
+	i := len(a.finals)
 	a.mu.Unlock()
+	if a.finalErr != nil {
+		return a.finalErr(i)
+	}
 	return nil
 }
 
@@ -131,6 +137,32 @@ func TestTelegramStreamRetryAfterRetainsLatestPreview(t *testing.T) {
 	}
 }
 
+func TestTelegramStreamEditRetryAfterReschedulesPendingPreviewWithoutNewContent(t *testing.T) {
+	api := &telegramStreamAPI{}
+	var calls atomic.Int32
+	got := make(chan string, 2)
+	s := newTelegramStreamSession(context.Background(), api, -9, false, telegramStreamDelivery{editPreview: func(_ context.Context, _ int64, text string) error {
+		if calls.Add(1) == 1 {
+			return &telegramAPIError{Method: "editMessageText", ErrorCode: 429, RetryAfter: 1}
+		}
+		got <- text
+		return nil
+	}})
+	defer s.Close()
+
+	select {
+	case text := <-got:
+		if text != telegramThinkingMessage {
+			t.Fatalf("retried preview = %q, want thinking preview", text)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("pending preview was not retried after edit retry_after")
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("edit calls = %d, want 2", got)
+	}
+}
+
 func TestTelegramStreamNativeFailureFallsBackOnlyForThatSession(t *testing.T) {
 	failing := &telegramStreamAPI{draftErr: func(int) error { return errors.New("unsupported") }}
 	healthy := &telegramStreamAPI{}
@@ -188,6 +220,25 @@ func TestTelegramStreamFlushAndFinalizePromptlyBypassPreviewRetry(t *testing.T) 
 	}
 }
 
+func TestTelegramStreamFlushDeliversPendingContentBeforeReturning(t *testing.T) {
+	api := &telegramStreamAPI{}
+	s := newTelegramStreamSession(context.Background(), api, 5, true, telegramStreamDelivery{})
+	defer s.Close()
+	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 1 })
+
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "pending answer"})
+	if err := s.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	drafts, _ := api.snapshot()
+	if len(drafts) != 2 {
+		t.Fatalf("drafts when Flush returned = %d, want pending content delivered", len(drafts))
+	}
+	if got := drafts[1].RichMessage.Markdown; got != "pending answer" {
+		t.Fatalf("flushed preview = %q, want pending answer", got)
+	}
+}
+
 func TestTelegramStreamCancelAndCloseStopPendingThrottledDelivery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	api := &telegramStreamAPI{}
@@ -235,5 +286,64 @@ func TestTelegramStreamGroupEditsPlaceholder(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("missing content edit")
+	}
+}
+
+func TestTelegramStreamLongPrivateFinalUsesRichMarkdownForEveryChunkInOrder(t *testing.T) {
+	api := &telegramStreamAPI{}
+	s := newTelegramStreamSession(context.Background(), api, 42, true, telegramStreamDelivery{})
+	defer s.Close()
+
+	markdown := strings.Repeat("a", telegramMaxMessageLength) + strings.Repeat("b", 17)
+	if err := s.Finalize(markdown, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 2 {
+		t.Fatalf("rich final calls = %d, want 2", len(finals))
+	}
+	if got := finals[0].RichMessage.Markdown; got != strings.Repeat("a", telegramMaxMessageLength) {
+		t.Fatalf("first rich chunk length/content = %d/%q", len(got), got[:min(len(got), 20)])
+	}
+	if got := finals[1].RichMessage.Markdown; got != strings.Repeat("b", 17) {
+		t.Fatalf("second rich chunk = %q", got)
+	}
+}
+
+func TestTelegramStreamLongPrivateFinalFallsBackWithoutLosingOrReorderingChunks(t *testing.T) {
+	api := &telegramStreamAPI{finalErr: func(i int) error {
+		if i == 1 {
+			return errors.New("rich markdown rejected")
+		}
+		return nil
+	}}
+	var markdownChunks, plainChunks []string
+	s := newTelegramStreamSession(context.Background(), api, 42, true, telegramStreamDelivery{
+		finalMarkdown: func(_ context.Context, _ int64, chunks []string) error {
+			markdownChunks = append([]string(nil), chunks...)
+			return errors.New("MarkdownV2 rejected")
+		},
+		finalPlain: func(_ context.Context, _ int64, chunks []string) error {
+			plainChunks = append([]string(nil), chunks...)
+			return nil
+		},
+	})
+	defer s.Close()
+
+	markdown := strings.Repeat("a", telegramMaxMessageLength) + strings.Repeat("b", 17)
+	if err := s.Finalize(markdown, nil); err != nil {
+		t.Fatal(err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 2 {
+		t.Fatalf("rich final calls = %d, want every rich chunk attempted in order", len(finals))
+	}
+	wantMarkdown := []string{strings.Repeat("a", telegramMaxMessageLength)}
+	if len(markdownChunks) != 1 || markdownChunks[0] != wantMarkdown[0] {
+		t.Fatalf("MarkdownV2 fallback chunks lost or reordered: lengths %d, %d", len(markdownChunks), len(plainChunks))
+	}
+	wantPlain := []string{strings.Repeat("a", telegramMaxMessageLength)}
+	if len(plainChunks) != 1 || plainChunks[0] != wantPlain[0] {
+		t.Fatalf("plain fallback chunks lost or reordered: %#v", plainChunks)
 	}
 }
