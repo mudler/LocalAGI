@@ -375,10 +375,7 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 	}
 
 	// Update the message with the final response
-	formattedResponse := formatResponseWithURLs(res.Response, urls)
-
-	// Split the message if it's too long
-	messages := xstrings.SplitParagraph(formattedResponse, telegramMaxMessageLength)
+	messages := telegramFormatResponse(res.Response, urls, telegramMaxMessageLength)
 
 	if len(messages) == 0 {
 		_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
@@ -672,19 +669,6 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 	return urls, nil
 }
 
-// formatResponseWithURLs formats the response text and creates message entities for URLs
-func formatResponseWithURLs(response string, urls []string) string {
-	finalResponse := response
-	if len(urls) > 0 {
-		finalResponse += "\n\nReferences:\n"
-		for i, url := range urls {
-			finalResponse += fmt.Sprintf("🔗 %d. %s\n", i+1, url)
-		}
-	}
-
-	return bot.EscapeMarkdown(finalResponse)
-}
-
 func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent, update *models.Update) {
 	if update.Message == nil || update.Message.From == nil {
 		xlog.Debug("Message or user is nil", "update", update)
@@ -859,10 +843,7 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 	}
 
 	// Update the message with the final response
-	formattedResponse := formatResponseWithURLs(res.Response, urls)
-
-	// Split the message if it's too long
-	messages := xstrings.SplitParagraph(formattedResponse, telegramMaxMessageLength)
+	messages := telegramFormatResponse(res.Response, urls, telegramMaxMessageLength)
 
 	if len(messages) == 0 {
 		_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
