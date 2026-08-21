@@ -225,6 +225,21 @@ func (a *Agent) Context() context.Context {
 	return a.context.Context
 }
 
+func (a *Agent) streamCallbackForJob(job *types.Job) func(cogito.StreamEvent) {
+	agentCallback := a.options.streamCallback
+	requestCallback := job.StreamCallback
+	if agentCallback == nil {
+		return requestCallback
+	}
+	if requestCallback == nil {
+		return agentCallback
+	}
+	return func(event cogito.StreamEvent) {
+		agentCallback(event)
+		requestCallback(event)
+	}
+}
+
 // Ask is a blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
@@ -1361,8 +1376,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		cogitoOpts = append(cogitoOpts, cogito.WithMaxRetries(a.options.maxAttempts))
 	}
 
-	if a.options.streamCallback != nil {
-		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(a.options.streamCallback))
+	if streamCallback := a.streamCallbackForJob(job); streamCallback != nil {
+		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(streamCallback))
 	}
 
 	fragment, err = cogito.ExecuteTools(

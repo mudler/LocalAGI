@@ -22,6 +22,7 @@ type Job struct {
 	Result              *JobResult
 	ReasoningCallback   func(ActionCurrentState) bool
 	ResultCallback      func(ActionState)
+	StreamCallback      func(cogito.StreamEvent)
 	ConversationHistory []openai.ChatCompletionMessage
 	UUID                string
 	Metadata            map[string]interface{}
@@ -79,6 +80,12 @@ func WithReasoningCallback(f func(ActionCurrentState) bool) JobOption {
 func WithResultCallback(f func(ActionState)) JobOption {
 	return func(r *Job) {
 		r.ResultCallback = f
+	}
+}
+
+func WithStreamCallback(f func(cogito.StreamEvent)) JobOption {
+	return func(j *Job) {
+		j.StreamCallback = f
 	}
 }
 
