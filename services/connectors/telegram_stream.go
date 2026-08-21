@@ -30,6 +30,7 @@ type telegramStreamCommand struct {
 
 type telegramStreamSession struct {
 	ctx       context.Context
+	finalCtx  context.Context
 	cancel    context.CancelFunc
 	api       telegramAPI
 	chatID    int64
@@ -59,13 +60,23 @@ func newTelegramStreamSession(parent context.Context, api telegramAPI, chatID in
 }
 
 func newTelegramStreamSessionWithHeartbeat(parent context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery, heartbeat time.Duration) *telegramStreamSession {
-	ctx, cancel := context.WithCancel(parent)
+	return newTelegramStreamSessionWithContexts(parent, parent, api, chatID, private, delivery, heartbeat)
+}
+
+func newTelegramStreamSessionWithContexts(finalParent, previewParent context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery, heartbeat time.Duration) *telegramStreamSession {
+	finalCtx, cancelFinal := context.WithCancel(finalParent)
+	ctx, cancelPreview := context.WithCancel(previewParent)
+	stopPreviewLink := context.AfterFunc(finalCtx, cancelPreview)
 	draftID := telegramDraftSequence.Add(1)
 	if draftID == 0 {
 		draftID = telegramDraftSequence.Add(1)
 	}
 	s := &telegramStreamSession{
-		ctx: ctx, parentCtx: parent, cancel: cancel, api: api, chatID: chatID, private: private, heartbeat: heartbeat,
+		ctx: ctx, finalCtx: finalCtx, parentCtx: previewParent, cancel: func() {
+			stopPreviewLink()
+			cancelPreview()
+			cancelFinal()
+		}, api: api, chatID: chatID, private: private, heartbeat: heartbeat,
 		draftID: draftID, delivery: delivery, wake: make(chan struct{}, 1),
 		command: make(chan telegramStreamCommand), done: make(chan struct{}), dirty: true, thinkingPending: true,
 	}
@@ -146,6 +157,8 @@ func (s *telegramStreamSession) run() {
 	var nextPreview time.Time
 	var retryUntil time.Time
 	var flushWaiters []chan error
+	previewDone := s.ctx.Done()
+	previewStopped := false
 	stopTimer := func() {
 		if timer != nil && !timer.Stop() {
 			select {
@@ -202,10 +215,25 @@ func (s *telegramStreamSession) run() {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.finalCtx.Done():
 			return
+		case <-previewDone:
+			previewDone = nil
+			previewStopped = true
+			stopTimer()
+			s.mu.Lock()
+			s.dirty = false
+			s.mu.Unlock()
+			for _, waiter := range flushWaiters {
+				waiter <- s.ctx.Err()
+			}
+			flushWaiters = nil
 		case command := <-s.command:
 			if command.kind == 1 {
+				if previewStopped {
+					command.done <- s.ctx.Err()
+					continue
+				}
 				if time.Now().Before(retryUntil) {
 					command.done <- errors.New("Telegram preview pending retry")
 					continue
@@ -299,6 +327,9 @@ func telegramStreamStatus(event cogito.StreamEvent) string {
 }
 
 func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
+	if s.ctx.Err() != nil {
+		return false, 0
+	}
 	text, version, ok, thinking := s.previewSnapshot()
 	if !ok {
 		return false, 0
@@ -342,7 +373,7 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) error {
 	formatted := telegramFormatResponse(markdown, urls, telegramMaxMessageLength)
 	if s.delivery.clearPreview != nil {
-		if err := s.delivery.clearPreview(s.ctx, s.chatID); err != nil {
+		if err := s.delivery.clearPreview(s.finalCtx, s.chatID); err != nil {
 			return err
 		}
 	}
@@ -352,7 +383,7 @@ func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) err
 		if !s.private && s.delivery.replyTo != 0 {
 			final.ReplyParameters = &telegramReplyParameters{MessageID: s.delivery.replyTo}
 		}
-		if err := s.api.sendRichMessage(s.ctx, final); err == nil {
+		if err := s.api.sendRichMessage(s.finalCtx, final); err == nil {
 			continue
 		}
 		failedAt = i
@@ -366,7 +397,7 @@ func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) err
 	for i, chunk := range remaining {
 		markdownChunks[i] = telegramMarkdownV2(chunk)
 	}
-	if s.delivery.finalMarkdown != nil && s.delivery.finalMarkdown(s.ctx, s.chatID, markdownChunks) == nil {
+	if s.delivery.finalMarkdown != nil && s.delivery.finalMarkdown(s.finalCtx, s.chatID, markdownChunks) == nil {
 		return nil
 	}
 	plainChunks := make([]string, len(remaining))
@@ -374,7 +405,7 @@ func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) err
 		plainChunks[i] = telegramPlainText(chunk)
 	}
 	if s.delivery.finalPlain != nil {
-		return s.delivery.finalPlain(s.ctx, s.chatID, plainChunks)
+		return s.delivery.finalPlain(s.finalCtx, s.chatID, plainChunks)
 	}
 	return nil
 }

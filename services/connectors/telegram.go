@@ -71,7 +71,7 @@ func telegramAskOptions(history []openai.ChatCompletionMessage, jobUUID string, 
 func telegramNewJobWithStream(parent context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery, history []openai.ChatCompletionMessage, jobUUID string, metadata map[string]any) (*types.Job, *telegramStreamSession) {
 	opts := append(telegramAskOptions(history, jobUUID, metadata, nil), types.WithContext(parent))
 	job := types.NewJob(opts...)
-	session := newTelegramStreamSession(job.GetContext(), api, chatID, private, delivery)
+	session := newTelegramStreamSessionWithContexts(parent, job.GetContext(), api, chatID, private, delivery, telegramDraftHeartbeatInterval)
 	job.StreamCallback = session.Accept
 	return job, session
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -76,32 +77,40 @@ func TestTelegramDeliveryClearResetsPlaceholderAndFallbackSendsAfterRich(t *test
 	}
 }
 
-func TestTelegramStreamingJobUsesTrackedJobContext(t *testing.T) {
+func TestTelegramStreamingJobCancellationStillAllowsFinalDelivery(t *testing.T) {
 	api := &telegramStreamAPI{}
 	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
-	if session.parentCtx != job.GetContext() {
-		t.Fatal("session does not use tracked job context")
-	}
+	defer session.Close()
 	job.Cancel()
-	select {
-	case <-session.done:
-	case <-time.After(time.Second):
-		t.Fatal("job cancellation did not stop session")
+	if err := session.Finalize("completed answer", nil); err != nil {
+		t.Fatalf("Finalize after normal job completion: %v", err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 1 || finals[0].RichMessage.Markdown != "completed answer" {
+		t.Fatalf("finals = %#v, want persistent completed answer", finals)
 	}
 }
 
-type cancellingTelegramAPI struct{ started chan struct{} }
+type cancellingTelegramAPI struct {
+	started  chan struct{}
+	returned chan struct{}
+	calls    atomic.Int32
+}
 
 func (a *cancellingTelegramAPI) sendRichMessageDraft(ctx context.Context, _ telegramRichMessageDraft) error {
-	close(a.started)
+	if a.calls.Add(1) == 1 {
+		close(a.started)
+	}
 	<-ctx.Done()
+	close(a.returned)
 	return ctx.Err()
 }
 func (*cancellingTelegramAPI) sendRichMessage(context.Context, telegramRichMessage) error { return nil }
 
 func TestTelegramTrackedJobCancellationAbortsInflightDraftRequest(t *testing.T) {
-	api := &cancellingTelegramAPI{started: make(chan struct{})}
+	api := &cancellingTelegramAPI{started: make(chan struct{}), returned: make(chan struct{})}
 	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
+	defer session.Close()
 	select {
 	case <-api.started:
 	case <-time.After(time.Second):
@@ -109,9 +118,22 @@ func TestTelegramTrackedJobCancellationAbortsInflightDraftRequest(t *testing.T) 
 	}
 	job.Cancel()
 	select {
-	case <-session.done:
+	case <-api.returned:
 	case <-time.After(time.Second):
-		t.Fatal("in-flight request was not cancelled")
+		t.Fatal("in-flight draft request was not cancelled")
+	}
+	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "must not restart previews"})
+	time.Sleep(telegramStreamInterval + 50*time.Millisecond)
+	if got := api.calls.Load(); got != 1 {
+		t.Fatalf("draft calls after job cancellation = %d, want 1", got)
+	}
+	select {
+	case <-session.done:
+		t.Fatal("job cancellation stopped final-delivery orchestration")
+	default:
+	}
+	if err := session.Finalize("answer after cancellation", nil); err != nil {
+		t.Fatalf("Finalize after cancellation: %v", err)
 	}
 }
 
