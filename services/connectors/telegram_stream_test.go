@@ -242,7 +242,7 @@ func TestTelegramStreamFlushDeliversPendingContentBeforeReturning(t *testing.T) 
 	}
 }
 
-func TestTelegramStreamFlushWaitsForRetryAndDeliversPendingContent(t *testing.T) {
+func TestTelegramStreamFlushReportsPendingRetryPromptly(t *testing.T) {
 	api := &telegramStreamAPI{draftErr: func(i int) error {
 		if i == 2 {
 			return &telegramAPIError{ErrorCode: 429, RetryAfter: 1}
@@ -255,15 +255,55 @@ func TestTelegramStreamFlushWaitsForRetryAndDeliversPendingContent(t *testing.T)
 
 	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "pending after retry"})
 	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 2 })
+	start := time.Now()
+	if err := s.Flush(); err == nil {
+		t.Fatal("Flush error = nil, want pending preview error")
+	}
+	if time.Since(start) > 500*time.Millisecond {
+		t.Fatal("Flush waited for retry_after")
+	}
+}
+
+func TestTelegramStreamPreviewUsesUTF8SafeTail(t *testing.T) {
+	api := &telegramStreamAPI{}
+	s := newTelegramStreamSession(context.Background(), api, 5, true, telegramStreamDelivery{})
+	defer s.Close()
+	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 1 })
+	full := strings.Repeat("🙂", telegramMaxMessageLength+10)
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: full})
 	if err := s.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	drafts, _ := api.snapshot()
-	if len(drafts) != 3 {
-		t.Fatalf("drafts when Flush returned = %d, want retry delivered", len(drafts))
+	got := drafts[len(drafts)-1].RichMessage.Markdown
+	if len([]rune(got)) != telegramMaxMessageLength || got != strings.Repeat("🙂", telegramMaxMessageLength) {
+		t.Fatalf("preview rune length = %d, want tail of %d", len([]rune(got)), telegramMaxMessageLength)
 	}
-	if got := drafts[2].RichMessage.Markdown; got != "pending after retry" {
-		t.Fatalf("retried preview = %q, want pending content", got)
+	if s.content != full {
+		t.Fatal("preview truncation discarded final content")
+	}
+}
+
+func TestTelegramStreamPrivateShowsPublishedStatusBeforeContent(t *testing.T) {
+	api := &telegramStreamAPI{}
+	s := newTelegramStreamSession(context.Background(), api, 5, true, telegramStreamDelivery{})
+	defer s.Close()
+	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 1 })
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventReasoning, Content: "checking sources"})
+	if err := s.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	drafts, _ := api.snapshot()
+	if got := drafts[len(drafts)-1].RichMessage.Markdown; got != "checking sources" {
+		t.Fatalf("status = %q", got)
+	}
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "answer"})
+	if err := s.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	drafts, _ = api.snapshot()
+	if got := drafts[len(drafts)-1].RichMessage.Markdown; got != "answer" {
+		t.Fatalf("answer = %q", got)
 	}
 }
 
@@ -381,15 +421,15 @@ func TestTelegramStreamLongPrivateFinalFallsBackWithoutLosingOrReorderingChunks(
 		t.Fatal(err)
 	}
 	_, finals := api.snapshot()
-	if len(finals) != 2 {
-		t.Fatalf("rich final calls = %d, want every rich chunk attempted in order", len(finals))
+	if len(finals) != 1 {
+		t.Fatalf("rich final calls = %d, want rich delivery to stop at first failure", len(finals))
 	}
-	wantMarkdown := []string{strings.Repeat("a", telegramMaxMessageLength)}
-	if len(markdownChunks) != 1 || markdownChunks[0] != wantMarkdown[0] {
+	wantMarkdown := []string{strings.Repeat("a", telegramMaxMessageLength), strings.Repeat("b", 17)}
+	if len(markdownChunks) != 2 || markdownChunks[0] != wantMarkdown[0] || markdownChunks[1] != wantMarkdown[1] {
 		t.Fatalf("MarkdownV2 fallback chunks lost or reordered: lengths %d, %d", len(markdownChunks), len(plainChunks))
 	}
-	wantPlain := []string{strings.Repeat("a", telegramMaxMessageLength)}
-	if len(plainChunks) != 1 || plainChunks[0] != wantPlain[0] {
+	wantPlain := []string{strings.Repeat("a", telegramMaxMessageLength), strings.Repeat("b", 17)}
+	if len(plainChunks) != 2 || plainChunks[0] != wantPlain[0] || plainChunks[1] != wantPlain[1] {
 		t.Fatalf("plain fallback chunks lost or reordered: %#v", plainChunks)
 	}
 }

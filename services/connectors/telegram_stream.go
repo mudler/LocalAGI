@@ -37,6 +37,7 @@ type telegramStreamSession struct {
 
 	mu              sync.Mutex
 	content         string
+	status          string
 	version         uint64
 	dirty           bool
 	thinkingPending bool
@@ -68,7 +69,7 @@ func (s *telegramStreamSession) Accept(event cogito.StreamEvent) {
 	if event.Type == cogito.StreamEventDone {
 		return
 	}
-	if event.Type != cogito.StreamEventContent || event.Content == "" {
+	if event.Type != cogito.StreamEventContent && event.Type != cogito.StreamEventReasoning && event.Type != cogito.StreamEventStatus && event.Type != cogito.StreamEventToolCall && event.Type != cogito.StreamEventToolResult {
 		return
 	}
 	s.mu.Lock()
@@ -76,7 +77,11 @@ func (s *telegramStreamSession) Accept(event cogito.StreamEvent) {
 		s.mu.Unlock()
 		return
 	}
-	s.content += event.Content
+	if event.Type == cogito.StreamEventContent && event.Content != "" {
+		s.content += event.Content
+	} else if s.content == "" {
+		s.status = telegramStreamStatus(event)
+	}
 	s.version++
 	s.dirty = true
 	s.mu.Unlock()
@@ -188,18 +193,26 @@ func (s *telegramStreamSession) run() {
 			return
 		case command := <-s.command:
 			if command.kind == 1 {
-				if !time.Now().Before(retryUntil) {
-					attempted, retry := s.deliverPreview()
-					if attempted {
-						nextPreview = time.Now().Add(telegramStreamInterval)
-					}
-					if retry > 0 {
-						retryUntil = time.Now().Add(retry)
-					}
+				if time.Now().Before(retryUntil) {
+					command.done <- errors.New("Telegram preview pending retry")
+					continue
+				}
+				attempted, retry := s.deliverPreview()
+				if attempted {
+					nextPreview = time.Now().Add(telegramStreamInterval)
+				}
+				if retry > 0 {
+					retryUntil = time.Now().Add(retry)
+					command.done <- errors.New("Telegram preview pending retry")
+					continue
 				}
 				flushWaiters = append(flushWaiters, command.done)
 				schedulePending()
 			} else {
+				stopTimer()
+				s.mu.Lock()
+				s.dirty = false
+				s.mu.Unlock()
 				command.done <- s.deliverFinal(command.markdown, command.urls)
 			}
 		case <-s.wake:
@@ -238,9 +251,33 @@ func (s *telegramStreamSession) previewSnapshot() (string, uint64, bool, bool) {
 	}
 	text := s.content
 	if text == "" {
-		text = telegramThinkingMessage
+		text = s.status
+		if text == "" {
+			text = telegramThinkingMessage
+		}
 	}
-	return text, s.version, true, false
+	return telegramPreviewTail(text, telegramMaxMessageLength), s.version, true, false
+}
+
+func telegramPreviewTail(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[len(runes)-limit:])
+}
+
+func telegramStreamStatus(event cogito.StreamEvent) string {
+	if event.Content != "" {
+		return event.Content
+	}
+	if event.ToolName != "" {
+		return "Using " + event.ToolName + "…"
+	}
+	if event.Type == cogito.StreamEventToolResult {
+		return "Tool completed…"
+	}
+	return ""
 }
 
 func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
@@ -283,25 +320,34 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 
 func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) error {
 	formatted := telegramFormatResponse(markdown, urls, telegramMaxMessageLength)
-	usedFallback := false
-	for _, chunk := range formatted {
+	failedAt := -1
+	for i, chunk := range formatted {
 		if err := s.api.sendRichMessage(s.ctx, telegramRichMessage{ChatID: s.chatID, RichMessage: telegramInputRichMessage{Markdown: chunk}}); err == nil {
 			continue
 		}
-		usedFallback = true
-		if s.delivery.finalMarkdown != nil {
-			if err := s.delivery.finalMarkdown(s.ctx, s.chatID, []string{telegramMarkdownV2(chunk)}); err == nil {
-				continue
-			}
-		}
-		if s.delivery.finalPlain != nil {
-			if err := s.delivery.finalPlain(s.ctx, s.chatID, []string{telegramPlainText(chunk)}); err != nil {
-				return err
-			}
-		}
+		failedAt = i
+		break
 	}
-	if !usedFallback && s.delivery.clearPreview != nil {
-		return s.delivery.clearPreview(s.ctx, s.chatID)
+	if failedAt < 0 {
+		if s.delivery.clearPreview != nil {
+			return s.delivery.clearPreview(s.ctx, s.chatID)
+		}
+		return nil
+	}
+	remaining := formatted[failedAt:]
+	markdownChunks := make([]string, len(remaining))
+	for i, chunk := range remaining {
+		markdownChunks[i] = telegramMarkdownV2(chunk)
+	}
+	if s.delivery.finalMarkdown != nil && s.delivery.finalMarkdown(s.ctx, s.chatID, markdownChunks) == nil {
+		return nil
+	}
+	plainChunks := make([]string, len(remaining))
+	for i, chunk := range remaining {
+		plainChunks[i] = telegramPlainText(chunk)
+	}
+	if s.delivery.finalPlain != nil {
+		return s.delivery.finalPlain(s.ctx, s.chatID, plainChunks)
 	}
 	return nil
 }

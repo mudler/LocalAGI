@@ -911,6 +911,7 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 }
 
 func (a *Agent) consumeJob(job *types.Job, role string) {
+	streamCallback := a.streamCallbackForJob(job)
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
 		return
@@ -1078,8 +1079,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				return
 			}
 			// Forward reasoning to stream callback
-			if a.options.streamCallback != nil {
-				a.options.streamCallback(cogito.StreamEvent{
+			if streamCallback != nil {
+				streamCallback(cogito.StreamEvent{
 					Type:    cogito.StreamEventReasoning,
 					Content: s,
 				})
@@ -1176,12 +1177,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				}
 
 				// Forward tool selection to stream callback
-				if a.options.streamCallback != nil {
+				if streamCallback != nil {
 					toolName := tc.Name
 					if chosenAction != nil {
 						toolName = chosenAction.Definition().Name.String()
 					}
-					a.options.streamCallback(cogito.StreamEvent{
+					streamCallback(cogito.StreamEvent{
 						Type:     cogito.StreamEventToolCall,
 						ToolName: toolName,
 						ToolArgs: fmt.Sprintf("%v", tc.Arguments),
@@ -1376,7 +1377,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		cogitoOpts = append(cogitoOpts, cogito.WithMaxRetries(a.options.maxAttempts))
 	}
 
-	if streamCallback := a.streamCallbackForJob(job); streamCallback != nil {
+	if streamCallback != nil {
 		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(streamCallback))
 	}
 
