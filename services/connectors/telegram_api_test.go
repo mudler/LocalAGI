@@ -10,12 +10,12 @@ import (
 	"testing"
 )
 
-func TestTelegramAPISendsRichMessageDraft(t *testing.T) {
+func TestTelegramAPISendsMessageDraft(t *testing.T) {
 	t.Parallel()
 
 	const token = "123456:test-token"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got, want := r.URL.Path, "/bot"+token+"/sendRichMessageDraft"; got != want {
+		if got, want := r.URL.Path, "/bot"+token+"/sendMessageDraft"; got != want {
 			t.Errorf("path = %q, want %q", got, want)
 		}
 		if got, want := r.Header.Get("Content-Type"), "application/json"; got != want {
@@ -29,9 +29,7 @@ func TestTelegramAPISendsRichMessageDraft(t *testing.T) {
 		want := map[string]any{
 			"chat_id":  float64(42),
 			"draft_id": float64(77),
-			"rich_message": map[string]any{
-				"markdown": "**working**",
-			},
+			"text":     "working",
 		}
 		if !equalJSON(payload, want) {
 			t.Errorf("payload = %#v, want %#v", payload, want)
@@ -42,15 +40,13 @@ func TestTelegramAPISendsRichMessageDraft(t *testing.T) {
 	defer server.Close()
 
 	api := newTelegramHTTPAPI(token, server.Client(), server.URL)
-	err := api.sendRichMessageDraft(context.Background(), telegramRichMessageDraft{
+	err := api.sendMessageDraft(context.Background(), telegramMessageDraft{
 		ChatID:  42,
 		DraftID: 77,
-		RichMessage: telegramInputRichMessage{
-			Markdown: "**working**",
-		},
+		Text:    "working",
 	})
 	if err != nil {
-		t.Fatalf("sendRichMessageDraft() error = %v", err)
+		t.Fatalf("sendMessageDraft() error = %v", err)
 	}
 }
 
@@ -125,16 +121,16 @@ func TestTelegramAPIReturnsRetryAfterAndRedactsEchoedToken(t *testing.T) {
 	defer server.Close()
 
 	api := newTelegramHTTPAPI(token, server.Client(), server.URL)
-	err := api.sendRichMessageDraft(context.Background(), telegramRichMessageDraft{
-		ChatID: 1, DraftID: 9, RichMessage: telegramInputRichMessage{Markdown: "text"},
+	err := api.sendMessageDraft(context.Background(), telegramMessageDraft{
+		ChatID: 1, DraftID: 9, Text: "text",
 	})
 	if err == nil {
-		t.Fatal("sendRichMessageDraft() error = nil, want Telegram API error")
+		t.Fatal("sendMessageDraft() error = nil, want Telegram API error")
 	}
 	if strings.Contains(err.Error(), token) {
 		t.Fatalf("error leaked bot token: %q", err)
 	}
-	if got := err.Error(); !strings.Contains(got, "sendRichMessageDraft") || !strings.Contains(got, "send failed for [REDACTED] then [REDACTED]") {
+	if got := err.Error(); !strings.Contains(got, "sendMessageDraft") || !strings.Contains(got, "send failed for [REDACTED] then [REDACTED]") {
 		t.Errorf("error = %q, want method and redacted description", got)
 	}
 
@@ -151,11 +147,11 @@ func TestTelegramAPIRejectsZeroDraftID(t *testing.T) {
 	t.Parallel()
 
 	api := newTelegramHTTPAPI("token", http.DefaultClient, "http://unused.invalid")
-	err := api.sendRichMessageDraft(context.Background(), telegramRichMessageDraft{
-		ChatID: 1, RichMessage: telegramInputRichMessage{Markdown: "text"},
+	err := api.sendMessageDraft(context.Background(), telegramMessageDraft{
+		ChatID: 1, Text: "text",
 	})
 	if err == nil || !strings.Contains(err.Error(), "draft_id must be nonzero") {
-		t.Fatalf("sendRichMessageDraft() error = %v, want nonzero draft ID error", err)
+		t.Fatalf("sendMessageDraft() error = %v, want nonzero draft ID error", err)
 	}
 }
 
