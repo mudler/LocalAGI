@@ -13,7 +13,7 @@ import (
 const telegramBotAPIBaseURL = "https://api.telegram.org"
 
 type telegramAPI interface {
-	sendRichMessageDraft(context.Context, telegramRichMessageDraft) error
+	sendMessageDraft(context.Context, telegramMessageDraft) error
 	sendRichMessage(context.Context, telegramRichMessage) error
 }
 
@@ -21,10 +21,10 @@ type telegramInputRichMessage struct {
 	Markdown string `json:"markdown"`
 }
 
-type telegramRichMessageDraft struct {
-	ChatID      int64                    `json:"chat_id"`
-	DraftID     int64                    `json:"draft_id"`
-	RichMessage telegramInputRichMessage `json:"rich_message"`
+type telegramMessageDraft struct {
+	ChatID  int64  `json:"chat_id"`
+	DraftID int64  `json:"draft_id"`
+	Text    string `json:"text"`
 }
 
 type telegramRichMessage struct {
@@ -68,11 +68,11 @@ func newTelegramHTTPAPI(token string, client *http.Client, baseURL string) teleg
 	}
 }
 
-func (a *telegramHTTPAPI) sendRichMessageDraft(ctx context.Context, input telegramRichMessageDraft) error {
+func (a *telegramHTTPAPI) sendMessageDraft(ctx context.Context, input telegramMessageDraft) error {
 	if input.DraftID == 0 {
-		return fmt.Errorf("telegram sendRichMessageDraft: draft_id must be nonzero")
+		return fmt.Errorf("telegram sendMessageDraft: draft_id must be nonzero")
 	}
-	return a.call(ctx, "sendRichMessageDraft", input)
+	return a.call(ctx, "sendMessageDraft", input)
 }
 
 func (a *telegramHTTPAPI) sendRichMessage(ctx context.Context, input telegramRichMessage) error {
