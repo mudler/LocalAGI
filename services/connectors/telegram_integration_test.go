@@ -31,6 +31,44 @@ func TestTelegramExecutesTrackedJobIdentity(t *testing.T) {
 	}
 }
 
+func TestTelegramStreamingJobMarksLegacyStatusDeliveryDisabled(t *testing.T) {
+	metadata := map[string]any{"chatID": int64(42)}
+	job, session := telegramNewJobWithStream(t.Context(), &telegramStreamAPI{}, 42, true, telegramStreamDelivery{}, nil, "job", metadata)
+	defer session.Close()
+
+	if telegramUseLegacyStatusDelivery(job) {
+		t.Fatal("streaming job routed to legacy status delivery")
+	}
+	if got, ok := job.Metadata[telegramStreamingMetadataKey].(bool); !ok || !got {
+		t.Fatalf("streaming metadata = %#v, want true", job.Metadata[telegramStreamingMetadataKey])
+	}
+}
+
+func TestTelegramNonStreamingJobKeepsLegacyStatusDelivery(t *testing.T) {
+	job := types.NewJob(types.WithMetadata(map[string]any{"chatID": int64(42)}))
+	if !telegramUseLegacyStatusDelivery(job) {
+		t.Fatal("non-streaming job did not route to legacy status delivery")
+	}
+}
+
+func TestTelegramStreamingCallbacksDoNotInvokeLegacyStatusPath(t *testing.T) {
+	job := types.NewJob(types.WithMetadata(map[string]any{telegramStreamingMetadataKey: true}))
+	calls := 0
+	telegramDeliverLegacyStatus(job, func() { calls++ })
+	if calls != 0 {
+		t.Fatalf("legacy status calls = %d, want 0", calls)
+	}
+}
+
+func TestTelegramNonStreamingCallbacksInvokeLegacyStatusPath(t *testing.T) {
+	job := types.NewJob()
+	calls := 0
+	telegramDeliverLegacyStatus(job, func() { calls++ })
+	if calls != 1 {
+		t.Fatalf("legacy status calls = %d, want 1", calls)
+	}
+}
+
 type recordingTelegramBot struct {
 	sends, edits []models.ParseMode
 	texts        []string

@@ -31,6 +31,7 @@ import (
 
 const telegramThinkingMessage = "🤔 thinking..."
 const telegramMaxMessageLength = 3000
+const telegramStreamingMetadataKey = "telegram_streaming"
 
 type Telegram struct {
 	Token string
@@ -69,11 +70,29 @@ func telegramAskOptions(history []openai.ChatCompletionMessage, jobUUID string, 
 }
 
 func telegramNewJobWithStream(parent context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery, history []openai.ChatCompletionMessage, jobUUID string, metadata map[string]any) (*types.Job, *telegramStreamSession) {
+	if metadata == nil {
+		metadata = make(map[string]any)
+	}
+	metadata[telegramStreamingMetadataKey] = true
 	opts := append(telegramAskOptions(history, jobUUID, metadata, nil), types.WithContext(parent))
 	job := types.NewJob(opts...)
 	session := newTelegramStreamSessionWithContexts(parent, job.GetContext(), api, chatID, private, delivery, telegramDraftHeartbeatInterval)
 	job.StreamCallback = session.Accept
 	return job, session
+}
+
+func telegramUseLegacyStatusDelivery(job *types.Job) bool {
+	if job == nil || job.Metadata == nil {
+		return true
+	}
+	streaming, _ := job.Metadata[telegramStreamingMetadataKey].(bool)
+	return !streaming
+}
+
+func telegramDeliverLegacyStatus(job *types.Job, deliver func()) {
+	if telegramUseLegacyStatusDelivery(job) {
+		deliver()
+	}
 }
 
 type telegramMessageBot interface {
@@ -539,29 +558,31 @@ func (t *Telegram) AgentResultCallback() func(state types.ActionState) {
 			return
 		}
 
-		// Update placeholder with tool result if still in progress
-		t.placeholderMutex.Lock()
-		msgID, exists := t.placeholders[job.UUID]
-		if exists && msgID != 0 && t.bot != nil {
-			acc, ok := t.jobStatus[job.UUID]
-			if !ok {
-				acc = common.NewStatusAccumulator()
-				t.jobStatus[job.UUID] = acc
-			}
-			acc.AppendToolResult(common.ActionDisplayName(state.Action), state.Result)
-			thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
-			t.placeholderMutex.Unlock()
-			_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
-				ChatID:    chatID,
-				MessageID: msgID,
-				Text:      thought,
-			})
-			if err != nil {
-				xlog.Error("Error updating tool result message", "error", err)
-			}
+		telegramDeliverLegacyStatus(job, func() {
+			// Update placeholder with tool result if still in progress.
 			t.placeholderMutex.Lock()
-		}
-		t.placeholderMutex.Unlock()
+			msgID, exists := t.placeholders[job.UUID]
+			if exists && msgID != 0 && t.bot != nil {
+				acc, ok := t.jobStatus[job.UUID]
+				if !ok {
+					acc = common.NewStatusAccumulator()
+					t.jobStatus[job.UUID] = acc
+				}
+				acc.AppendToolResult(common.ActionDisplayName(state.Action), state.Result)
+				thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
+				t.placeholderMutex.Unlock()
+				_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
+					ChatID:    chatID,
+					MessageID: msgID,
+					Text:      thought,
+				})
+				if err != nil {
+					xlog.Error("Error updating tool result message", "error", err)
+				}
+				t.placeholderMutex.Lock()
+			}
+			t.placeholderMutex.Unlock()
+		})
 
 		t.activeJobsMutex.Lock()
 		delete(t.activeJobs, chatID)
@@ -571,46 +592,48 @@ func (t *Telegram) AgentResultCallback() func(state types.ActionState) {
 
 func (t *Telegram) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
 	return func(state types.ActionCurrentState) bool {
-		t.placeholderMutex.Lock()
-		msgID, exists := t.placeholders[state.Job.UUID]
-		chatID := int64(0)
-		if state.Job.Metadata != nil {
-			if ch, ok := state.Job.Metadata["chatID"].(int64); ok {
-				chatID = ch
+		telegramDeliverLegacyStatus(state.Job, func() {
+			t.placeholderMutex.Lock()
+			msgID, exists := t.placeholders[state.Job.UUID]
+			chatID := int64(0)
+			if state.Job.Metadata != nil {
+				if ch, ok := state.Job.Metadata["chatID"].(int64); ok {
+					chatID = ch
+				}
 			}
-		}
-		if !exists || msgID == 0 || chatID == 0 || t.bot == nil {
+			if !exists || msgID == 0 || chatID == 0 || t.bot == nil {
+				t.placeholderMutex.Unlock()
+				return
+			}
+
+			if state.Reasoning == "" && state.Action == nil {
+				t.placeholderMutex.Unlock()
+				return
+			}
+
+			acc, ok := t.jobStatus[state.Job.UUID]
+			if !ok {
+				acc = common.NewStatusAccumulator()
+				t.jobStatus[state.Job.UUID] = acc
+			}
+			if state.Reasoning != "" {
+				acc.AppendReasoning(state.Reasoning)
+			}
+			if state.Action != nil {
+				acc.AppendToolCall(common.ActionDisplayName(state.Action), state.Params.String())
+			}
+			thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
 			t.placeholderMutex.Unlock()
-			return true
-		}
 
-		if state.Reasoning == "" && state.Action == nil {
-			t.placeholderMutex.Unlock()
-			return true
-		}
-
-		acc, ok := t.jobStatus[state.Job.UUID]
-		if !ok {
-			acc = common.NewStatusAccumulator()
-			t.jobStatus[state.Job.UUID] = acc
-		}
-		if state.Reasoning != "" {
-			acc.AppendReasoning(state.Reasoning)
-		}
-		if state.Action != nil {
-			acc.AppendToolCall(common.ActionDisplayName(state.Action), state.Params.String())
-		}
-		thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
-		t.placeholderMutex.Unlock()
-
-		_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
-			ChatID:    chatID,
-			MessageID: msgID,
-			Text:      thought,
+			_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
+				ChatID:    chatID,
+				MessageID: msgID,
+				Text:      thought,
+			})
+			if err != nil {
+				xlog.Error("Error updating reasoning message", "error", err)
+			}
 		})
-		if err != nil {
-			xlog.Error("Error updating reasoning message", "error", err)
-		}
 		return true
 	}
 }
