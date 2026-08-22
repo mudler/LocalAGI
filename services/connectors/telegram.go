@@ -76,7 +76,10 @@ func telegramNewJobWithStream(parent context.Context, api telegramAPI, chatID in
 	metadata[telegramStreamingMetadataKey] = true
 	opts := append(telegramAskOptions(history, jobUUID, metadata, nil), types.WithContext(parent))
 	job := types.NewJob(opts...)
-	session := newTelegramStreamSessionWithContexts(parent, job.GetContext(), api, chatID, private, delivery, telegramDraftHeartbeatInterval)
+	// Like Hermes' StreamConsumer, the preview queue belongs to the whole
+	// connector turn. Agent.consumeJob cancels the job context during normal
+	// completion, before this handler has had a chance to flush and finalize.
+	session := newTelegramStreamSession(parent, api, chatID, private, delivery)
 	job.StreamCallback = session.Accept
 	return job, session
 }

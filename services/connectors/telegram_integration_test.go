@@ -143,15 +143,14 @@ func TestTelegramStreamingJobCancellationStillAllowsFinalDelivery(t *testing.T) 
 	}
 }
 
-func TestTelegramDeliveryPreviewCancellationAbortsInflightLegacyEdit(t *testing.T) {
+func TestTelegramTurnCancellationAbortsInflightLegacyEdit(t *testing.T) {
 	tg := &Telegram{placeholders: map[string]int{"job": 10}}
 	b := &contextBlockingTelegramBot{
 		started:  make(chan struct{}),
 		returned: make(chan struct{}),
 	}
 	delivery := tg.telegramDelivery(context.Background(), b, -1, 7, "job", 10)
-	job, session := telegramNewJobWithStream(t.Context(), &telegramStreamAPI{}, -1, false, delivery, nil, "job", nil)
-	defer session.Close()
+	_, session := telegramNewJobWithStream(t.Context(), &telegramStreamAPI{}, -1, false, delivery, nil, "job", nil)
 
 	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "working"})
 	select {
@@ -160,7 +159,7 @@ func TestTelegramDeliveryPreviewCancellationAbortsInflightLegacyEdit(t *testing.
 		t.Fatal("legacy preview edit did not start")
 	}
 
-	job.Cancel()
+	session.Close()
 	select {
 	case <-b.returned:
 	case <-time.After(time.Second):
@@ -174,7 +173,7 @@ type cancellingTelegramAPI struct {
 	calls    atomic.Int32
 }
 
-func (a *cancellingTelegramAPI) sendRichMessageDraft(ctx context.Context, _ telegramRichMessageDraft) error {
+func (a *cancellingTelegramAPI) sendMessageDraft(ctx context.Context, _ telegramMessageDraft) error {
 	if a.calls.Add(1) == 1 {
 		close(a.started)
 	}
@@ -184,16 +183,15 @@ func (a *cancellingTelegramAPI) sendRichMessageDraft(ctx context.Context, _ tele
 }
 func (*cancellingTelegramAPI) sendRichMessage(context.Context, telegramRichMessage) error { return nil }
 
-func TestTelegramTrackedJobCancellationAbortsInflightDraftRequest(t *testing.T) {
+func TestTelegramTurnCancellationAbortsInflightDraftRequest(t *testing.T) {
 	api := &cancellingTelegramAPI{started: make(chan struct{}), returned: make(chan struct{})}
-	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
-	defer session.Close()
+	_, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
 	select {
 	case <-api.started:
 	case <-time.After(time.Second):
 		t.Fatal("draft request did not start")
 	}
-	job.Cancel()
+	session.Close()
 	select {
 	case <-api.returned:
 	case <-time.After(time.Second):
@@ -202,15 +200,28 @@ func TestTelegramTrackedJobCancellationAbortsInflightDraftRequest(t *testing.T) 
 	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "must not restart previews"})
 	time.Sleep(telegramStreamInterval + 50*time.Millisecond)
 	if got := api.calls.Load(); got != 1 {
-		t.Fatalf("draft calls after job cancellation = %d, want 1", got)
+		t.Fatalf("draft calls after turn cancellation = %d, want 1", got)
 	}
-	select {
-	case <-session.done:
-		t.Fatal("job cancellation stopped final-delivery orchestration")
-	default:
+}
+
+func TestTelegramJobCompletionDoesNotCancelPendingTurnPreview(t *testing.T) {
+	api := &telegramStreamAPI{}
+	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
+	defer session.Close()
+	waitTelegramStream(t, func() bool { drafts, _ := api.snapshot(); return len(drafts) == 1 })
+
+	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "completed answer"})
+	// Agent.consumeJob cancels its job context when computation completes. The
+	// Telegram consumer belongs to the surrounding turn and must remain alive
+	// long enough for the handler to drain it.
+	job.Cancel()
+	if err := session.Flush(); err != nil {
+		t.Fatalf("Flush after job completion: %v", err)
 	}
-	if err := session.Finalize("answer after cancellation", nil); err != nil {
-		t.Fatalf("Finalize after cancellation: %v", err)
+
+	drafts, _ := api.snapshot()
+	if got := drafts[len(drafts)-1].Text; got != "completed answer"+telegramStreamCursor {
+		t.Fatalf("flushed draft = %q, want completed answer", got)
 	}
 }
 
@@ -224,7 +235,7 @@ type contextRecordingTelegramAPI struct {
 	contexts []context.Context
 }
 
-func (*contextRecordingTelegramAPI) sendRichMessageDraft(context.Context, telegramRichMessageDraft) error {
+func (*contextRecordingTelegramAPI) sendMessageDraft(context.Context, telegramMessageDraft) error {
 	return nil
 }
 
@@ -239,7 +250,7 @@ func (a *contextRecordingTelegramAPI) sendRichMessage(ctx context.Context, _ tel
 	return errors.New("force fallback delivery")
 }
 
-func (*orderedTelegramAPI) sendRichMessageDraft(context.Context, telegramRichMessageDraft) error {
+func (*orderedTelegramAPI) sendMessageDraft(context.Context, telegramMessageDraft) error {
 	return nil
 }
 func (a *orderedTelegramAPI) sendRichMessage(_ context.Context, m telegramRichMessage) error {
@@ -356,7 +367,7 @@ func TestTelegramAskOptionsAttachMatchingSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	drafts, _ := api.snapshot()
-	if got := drafts[len(drafts)-1].RichMessage.Markdown; got != "hello" {
+	if got := drafts[len(drafts)-1].Text; got != "hello"+telegramStreamCursor {
 		t.Fatalf("preview = %q, want hello", got)
 	}
 }

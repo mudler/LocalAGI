@@ -15,7 +15,7 @@ import (
 
 type telegramStreamAPI struct {
 	mu       sync.Mutex
-	drafts   []telegramRichMessageDraft
+	drafts   []telegramMessageDraft
 	finals   []telegramRichMessage
 	draftErr func(int) error
 	finalErr func(int) error
@@ -24,7 +24,7 @@ type telegramStreamAPI struct {
 	block    time.Duration
 }
 
-func (a *telegramStreamAPI) sendRichMessageDraft(_ context.Context, draft telegramRichMessageDraft) error {
+func (a *telegramStreamAPI) sendMessageDraft(_ context.Context, draft telegramMessageDraft) error {
 	n := a.inCall.Add(1)
 	defer a.inCall.Add(-1)
 	for old := a.maxCalls.Load(); n > old && !a.maxCalls.CompareAndSwap(old, n); old = a.maxCalls.Load() {
@@ -57,10 +57,10 @@ func (a *telegramStreamAPI) sendRichMessage(_ context.Context, final telegramRic
 	return nil
 }
 
-func (a *telegramStreamAPI) snapshot() ([]telegramRichMessageDraft, []telegramRichMessage) {
+func (a *telegramStreamAPI) snapshot() ([]telegramMessageDraft, []telegramRichMessage) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return append([]telegramRichMessageDraft(nil), a.drafts...), append([]telegramRichMessage(nil), a.finals...)
+	return append([]telegramMessageDraft(nil), a.drafts...), append([]telegramRichMessage(nil), a.finals...)
 }
 
 func waitTelegramStream(t *testing.T, condition func() bool) {
@@ -93,7 +93,7 @@ func TestTelegramStreamPrivateUsesStableDraftAndRateLimitsSerializedCalls(t *tes
 	if drafts[0].DraftID == 0 || drafts[1].DraftID != drafts[0].DraftID {
 		t.Fatalf("draft IDs = %d, %d, want same nonzero ID", drafts[0].DraftID, drafts[1].DraftID)
 	}
-	if drafts[0].RichMessage.Markdown != telegramThinkingMessage || drafts[1].RichMessage.Markdown != "one two three" {
+	if drafts[0].Text != telegramThinkingMessage+telegramStreamCursor || drafts[1].Text != "one two three"+telegramStreamCursor {
 		t.Fatalf("drafts = %#v", drafts)
 	}
 	if api.maxCalls.Load() != 1 {
@@ -112,10 +112,10 @@ func TestTelegramStreamAlwaysDeliversThinkingBeforeImmediateContent(t *testing.T
 
 	waitTelegramStream(t, func() bool { drafts, _ := api.snapshot(); return len(drafts) == 2 })
 	drafts, _ := api.snapshot()
-	if got := drafts[0].RichMessage.Markdown; got != telegramThinkingMessage {
+	if got := drafts[0].Text; got != telegramThinkingMessage+telegramStreamCursor {
 		t.Fatalf("initial draft = %q, want thinking draft", got)
 	}
-	if got := drafts[1].RichMessage.Markdown; got != "immediate" {
+	if got := drafts[1].Text; got != "immediate"+telegramStreamCursor {
 		t.Fatalf("content draft = %q, want immediate content without another event", got)
 	}
 }
@@ -123,7 +123,7 @@ func TestTelegramStreamAlwaysDeliversThinkingBeforeImmediateContent(t *testing.T
 func TestTelegramStreamRetryAfterRetainsLatestPreview(t *testing.T) {
 	api := &telegramStreamAPI{draftErr: func(i int) error {
 		if i == 2 {
-			return &telegramAPIError{Method: "sendRichMessageDraft", ErrorCode: 429, RetryAfter: 1}
+			return &telegramAPIError{Method: "sendMessageDraft", ErrorCode: 429, RetryAfter: 1}
 		}
 		return nil
 	}}
@@ -135,7 +135,7 @@ func TestTelegramStreamRetryAfterRetainsLatestPreview(t *testing.T) {
 	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: " latest"})
 	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 3 })
 	drafts, _ := api.snapshot()
-	if got := drafts[2].RichMessage.Markdown; got != "first latest" {
+	if got := drafts[2].Text; got != "first latest"+telegramStreamCursor {
 		t.Fatalf("retried preview = %q", got)
 	}
 }
@@ -155,7 +155,7 @@ func TestTelegramStreamEditRetryAfterReschedulesPendingPreviewWithoutNewContent(
 
 	select {
 	case text := <-got:
-		if text != telegramThinkingMessage {
+		if text != telegramThinkingMessage+telegramStreamCursor {
 			t.Fatalf("retried preview = %q, want thinking preview", text)
 		}
 	case <-time.After(2 * time.Second):
@@ -187,7 +187,7 @@ func TestTelegramStreamNativeFailureFallsBackOnlyForThatSession(t *testing.T) {
 	waitTelegramStream(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
-		return len(edits[1]) > 0 && edits[1][len(edits[1])-1] == "fallback"
+		return len(edits[1]) > 0 && edits[1][len(edits[1])-1] == "fallback"+telegramStreamCursor
 	})
 	waitTelegramStream(t, func() bool { d, _ := healthy.snapshot(); return len(d) >= 2 })
 	mu.Lock()
@@ -237,7 +237,7 @@ func TestTelegramStreamFlushDeliversPendingContentBeforeReturning(t *testing.T) 
 	if len(drafts) != 2 {
 		t.Fatalf("drafts when Flush returned = %d, want pending content delivered", len(drafts))
 	}
-	if got := drafts[1].RichMessage.Markdown; got != "pending answer" {
+	if got := drafts[1].Text; got != "pending answer"+telegramStreamCursor {
 		t.Fatalf("flushed preview = %q, want pending answer", got)
 	}
 }
@@ -319,8 +319,8 @@ func TestTelegramStreamPreviewUsesUTF8SafeTail(t *testing.T) {
 		t.Fatal(err)
 	}
 	drafts, _ := api.snapshot()
-	got := drafts[len(drafts)-1].RichMessage.Markdown
-	if len([]rune(got)) != telegramMaxMessageLength || got != strings.Repeat("🙂", telegramMaxMessageLength) {
+	got := drafts[len(drafts)-1].Text
+	if len([]rune(got)) != telegramMaxMessageLength || got != strings.Repeat("🙂", telegramMaxMessageLength-len([]rune(telegramStreamCursor)))+telegramStreamCursor {
 		t.Fatalf("preview rune length = %d, want tail of %d", len([]rune(got)), telegramMaxMessageLength)
 	}
 	if s.content != full {
@@ -338,7 +338,7 @@ func TestTelegramStreamPrivateShowsPublishedStatusBeforeContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	drafts, _ := api.snapshot()
-	if got := drafts[len(drafts)-1].RichMessage.Markdown; got != "checking sources" {
+	if got := drafts[len(drafts)-1].Text; got != "checking sources"+telegramStreamCursor {
 		t.Fatalf("status = %q", got)
 	}
 	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "answer"})
@@ -346,7 +346,7 @@ func TestTelegramStreamPrivateShowsPublishedStatusBeforeContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	drafts, _ = api.snapshot()
-	if got := drafts[len(drafts)-1].RichMessage.Markdown; got != "answer" {
+	if got := drafts[len(drafts)-1].Text; got != "answer"+telegramStreamCursor {
 		t.Fatalf("answer = %q", got)
 	}
 }
@@ -402,7 +402,7 @@ func TestTelegramStreamGroupEditsPlaceholder(t *testing.T) {
 	defer s.Close()
 	select {
 	case text := <-got:
-		if text != telegramThinkingMessage {
+		if text != telegramThinkingMessage+telegramStreamCursor {
 			t.Fatalf("initial edit = %q", text)
 		}
 	case <-time.After(time.Second):
@@ -411,7 +411,7 @@ func TestTelegramStreamGroupEditsPlaceholder(t *testing.T) {
 	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "group answer"})
 	select {
 	case text := <-got:
-		if text != "group answer" {
+		if text != "group answer"+telegramStreamCursor {
 			t.Fatalf("content edit = %q", text)
 		}
 	case <-time.After(time.Second):
@@ -483,7 +483,7 @@ func TestTelegramStreamNativeDraftHeartbeatAndClose(t *testing.T) {
 	s := newTelegramStreamSessionWithHeartbeat(context.Background(), api, 42, true, telegramStreamDelivery{}, 20*time.Millisecond)
 	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) >= 2 })
 	drafts, _ := api.snapshot()
-	if drafts[0].DraftID != drafts[1].DraftID || drafts[0].RichMessage.Markdown != drafts[1].RichMessage.Markdown {
+	if drafts[0].DraftID != drafts[1].DraftID || drafts[0].Text != drafts[1].Text {
 		t.Fatalf("heartbeats changed draft: %#v", drafts[:2])
 	}
 	s.Close()

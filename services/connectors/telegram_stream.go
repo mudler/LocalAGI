@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/mudler/cogito"
+	"github.com/mudler/xlog"
 )
 
 const telegramStreamInterval = 400 * time.Millisecond
 const telegramDraftHeartbeatInterval = 25 * time.Second
+const telegramStreamCursor = " ▉"
 
 type telegramStreamDelivery struct {
 	editPreview   func(context.Context, int64, string) error
@@ -271,7 +273,10 @@ func (s *telegramStreamSession) run() {
 				schedule(when)
 				continue
 			}
-			attempted, retry, _ := s.deliverPreview()
+			attempted, retry, err := s.deliverPreview()
+			if err != nil && retry == 0 && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+				xlog.Warn("Telegram preview delivery failed", "chat_id", s.chatID, "error", err)
+			}
 			if attempted {
 				nextPreview = time.Now().Add(telegramStreamInterval)
 			}
@@ -298,7 +303,7 @@ func (s *telegramStreamSession) previewSnapshot() (string, uint64, bool, bool) {
 		return "", 0, false, false
 	}
 	if s.thinkingPending {
-		return telegramThinkingMessage, s.version, true, true
+		return telegramThinkingMessage + telegramStreamCursor, s.version, true, true
 	}
 	text := s.content
 	if text == "" {
@@ -307,7 +312,8 @@ func (s *telegramStreamSession) previewSnapshot() (string, uint64, bool, bool) {
 			text = telegramThinkingMessage
 		}
 	}
-	return telegramPreviewTail(text, telegramMaxMessageLength), s.version, true, false
+	limit := telegramMaxMessageLength - len([]rune(telegramStreamCursor))
+	return telegramPreviewTail(text, limit) + telegramStreamCursor, s.version, true, false
 }
 
 func telegramPreviewTail(text string, limit int) string {
@@ -341,12 +347,16 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration, error) {
 	}
 	var err error
 	if s.private {
-		err = s.api.sendRichMessageDraft(s.ctx, telegramRichMessageDraft{ChatID: s.chatID, DraftID: s.draftID, RichMessage: telegramInputRichMessage{Markdown: text}})
+		err = s.api.sendMessageDraft(s.ctx, telegramMessageDraft{ChatID: s.chatID, DraftID: s.draftID, Text: text})
 		var apiErr *telegramAPIError
 		if errors.As(err, &apiErr) && apiErr.RetryAfter > 0 {
 			return true, time.Duration(apiErr.RetryAfter) * time.Second, err
 		}
 		if err != nil {
+			if s.ctx.Err() != nil {
+				return true, 0, err
+			}
+			xlog.Warn("Telegram sendMessageDraft failed; falling back to editable message", "chat_id", s.chatID, "error", err)
 			s.private = false
 			if s.delivery.editPreview != nil {
 				err = s.delivery.editPreview(s.ctx, s.chatID, text)
