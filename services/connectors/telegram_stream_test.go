@@ -328,12 +328,13 @@ func TestTelegramStreamPreviewUsesUTF8SafeTail(t *testing.T) {
 	}
 }
 
-func TestTelegramStreamPrivateShowsPublishedStatusBeforeContent(t *testing.T) {
+func TestTelegramStreamPrivateAccumulatesReasoningBeforeContent(t *testing.T) {
 	api := &telegramStreamAPI{}
 	s := newTelegramStreamSession(context.Background(), api, 5, true, telegramStreamDelivery{})
 	defer s.Close()
 	waitTelegramStream(t, func() bool { d, _ := api.snapshot(); return len(d) == 1 })
-	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventReasoning, Content: "checking sources"})
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventReasoning, Content: "checking "})
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventReasoning, Content: "sources"})
 	if err := s.Flush(); err != nil {
 		t.Fatal(err)
 	}
