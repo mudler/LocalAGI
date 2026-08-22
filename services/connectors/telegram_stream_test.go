@@ -264,6 +264,50 @@ func TestTelegramStreamFlushReportsPendingRetryPromptly(t *testing.T) {
 	}
 }
 
+func TestTelegramStreamFlushReportsPersistentEditErrorAndFinalizeSucceeds(t *testing.T) {
+	previewErr := errors.New("persistent edit failure")
+	var editCalls atomic.Int32
+	api := &telegramStreamAPI{}
+	s := newTelegramStreamSession(context.Background(), api, -5, false, telegramStreamDelivery{
+		editPreview: func(context.Context, int64, string) error {
+			editCalls.Add(1)
+			return previewErr
+		},
+	})
+	defer s.Close()
+	waitTelegramStream(t, func() bool { return editCalls.Load() == 1 })
+
+	s.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "answer"})
+	started := time.Now()
+	if err := s.Flush(); !errors.Is(err, previewErr) {
+		t.Fatalf("Flush error = %v, want %v", err, previewErr)
+	}
+	if elapsed := time.Since(started); elapsed > 500*time.Millisecond {
+		t.Fatalf("Flush took %v, want less than 500ms", elapsed)
+	}
+	if got := editCalls.Load(); got != 2 {
+		t.Fatalf("edit calls after Flush = %d, want 2", got)
+	}
+	s.mu.Lock()
+	dirty := s.dirty
+	s.mu.Unlock()
+	if !dirty {
+		t.Fatal("Flush cleared preview state after delivery error")
+	}
+
+	if err := s.Finalize("answer", nil); err != nil {
+		t.Fatalf("Finalize after Flush error: %v", err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 1 || finals[0].RichMessage.Markdown != "answer" {
+		t.Fatalf("finals = %#v", finals)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if got := editCalls.Load(); got != 2 {
+		t.Fatalf("edit calls after Finalize = %d, want no busy retry loop", got)
+	}
+}
+
 func TestTelegramStreamPreviewUsesUTF8SafeTail(t *testing.T) {
 	api := &telegramStreamAPI{}
 	s := newTelegramStreamSession(context.Background(), api, 5, true, telegramStreamDelivery{})

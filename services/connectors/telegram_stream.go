@@ -238,13 +238,18 @@ func (s *telegramStreamSession) run() {
 					command.done <- errors.New("Telegram preview pending retry")
 					continue
 				}
-				attempted, retry := s.deliverPreview()
+				attempted, retry, err := s.deliverPreview()
 				if attempted {
 					nextPreview = time.Now().Add(telegramStreamInterval)
 				}
 				if retry > 0 {
 					retryUntil = time.Now().Add(retry)
 					command.done <- errors.New("Telegram preview pending retry")
+					continue
+				}
+				if err != nil {
+					command.done <- err
+					schedulePending()
 					continue
 				}
 				flushWaiters = append(flushWaiters, command.done)
@@ -266,7 +271,7 @@ func (s *telegramStreamSession) run() {
 				schedule(when)
 				continue
 			}
-			attempted, retry := s.deliverPreview()
+			attempted, retry, _ := s.deliverPreview()
 			if attempted {
 				nextPreview = time.Now().Add(telegramStreamInterval)
 			}
@@ -326,20 +331,20 @@ func telegramStreamStatus(event cogito.StreamEvent) string {
 	return ""
 }
 
-func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
+func (s *telegramStreamSession) deliverPreview() (bool, time.Duration, error) {
 	if s.ctx.Err() != nil {
-		return false, 0
+		return false, 0, nil
 	}
 	text, version, ok, thinking := s.previewSnapshot()
 	if !ok {
-		return false, 0
+		return false, 0, nil
 	}
 	var err error
 	if s.private {
 		err = s.api.sendRichMessageDraft(s.ctx, telegramRichMessageDraft{ChatID: s.chatID, DraftID: s.draftID, RichMessage: telegramInputRichMessage{Markdown: text}})
 		var apiErr *telegramAPIError
 		if errors.As(err, &apiErr) && apiErr.RetryAfter > 0 {
-			return true, time.Duration(apiErr.RetryAfter) * time.Second
+			return true, time.Duration(apiErr.RetryAfter) * time.Second, err
 		}
 		if err != nil {
 			s.private = false
@@ -352,7 +357,7 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 	}
 	var apiErr *telegramAPIError
 	if errors.As(err, &apiErr) && apiErr.RetryAfter > 0 {
-		return true, time.Duration(apiErr.RetryAfter) * time.Second
+		return true, time.Duration(apiErr.RetryAfter) * time.Second, err
 	}
 	if err == nil {
 		s.mu.Lock()
@@ -367,7 +372,7 @@ func (s *telegramStreamSession) deliverPreview() (bool, time.Duration) {
 		}
 		s.mu.Unlock()
 	}
-	return true, 0
+	return true, 0, err
 }
 
 func (s *telegramStreamSession) deliverFinal(markdown string, urls []string) error {
