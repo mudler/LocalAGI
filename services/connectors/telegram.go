@@ -22,20 +22,24 @@ import (
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/services/connectors/common"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
+	"github.com/mudler/LocalAGI/services/connectors/common"
 	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
 )
 
 const telegramThinkingMessage = "🤔 thinking..."
 const telegramMaxMessageLength = 3000
+const telegramStreamingMetadataKey = "telegram_streaming"
 
 type Telegram struct {
 	Token string
 	bot   *bot.Bot
 	agent *agent.Agent
+	api   telegramAPI
+
+	streaming bool
 
 	admins []string
 
@@ -51,6 +55,155 @@ type Telegram struct {
 	channelID   string
 	groupMode   bool
 	mentionOnly bool
+}
+
+func telegramAskOptions(history []openai.ChatCompletionMessage, jobUUID string, metadata map[string]any, session *telegramStreamSession) []types.JobOption {
+	opts := []types.JobOption{
+		types.WithConversationHistory(history),
+		types.WithUUID(jobUUID),
+		types.WithMetadata(metadata),
+	}
+	if session != nil {
+		opts = append(opts, types.WithStreamCallback(session.Accept))
+	}
+	return opts
+}
+
+func telegramNewJobWithStream(parent context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery, history []openai.ChatCompletionMessage, jobUUID string, metadata map[string]any) (*types.Job, *telegramStreamSession) {
+	if metadata == nil {
+		metadata = make(map[string]any)
+	}
+	metadata[telegramStreamingMetadataKey] = true
+	opts := append(telegramAskOptions(history, jobUUID, metadata, nil), types.WithContext(parent))
+	job := types.NewJob(opts...)
+	session := newTelegramStreamSessionWithContexts(parent, job.GetContext(), api, chatID, private, delivery, telegramDraftHeartbeatInterval)
+	job.StreamCallback = session.Accept
+	return job, session
+}
+
+func telegramUseLegacyStatusDelivery(job *types.Job) bool {
+	if job == nil || job.Metadata == nil {
+		return true
+	}
+	streaming, _ := job.Metadata[telegramStreamingMetadataKey].(bool)
+	return !streaming
+}
+
+func telegramDeliverLegacyStatus(job *types.Job, deliver func()) {
+	if telegramUseLegacyStatusDelivery(job) {
+		deliver()
+	}
+}
+
+type telegramMessageBot interface {
+	SendMessage(context.Context, *bot.SendMessageParams) (*models.Message, error)
+	EditMessageText(context.Context, *bot.EditMessageTextParams) (*models.Message, error)
+	DeleteMessage(context.Context, *bot.DeleteMessageParams) (bool, error)
+}
+
+type telegramJobExecutor interface {
+	Execute(*types.Job) *types.JobResult
+}
+
+func telegramExecuteJob(executor telegramJobExecutor, job *types.Job) *types.JobResult {
+	return executor.Execute(job)
+}
+
+func (t *Telegram) telegramDelivery(_ context.Context, b telegramMessageBot, chatID int64, replyTo int, jobUUID string, initialMessageID int) telegramStreamDelivery {
+	var mu sync.Mutex
+	messageID := initialMessageID
+	ensurePlaceholder := func(ctx context.Context, text string, mode models.ParseMode) (int, bool, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if messageID != 0 {
+			return messageID, false, nil
+		}
+		params := &bot.SendMessageParams{ChatID: chatID, Text: text, ParseMode: mode}
+		disabled := true
+		params.LinkPreviewOptions = &models.LinkPreviewOptions{IsDisabled: &disabled}
+		if replyTo != 0 {
+			params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
+		}
+		msg, err := b.SendMessage(ctx, params)
+		if err != nil {
+			return 0, false, err
+		}
+		messageID = msg.ID
+		t.placeholderMutex.Lock()
+		t.placeholders[jobUUID] = messageID
+		t.placeholderMutex.Unlock()
+		return messageID, true, nil
+	}
+	sendChunks := func(ctx context.Context, chunks []string, mode models.ParseMode) error {
+		for i, chunk := range chunks {
+			if i == 0 {
+				if id, created, err := ensurePlaceholder(ctx, chunk, mode); err != nil {
+					return err
+				} else if !created {
+					disabled := true
+					if _, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{ChatID: chatID, MessageID: id, Text: chunk, ParseMode: mode, LinkPreviewOptions: &models.LinkPreviewOptions{IsDisabled: &disabled}}); err != nil {
+						return err
+					}
+				} else if mode != "" {
+					// Creation already delivered identical text. Parse mode is relevant
+					// only to final fallback, whose placeholders normally pre-exist.
+					_ = id
+				}
+				continue
+			}
+			params := &bot.SendMessageParams{ChatID: chatID, Text: chunk, ParseMode: mode}
+			disabled := true
+			params.LinkPreviewOptions = &models.LinkPreviewOptions{IsDisabled: &disabled}
+			if replyTo != 0 {
+				params.ReplyParameters = &models.ReplyParameters{MessageID: replyTo}
+			}
+			if _, err := b.SendMessage(ctx, params); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return telegramStreamDelivery{
+		editPreview: func(ctx context.Context, _ int64, text string) error {
+			id, created, err := ensurePlaceholder(ctx, text, "")
+			if err != nil {
+				return err
+			}
+			if created {
+				return nil
+			}
+			disabled := true
+			_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{ChatID: chatID, MessageID: id, Text: text, LinkPreviewOptions: &models.LinkPreviewOptions{IsDisabled: &disabled}})
+			return err
+		},
+		finalMarkdown: func(ctx context.Context, _ int64, chunks []string) error {
+			return sendChunks(ctx, chunks, models.ParseModeMarkdown)
+		},
+		finalPlain: func(ctx context.Context, _ int64, chunks []string) error {
+			return sendChunks(ctx, chunks, "")
+		},
+		clearPreview: func(ctx context.Context, _ int64) error {
+			mu.Lock()
+			id := messageID
+			messageID = 0
+			mu.Unlock()
+			if id == 0 {
+				return nil
+			}
+			t.placeholderMutex.Lock()
+			delete(t.placeholders, jobUUID)
+			t.placeholderMutex.Unlock()
+			_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{ChatID: chatID, MessageID: id})
+			return err
+		},
+		replyTo: replyTo,
+	}
+}
+
+func telegramFinalSession(ctx context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery) *telegramStreamSession {
+	finalCtx := ctx
+	ctx, cancel := context.WithCancel(ctx)
+	return &telegramStreamSession{ctx: ctx, finalCtx: finalCtx, cancel: cancel, api: api, chatID: chatID, private: private, delivery: delivery}
 }
 
 // isBotMentioned checks if the bot is mentioned in the message
@@ -261,7 +414,7 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 
 	// Add chat ID and conversation_id for tracking and cancel-previous-on-new-message
 	metadata := map[string]interface{}{
-		"chatID": update.Message.Chat.ID,
+		"chatID":                        update.Message.Chat.ID,
 		types.MetadataKeyConversationID: fmt.Sprintf("telegram:%d", update.Message.Chat.ID),
 	}
 
@@ -282,12 +435,15 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 
 	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("telegram:%d", update.Message.Chat.ID))
 
-	// Create a new job with the conversation history and metadata
-	job := types.NewJob(
-		types.WithConversationHistory(currentConv),
-		types.WithUUID(jobUUID),
-		types.WithMetadata(metadata),
-	)
+	delivery := t.telegramDelivery(ctx, b, update.Message.Chat.ID, update.Message.ID, jobUUID, msg.ID)
+	var streamSession *telegramStreamSession
+	var job *types.Job
+	if t.streaming {
+		job, streamSession = telegramNewJobWithStream(ctx, t.api, update.Message.Chat.ID, false, delivery, currentConv, jobUUID, metadata)
+		defer streamSession.Close()
+	} else {
+		job = types.NewJob(telegramAskOptions(currentConv, jobUUID, metadata, nil)...)
+	}
 
 	// Mark this chat as having an active job
 	t.activeJobsMutex.Lock()
@@ -313,20 +469,16 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 		t.placeholderMutex.Unlock()
 	}()
 
-	res := a.Ask(
-		types.WithConversationHistory(currentConv),
-		types.WithUUID(jobUUID),
-		types.WithMetadata(metadata),
-	)
+	res := telegramExecuteJob(a, job)
+	if streamSession != nil {
+		if err := streamSession.Flush(); err != nil {
+			xlog.Error("Error flushing Telegram stream", "error", err)
+		}
+	}
 
 	if res.Response == "" {
 		xlog.Error("Empty response from agent")
-		_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
-			ChatID:    update.Message.Chat.ID,
-			MessageID: msg.ID,
-			Text:      "there was an internal error. try again!",
-		})
-		if err != nil {
+		if err := delivery.finalPlain(ctx, update.Message.Chat.ID, []string{"there was an internal error. try again!"}); err != nil {
 			xlog.Error("Error updating error message", "error", err)
 		}
 		return
@@ -360,12 +512,9 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 				xlog.Error("Error sending audio response", "error", err)
 			} else {
 				xlog.Debug("Audio response sent successfully")
-				// Remove the thinking placeholder message before returning
-				_, err := t.bot.DeleteMessage(ctx, &bot.DeleteMessageParams{
-					ChatID:    update.Message.Chat.ID,
-					MessageID: msg.ID,
-				})
-				if err != nil {
+				// Remove any legacy preview before returning. Native drafts are
+				// superseded by the audio message itself.
+				if err := delivery.clearPreview(ctx, update.Message.Chat.ID); err != nil {
 					xlog.Error("Error deleting thinking placeholder", "error", err)
 				}
 				// Don't send text response if audio was sent successfully
@@ -374,13 +523,7 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 		}
 	}
 
-	// Update the message with the final response
-	formattedResponse := formatResponseWithURLs(res.Response, urls)
-
-	// Split the message if it's too long
-	messages := xstrings.SplitParagraph(formattedResponse, telegramMaxMessageLength)
-
-	if len(messages) == 0 {
+	if len(telegramFormatResponse(res.Response, urls, telegramMaxMessageLength)) == 0 {
 		_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
 			ChatID:    update.Message.Chat.ID,
 			MessageID: msg.ID,
@@ -392,31 +535,14 @@ func (t *Telegram) handleGroupMessage(ctx context.Context, b *bot.Bot, a *agent.
 		return
 	}
 
-	// Update the first message
-	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
-		ChatID:    update.Message.Chat.ID,
-		MessageID: msg.ID,
-		Text:      messages[0],
-		ParseMode: models.ParseModeMarkdown,
-	})
-	if err != nil {
-		xlog.Error("Error updating message", "error", err)
-		return
+	var finalErr error
+	if streamSession != nil {
+		finalErr = streamSession.Finalize(res.Response, urls)
+	} else {
+		finalErr = telegramFinalSession(ctx, t.api, update.Message.Chat.ID, false, delivery).deliverFinal(res.Response, urls)
 	}
-
-	// Send additional chunks as new messages
-	for i := 1; i < len(messages); i++ {
-		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:    update.Message.Chat.ID,
-			Text:      messages[i],
-			ParseMode: models.ParseModeMarkdown,
-			ReplyParameters: &models.ReplyParameters{
-				MessageID: update.Message.ID,
-			},
-		})
-		if err != nil {
-			xlog.Error("Error sending additional message", "error", err)
-		}
+	if finalErr != nil {
+		xlog.Error("Error delivering final Telegram response", "error", finalErr)
 	}
 }
 
@@ -433,29 +559,31 @@ func (t *Telegram) AgentResultCallback() func(state types.ActionState) {
 			return
 		}
 
-		// Update placeholder with tool result if still in progress
-		t.placeholderMutex.Lock()
-		msgID, exists := t.placeholders[job.UUID]
-		if exists && msgID != 0 && t.bot != nil {
-			acc, ok := t.jobStatus[job.UUID]
-			if !ok {
-				acc = common.NewStatusAccumulator()
-				t.jobStatus[job.UUID] = acc
-			}
-			acc.AppendToolResult(common.ActionDisplayName(state.Action), state.Result)
-			thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
-			t.placeholderMutex.Unlock()
-			_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
-				ChatID:    chatID,
-				MessageID: msgID,
-				Text:      thought,
-			})
-			if err != nil {
-				xlog.Error("Error updating tool result message", "error", err)
-			}
+		telegramDeliverLegacyStatus(job, func() {
+			// Update placeholder with tool result if still in progress.
 			t.placeholderMutex.Lock()
-		}
-		t.placeholderMutex.Unlock()
+			msgID, exists := t.placeholders[job.UUID]
+			if exists && msgID != 0 && t.bot != nil {
+				acc, ok := t.jobStatus[job.UUID]
+				if !ok {
+					acc = common.NewStatusAccumulator()
+					t.jobStatus[job.UUID] = acc
+				}
+				acc.AppendToolResult(common.ActionDisplayName(state.Action), state.Result)
+				thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
+				t.placeholderMutex.Unlock()
+				_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
+					ChatID:    chatID,
+					MessageID: msgID,
+					Text:      thought,
+				})
+				if err != nil {
+					xlog.Error("Error updating tool result message", "error", err)
+				}
+				t.placeholderMutex.Lock()
+			}
+			t.placeholderMutex.Unlock()
+		})
 
 		t.activeJobsMutex.Lock()
 		delete(t.activeJobs, chatID)
@@ -465,46 +593,48 @@ func (t *Telegram) AgentResultCallback() func(state types.ActionState) {
 
 func (t *Telegram) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
 	return func(state types.ActionCurrentState) bool {
-		t.placeholderMutex.Lock()
-		msgID, exists := t.placeholders[state.Job.UUID]
-		chatID := int64(0)
-		if state.Job.Metadata != nil {
-			if ch, ok := state.Job.Metadata["chatID"].(int64); ok {
-				chatID = ch
+		telegramDeliverLegacyStatus(state.Job, func() {
+			t.placeholderMutex.Lock()
+			msgID, exists := t.placeholders[state.Job.UUID]
+			chatID := int64(0)
+			if state.Job.Metadata != nil {
+				if ch, ok := state.Job.Metadata["chatID"].(int64); ok {
+					chatID = ch
+				}
 			}
-		}
-		if !exists || msgID == 0 || chatID == 0 || t.bot == nil {
+			if !exists || msgID == 0 || chatID == 0 || t.bot == nil {
+				t.placeholderMutex.Unlock()
+				return
+			}
+
+			if state.Reasoning == "" && state.Action == nil {
+				t.placeholderMutex.Unlock()
+				return
+			}
+
+			acc, ok := t.jobStatus[state.Job.UUID]
+			if !ok {
+				acc = common.NewStatusAccumulator()
+				t.jobStatus[state.Job.UUID] = acc
+			}
+			if state.Reasoning != "" {
+				acc.AppendReasoning(state.Reasoning)
+			}
+			if state.Action != nil {
+				acc.AppendToolCall(common.ActionDisplayName(state.Action), state.Params.String())
+			}
+			thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
 			t.placeholderMutex.Unlock()
-			return true
-		}
 
-		if state.Reasoning == "" && state.Action == nil {
-			t.placeholderMutex.Unlock()
-			return true
-		}
-
-		acc, ok := t.jobStatus[state.Job.UUID]
-		if !ok {
-			acc = common.NewStatusAccumulator()
-			t.jobStatus[state.Job.UUID] = acc
-		}
-		if state.Reasoning != "" {
-			acc.AppendReasoning(state.Reasoning)
-		}
-		if state.Action != nil {
-			acc.AppendToolCall(common.ActionDisplayName(state.Action), state.Params.String())
-		}
-		thought := acc.BuildMessage(telegramThinkingMessage, telegramMaxMessageLength)
-		t.placeholderMutex.Unlock()
-
-		_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
-			ChatID:    chatID,
-			MessageID: msgID,
-			Text:      thought,
+			_, err := t.bot.EditMessageText(t.agent.Context(), &bot.EditMessageTextParams{
+				ChatID:    chatID,
+				MessageID: msgID,
+				Text:      thought,
+			})
+			if err != nil {
+				xlog.Error("Error updating reasoning message", "error", err)
+			}
 		})
-		if err != nil {
-			xlog.Error("Error updating reasoning message", "error", err)
-		}
 		return true
 	}
 }
@@ -672,19 +802,6 @@ func (t *Telegram) handleMultimediaContent(ctx context.Context, chatID int64, re
 	return urls, nil
 }
 
-// formatResponseWithURLs formats the response text and creates message entities for URLs
-func formatResponseWithURLs(response string, urls []string) string {
-	finalResponse := response
-	if len(urls) > 0 {
-		finalResponse += "\n\nReferences:\n"
-		for i, url := range urls {
-			finalResponse += fmt.Sprintf("🔗 %d. %s\n", i+1, url)
-		}
-	}
-
-	return bot.EscapeMarkdown(finalResponse)
-}
-
 func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent, update *models.Update) {
 	if update.Message == nil || update.Message.From == nil {
 		xlog.Debug("Message or user is nil", "update", update)
@@ -738,27 +855,23 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		message,
 	)
 
-	// Send initial placeholder message
-	msg, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID:    update.Message.Chat.ID,
-		Text:      bot.EscapeMarkdown(telegramThinkingMessage),
-		ParseMode: models.ParseModeMarkdown,
-	})
-	if err != nil {
-		xlog.Error("Error sending initial message", "error", err)
-		return
+	msg := &models.Message{}
+	jobUUID := types.NewJob().UUID
+	if !t.streaming {
+		msg, err = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: update.Message.Chat.ID, Text: bot.EscapeMarkdown(telegramThinkingMessage), ParseMode: models.ParseModeMarkdown})
+		if err != nil {
+			xlog.Error("Error sending initial message", "error", err)
+			return
+		}
+		jobUUID = fmt.Sprintf("%d", msg.ID)
+		t.placeholderMutex.Lock()
+		t.placeholders[jobUUID] = msg.ID
+		t.placeholderMutex.Unlock()
 	}
-
-	// Store the UUID->placeholder message mapping
-	jobUUID := fmt.Sprintf("%d", msg.ID)
-
-	t.placeholderMutex.Lock()
-	t.placeholders[jobUUID] = msg.ID
-	t.placeholderMutex.Unlock()
 
 	// Add chat ID and conversation_id for tracking and cancel-previous-on-new-message
 	metadata := map[string]interface{}{
-		"chatID": update.Message.Chat.ID,
+		"chatID":                        update.Message.Chat.ID,
 		types.MetadataKeyConversationID: fmt.Sprintf("telegram:%d", update.Message.Chat.ID),
 	}
 
@@ -767,12 +880,15 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		metadata["originalMessageType"] = "audio"
 	}
 
-	// Create a new job with the conversation history and metadata
-	job := types.NewJob(
-		types.WithConversationHistory(currentConv),
-		types.WithUUID(jobUUID),
-		types.WithMetadata(metadata),
-	)
+	delivery := t.telegramDelivery(ctx, b, update.Message.Chat.ID, 0, jobUUID, msg.ID)
+	var streamSession *telegramStreamSession
+	var job *types.Job
+	if t.streaming {
+		job, streamSession = telegramNewJobWithStream(ctx, t.api, update.Message.Chat.ID, true, delivery, currentConv, jobUUID, metadata)
+		defer streamSession.Close()
+	} else {
+		job = types.NewJob(telegramAskOptions(currentConv, jobUUID, metadata, nil)...)
+	}
 
 	// Mark this chat as having an active job
 	t.activeJobsMutex.Lock()
@@ -798,20 +914,16 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		t.placeholderMutex.Unlock()
 	}()
 
-	res := a.Ask(
-		types.WithConversationHistory(currentConv),
-		types.WithUUID(jobUUID),
-		types.WithMetadata(metadata),
-	)
+	res := telegramExecuteJob(a, job)
+	if streamSession != nil {
+		if err := streamSession.Flush(); err != nil {
+			xlog.Error("Error flushing Telegram stream", "error", err)
+		}
+	}
 
 	if res.Response == "" {
 		xlog.Error("Empty response from agent")
-		_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
-			ChatID:    update.Message.Chat.ID,
-			MessageID: msg.ID,
-			Text:      "there was an internal error. try again!",
-		})
-		if err != nil {
+		if err := delivery.finalPlain(ctx, update.Message.Chat.ID, []string{"there was an internal error. try again!"}); err != nil {
 			xlog.Error("Error updating error message", "error", err)
 		}
 		return
@@ -844,12 +956,9 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 				xlog.Error("Error sending audio response", "error", err)
 			} else {
 				xlog.Debug("Audio response sent successfully")
-				// Remove the thinking placeholder message before returning
-				_, err := t.bot.DeleteMessage(ctx, &bot.DeleteMessageParams{
-					ChatID:    update.Message.Chat.ID,
-					MessageID: msg.ID,
-				})
-				if err != nil {
+				// Remove any legacy preview before returning. Native drafts are
+				// superseded by the audio message itself.
+				if err := delivery.clearPreview(ctx, update.Message.Chat.ID); err != nil {
 					xlog.Error("Error deleting thinking placeholder", "error", err)
 				}
 				// Don't send text response if audio was sent successfully
@@ -858,13 +967,7 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		}
 	}
 
-	// Update the message with the final response
-	formattedResponse := formatResponseWithURLs(res.Response, urls)
-
-	// Split the message if it's too long
-	messages := xstrings.SplitParagraph(formattedResponse, telegramMaxMessageLength)
-
-	if len(messages) == 0 {
+	if len(telegramFormatResponse(res.Response, urls, telegramMaxMessageLength)) == 0 {
 		_, err := b.EditMessageText(ctx, &bot.EditMessageTextParams{
 			ChatID:    update.Message.Chat.ID,
 			MessageID: msg.ID,
@@ -877,28 +980,14 @@ func (t *Telegram) handleUpdate(ctx context.Context, b *bot.Bot, a *agent.Agent,
 		return
 	}
 
-	// Update the first message
-	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
-		ChatID:    update.Message.Chat.ID,
-		MessageID: msg.ID,
-		Text:      messages[0],
-		ParseMode: models.ParseModeMarkdown,
-	})
-	if err != nil {
-		xlog.Error("Error updating message", "error", err)
-		return
+	var finalErr error
+	if streamSession != nil {
+		finalErr = streamSession.Finalize(res.Response, urls)
+	} else {
+		finalErr = telegramFinalSession(ctx, t.api, update.Message.Chat.ID, true, delivery).deliverFinal(res.Response, urls)
 	}
-
-	// Send additional chunks as new messages
-	for i := 1; i < len(messages); i++ {
-		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:    update.Message.Chat.ID,
-			Text:      messages[i],
-			ParseMode: models.ParseModeMarkdown,
-		})
-		if err != nil {
-			xlog.Error("Error sending additional message", "error", err)
-		}
+	if finalErr != nil {
+		xlog.Error("Error delivering final Telegram response", "error", finalErr)
 	}
 }
 
@@ -1032,8 +1121,15 @@ func NewTelegramConnector(config map[string]string) (*Telegram, error) {
 		admins = append(admins, strings.Split(config["admins"], ",")...)
 	}
 
+	streaming := true
+	if value, ok := config["streaming"]; ok {
+		streaming = value != "false"
+	}
+
 	return &Telegram{
 		Token:        token,
+		api:          newTelegramHTTPAPI(token, http.DefaultClient, ""),
+		streaming:    streaming,
 		admins:       admins,
 		placeholders: make(map[string]int),
 		jobStatus:    make(map[string]*common.StatusAccumulator),
@@ -1076,6 +1172,13 @@ func TelegramConfigMeta() []config.Field {
 			Label:    "Mention Only",
 			Type:     config.FieldTypeCheckbox,
 			HelpText: "Bot will only respond when mentioned in group chats",
+		},
+		{
+			Name:         "streaming",
+			Label:        "Streaming",
+			Type:         config.FieldTypeCheckbox,
+			DefaultValue: true,
+			HelpText:     "Show progressive response previews (native rich drafts in private chats and edited placeholders in groups)",
 		},
 	}
 }

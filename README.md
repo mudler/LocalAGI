@@ -14,6 +14,8 @@
 
 Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/LocalAGI_bot)
 
+Telegram response streaming is enabled by default (`"streaming": "true"`). Private chats use native rich drafts, while groups progressively edit a placeholder. Set `"streaming": "false"` to suppress previews; final responses still use rich Markdown with MarkdownV2 and plain-text fallbacks.
+
 </div>
 
 Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
@@ -826,6 +828,12 @@ Configuration options:
 - `mention_only`: When enabled, bot only responds when mentioned in groups
 - `admins`: Comma-separated list of Telegram usernames allowed to use the bot in private chats
 - `channel_id`: Optional channel ID for the bot to send messages to
+- `streaming`: Show progressive responses. Defaults to `true`; set it to `false` for final-only output.
+
+Private chats use native rich drafts when the configured Telegram Bot API
+supports the current rich-message methods. If those methods are unavailable,
+the connector automatically falls back to progressive message edits. Final
+responses fall back from rich Markdown to MarkdownV2 and then plain text.
 
 > **Important**: For group functionality to work properly:
 > 1. Go to @BotFather
