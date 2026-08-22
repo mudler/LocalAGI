@@ -14,6 +14,8 @@
 
 Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/LocalAGI_bot)
 
+Telegram response streaming is enabled by default (`"streaming": "true"`). Private chats use native rich drafts, while groups progressively edit a placeholder. Set `"streaming": "false"` to suppress previews; final responses still use rich Markdown with MarkdownV2 and plain-text fallbacks.
+
 </div>
 
 Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
@@ -239,7 +241,8 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_BASE_URL` | Optional base URL for the app (only relevant when using an external LocalRAG URL; not used for built-in knowledge base) |
+| `LOCALAGI_LOCALRAG_URL` | Optional URL when using an external LocalRAG URL; not used for built-in knowledge base |
+| `LOCALAGI_BASE_URL` | Optional base URL for the app (defaults to ":3000") |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
@@ -825,6 +828,12 @@ Configuration options:
 - `mention_only`: When enabled, bot only responds when mentioned in groups
 - `admins`: Comma-separated list of Telegram usernames allowed to use the bot in private chats
 - `channel_id`: Optional channel ID for the bot to send messages to
+- `streaming`: Show progressive responses. Defaults to `true`; set it to `false` for final-only output.
+
+Private chats use native rich drafts when the configured Telegram Bot API
+supports the current rich-message methods. If those methods are unavailable,
+the connector automatically falls back to progressive message edits. Final
+responses fall back from rich Markdown to MarkdownV2 and then plain text.
 
 > **Important**: For group functionality to work properly:
 > 1. Go to @BotFather
@@ -1049,7 +1058,8 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_BASE_URL` | Optional base URL for built-in knowledge base (default `http://localhost:3000`) |
+| `LOCALAGI_LOCALRAG_URL` | Optional URL when using an external LocalRAG URL; not used for built-in knowledge base |
+| `LOCALAGI_BASE_URL` | Optional base URL for the app (defaults to ":3000") |
 | `LOCALAGI_SSHBOX_URL` | LocalAGI SSHBox URL, e.g. user:pass@ip:port |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |

@@ -63,6 +63,39 @@ type backendInProcess struct {
 
 var _ Backend = (*backendInProcess)(nil)
 
+// lookup returns the cached collection KB for name. If the cache holds a
+// placeholder (nil entry — the engine init failed at startup, e.g. because
+// the embedding service was momentarily unreachable when iterating over
+// existing collections in NewInProcessBackend) it attempts to re-initialise
+// the engine now so a transient outage doesn't permanently 404 a collection
+// that still has data on disk / in the vector DB. Returns (nil, false) only
+// when the collection isn't known at all, or when re-init still fails.
+func (b *backendInProcess) lookup(name string) (*rag.PersistentKB, bool) {
+	b.state.Mu.RLock()
+	kb, exists := b.state.Collections[name]
+	b.state.Mu.RUnlock()
+	if !exists {
+		return nil, false
+	}
+	if kb != nil {
+		return kb, true
+	}
+	// Placeholder: collection is known on disk but its engine wrapper failed
+	// to construct earlier. Retry under the write lock.
+	b.state.Mu.Lock()
+	defer b.state.Mu.Unlock()
+	if kb, ok := b.state.Collections[name]; ok && kb != nil {
+		return kb, true
+	}
+	kb = newVectorEngine(b.cfg.VectorEngine, b.openAIClient, b.cfg.LLMAPIURL, b.cfg.LLMAPIKey, name, b.cfg.CollectionDBPath, b.cfg.FileAssets, b.cfg.EmbeddingModel, b.cfg.DatabaseURL, b.cfg.MaxChunkingSize, b.cfg.ChunkOverlap)
+	if kb == nil {
+		return nil, false
+	}
+	b.state.Collections[name] = kb
+	b.state.SourceManager.RegisterCollection(name, kb)
+	return kb, true
+}
+
 func (b *backendInProcess) ListCollections() ([]string, error) {
 	return rag.ListAllCollections(b.cfg.CollectionDBPath), nil
 }
@@ -80,9 +113,7 @@ func (b *backendInProcess) CreateCollection(name string) error {
 }
 
 func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reader) (string, error) {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return "", fmt.Errorf("collection not found: %s", collection)
 	}
@@ -108,9 +139,7 @@ func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reade
 }
 
 func (b *backendInProcess) ListEntries(collection string) ([]string, error) {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return nil, fmt.Errorf("collection not found: %s", collection)
 	}
@@ -118,9 +147,7 @@ func (b *backendInProcess) ListEntries(collection string) ([]string, error) {
 }
 
 func (b *backendInProcess) GetEntryContent(collection, entry string) (string, int, error) {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return "", 0, fmt.Errorf("collection not found: %s", collection)
 	}
@@ -128,9 +155,7 @@ func (b *backendInProcess) GetEntryContent(collection, entry string) (string, in
 }
 
 func (b *backendInProcess) Search(collection, query string, maxResults int) ([]SearchResult, error) {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return nil, fmt.Errorf("collection not found: %s", collection)
 	}
@@ -159,22 +184,18 @@ func (b *backendInProcess) Search(collection, query string, maxResults int) ([]S
 }
 
 func (b *backendInProcess) Reset(collection string) error {
-	b.state.Mu.Lock()
-	kb, exists := b.state.Collections[collection]
-	if exists {
-		delete(b.state.Collections, collection)
-	}
-	b.state.Mu.Unlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return fmt.Errorf("collection not found: %s", collection)
 	}
+	b.state.Mu.Lock()
+	delete(b.state.Collections, collection)
+	b.state.Mu.Unlock()
 	return kb.Reset()
 }
 
 func (b *backendInProcess) DeleteEntry(collection, entry string) ([]string, error) {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return nil, fmt.Errorf("collection not found: %s", collection)
 	}
@@ -186,9 +207,7 @@ func (b *backendInProcess) DeleteEntry(collection, entry string) ([]string, erro
 }
 
 func (b *backendInProcess) AddSource(collection, url string, intervalMin int) error {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return fmt.Errorf("collection not found: %s", collection)
 	}
@@ -201,9 +220,7 @@ func (b *backendInProcess) RemoveSource(collection, url string) error {
 }
 
 func (b *backendInProcess) ListSources(collection string) ([]SourceInfo, error) {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return nil, fmt.Errorf("collection not found: %s", collection)
 	}
@@ -220,9 +237,7 @@ func (b *backendInProcess) ListSources(collection string) ([]SourceInfo, error) 
 }
 
 func (b *backendInProcess) GetEntryFilePath(collection, entry string) (string, error) {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return "", fmt.Errorf("collection not found: %s", collection)
 	}
@@ -230,9 +245,7 @@ func (b *backendInProcess) GetEntryFilePath(collection, entry string) (string, e
 }
 
 func (b *backendInProcess) EntryExists(collection, entry string) bool {
-	b.state.Mu.RLock()
-	kb, exists := b.state.Collections[collection]
-	b.state.Mu.RUnlock()
+	kb, exists := b.lookup(collection)
 	if !exists {
 		return false
 	}
@@ -257,8 +270,14 @@ func NewInProcessBackend(cfg *Config) (Backend, *State) {
 	colls := rag.ListAllCollections(cfg.CollectionDBPath)
 	for _, c := range colls {
 		collection := newVectorEngine(cfg.VectorEngine, openAIClient, cfg.LLMAPIURL, cfg.LLMAPIKey, c, cfg.CollectionDBPath, cfg.FileAssets, cfg.EmbeddingModel, cfg.DatabaseURL, cfg.MaxChunkingSize, cfg.ChunkOverlap)
+		// Register every on-disk collection — even when the engine wrapper
+		// failed to construct (e.g. the embedding service was momentarily
+		// unreachable). A nil entry marks "known on disk but not yet loaded";
+		// backendInProcess.lookup will rehydrate lazily on first access so a
+		// transient outage at boot doesn't permanently 404 collections whose
+		// data is still on disk / in the vector DB.
+		st.Collections[c] = collection
 		if collection != nil {
-			st.Collections[c] = collection
 			st.SourceManager.RegisterCollection(c, collection)
 		}
 	}

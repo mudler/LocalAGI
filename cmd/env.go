@@ -20,6 +20,7 @@ type Env struct {
 	
 	// Directories and paths
 	StateDir                string
+	LocalAGIURL             string
 	LocalRAGURL             string
 	CustomActionsDir        string
 	SSHBoxURL               string
@@ -51,6 +52,7 @@ func LoadEnv() Env {
 		TTSModel:                 envOrDefault("LOCALAGI_TTS_MODEL", ""),
 		Timeout:                  envOrDefault("LOCALAGI_TIMEOUT", "5m"),
 		StateDir:                 envOrDefault("LOCALAGI_STATE_DIR", ""),
+		LocalAGIURL:              envOrDefault("LOCALAGI_BASE_URL", ":3000"),
 		LocalRAGURL:              os.Getenv("LOCALAGI_LOCALRAG_URL"),
 		CustomActionsDir:         os.Getenv("LOCALAGI_CUSTOM_ACTIONS_DIR"),
 		SSHBoxURL:                os.Getenv("LOCALAGI_SSHBOX_URL"),
