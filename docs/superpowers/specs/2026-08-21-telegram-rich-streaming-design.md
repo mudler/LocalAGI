@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Telegram connector streams agent output as Telegram renders it. Private chats use native rich-message drafts. Other chats use progressive message edits. The connector sends the final answer as a persistent rich message.
+The Telegram connector streams agent output as Telegram renders it. Private chats use native message drafts. Other chats use progressive message edits. The connector sends the final answer as a persistent rich message.
 
 Streaming is enabled by default. Operators can disable it with the connector setting `streaming=false`.
 
@@ -27,7 +27,7 @@ Streaming is enabled by default. Operators can disable it with the connector set
 
 ### Private chats
 
-The connector starts a native rich draft with a Telegram thinking block. It appends answer deltas to the draft as the model produces them. Telegram animates updates that use the same nonzero draft ID.
+The connector starts a native draft with a Telegram thinking block. It appends answer deltas to the draft as the model produces them. Telegram animates updates that use the same nonzero draft ID.
 
 The connector sends the completed answer with `sendRichMessage`. The persistent message uses the model's raw Markdown. The ephemeral draft then expires according to Telegram behavior.
 
@@ -37,7 +37,7 @@ The connector sends the existing thinking placeholder as a reply. It edits that 
 
 ### Reasoning and tool activity
 
-Before answer content starts, the preview can show reasoning and tool activity through the existing status accumulator. Answer content takes priority after the first content delta. The connector does not expose hidden reasoning that the agent does not already publish.
+Before answer content starts, the preview can show reasoning and tool activity. Consecutive reasoning deltas append to the visible reasoning buffer; they never replace the preceding delta. Tool status events replace the status text because they describe state transitions rather than token fragments. Answer content takes priority after the first content delta. The connector does not expose hidden reasoning that the agent does not already publish.
 
 ### Disabled streaming
 
@@ -64,7 +64,7 @@ Each incoming Telegram request creates one stream session. The session owns thes
 - Draft ID or placeholder message ID.
 - Accumulated answer content.
 - The most recent delivered content.
-- Delivery mode: rich draft, edited message, or final-only.
+- Delivery mode: native draft, edited message, or final-only.
 - Throttle timer and cancellation context.
 
 The request callback only appends event data and signals the session worker. One worker performs Telegram API calls in order. This structure avoids concurrent edits and protects the model callback from network latency.
@@ -75,7 +75,7 @@ The handler closes and flushes the session before final delivery. Cleanup stops 
 
 The pinned `go-telegram/bot` version does not expose the Bot API 10.2 rich-message methods. A small internal client calls these methods through the Bot API HTTP endpoint:
 
-- `sendRichMessageDraft`
+- `sendMessageDraft`
 - `sendRichMessage`
 
 The client uses typed request and response structures. It uses the request context and returns Telegram's error description. Existing operations continue to use `go-telegram/bot`.
@@ -100,7 +100,7 @@ The connector does not call `bot.EscapeMarkdown` on rich Markdown. The current e
 
 Delivery uses this fallback order:
 
-1. Send a rich draft in a private chat.
+1. Send a native text draft in a private chat.
 2. If the draft fails, switch that response to progressive edits.
 3. Finalize with a rich persistent message or rich edit.
 4. If rich formatting fails, convert the content to Telegram MarkdownV2.
@@ -144,7 +144,8 @@ No token or BotFather setting is required. Unsupported Bot API servers use the f
 
 Unit tests use named, table-driven subtests where cases share a contract. Tests cover these behaviors:
 
-- Private chats start and update one rich draft with a stable draft ID.
+- Private chats start and update one native draft with a stable draft ID.
+- Consecutive reasoning deltas accumulate instead of showing one token at a time.
 - Private chats send one persistent rich final response.
 - Groups edit one placeholder instead of creating a draft.
 - Character deltas coalesce into throttled updates.

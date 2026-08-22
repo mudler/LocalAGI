@@ -44,6 +44,7 @@ type telegramStreamSession struct {
 	mu              sync.Mutex
 	content         string
 	status          string
+	reasoningActive bool
 	version         uint64
 	dirty           bool
 	thinkingPending bool
@@ -102,7 +103,13 @@ func (s *telegramStreamSession) Accept(event cogito.StreamEvent) {
 	if event.Type == cogito.StreamEventContent && event.Content != "" {
 		s.content += event.Content
 	} else if s.content == "" {
-		s.status = telegramStreamStatus(event)
+		status := telegramStreamStatus(event)
+		if event.Type == cogito.StreamEventReasoning && s.reasoningActive {
+			s.status += status
+		} else {
+			s.status = status
+		}
+		s.reasoningActive = event.Type == cogito.StreamEventReasoning
 	}
 	s.version++
 	s.dirty = true
