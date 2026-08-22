@@ -201,8 +201,9 @@ func (t *Telegram) telegramDelivery(_ context.Context, b telegramMessageBot, cha
 }
 
 func telegramFinalSession(ctx context.Context, api telegramAPI, chatID int64, private bool, delivery telegramStreamDelivery) *telegramStreamSession {
+	finalCtx := ctx
 	ctx, cancel := context.WithCancel(ctx)
-	return &telegramStreamSession{ctx: ctx, cancel: cancel, api: api, chatID: chatID, private: private, delivery: delivery}
+	return &telegramStreamSession{ctx: ctx, finalCtx: finalCtx, cancel: cancel, api: api, chatID: chatID, private: private, delivery: delivery}
 }
 
 // isBotMentioned checks if the bot is mentioned in the message

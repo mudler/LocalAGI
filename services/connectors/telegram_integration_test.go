@@ -3,6 +3,7 @@ package connectors
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -219,6 +220,25 @@ type orderedTelegramAPI struct {
 	calls  int
 }
 
+type contextRecordingTelegramAPI struct {
+	contexts []context.Context
+}
+
+func (*contextRecordingTelegramAPI) sendRichMessageDraft(context.Context, telegramRichMessageDraft) error {
+	return nil
+}
+
+func (a *contextRecordingTelegramAPI) sendRichMessage(ctx context.Context, _ telegramRichMessage) error {
+	a.contexts = append(a.contexts, ctx)
+	if ctx == nil {
+		return errors.New("rich message received nil context")
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("rich message received canceled context: %w", err)
+	}
+	return errors.New("force fallback delivery")
+}
+
 func (*orderedTelegramAPI) sendRichMessageDraft(context.Context, telegramRichMessageDraft) error {
 	return nil
 }
@@ -373,5 +393,69 @@ func TestTelegramFinalDeliveryContinuesAfterPreviewCleanupFailure(t *testing.T) 
 	_, finals := api.snapshot()
 	if len(finals) != 1 || finals[0].RichMessage.Markdown != "persistent answer" {
 		t.Fatalf("finals = %#v, want persistent answer", finals)
+	}
+}
+
+func TestTelegramFinalOnlyDeliveryUsesSuppliedLiveContext(t *testing.T) {
+	type contextKey struct{}
+	supplied := context.WithValue(t.Context(), contextKey{}, "final-only")
+	api := &contextRecordingTelegramAPI{}
+	var cleanupContexts, markdownContexts, plainContexts []context.Context
+	session := telegramFinalSession(supplied, api, -42, false, telegramStreamDelivery{
+		clearPreview: func(ctx context.Context, _ int64) error {
+			cleanupContexts = append(cleanupContexts, ctx)
+			if ctx == nil {
+				return errors.New("cleanup received nil context")
+			}
+			return ctx.Err()
+		},
+		finalMarkdown: func(ctx context.Context, _ int64, _ []string) error {
+			markdownContexts = append(markdownContexts, ctx)
+			if ctx == nil {
+				return errors.New("markdown fallback received nil context")
+			}
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return errors.New("force plain fallback delivery")
+		},
+		finalPlain: func(ctx context.Context, _ int64, _ []string) error {
+			plainContexts = append(plainContexts, ctx)
+			if ctx == nil {
+				return errors.New("plain fallback received nil context")
+			}
+			return ctx.Err()
+		},
+	})
+	defer session.cancel()
+
+	if err := session.deliverFinal("final answer", nil); err != nil {
+		t.Fatalf("deliverFinal() error = %v", err)
+	}
+
+	operations := []struct {
+		name     string
+		contexts []context.Context
+	}{
+		{name: "cleanup", contexts: cleanupContexts},
+		{name: "rich API", contexts: api.contexts},
+		{name: "Markdown fallback", contexts: markdownContexts},
+		{name: "plain fallback", contexts: plainContexts},
+	}
+	for _, operation := range operations {
+		t.Run(operation.name, func(t *testing.T) {
+			if len(operation.contexts) != 1 {
+				t.Fatalf("contexts = %#v, want one call", operation.contexts)
+			}
+			if operation.contexts[0] != supplied {
+				t.Fatalf("context = %#v, want supplied context %#v", operation.contexts[0], supplied)
+			}
+			if err := operation.contexts[0].Err(); err != nil {
+				t.Fatalf("context is not live: %v", err)
+			}
+			if got := operation.contexts[0].Value(contextKey{}); got != "final-only" {
+				t.Fatalf("context value = %#v, want final-only", got)
+			}
+		})
 	}
 }
