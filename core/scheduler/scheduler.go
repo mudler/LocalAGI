@@ -160,17 +160,19 @@ func (s *Scheduler) executeTask(task *Task) {
 	now := time.Now()
 	task.LastRun = &now
 
-	// For one-time tasks, mark as deleted
+	// A one-time task is done once it has run. Returning here matters: the
+	// update below would otherwise run against the row just deleted and log a
+	// "task not found" error on every one-time task.
 	if task.ScheduleType == ScheduleTypeOnce {
 		if err := s.store.Delete(task.ID); err != nil {
 			xlog.Error("Failed to delete task", "task_id", task.ID, "error", err)
 		}
-	} else {
-		// Calculate next run
-		if err := task.CalculateNextRun(); err != nil {
-			xlog.Error("Failed to calculate next run", "task_id", task.ID, "error", err)
-			task.Status = TaskStatusPaused
-		}
+		return
+	}
+
+	if err := task.CalculateNextRun(); err != nil {
+		xlog.Error("Failed to calculate next run", "task_id", task.ID, "error", err)
+		task.Status = TaskStatusPaused
 	}
 
 	if err := s.store.Update(task); err != nil {
