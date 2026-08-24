@@ -1407,9 +1407,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
-	if len(fragment.Messages) > 0 &&
-		fragment.LastMessage().Role == "tool" {
-		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
+	if toolToCall, ok := lastToolCallName(fragment.Messages); ok {
 		switch toolToCall {
 		case action.StopActionName:
 			job.Result.Finish(nil)
