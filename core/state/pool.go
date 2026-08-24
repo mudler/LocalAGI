@@ -50,13 +50,14 @@ func NewHTTPRAGProvider(baseURL, baseKey string) RAGProvider {
 	}
 }
 
-// RetentionConfig bounds the on-disk history a pool accumulates: conversation
-// dumps, which nothing ever reads back, and scheduler run history, which every
-// task execution re-marshals in full.
-type RetentionConfig struct {
+// PoolLimits bounds how much a pool accumulates: conversation dumps, which
+// nothing ever reads back; scheduler run history, which every task execution
+// re-marshals in full; and the tasks an agent may schedule for itself.
+type PoolLimits struct {
 	Conversations     conversations.RetentionPolicy
 	ConversationSweep time.Duration
 	SchedulerRuns     scheduler.RetentionPolicy
+	SchedulerCreation scheduler.CreationPolicy
 }
 
 type AgentPool struct {
@@ -78,7 +79,7 @@ type AgentPool struct {
 	timeout                                                       string
 	conversationLogs                                              string
 	skillsService                                                 SkillsProvider
-	retention                                                     RetentionConfig
+	limits                                                        PoolLimits
 	convPruner                                                    *conversations.Pruner
 }
 
@@ -128,7 +129,7 @@ func NewAgentPool(
 	timeout string,
 	withLogs bool,
 	skillsService SkillsProvider,
-	retention RetentionConfig,
+	limits PoolLimits,
 ) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
@@ -161,8 +162,8 @@ func NewAgentPool(
 			filters:                      filters,
 			timeout:                      timeout,
 			conversationLogs:             conversationPath,
-			retention:                    retention,
-			convPruner:                   conversations.NewPruner(conversationPath, retention.Conversations, retention.ConversationSweep),
+			limits:                       limits,
+			convPruner:                   conversations.NewPruner(conversationPath, limits.Conversations, limits.ConversationSweep),
 			skillsService:                skillsService,
 		}, nil
 	}
@@ -201,8 +202,8 @@ func NewAgentPool(
 		availableActions:             availableActions,
 		timeout:                      timeout,
 		conversationLogs:             conversationPath,
-		retention:                    retention,
-		convPruner:                   conversations.NewPruner(conversationPath, retention.Conversations, retention.ConversationSweep),
+		limits:                       limits,
+		convPruner:                   conversations.NewPruner(conversationPath, limits.Conversations, limits.ConversationSweep),
 		skillsService:                skillsService,
 	}, nil
 }
@@ -415,7 +416,8 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 
 	opts := []Option{
 		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
-		WithSchedulerRetention(a.retention.SchedulerRuns),
+		WithSchedulerRetention(a.limits.SchedulerRuns),
+		WithSchedulerCreation(a.limits.SchedulerCreation),
 		WithModel(model),
 		WithLLMAPIURL(effectiveAPIURL),
 		WithContext(ctx),
@@ -850,7 +852,8 @@ func (a *AgentPool) createAgentWithoutRun(name, pooldir string, config *AgentCon
 
 	opts := []Option{
 		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
-		WithSchedulerRetention(a.retention.SchedulerRuns),
+		WithSchedulerRetention(a.limits.SchedulerRuns),
+		WithSchedulerCreation(a.limits.SchedulerCreation),
 		WithModel(model),
 		WithLLMAPIURL(effectiveAPIURL),
 		WithContext(ctx),

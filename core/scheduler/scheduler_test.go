@@ -306,7 +306,7 @@ var _ = Describe("Scheduler", func() {
 		It("should execute a due task", func() {
 			task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, "0s")
 			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
-			err := sched.CreateTask(task)
+			_, err := sched.CreateTask(task)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Scheduler is already started in BeforeEach
@@ -331,7 +331,7 @@ var _ = Describe("Scheduler", func() {
 		It("should execute recurring tasks multiple times", func() {
 			task, _ := scheduler.NewTask("test-agent", "recurring", scheduler.ScheduleTypeInterval, "500")
 			task.NextRun = time.Now().Add(-1 * time.Second)
-			err := sched.CreateTask(task)
+			_, err := sched.CreateTask(task)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Scheduler is already started in BeforeEach
@@ -350,7 +350,7 @@ var _ = Describe("Scheduler", func() {
 			executor.SetShouldError(true)
 			task, _ := scheduler.NewTask("test-agent", "error task", scheduler.ScheduleTypeOnce, "0s")
 			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			// Scheduler is already started in BeforeEach
 
@@ -368,7 +368,7 @@ var _ = Describe("Scheduler", func() {
 			task, _ := scheduler.NewTask("test-agent", "paused", scheduler.ScheduleTypeOnce, "0s")
 			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
 			task.Status = scheduler.TaskStatusPaused
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			// Scheduler is already started in BeforeEach
 
@@ -381,7 +381,7 @@ var _ = Describe("Scheduler", func() {
 	Describe("Task Management", func() {
 		It("should pause and resume a task", func() {
 			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 * * *")
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			err := sched.PauseTask(task.ID)
 			Expect(err).NotTo(HaveOccurred())
@@ -405,9 +405,10 @@ var _ = Describe("Scheduler", func() {
 			task3, err := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeCron, "0 0 * * *")
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(sched.CreateTask(task1)).To(Succeed())
-			Expect(sched.CreateTask(task2)).To(Succeed())
-			Expect(sched.CreateTask(task3)).To(Succeed())
+			for _, t := range []*scheduler.Task{task1, task2, task3} {
+				_, err := sched.CreateTask(t)
+				Expect(err).NotTo(HaveOccurred())
+			}
 
 			agent1Tasks, err := sched.GetTasksByAgent("agent1")
 			Expect(err).NotTo(HaveOccurred())
@@ -416,7 +417,7 @@ var _ = Describe("Scheduler", func() {
 
 		It("should delete a task", func() {
 			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 * * *")
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			err := sched.DeleteTask(task.ID)
 			Expect(err).NotTo(HaveOccurred())

@@ -159,7 +159,7 @@ func New(opts ...Option) (*Agent, error) {
 		pollInterval = 30 * time.Second
 	}
 
-	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)
+	a.taskScheduler = scheduler.NewSchedulerWithPolicy(store, executor, pollInterval, options.schedulerCreation)
 	a.sharedState.Scheduler = a.taskScheduler
 	a.sharedState.AgentName = a.Character.Name
 	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)

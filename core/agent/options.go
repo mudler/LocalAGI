@@ -59,6 +59,7 @@ type options struct {
 	statefile             string
 	schedulerStorePath    string // Path to scheduler JSON storage file
 	schedulerRetention    scheduler.RetentionPolicy
+	schedulerCreation     scheduler.CreationPolicy
 	context               context.Context
 	permanentGoal         string
 	timeout               string
@@ -592,6 +593,14 @@ func WithSchedulerStorePath(path string) Option {
 func WithSchedulerRetention(p scheduler.RetentionPolicy) Option {
 	return func(o *options) error {
 		o.schedulerRetention = p
+		return nil
+	}
+}
+
+// WithSchedulerCreation bounds what an agent may schedule for itself.
+func WithSchedulerCreation(p scheduler.CreationPolicy) Option {
+	return func(o *options) error {
+		o.schedulerCreation = p
 		return nil
 	}
 }

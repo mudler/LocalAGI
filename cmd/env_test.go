@@ -29,6 +29,37 @@ func TestRetentionDefaults(t *testing.T) {
 	if env.SchedulerMaxRunAge != 720*time.Hour {
 		t.Errorf("SchedulerMaxRunAge = %v, want 720h", env.SchedulerMaxRunAge)
 	}
+	if !env.SchedulerDedupeTasks {
+		t.Error("SchedulerDedupeTasks = false, want true")
+	}
+	if env.SchedulerMaxTasksPerAgent != 100 {
+		t.Errorf("SchedulerMaxTasksPerAgent = %d, want 100", env.SchedulerMaxTasksPerAgent)
+	}
+}
+
+func TestCreationPolicyOverrides(t *testing.T) {
+	t.Setenv("LOCALAGI_SCHEDULER_DEDUPE_TASKS", "false")
+	t.Setenv("LOCALAGI_SCHEDULER_MAX_TASKS_PER_AGENT", "5")
+
+	env := LoadEnv()
+
+	if env.SchedulerDedupeTasks {
+		t.Error("SchedulerDedupeTasks = true, want false")
+	}
+	if env.SchedulerMaxTasksPerAgent != 5 {
+		t.Errorf("SchedulerMaxTasksPerAgent = %d, want 5", env.SchedulerMaxTasksPerAgent)
+	}
+}
+
+// Dedupe is a safety default; a typo must not switch it off.
+func TestCreationPolicyUnparseableBoolKeepsDedupeOn(t *testing.T) {
+	t.Setenv("LOCALAGI_SCHEDULER_DEDUPE_TASKS", "yes-please")
+
+	env := LoadEnv()
+
+	if !env.SchedulerDedupeTasks {
+		t.Error("SchedulerDedupeTasks = false, want the true default")
+	}
 }
 
 func TestRetentionOverrides(t *testing.T) {
@@ -59,6 +90,20 @@ func TestRetentionOverrides(t *testing.T) {
 
 // "0" is how an operator turns a single limit off, and it has to survive the
 // fallback-to-default path that an empty value takes.
+func TestLimitsCarriesCreationPolicy(t *testing.T) {
+	t.Setenv("LOCALAGI_SCHEDULER_DEDUPE_TASKS", "true")
+	t.Setenv("LOCALAGI_SCHEDULER_MAX_TASKS_PER_AGENT", "42")
+
+	limits := LoadEnv().Limits()
+
+	if !limits.SchedulerCreation.Dedupe {
+		t.Error("Limits().SchedulerCreation.Dedupe = false, want true")
+	}
+	if limits.SchedulerCreation.MaxTasksPerAgent != 42 {
+		t.Errorf("Limits().SchedulerCreation.MaxTasksPerAgent = %d, want 42", limits.SchedulerCreation.MaxTasksPerAgent)
+	}
+}
+
 func TestRetentionZeroDisablesIndividualLimits(t *testing.T) {
 	t.Setenv("LOCALAGI_CONVERSATIONS_MAX_AGE", "0")
 	t.Setenv("LOCALAGI_CONVERSATIONS_MAX_PER_AGENT", "0")

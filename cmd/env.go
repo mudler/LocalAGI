@@ -44,6 +44,8 @@ type Env struct {
 	ConversationsPruneInterval time.Duration
 	SchedulerMaxRunsPerTask    int
 	SchedulerMaxRunAge         time.Duration
+	SchedulerDedupeTasks       bool
+	SchedulerMaxTasksPerAgent  int
 
 	// RAG/Vector settings
 	VectorEngine              string
@@ -82,6 +84,8 @@ func LoadEnv() Env {
 		ConversationsPruneInterval: envDuration("LOCALAGI_CONVERSATIONS_PRUNE_INTERVAL", time.Hour),
 		SchedulerMaxRunsPerTask:    envInt("LOCALAGI_SCHEDULER_MAX_RUNS_PER_TASK", 20),
 		SchedulerMaxRunAge:         envDuration("LOCALAGI_SCHEDULER_MAX_RUN_AGE", 720*time.Hour),
+		SchedulerDedupeTasks:       envBool("LOCALAGI_SCHEDULER_DEDUPE_TASKS", true),
+		SchedulerMaxTasksPerAgent:  envInt("LOCALAGI_SCHEDULER_MAX_TASKS_PER_AGENT", 100),
 	}
 	
 	// Parse APIKeys from comma-separated string
@@ -116,9 +120,9 @@ func LoadEnv() Env {
 	return env
 }
 
-// Retention builds the pool retention config from the parsed environment.
-func (e Env) Retention() state.RetentionConfig {
-	return state.RetentionConfig{
+// Limits builds the pool limits from the parsed environment.
+func (e Env) Limits() state.PoolLimits {
+	return state.PoolLimits{
 		Conversations: conversations.RetentionPolicy{
 			MaxAge:      e.ConversationsMaxAge,
 			MaxPerAgent: e.ConversationsMaxPerAgent,
@@ -127,6 +131,10 @@ func (e Env) Retention() state.RetentionConfig {
 		SchedulerRuns: scheduler.RetentionPolicy{
 			MaxRunsPerTask: e.SchedulerMaxRunsPerTask,
 			MaxRunAge:      e.SchedulerMaxRunAge,
+		},
+		SchedulerCreation: scheduler.CreationPolicy{
+			Dedupe:           e.SchedulerDedupeTasks,
+			MaxTasksPerAgent: e.SchedulerMaxTasksPerAgent,
 		},
 	}
 }
@@ -164,6 +172,23 @@ func envInt(envKey string, fallback int) int {
 	}
 
 	return n
+}
+
+// envBool reads a boolean, keeping the fallback when the value is unset or
+// unparseable.
+func envBool(envKey string, fallback bool) bool {
+	v := os.Getenv(envKey)
+	if v == "" {
+		return fallback
+	}
+
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		xlog.Warn("Ignoring unparseable boolean, using default", "env", envKey, "value", v, "default", fallback)
+		return fallback
+	}
+
+	return b
 }
 
 // envOrDefault returns the environment variable value if set, otherwise the fallback.
