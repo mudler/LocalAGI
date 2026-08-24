@@ -85,6 +85,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		env.Timeout,
 		env.EnableConversationsLogging,
 		skillsService,
+		env.Limits(),
 	)
 	if err != nil {
 		return err

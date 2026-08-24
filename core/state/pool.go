@@ -12,6 +12,8 @@ import (
 	"time"
 
 	. "github.com/mudler/LocalAGI/core/agent"
+	"github.com/mudler/LocalAGI/core/conversations"
+	"github.com/mudler/LocalAGI/core/scheduler"
 	sseLib "github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/localrag"
@@ -48,6 +50,16 @@ func NewHTTPRAGProvider(baseURL, baseKey string) RAGProvider {
 	}
 }
 
+// PoolLimits bounds how much a pool accumulates: conversation dumps, which
+// nothing ever reads back; scheduler run history, which every task execution
+// re-marshals in full; and the tasks an agent may schedule for itself.
+type PoolLimits struct {
+	Conversations     conversations.RetentionPolicy
+	ConversationSweep time.Duration
+	SchedulerRuns     scheduler.RetentionPolicy
+	SchedulerCreation scheduler.CreationPolicy
+}
+
 type AgentPool struct {
 	sync.Mutex
 	file                                                          string
@@ -67,6 +79,8 @@ type AgentPool struct {
 	timeout                                                       string
 	conversationLogs                                              string
 	skillsService                                                 SkillsProvider
+	limits                                                        PoolLimits
+	convPruner                                                    *conversations.Pruner
 }
 
 // SetRAGProvider sets the single RAG provider (HTTP or embedded). Must be called after pool creation.
@@ -115,6 +129,7 @@ func NewAgentPool(
 	timeout string,
 	withLogs bool,
 	skillsService SkillsProvider,
+	limits PoolLimits,
 ) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
@@ -147,6 +162,8 @@ func NewAgentPool(
 			filters:                      filters,
 			timeout:                      timeout,
 			conversationLogs:             conversationPath,
+			limits:                       limits,
+			convPruner:                   conversations.NewPruner(conversationPath, limits.Conversations, limits.ConversationSweep),
 			skillsService:                skillsService,
 		}, nil
 	}
@@ -185,6 +202,8 @@ func NewAgentPool(
 		availableActions:             availableActions,
 		timeout:                      timeout,
 		conversationLogs:             conversationPath,
+		limits:                       limits,
+		convPruner:                   conversations.NewPruner(conversationPath, limits.Conversations, limits.ConversationSweep),
 		skillsService:                skillsService,
 	}, nil
 }
@@ -397,6 +416,8 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 
 	opts := []Option{
 		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
+		WithSchedulerRetention(a.limits.SchedulerRuns),
+		WithSchedulerCreation(a.limits.SchedulerCreation),
 		WithModel(model),
 		WithLLMAPIURL(effectiveAPIURL),
 		WithContext(ctx),
@@ -707,6 +728,7 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 func (a *AgentPool) StartAll() error {
 	a.Lock()
 	defer a.Unlock()
+	a.convPruner.Start()
 	for name, config := range a.pool {
 		if a.agents[name] != nil { // Agent already started
 			continue
@@ -721,6 +743,7 @@ func (a *AgentPool) StartAll() error {
 func (a *AgentPool) StopAll() {
 	a.Lock()
 	defer a.Unlock()
+	a.convPruner.Stop()
 	for _, agent := range a.agents {
 		agent.Stop()
 	}
@@ -829,6 +852,8 @@ func (a *AgentPool) createAgentWithoutRun(name, pooldir string, config *AgentCon
 
 	opts := []Option{
 		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
+		WithSchedulerRetention(a.limits.SchedulerRuns),
+		WithSchedulerCreation(a.limits.SchedulerCreation),
 		WithModel(model),
 		WithLLMAPIURL(effectiveAPIURL),
 		WithContext(ctx),

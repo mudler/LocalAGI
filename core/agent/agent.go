@@ -148,7 +148,7 @@ func New(opts ...Option) (*Agent, error) {
 		schedulerPath = "scheduled_tasks.json"
 	}
 
-	store, err := scheduler.NewJSONStore(schedulerPath)
+	store, err := scheduler.NewJSONStoreWithRetention(schedulerPath, options.schedulerRetention)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scheduler store: %v", err)
 	}
@@ -159,7 +159,7 @@ func New(opts ...Option) (*Agent, error) {
 		pollInterval = 30 * time.Second
 	}
 
-	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)
+	a.taskScheduler = scheduler.NewSchedulerWithPolicy(store, executor, pollInterval, options.schedulerCreation)
 	a.sharedState.Scheduler = a.taskScheduler
 	a.sharedState.AgentName = a.Character.Name
 	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)
@@ -1407,9 +1407,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
-	if len(fragment.Messages) > 0 &&
-		fragment.LastMessage().Role == "tool" {
-		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
+	if toolToCall, ok := lastToolCallName(fragment.Messages); ok {
 		switch toolToCall {
 		case action.StopActionName:
 			job.Result.Finish(nil)

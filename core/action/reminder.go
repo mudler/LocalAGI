@@ -62,17 +62,26 @@ func (a *RecurringReminderAction) Run(ctx context.Context, sharedState *types.Ag
 
 	task.Metadata["reminder_type"] = "user_created"
 
-	err = sharedState.Scheduler.CreateTask(task)
+	// The scheduler returns the task that is now scheduled, which is the
+	// existing one when an equivalent reminder is already set.
+	scheduled, err := sharedState.Scheduler.CreateTask(task)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 
+	message := fmt.Sprintf("Recurring reminder set successfully (ID: %s). Next run: %s",
+		scheduled.ID, scheduled.NextRun.Format(time.RFC3339))
+	if scheduled.ID != task.ID {
+		message = fmt.Sprintf("Recurring reminder already scheduled (ID: %s, status: %s). Next run: %s",
+			scheduled.ID, scheduled.Status, scheduled.NextRun.Format(time.RFC3339))
+	}
+
 	return types.ActionResult{
-		Result: fmt.Sprintf("Recurring reminder set successfully (ID: %s). Next run: %s", task.ID, task.NextRun.Format(time.RFC3339)),
+		Result: message,
 		Metadata: map[string]interface{}{
-			"task_id":  task.ID,
+			"task_id":  scheduled.ID,
 			"message":  result.Message,
-			"next_run": task.NextRun,
+			"next_run": scheduled.NextRun,
 		},
 	}, nil
 }
@@ -102,17 +111,24 @@ func (a *OneTimeReminderAction) Run(ctx context.Context, sharedState *types.Agen
 
 	task.Metadata["reminder_type"] = "user_created"
 
-	err = sharedState.Scheduler.CreateTask(task)
+	scheduled, err := sharedState.Scheduler.CreateTask(task)
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 
+	message := fmt.Sprintf("One-time reminder set in %s (at %s, ID: %s)",
+		result.Delay, scheduled.NextRun.Format(time.RFC3339), scheduled.ID)
+	if scheduled.ID != task.ID {
+		message = fmt.Sprintf("One-time reminder already scheduled (ID: %s, status: %s). Next run: %s",
+			scheduled.ID, scheduled.Status, scheduled.NextRun.Format(time.RFC3339))
+	}
+
 	return types.ActionResult{
-		Result: fmt.Sprintf("One-time reminder set in %s (at %s, ID: %s)", result.Delay, task.NextRun.Format(time.RFC3339), task.ID),
+		Result: message,
 		Metadata: map[string]interface{}{
-			"task_id":  task.ID,
+			"task_id":  scheduled.ID,
 			"message":  result.Message,
-			"next_run": task.NextRun,
+			"next_run": scheduled.NextRun,
 		},
 	}, nil
 }
