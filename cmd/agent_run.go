@@ -121,7 +121,7 @@ func runAgentForeground(agentName string, agentConfig *state.AgentConfig, prompt
 		env.Model, env.MultimodalModel, env.TranscriptionModel, env.TranscriptionLanguage, env.TTSModel,
 		env.LLMAPIURL, env.LLMAPIKey, env.StateDir,
 		actionsFactory, services.Connectors, dynamicPromptsFactory, services.Filters,
-		env.Timeout, false, skillsService,
+		env.Timeout, false, skillsService, env.Retention(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create agent pool: %w", err)
@@ -317,7 +317,7 @@ func startStandaloneAgent(name string, config *state.AgentConfig) error {
 		env.Model, env.MultimodalModel, env.TranscriptionModel, env.TranscriptionLanguage, env.TTSModel,
 		env.LLMAPIURL, env.LLMAPIKey, env.StateDir,
 		actionsFactory, services.Connectors, dynamicPromptsFactory, services.Filters,
-		env.Timeout, false, skillsService,
+		env.Timeout, false, skillsService, env.Retention(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create agent pool: %w", err)

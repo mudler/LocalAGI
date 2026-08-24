@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mudler/LocalAGI/core/scheduler"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/cogito"
 )
@@ -57,6 +58,7 @@ type options struct {
 	characterfile         string
 	statefile             string
 	schedulerStorePath    string // Path to scheduler JSON storage file
+	schedulerRetention    scheduler.RetentionPolicy
 	context               context.Context
 	permanentGoal         string
 	timeout               string
@@ -582,6 +584,14 @@ func WithKBAutoSearch(enabled bool) Option {
 func WithSchedulerStorePath(path string) Option {
 	return func(o *options) error {
 		o.schedulerStorePath = path
+		return nil
+	}
+}
+
+// WithSchedulerRetention bounds how much task run history the scheduler store keeps.
+func WithSchedulerRetention(p scheduler.RetentionPolicy) Option {
+	return func(o *options) error {
+		o.schedulerRetention = p
 		return nil
 	}
 }

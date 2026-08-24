@@ -148,7 +148,7 @@ func New(opts ...Option) (*Agent, error) {
 		schedulerPath = "scheduled_tasks.json"
 	}
 
-	store, err := scheduler.NewJSONStore(schedulerPath)
+	store, err := scheduler.NewJSONStoreWithRetention(schedulerPath, options.schedulerRetention)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scheduler store: %v", err)
 	}
