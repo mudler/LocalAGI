@@ -762,6 +762,36 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
 }
 
+// correctUnknownToolCall decides how to handle a tool call whose name does not
+// match any available action. corrected is false for the built-in control verbs
+// (stop/send_message/update_state), which are dispatched by name elsewhere and
+// need no correction. Otherwise it returns an Adjustment that feeds the valid
+// tool list back to the model so it can self-correct -- up to max attempts per
+// tool name, after which the call is skipped to avoid an unbounded re-selection
+// loop. attempts is mutated to track per-tool-name correction counts.
+func correctUnknownToolCall(name string, available []string, attempts map[string]int, max int) (decision cogito.ToolCallDecision, corrected bool) {
+	switch name {
+	case action.StopActionName, action.ConversationActionName, action.StateActionName:
+		return cogito.ToolCallDecision{}, false
+	}
+
+	if attempts[name] < max {
+		attempts[name]++
+		return cogito.ToolCallDecision{
+			Approved: true,
+			Adjustment: fmt.Sprintf(
+				"The tool %q does not exist and cannot be called. "+
+					"You must call one of the available tools, using its exact name: %s. "+
+					"Re-issue your request using one of these tools.",
+				name, strings.Join(available, ", ")),
+		}, true
+	}
+
+	// Repeated hallucination: skip the bad call instead of looping forever or
+	// aborting the whole run.
+	return cogito.ToolCallDecision{Skip: true}, true
+}
+
 // replyWithToolCall handles user-defined actions by recording the action state without setting Response
 func (a *Agent) replyWithToolCall(job *types.Job, conv []openai.ChatCompletionMessage, params types.ActionParams, chosenAction types.Action, reasoning string) {
 	// Record the action state so the webui can detect this is a user-defined action
@@ -1060,6 +1090,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	var observables = make(map[string]*types.Observable)
 
+	// Bounds the number of self-correction nudges we send when the model
+	// invokes a tool that does not exist, so a model that keeps hallucinating
+	// tool names cannot loop forever (cogito re-runs tool selection on every
+	// Adjustment). Keyed by tool name; once exhausted the bad call is skipped.
+	const maxToolCorrectionAttempts = 3
+	toolCorrectionAttempts := make(map[string]int)
+
 	cogitoOpts := []cogito.Option{
 		cogito.WithMCPs(a.mcpSessions...),
 		cogito.WithTools(
@@ -1167,6 +1204,30 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 				xlog.Debug("Action found", "action", chosenAction)
 
+				// Guard against hallucinated / unavailable tool names. Models
+				// (local ones in particular) sometimes invoke a tool that was
+				// never offered. Without this the run proceeds with a nil action
+				// -- producing an empty result and a nil-pointer dereference in
+				// the observer/decision path below -- and the model receives no
+				// signal to recover. Feed the valid tool list back via cogito's
+				// Adjustment mechanism so the model re-selects an existing tool.
+				if chosenAction == nil {
+					available := make([]string, 0, len(allActions))
+					for _, act := range allActions {
+						available = append(available, act.Definition().Name.String())
+					}
+					if decision, corrected := correctUnknownToolCall(tc.Name, available, toolCorrectionAttempts, maxToolCorrectionAttempts); corrected {
+						if decision.Skip {
+							xlog.Warn("LLM repeatedly selected unknown tools, skipping call",
+								"tool", tc.Name, "available", available)
+						} else {
+							xlog.Warn("LLM selected an unknown tool, requesting self-correction",
+								"tool", tc.Name, "attempt", toolCorrectionAttempts[tc.Name], "available", available)
+						}
+						return decision
+					}
+				}
+
 				if chosenAction != nil && types.IsActionUserDefined(chosenAction) {
 					xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
 					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, tc.Reasoning)
@@ -1194,14 +1255,19 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					obs.Name = "decision"
 					obs.ParentID = job.Obs.ID
 					obs.Icon = "brain"
-					obs.Creation = &types.Creation{
+					creation := &types.Creation{
 						ChatCompletionRequest: &openai.ChatCompletionRequest{
 							Model:    a.options.LLMAPI.Model,
 							Messages: conv,
 						},
-						FunctionDefinition: chosenAction.Definition().ToFunctionDefinition(),
-						FunctionParams:     types.ActionParams(tc.Arguments),
+						FunctionParams: types.ActionParams(tc.Arguments),
 					}
+					// chosenAction can be nil for a built-in control verb that
+					// is handled by name below but absent from allActions.
+					if chosenAction != nil {
+						creation.FunctionDefinition = chosenAction.Definition().ToFunctionDefinition()
+					}
+					obs.Creation = creation
 
 					a.observer.Update(*obs)
 					observables[tc.ID] = obs
