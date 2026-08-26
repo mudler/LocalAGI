@@ -214,6 +214,9 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/api/git-repos/:id/sync", app.SyncGitRepo)
 	webapp.Post("/api/git-repos/:id/toggle", app.ToggleGitRepo)
 
+	// Model Context Protocol endpoint, exposing agent management to MCP clients.
+	app.registerMCPRoutes(pool, webapp)
+
 	// Collections / knowledge base API (LocalRecall-compatible). Same interface for in-process or remote.
 	var collectionsBackend CollectionsBackend
 	if app.config.LocalRAGURL != "" {

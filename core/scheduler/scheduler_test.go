@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/mudler/LocalAGI/core/scheduler"
@@ -11,18 +12,50 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// MockExecutor for testing
+// MockExecutor for testing.
+//
+// The scheduler runs each task on its own goroutine while the specs poll from
+// the ginkgo goroutine, so every field access has to be guarded.
 type MockExecutor struct {
+	mu            sync.Mutex
 	executedTasks []string
 	shouldError   bool
 }
 
 func (m *MockExecutor) Execute(ctx context.Context, agentName string, prompt string) (*scheduler.JobResult, error) {
+	m.mu.Lock()
 	m.executedTasks = append(m.executedTasks, agentName+":"+prompt)
-	if m.shouldError {
+	shouldError := m.shouldError
+	m.mu.Unlock()
+
+	if shouldError {
 		return nil, errors.New("mock execution error")
 	}
 	return &scheduler.JobResult{Response: "test response"}, nil
+}
+
+// ExecutedCount reports how many tasks have run so far.
+func (m *MockExecutor) ExecutedCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return len(m.executedTasks)
+}
+
+// ExecutedAt reports the task recorded at index i.
+func (m *MockExecutor) ExecutedAt(i int) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.executedTasks[i]
+}
+
+// SetShouldError makes subsequent executions fail.
+func (m *MockExecutor) SetShouldError(v bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.shouldError = v
 }
 
 var _ = Describe("Scheduler", func() {
@@ -273,16 +306,16 @@ var _ = Describe("Scheduler", func() {
 		It("should execute a due task", func() {
 			task, _ := scheduler.NewTask("test-agent", "test prompt", scheduler.ScheduleTypeOnce, "0s")
 			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
-			err := sched.CreateTask(task)
+			_, err := sched.CreateTask(task)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Scheduler is already started in BeforeEach
 
 			Eventually(func() int {
-				return len(executor.executedTasks)
+				return executor.ExecutedCount()
 			}, "2s", "100ms").Should(Equal(1))
 
-			Expect(executor.executedTasks[0]).To(Equal("test-agent:test prompt"))
+			Expect(executor.ExecutedAt(0)).To(Equal("test-agent:test prompt"))
 
 			// Verify task run was logged
 			runs, err := sched.GetTaskRuns(task.ID, 10)
@@ -298,13 +331,13 @@ var _ = Describe("Scheduler", func() {
 		It("should execute recurring tasks multiple times", func() {
 			task, _ := scheduler.NewTask("test-agent", "recurring", scheduler.ScheduleTypeInterval, "500")
 			task.NextRun = time.Now().Add(-1 * time.Second)
-			err := sched.CreateTask(task)
+			_, err := sched.CreateTask(task)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Scheduler is already started in BeforeEach
 
 			Eventually(func() int {
-				return len(executor.executedTasks)
+				return executor.ExecutedCount()
 			}, "3s", "100ms").Should(BeNumerically(">=", 2))
 
 			// Verify task is still active
@@ -314,10 +347,10 @@ var _ = Describe("Scheduler", func() {
 		})
 
 		It("should handle task execution errors", func() {
-			executor.shouldError = true
+			executor.SetShouldError(true)
 			task, _ := scheduler.NewTask("test-agent", "error task", scheduler.ScheduleTypeOnce, "0s")
 			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			// Scheduler is already started in BeforeEach
 
@@ -335,12 +368,12 @@ var _ = Describe("Scheduler", func() {
 			task, _ := scheduler.NewTask("test-agent", "paused", scheduler.ScheduleTypeOnce, "0s")
 			task.NextRun = time.Now().Add(-1 * time.Second) // force into the past
 			task.Status = scheduler.TaskStatusPaused
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			// Scheduler is already started in BeforeEach
 
 			Consistently(func() int {
-				return len(executor.executedTasks)
+				return executor.ExecutedCount()
 			}, "1s", "100ms").Should(Equal(0))
 		})
 	})
@@ -348,7 +381,7 @@ var _ = Describe("Scheduler", func() {
 	Describe("Task Management", func() {
 		It("should pause and resume a task", func() {
 			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 * * *")
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			err := sched.PauseTask(task.ID)
 			Expect(err).NotTo(HaveOccurred())
@@ -372,9 +405,10 @@ var _ = Describe("Scheduler", func() {
 			task3, err := scheduler.NewTask("agent1", "prompt3", scheduler.ScheduleTypeCron, "0 0 * * *")
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(sched.CreateTask(task1)).To(Succeed())
-			Expect(sched.CreateTask(task2)).To(Succeed())
-			Expect(sched.CreateTask(task3)).To(Succeed())
+			for _, t := range []*scheduler.Task{task1, task2, task3} {
+				_, err := sched.CreateTask(t)
+				Expect(err).NotTo(HaveOccurred())
+			}
 
 			agent1Tasks, err := sched.GetTasksByAgent("agent1")
 			Expect(err).NotTo(HaveOccurred())
@@ -383,7 +417,7 @@ var _ = Describe("Scheduler", func() {
 
 		It("should delete a task", func() {
 			task, _ := scheduler.NewTask("test-agent", "test", scheduler.ScheduleTypeCron, "0 0 * * *")
-			sched.CreateTask(task)
+			_, _ = sched.CreateTask(task)
 
 			err := sched.DeleteTask(task.ID)
 			Expect(err).NotTo(HaveOccurred())

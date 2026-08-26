@@ -148,7 +148,7 @@ func New(opts ...Option) (*Agent, error) {
 		schedulerPath = "scheduled_tasks.json"
 	}
 
-	store, err := scheduler.NewJSONStore(schedulerPath)
+	store, err := scheduler.NewJSONStoreWithRetention(schedulerPath, options.schedulerRetention)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scheduler store: %v", err)
 	}
@@ -159,7 +159,7 @@ func New(opts ...Option) (*Agent, error) {
 		pollInterval = 30 * time.Second
 	}
 
-	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)
+	a.taskScheduler = scheduler.NewSchedulerWithPolicy(store, executor, pollInterval, options.schedulerCreation)
 	a.sharedState.Scheduler = a.taskScheduler
 	a.sharedState.AgentName = a.Character.Name
 	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)
@@ -223,6 +223,21 @@ func (a *Agent) AddSubscriber(f func(*types.ConversationMessage)) {
 
 func (a *Agent) Context() context.Context {
 	return a.context.Context
+}
+
+func (a *Agent) streamCallbackForJob(job *types.Job) func(cogito.StreamEvent) {
+	agentCallback := a.options.streamCallback
+	requestCallback := job.StreamCallback
+	if agentCallback == nil {
+		return requestCallback
+	}
+	if requestCallback == nil {
+		return agentCallback
+	}
+	return func(event cogito.StreamEvent) {
+		agentCallback(event)
+		requestCallback(event)
+	}
 }
 
 // Ask is a blocking call that returns the response as soon as it's ready.
@@ -896,6 +911,7 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 }
 
 func (a *Agent) consumeJob(job *types.Job, role string) {
+	streamCallback := a.streamCallbackForJob(job)
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
 		return
@@ -1063,8 +1079,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				return
 			}
 			// Forward reasoning to stream callback
-			if a.options.streamCallback != nil {
-				a.options.streamCallback(cogito.StreamEvent{
+			if streamCallback != nil {
+				streamCallback(cogito.StreamEvent{
 					Type:    cogito.StreamEventReasoning,
 					Content: s,
 				})
@@ -1161,12 +1177,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 				}
 
 				// Forward tool selection to stream callback
-				if a.options.streamCallback != nil {
+				if streamCallback != nil {
 					toolName := tc.Name
 					if chosenAction != nil {
 						toolName = chosenAction.Definition().Name.String()
 					}
-					a.options.streamCallback(cogito.StreamEvent{
+					streamCallback(cogito.StreamEvent{
 						Type:     cogito.StreamEventToolCall,
 						ToolName: toolName,
 						ToolArgs: fmt.Sprintf("%v", tc.Arguments),
@@ -1361,8 +1377,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		cogitoOpts = append(cogitoOpts, cogito.WithMaxRetries(a.options.maxAttempts))
 	}
 
-	if a.options.streamCallback != nil {
-		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(a.options.streamCallback))
+	if streamCallback != nil {
+		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(streamCallback))
 	}
 
 	fragment, err = cogito.ExecuteTools(
@@ -1391,9 +1407,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
-	if len(fragment.Messages) > 0 &&
-		fragment.LastMessage().Role == "tool" {
-		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
+	if toolToCall, ok := lastToolCallName(fragment.Messages); ok {
 		switch toolToCall {
 		case action.StopActionName:
 			job.Result.Finish(nil)

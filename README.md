@@ -14,6 +14,8 @@
 
 Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/LocalAGI_bot)
 
+Telegram response streaming is enabled by default (`"streaming": "true"`). Private chats use native rich drafts, while groups progressively edit a placeholder. Set `"streaming": "false"` to suppress previews; final responses still use rich Markdown with MarkdownV2 and plain-text fallbacks.
+
 </div>
 
 Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
@@ -694,6 +696,47 @@ You can create MCP servers in any language that supports the MCP protocol and ad
 1. **Via Web UI**: In the MCP Settings section of agent creation, add MCP servers
 2. **Via API**: Include MCP server configuration in your agent config
 
+#### LocalAGI as an MCP Server
+
+LocalAGI also works the other way around: it exposes its own MCP server so that MCP clients can manage agents. The endpoint is served at `/mcp` on the same address as the Web UI and the REST API:
+
+```
+http://localhost:3000/mcp
+```
+
+It speaks Streamable HTTP and is protected by the same API keys as the rest of the API, so clients authenticate with `Authorization: Bearer <your-api-key>` when `LOCALAGI_API_KEYS` is set.
+
+Example client configuration:
+
+```json
+{
+  "mcpServers": {
+    "localagi": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+
+The following tools are available:
+
+| Tool | Description |
+|------|-------------|
+| `list_agents` | List the configured agents, with their model and current state |
+| `get_agent_config` | Read the full configuration of an agent |
+| `create_agent` | Create a new agent and start it (only `name` is required) |
+| `update_agent_config` | Replace the configuration of an agent and restart it |
+| `delete_agent` | Delete an agent and its state |
+| `pause_agent` | Pause a running agent |
+| `start_agent` | Resume a paused agent |
+| `get_agent_config_schema` | Describe the configuration fields, and the connectors, actions, dynamic prompts and filters available on this instance |
+
+`create_agent` and `update_agent_config` accept the same configuration as the REST API. Call `get_agent_config_schema` first to discover which connectors, actions and filters the instance provides, and what each one expects.
+
 #### Best Practices
 
 - **Security**: Always validate inputs and use proper authentication for remote MCP servers
@@ -826,6 +869,12 @@ Configuration options:
 - `mention_only`: When enabled, bot only responds when mentioned in groups
 - `admins`: Comma-separated list of Telegram usernames allowed to use the bot in private chats
 - `channel_id`: Optional channel ID for the bot to send messages to
+- `streaming`: Show progressive responses. Defaults to `true`; set it to `false` for final-only output.
+
+Private chats use native rich drafts when the configured Telegram Bot API
+supports the current rich-message methods. If those methods are unavailable,
+the connector automatically falls back to progressive message edits. Final
+responses fall back from rich Markdown to MarkdownV2 and then plain text.
 
 > **Important**: For group functionality to work properly:
 > 1. Go to @BotFather

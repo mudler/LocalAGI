@@ -19,16 +19,23 @@ type Scheduler struct {
 	wg           sync.WaitGroup
 	mu           sync.RWMutex
 	runningTasks map[string]context.CancelFunc
+	policy       CreationPolicy
 }
 
-// NewScheduler creates a new scheduler with the given store and executor
+// NewScheduler creates a new scheduler that accepts every task it is given.
 func NewScheduler(store TaskStore, executor AgentExecutor, pollInterval time.Duration) *Scheduler {
+	return NewSchedulerWithPolicy(store, executor, pollInterval, CreationPolicy{})
+}
 
+// NewSchedulerWithPolicy creates a scheduler that bounds what an agent may
+// schedule for itself.
+func NewSchedulerWithPolicy(store TaskStore, executor AgentExecutor, pollInterval time.Duration, policy CreationPolicy) *Scheduler {
 	return &Scheduler{
 		store:        store,
 		executor:     executor,
 		pollInterval: pollInterval,
 		runningTasks: make(map[string]context.CancelFunc),
+		policy:       policy,
 	}
 }
 
@@ -153,17 +160,19 @@ func (s *Scheduler) executeTask(task *Task) {
 	now := time.Now()
 	task.LastRun = &now
 
-	// For one-time tasks, mark as deleted
+	// A one-time task is done once it has run. Returning here matters: the
+	// update below would otherwise run against the row just deleted and log a
+	// "task not found" error on every one-time task.
 	if task.ScheduleType == ScheduleTypeOnce {
 		if err := s.store.Delete(task.ID); err != nil {
 			xlog.Error("Failed to delete task", "task_id", task.ID, "error", err)
 		}
-	} else {
-		// Calculate next run
-		if err := task.CalculateNextRun(); err != nil {
-			xlog.Error("Failed to calculate next run", "task_id", task.ID, "error", err)
-			task.Status = TaskStatusPaused
-		}
+		return
+	}
+
+	if err := task.CalculateNextRun(); err != nil {
+		xlog.Error("Failed to calculate next run", "task_id", task.ID, "error", err)
+		task.Status = TaskStatusPaused
 	}
 
 	if err := s.store.Update(task); err != nil {
@@ -173,9 +182,36 @@ func (s *Scheduler) executeTask(task *Task) {
 
 // CRUD operations
 
-// CreateTask adds a new task
-func (s *Scheduler) CreateTask(task *Task) error {
-	return s.store.Create(task)
+// CreateTask schedules a task and returns the task that is now scheduled.
+//
+// Under a dedupe policy an equivalent existing task is returned unchanged
+// rather than duplicated, so a caller that asks twice gets the same answer
+// twice. Returning an error there would invite a retry with different wording,
+// which is how one agent came to hold seven phrasings of a single reminder.
+func (s *Scheduler) CreateTask(task *Task) (*Task, error) {
+	if s.policy.Dedupe {
+		existing, err := s.findDuplicate(task)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			xlog.Debug("Reusing existing task instead of creating a duplicate",
+				"agent", task.AgentName, "task_id", existing.ID, "prompt", task.Prompt)
+			return existing, nil
+		}
+	}
+
+	// Checked only for a task that actually adds one; a duplicate consumes no
+	// room and must not be refused for lack of it.
+	if err := s.checkCapacity(task.AgentName); err != nil {
+		return nil, err
+	}
+
+	if err := s.store.Create(task); err != nil {
+		return nil, err
+	}
+
+	return task, nil
 }
 
 // GetTask retrieves a task by ID

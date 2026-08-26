@@ -10,7 +10,7 @@ import (
 
 // Forward declaration to avoid circular import
 type TaskScheduler interface {
-	CreateTask(task *scheduler.Task) error
+	CreateTask(task *scheduler.Task) (*scheduler.Task, error)
 	GetAllTasks() ([]*scheduler.Task, error)
 	GetTask(id string) (*scheduler.Task, error)
 	DeleteTask(id string) error
