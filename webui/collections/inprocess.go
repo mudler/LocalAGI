@@ -40,13 +40,19 @@ func newVectorEngine(
 			xlog.Error("DATABASE_URL is required for PostgreSQL engine")
 			return nil
 		}
-		xlog.Info("PostgreSQL collection", "collectionName", collectionName, "databaseURL", databaseURL)
+		xlog.Info("PostgreSQL collection", "collectionName", collectionName)
 		kb, err = rag.NewPersistentPostgresCollection(llmClient, collectionName, dbPath, fileAssets, embeddingModel, maxChunkSize, chunkOverlap, databaseURL)
 	default:
 		xlog.Error("Unknown vector engine", "engine", vectorEngineType)
 		return nil
 	}
 	if err != nil {
+		if vectorEngineType == "postgres" {
+			// Driver errors can include credentials from malformed connection strings.
+			xlog.Error("Failed to create vector engine collection",
+				"engine", vectorEngineType, "collection", collectionName)
+			return nil
+		}
 		xlog.Error("Failed to create vector engine collection",
 			"engine", vectorEngineType, "collection", collectionName, "error", err)
 		return nil
