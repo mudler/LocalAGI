@@ -35,6 +35,7 @@ func newTestPool(dir string) *state.AgentPool {
 		"5m",
 		false,
 		skillsService,
+		state.PoolLimits{},
 	)
 	Expect(err).ToNot(HaveOccurred())
 	return pool
