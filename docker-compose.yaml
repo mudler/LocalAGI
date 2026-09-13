@@ -104,9 +104,5 @@ services:
       # Optional: mount a host directory for skills (replaces the default state-dir/skills path)
       # - ./skills:/pool/skills
 
-volumes:
-  postgres_data:
-  models:
-  backends:
-  images:
-  localagi_pool:
+include:
+  - path: docker-compose-volumes-include.yaml

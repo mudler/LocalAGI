@@ -31,3 +31,6 @@ services:
     extends:
       file: docker-compose.yaml
       service: localagi
+
+include:
+  - path: docker-compose-volumes-include.yaml
