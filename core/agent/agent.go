@@ -912,6 +912,68 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 	return conv
 }
 
+// defaultRequiredFinishAttempts is how often the model is nudged to run the required
+// tool before the answer is let through anyway. A gate that can loop forever is worse
+// than one that gives up loudly.
+const defaultRequiredFinishAttempts = 3
+
+// requiredFinishPromptFor builds the instruction the model receives when it tries to
+// finish before the required tool has passed. WithRequiredToolBeforeFinishPrompt
+// overrides it, e.g. when the tool needs specific arguments explained.
+func requiredFinishPromptFor(tool, override string) string {
+	if override != "" {
+		return override
+	}
+	return "Before you send your final answer you MUST first call the tool " + tool +
+		" and it must succeed (ok:true). Call " + tool + " now; only send the final " +
+		"message after it passes."
+}
+
+// requiredToolResultOK reports whether a tool result indicates success. The contract is
+// deliberately narrow so it needs no configuration: the result is JSON carrying "ok": true.
+// The payload may be wrapped in MCP content, so a clean unmarshal is tried first with a
+// lenient substring match as fallback.
+func requiredToolResultOK(result string) bool {
+	var v struct {
+		OK bool `json:"ok"`
+	}
+	if err := json.Unmarshal([]byte(result), &v); err == nil {
+		return v.OK
+	}
+	return strings.Contains(result, `"ok": true`) || strings.Contains(result, `"ok":true`)
+}
+
+// requiredToolGate enforces, at the OUTPUT, that an agent runs its required tool
+// (to ok:true) before sending its final answer. It returns (decision, blocked):
+// blocked=true means the final message must be deferred and the model told to run the
+// tool first. It is a no-op (allow) when the gate is off, the tool is not bound to this
+// agent, or it already passed; after max attempts it allows the answer through to avoid
+// an unbounded loop (the caller logs the bypass). attempts is mutated.
+func requiredToolGate(toolAvailable, toolPassed bool, prompt string, attempts *int, max int) (cogito.ToolCallDecision, bool) {
+	if !toolAvailable || toolPassed {
+		return cogito.ToolCallDecision{}, false
+	}
+	if *attempts >= max {
+		return cogito.ToolCallDecision{}, false
+	}
+	*attempts++
+	return cogito.ToolCallDecision{
+		Approved:   true,
+		Adjustment: prompt,
+	}, true
+}
+
+// textFinalizationNeedsRequiredTool reports whether an agent is about to finalize with a
+// plain-text assistant answer although its required tool has NOT passed — i.e. it bypassed
+// the send_message gate and must be told to run the tool first. Local models in particular
+// finalize with text instead of calling send_message, which is why the gate exists twice.
+// Returns false once the tool passed, when it is unavailable or the gate is off, after max
+// attempts (graceful bypass), or when the last message is not a non-empty text answer.
+func textFinalizationNeedsRequiredTool(toolAvailable, toolPassed bool, attempts, max int, lastRole, lastContent string) bool {
+	return toolAvailable && !toolPassed && attempts < max &&
+		lastRole == "assistant" && strings.TrimSpace(lastContent) != ""
+}
+
 func (a *Agent) consumeJob(job *types.Job, role string) {
 	streamCallback := a.streamCallbackForJob(job)
 	if err := job.GetContext().Err(); err != nil {
@@ -1066,6 +1128,20 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	var observables = make(map[string]*types.Observable)
 
+	// Required-tool gate (opt-in via WithRequiredToolBeforeFinish): the agent must run the
+	// configured tool to success before it may send a final answer. Enforcement sits at the
+	// OUTPUT, not in the prompt: a model follows "always call X first" unreliably, and the
+	// one run where it forgets is the one that matters. Inert unless configured, and inert
+	// for an agent that does not have the tool bound.
+	requiredFinishTool := a.options.requiredFinishTool
+	maxRequiredFinishAttempts := a.options.requiredFinishAttempts
+	if maxRequiredFinishAttempts <= 0 {
+		maxRequiredFinishAttempts = defaultRequiredFinishAttempts
+	}
+	requiredFinishPrompt := requiredFinishPromptFor(requiredFinishTool, a.options.requiredFinishPrompt)
+	requiredFinishAttempts := 0
+	requiredToolPassed := false
+
 	cogitoOpts := []cogito.Option{
 		cogito.WithMCPs(a.liveMCPSessions()...),
 		cogito.WithTools(
@@ -1115,6 +1191,11 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			})
 		}),
 		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
+			// Required-tool gate: remember a successful run so the send_message callback
+			// knows the requirement was met in this turn.
+			if requiredFinishTool != "" && t.Name == requiredFinishTool && requiredToolResultOK(t.Result) {
+				requiredToolPassed = true
+			}
 			toolObs := observables[t.ToolArguments.ID]
 			if a.observer != nil && toolObs != nil {
 				toolObs.Progress = append(toolObs.Progress, types.Progress{
@@ -1219,6 +1300,15 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 						Approved: false,
 					}
 				case action.ConversationActionName:
+					// Required-tool gate at the OUTPUT: no final answer until the
+					// configured tool has passed.
+					requiredToolAvailable := requiredFinishTool != "" && allActions.Find(requiredFinishTool) != nil
+					if decision, blocked := requiredToolGate(requiredToolAvailable, requiredToolPassed,
+						requiredFinishPrompt, &requiredFinishAttempts, maxRequiredFinishAttempts); blocked {
+						xlog.Warn("required-tool gate: deferring final answer until the required tool passes",
+							"agent", a.Character.Name, "tool", requiredFinishTool, "attempt", requiredFinishAttempts)
+						return decision
+					}
 					message := action.ConversationActionResponse{}
 					toolArgs, _ := json.Marshal(tc.Arguments)
 					if err := json.Unmarshal([]byte(toolArgs), &message); err != nil {
@@ -1419,6 +1509,35 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			job.Result.Finish(nil)
 			return
 		}
+	}
+
+	// Required-tool gate, text-finalization path. The send_message gate above only fires
+	// when the model finalizes through the send_message tool. Weaker models often finalize
+	// with a plain assistant text answer instead and bypass it entirely -- so the same
+	// requirement is enforced here, or the gate has a hole wide enough to walk through.
+	// Bounded by the same attempt cap, then bypassed with a logged warning so a stubborn
+	// model cannot hang the turn.
+	requiredToolAvailableAtFinish := requiredFinishTool != "" && allActions.Find(requiredFinishTool) != nil
+	for len(fragment.Messages) > 0 && textFinalizationNeedsRequiredTool(
+		requiredToolAvailableAtFinish, requiredToolPassed, requiredFinishAttempts,
+		maxRequiredFinishAttempts, fragment.LastMessage().Role, fragment.LastMessage().Content) {
+		requiredFinishAttempts++
+		xlog.Info("required-tool gate: text finalization without the required tool, nudging",
+			"agent", a.Character.Name, "tool", requiredFinishTool, "attempt", requiredFinishAttempts)
+		fragment.Messages = append(fragment.Messages, openai.ChatCompletionMessage{
+			Role:    "user",
+			Content: requiredFinishPrompt,
+		})
+		fragment, err = cogito.ExecuteTools(a.llm, fragment, cogitoOpts...)
+		if err != nil && !errors.Is(err, cogito.ErrNoToolSelected) && !errors.Is(err, cogito.ErrGoalNotAchieved) {
+			xlog.Error("required-tool gate re-entry failed", "error", err)
+			break
+		}
+	}
+	if requiredToolAvailableAtFinish && !requiredToolPassed &&
+		requiredFinishAttempts >= maxRequiredFinishAttempts {
+		xlog.Warn("required-tool gate: bypass after max attempts -- answer finalized ungated",
+			"agent", a.Character.Name, "tool", requiredFinishTool)
 	}
 
 	if len(fragment.Messages) == 0 {
