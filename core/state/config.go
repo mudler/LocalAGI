@@ -114,6 +114,18 @@ type AgentConfig struct {
 	LoopDetection              int    `json:"loop_detection" form:"loop_detection"`
 	EnableAutoCompaction       bool   `json:"enable_auto_compaction" form:"enable_auto_compaction"`
 	AutoCompactionThreshold    int    `json:"auto_compaction_threshold" form:"auto_compaction_threshold"`
+
+	// RequiredToolBeforeFinish names a tool this agent MUST call successfully before it may
+	// send a final answer -- enforced at the output, not asked for in the prompt. Empty (the
+	// default) disables it; it also stays inert for an agent that does not have the tool
+	// bound, so setting it pool-wide is harmless. Use it for a step that must not be skipped:
+	// fact validation, a policy check, a cost guard.
+	RequiredToolBeforeFinish string `json:"required_tool_before_finish" form:"required_tool_before_finish"`
+
+	// RequiredToolBeforeFinishPrompt overrides the instruction the model receives when it
+	// tries to finish early. Empty uses a generic default naming the tool; override it when
+	// the tool needs specific arguments explained.
+	RequiredToolBeforeFinishPrompt string `json:"required_tool_before_finish_prompt" form:"required_tool_before_finish_prompt"`
 }
 
 type AgentConfigMeta struct {
