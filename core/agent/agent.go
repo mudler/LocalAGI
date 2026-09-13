@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/cogito"
 	"github.com/mudler/cogito/clients"
 
@@ -61,7 +60,10 @@ type Agent struct {
 
 	newConversations chan *types.ConversationMessage
 
-	mcpSessions []*mcp.ClientSession
+	mcpSessions []*mcpSession
+	// mcpMutex guards mcpSessions and mcpActionDefinitions, which are re-dialed
+	// and rebuilt from the job loop as servers come and go.
+	mcpMutex sync.Mutex
 	// only contains the MCP action definitions for observables
 	mcpActionDefinitions types.Actions
 
@@ -1039,6 +1041,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	fragment := cogito.NewFragment(conv...)
 
+	// Re-dial any MCP server that dropped its session since the last turn, so
+	// its tools are available again instead of being lost until a restart.
+	a.refreshMCPSessions()
+
 	availableActions := a.getAvailableActionsForJob(job)
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
 	allActions := append(availableActions, a.mcpActionDefinitions...)
@@ -1061,7 +1067,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	var observables = make(map[string]*types.Observable)
 
 	cogitoOpts := []cogito.Option{
-		cogito.WithMCPs(a.mcpSessions...),
+		cogito.WithMCPs(a.liveMCPSessions()...),
 		cogito.WithTools(
 			cogitoTools...,
 		),
