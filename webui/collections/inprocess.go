@@ -111,7 +111,10 @@ func (b *backendInProcess) ListCollections() ([]string, error) {
 }
 
 func (b *backendInProcess) CreateCollection(name string) error {
-	settings := b.settings(name)
+	return b.createCollection(name, b.settings(name))
+}
+
+func (b *backendInProcess) createCollection(name string, settings CollectionModelSettings) error {
 	b.operationMu.Lock()
 	defer b.operationMu.Unlock()
 	_, err := b.writable(name, settings, true)
@@ -119,7 +122,10 @@ func (b *backendInProcess) CreateCollection(name string) error {
 }
 
 func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reader) (string, error) {
-	settings := b.settings(collection)
+	return b.upload(collection, filename, fileBody, b.settings(collection))
+}
+
+func (b *backendInProcess) upload(collection, filename string, fileBody io.Reader, settings CollectionModelSettings) (string, error) {
 	b.operationMu.Lock()
 	defer b.operationMu.Unlock()
 	kb, err := b.writable(collection, settings, false)
@@ -164,7 +170,10 @@ func (b *backendInProcess) GetEntryContent(collection, entry string) (string, in
 }
 
 func (b *backendInProcess) Search(collection, query string, maxResults int) ([]SearchResult, error) {
-	settings := b.settings(collection)
+	return b.search(collection, query, maxResults, b.settings(collection))
+}
+
+func (b *backendInProcess) search(collection, query string, maxResults int, settings CollectionModelSettings) ([]SearchResult, error) {
 	b.operationMu.Lock()
 	defer b.operationMu.Unlock()
 	kb, err := b.writable(collection, settings, false)

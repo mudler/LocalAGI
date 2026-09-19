@@ -163,7 +163,7 @@ func RAGProviderFromState(cs *State) func(collectionName string) (agent.RAGDB, s
 		// Pool construction holds its config mutex. Defer collection creation and
 		// model resolution until an operation, when that mutex is no longer held.
 		if cs.backend != nil {
-			adapter := &backendRAGAdapter{backend: cs.backend, collection: name}
+			adapter := &backendRAGAdapter{backend: cs.backend, collection: name, settingsName: collectionName}
 			return adapter, &backendCompactionAdapter{adapter}, true
 		}
 		var kb *rag.PersistentKB

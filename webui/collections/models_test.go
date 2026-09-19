@@ -14,12 +14,15 @@ import (
 	"time"
 )
 
-func testModelBackend(t *testing.T, selected *CollectionModelSettings) (Backend, *State, *[]string) {
+func testModelBackend(t *testing.T, selected *CollectionModelSettings, reranked ...*bool) (Backend, *State, *[]string) {
 	t.Helper()
 	var mu sync.Mutex
 	models := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/rerank" {
+			for _, called := range reranked {
+				*called = true
+			}
 			if r.Header.Get("Authorization") != "Bearer secret" {
 				t.Error("missing rerank authentication")
 			}
@@ -295,5 +298,56 @@ func TestFailedModelSwitchDoesNotReuseOldEngine(t *testing.T) {
 	}
 	if got := (*models)[len(*models)-1]; got != "changed" {
 		t.Fatalf("retry wrote vectors using %q under changed identity", got)
+	}
+}
+
+func TestMixedCaseAgentResolvesOriginalModelSettings(t *testing.T) {
+	selected := CollectionModelSettings{EmbeddingModel: "custom", RerankerModel: "ranker"}
+	reranked := false
+	backend, st, models := testModelBackend(t, &selected, &reranked)
+	calls := 0
+	backend.(*backendInProcess).cfg.ModelSettings = func(name string) CollectionModelSettings {
+		calls++
+		if name != "Research" {
+			t.Errorf("model lookup name = %q, want Research", name)
+			return CollectionModelSettings{}
+		}
+		return selected
+	}
+	db, compact, ok := RAGProviderFromState(st)("Research")
+	if !ok || calls != 0 {
+		t.Fatalf("provider must resolve lazily: ok=%t calls=%d", ok, calls)
+	}
+	if err := db.Store("research document"); err != nil {
+		t.Fatal(err)
+	}
+	if compact.Collection() != "research" {
+		t.Fatalf("storage name = %q", compact.Collection())
+	}
+	results, err := db.Search("query", 1)
+	if err != nil || len(results) != 1 || !reranked {
+		t.Fatalf("search: %v %v reranked=%t", results, err, reranked)
+	}
+	for _, model := range *models {
+		if model != "custom" {
+			t.Fatalf("embedding model = %q", model)
+		}
+	}
+	selected.EmbeddingModel = "updated"
+	if err := db.Store("must require reset"); err == nil {
+		t.Fatal("updated setting not resolved dynamically")
+	}
+	if err := db.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "summary.txt")
+	if err := os.WriteFile(path, []byte("compacted research"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := compact.Store(path); err != nil {
+		t.Fatal(err)
+	}
+	if model := (*models)[len(*models)-1]; model != "updated" {
+		t.Fatalf("compaction model = %q", model)
 	}
 }
