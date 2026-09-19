@@ -1128,6 +1128,10 @@ Reranking uses the server's OpenAI-compatible API URL and key and calls
 reranker and retain document source metadata. A reranker error fails the search.
 These settings do not configure a remote LocalRecall server.
 
+Collection model lookup prefers an exact agent name. A normalized collection
+name, such as `research` for agent `Research`, also resolves that agent when the
+match is unique. Ambiguous normalized names fail instead of selecting a model.
+
 A collection records its embedding model separately from its document data.
 Changing that model on a collection with documents or external sources fails with
 an instruction to reset it. Reset, recreate the collection, and upload the documents

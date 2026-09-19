@@ -19,7 +19,11 @@ func NewInProcessCollectionsBackend(cfg *Config) (CollectionsBackend, *Collectio
 		DatabaseURL:      cfg.DatabaseURL,
 		ModelSettings: func(name string) (collections.CollectionModelSettings, error) {
 			if cfg.Pool != nil {
-				if agent := cfg.Pool.GetConfig(name); agent != nil {
+				agent, err := cfg.Pool.GetCollectionConfig(name)
+				if err != nil {
+					return collections.CollectionModelSettings{}, err
+				}
+				if agent != nil {
 					return collections.CollectionModelSettings{EmbeddingModel: agent.EmbeddingModel, RerankerModel: agent.RerankerModel}, nil
 				}
 			}

@@ -969,9 +969,31 @@ func (a *AgentPool) GetConfig(name string) *AgentConfig {
 	return &agent
 }
 
+// GetCollectionConfig resolves collection names without changing case-sensitive
+// agent identities. Legacy embedded collections use lowercase, trimmed names.
+func (a *AgentPool) GetCollectionConfig(name string) (*AgentConfig, error) {
+	a.Lock()
+	defer a.Unlock()
+	if config, exists := a.pool[name]; exists {
+		return &config, nil
+	}
+	normalized := strings.TrimSpace(strings.ToLower(name))
+	var match *AgentConfig
+	for agentName, config := range a.pool {
+		if strings.TrimSpace(strings.ToLower(agentName)) != normalized {
+			continue
+		}
+		if match != nil {
+			return nil, fmt.Errorf("collection %q matches multiple agent configurations", name)
+		}
+		matchedConfig := config
+		match = &matchedConfig
+	}
+	return match, nil
+}
+
 func (a *AgentPool) GetManager(name string) sseLib.Manager {
 	a.Lock()
 	defer a.Unlock()
 	return a.managers[name]
 }
-
