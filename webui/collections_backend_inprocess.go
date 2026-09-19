@@ -17,6 +17,14 @@ func NewInProcessCollectionsBackend(cfg *Config) (CollectionsBackend, *Collectio
 		MaxChunkingSize:  cfg.MaxChunkingSize,
 		ChunkOverlap:     cfg.ChunkOverlap,
 		DatabaseURL:      cfg.DatabaseURL,
+		ModelSettings: func(name string) collections.CollectionModelSettings {
+			if cfg.Pool != nil {
+				if agent := cfg.Pool.GetConfig(name); agent != nil {
+					return collections.CollectionModelSettings{EmbeddingModel: agent.EmbeddingModel, RerankerModel: agent.RerankerModel}
+				}
+			}
+			return collections.CollectionModelSettings{}
+		},
 	}
 	return collections.NewInProcessBackend(collCfg)
 }

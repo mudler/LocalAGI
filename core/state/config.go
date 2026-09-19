@@ -63,6 +63,8 @@ type AgentConfig struct {
 
 	Description string `json:"description" form:"description"`
 
+	EmbeddingModel        string `json:"embedding_model" form:"embedding_model"`
+	RerankerModel         string `json:"reranker_model" form:"reranker_model"`
 	Model                 string `json:"model" form:"model"`
 	MultimodalModel       string `json:"multimodal_model" form:"multimodal_model"`
 	TranscriptionModel    string `json:"transcription_model" form:"transcription_model"`
@@ -172,6 +174,20 @@ func NewAgentConfigMeta(
 			{
 				Name:         "model",
 				Label:        "Model",
+				Type:         "text",
+				DefaultValue: "",
+				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "embedding_model",
+				Label:        "Embedding Model",
+				Type:         "text",
+				DefaultValue: "",
+				Tags:         config.Tags{Section: "ModelSettings"},
+			},
+			{
+				Name:         "reranker_model",
+				Label:        "Reranker Model",
 				Type:         "text",
 				DefaultValue: "",
 				Tags:         config.Tags{Section: "ModelSettings"},

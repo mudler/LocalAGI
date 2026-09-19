@@ -40,16 +40,24 @@ type Backend interface {
 	GetEntryFilePath(collection, entry string) (string, error)
 }
 
+// CollectionModelSettings overrides models for one collection. Empty values use
+// the default embedding model and disable reranking, respectively.
+type CollectionModelSettings struct {
+	EmbeddingModel string
+	RerankerModel  string
+}
+
 // Config holds the configuration for the in-process collections backend.
 type Config struct {
-	LLMAPIURL       string
-	LLMAPIKey       string
-	LLMModel        string
+	ModelSettings    func(collectionName string) CollectionModelSettings
+	LLMAPIURL        string
+	LLMAPIKey        string
+	LLMModel         string
 	CollectionDBPath string
 	FileAssets       string
-	VectorEngine    string
-	EmbeddingModel  string
-	MaxChunkingSize int
-	ChunkOverlap    int
-	DatabaseURL     string
+	VectorEngine     string
+	EmbeddingModel   string
+	MaxChunkingSize  int
+	ChunkOverlap     int
+	DatabaseURL      string
 }

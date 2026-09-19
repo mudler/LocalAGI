@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/localrecall/rag"
@@ -160,6 +159,12 @@ func RAGProviderFromState(cs *State) func(collectionName string) (agent.RAGDB, s
 		name := strings.TrimSpace(strings.ToLower(collectionName))
 		if name == "" {
 			return nil, nil, false
+		}
+		// Pool construction holds its config mutex. Defer collection creation and
+		// model resolution until an operation, when that mutex is no longer held.
+		if cs.backend != nil {
+			adapter := &backendRAGAdapter{backend: cs.backend, collection: name}
+			return adapter, &backendCompactionAdapter{adapter}, true
 		}
 		var kb *rag.PersistentKB
 		cs.Mu.RLock()

@@ -11,6 +11,7 @@ type CollectionList map[string]*rag.PersistentKB
 
 // State holds in-memory state for the collections API.
 type State struct {
+	backend          *backendInProcess
 	Mu               sync.RWMutex
 	Collections      CollectionList
 	SourceManager    *rag.SourceManager
