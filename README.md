@@ -1141,6 +1141,9 @@ cannot be cancelled. Recreation is blocked until restart to prevent that fetch
 from writing embeddings from the previous model into the recreated collection.
 
 Applications embedding `webui/collections` can provide
-`Config.ModelSettings func(string) CollectionModelSettings` to resolve the embedding
+`Config.ModelSettings func(string) (CollectionModelSettings, error)` to resolve the embedding
 and reranker models by collection name. Model resolution occurs during operations;
 creating an agent's RAG provider does not call the resolver.
+Return an error to deny an embedding or reranking operation, for example when a
+model is not allowed for the user. Resolver errors prevent inference requests;
+existing collection inspection and reset remain available.

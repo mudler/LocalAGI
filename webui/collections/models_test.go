@@ -47,7 +47,7 @@ func testModelBackend(t *testing.T, selected *CollectionModelSettings, reranked 
 		w.Write([]byte(`{"data":[{"embedding":[1,0,0],"index":0}],"model":"test","usage":{}}`))
 	}))
 	t.Cleanup(server.Close)
-	b, st := NewInProcessBackend(&Config{LLMAPIURL: server.URL + "/v1", LLMAPIKey: "secret", CollectionDBPath: t.TempDir(), FileAssets: t.TempDir(), VectorEngine: "chromem", EmbeddingModel: "default", MaxChunkingSize: 200, ModelSettings: func(string) CollectionModelSettings { return *selected }})
+	b, st := NewInProcessBackend(&Config{LLMAPIURL: server.URL + "/v1", LLMAPIKey: "secret", CollectionDBPath: t.TempDir(), FileAssets: t.TempDir(), VectorEngine: "chromem", EmbeddingModel: "default", MaxChunkingSize: 200, ModelSettings: func(string) (CollectionModelSettings, error) { return *selected, nil }})
 	t.Cleanup(st.SourceManager.Stop)
 	return b, st, &models
 }
@@ -178,7 +178,7 @@ func TestProviderDoesNotResolveModelsWhileConstructing(t *testing.T) {
 	selected := CollectionModelSettings{}
 	backend, st, _ := testModelBackend(t, &selected)
 	calls := 0
-	backend.(*backendInProcess).cfg.ModelSettings = func(string) CollectionModelSettings { calls++; return selected }
+	backend.(*backendInProcess).cfg.ModelSettings = func(string) (CollectionModelSettings, error) { calls++; return selected, nil }
 	db, _, ok := RAGProviderFromState(st)("agent")
 	if !ok || db == nil || calls != 0 {
 		t.Fatalf("provider invoked resolver: %d", calls)
@@ -306,13 +306,13 @@ func TestMixedCaseAgentResolvesOriginalModelSettings(t *testing.T) {
 	reranked := false
 	backend, st, models := testModelBackend(t, &selected, &reranked)
 	calls := 0
-	backend.(*backendInProcess).cfg.ModelSettings = func(name string) CollectionModelSettings {
+	backend.(*backendInProcess).cfg.ModelSettings = func(name string) (CollectionModelSettings, error) {
 		calls++
 		if name != "Research" {
 			t.Errorf("model lookup name = %q, want Research", name)
-			return CollectionModelSettings{}
+			return CollectionModelSettings{}, nil
 		}
-		return selected
+		return selected, nil
 	}
 	db, compact, ok := RAGProviderFromState(st)("Research")
 	if !ok || calls != 0 {
@@ -349,5 +349,52 @@ func TestMixedCaseAgentResolvesOriginalModelSettings(t *testing.T) {
 	}
 	if model := (*models)[len(*models)-1]; model != "updated" {
 		t.Fatalf("compaction model = %q", model)
+	}
+}
+
+func TestModelResolverErrorBlocksInference(t *testing.T) {
+	selected := CollectionModelSettings{RerankerModel: "ranker"}
+	reranked := false
+	backend, st, models := testModelBackend(t, &selected, &reranked)
+	b := backend.(*backendInProcess)
+	db, compact, _ := RAGProviderFromState(st)("agent")
+	if err := db.Store("existing document"); err != nil {
+		t.Fatal(err)
+	}
+	before := len(*models)
+	denied := fmt.Errorf("model access denied")
+	b.cfg.ModelSettings = func(string) (CollectionModelSettings, error) { return selected, denied }
+	path := filepath.Join(t.TempDir(), "summary.txt")
+	if err := os.WriteFile(path, []byte("summary"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name string
+		run  func() error
+	}{
+		{"create", func() error { return b.CreateCollection("agent") }},
+		{"upload", func() error { _, err := b.Upload("agent", "file.txt", strings.NewReader("text")); return err }},
+		{"search", func() error { _, err := b.Search("agent", "query", 1); return err }},
+		{"source", func() error { return b.AddSource("agent", "invalid://source", 60) }},
+		{"embedded store", func() error { return db.Store("new text") }},
+		{"embedded search", func() error { _, err := db.Search("query", 1); return err }},
+		{"compaction", func() error { return compact.Store(path) }},
+	}
+	for _, check := range checks {
+		if err := check.run(); err != denied {
+			t.Errorf("%s: got %v, want resolver error", check.name, err)
+		}
+	}
+	if _, ok := st.EnsureCollection("agent"); ok {
+		t.Error("ensure ignored resolver failure")
+	}
+	if len(*models) != before || reranked {
+		t.Errorf("denied resolver emitted inference requests: embeddings=%d reranked=%t", len(*models)-before, reranked)
+	}
+	if entries, err := b.ListEntries("agent"); err != nil || len(entries) == 0 {
+		t.Fatalf("inspection unavailable: %v %v", entries, err)
+	}
+	if err := b.Reset("agent"); err != nil {
+		t.Fatalf("reset unavailable: %v", err)
 	}
 }

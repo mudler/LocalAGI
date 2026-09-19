@@ -111,7 +111,11 @@ func (b *backendInProcess) ListCollections() ([]string, error) {
 }
 
 func (b *backendInProcess) CreateCollection(name string) error {
-	return b.createCollection(name, b.settings(name))
+	settings, err := b.settings(name)
+	if err != nil {
+		return err
+	}
+	return b.createCollection(name, settings)
 }
 
 func (b *backendInProcess) createCollection(name string, settings CollectionModelSettings) error {
@@ -122,7 +126,11 @@ func (b *backendInProcess) createCollection(name string, settings CollectionMode
 }
 
 func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reader) (string, error) {
-	return b.upload(collection, filename, fileBody, b.settings(collection))
+	settings, err := b.settings(collection)
+	if err != nil {
+		return "", err
+	}
+	return b.upload(collection, filename, fileBody, settings)
 }
 
 func (b *backendInProcess) upload(collection, filename string, fileBody io.Reader, settings CollectionModelSettings) (string, error) {
@@ -170,7 +178,11 @@ func (b *backendInProcess) GetEntryContent(collection, entry string) (string, in
 }
 
 func (b *backendInProcess) Search(collection, query string, maxResults int) ([]SearchResult, error) {
-	return b.search(collection, query, maxResults, b.settings(collection))
+	settings, err := b.settings(collection)
+	if err != nil {
+		return nil, err
+	}
+	return b.search(collection, query, maxResults, settings)
 }
 
 func (b *backendInProcess) search(collection, query string, maxResults int, settings CollectionModelSettings) ([]SearchResult, error) {
@@ -253,7 +265,10 @@ func (b *backendInProcess) DeleteEntry(collection, entry string) ([]string, erro
 }
 
 func (b *backendInProcess) AddSource(collection, url string, intervalMin int) error {
-	settings := b.settings(collection)
+	settings, err := b.settings(collection)
+	if err != nil {
+		return err
+	}
 	b.operationMu.Lock()
 	defer b.operationMu.Unlock()
 	kb, err := b.writable(collection, settings, false)
@@ -347,7 +362,10 @@ func NewInProcessBackend(cfg *Config) (Backend, *State) {
 	}
 
 	st.EnsureCollection = func(name string) (*rag.PersistentKB, bool) {
-		settings := backend.settings(name)
+		settings, err := backend.settings(name)
+		if err != nil {
+			return nil, false
+		}
 		backend.operationMu.Lock()
 		defer backend.operationMu.Unlock()
 		collection, err := backend.writable(name, settings, true)

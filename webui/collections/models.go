@@ -17,15 +17,19 @@ import (
 	"github.com/mudler/localrecall/rag"
 )
 
-func (b *backendInProcess) settings(name string) CollectionModelSettings {
+func (b *backendInProcess) settings(name string) (CollectionModelSettings, error) {
 	var settings CollectionModelSettings
 	if b.cfg.ModelSettings != nil {
-		settings = b.cfg.ModelSettings(name)
+		var err error
+		settings, err = b.cfg.ModelSettings(name)
+		if err != nil {
+			return CollectionModelSettings{}, err
+		}
 	}
 	if settings.EmbeddingModel == "" {
 		settings.EmbeddingModel = b.cfg.EmbeddingModel
 	}
-	return settings
+	return settings, nil
 }
 
 func (b *backendInProcess) identityPath(name string) string {

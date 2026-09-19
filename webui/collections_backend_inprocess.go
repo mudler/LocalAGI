@@ -17,13 +17,13 @@ func NewInProcessCollectionsBackend(cfg *Config) (CollectionsBackend, *Collectio
 		MaxChunkingSize:  cfg.MaxChunkingSize,
 		ChunkOverlap:     cfg.ChunkOverlap,
 		DatabaseURL:      cfg.DatabaseURL,
-		ModelSettings: func(name string) collections.CollectionModelSettings {
+		ModelSettings: func(name string) (collections.CollectionModelSettings, error) {
 			if cfg.Pool != nil {
 				if agent := cfg.Pool.GetConfig(name); agent != nil {
-					return collections.CollectionModelSettings{EmbeddingModel: agent.EmbeddingModel, RerankerModel: agent.RerankerModel}
+					return collections.CollectionModelSettings{EmbeddingModel: agent.EmbeddingModel, RerankerModel: agent.RerankerModel}, nil
 				}
 			}
-			return collections.CollectionModelSettings{}
+			return collections.CollectionModelSettings{}, nil
 		},
 	}
 	return collections.NewInProcessBackend(collCfg)
