@@ -134,6 +134,14 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 		return
 	}
 
+	// Memory can be enabled without a knowledge base (the pool only attaches
+	// a RAG DB when the knowledge base is enabled and its provider succeeds).
+	// Skip instead of dereferencing a nil RAG DB, which would crash the process.
+	if a.options.ragdb == nil {
+		xlog.Warn("Long term or summary memory is enabled but no RAG DB is configured, not saving conversation to memory", "agent", a.Character.Name)
+		return
+	}
+
 	xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(conv))
 
 	if a.options.enableSummaryMemory && len(conv) > 0 {
@@ -141,8 +149,13 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 		fragment, err := a.llm.Ask(a.context.Context, fragment)
 		if err != nil {
 			xlog.Error("Error summarizing conversation", "error", err)
+			return
 		}
 		msg := fragment.LastMessage()
+		if msg == nil {
+			xlog.Error("Error summarizing conversation: empty response", "agent", a.Character.Name)
+			return
+		}
 
 		if err := a.options.ragdb.Store(msg.Content); err != nil {
 			xlog.Error("Error storing into memory", "error", err)
