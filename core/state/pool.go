@@ -651,6 +651,9 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		if config.RequiredToolBeforeFinishPrompt != "" {
 			opts = append(opts, WithRequiredToolBeforeFinishPrompt(config.RequiredToolBeforeFinishPrompt))
 		}
+		if config.RequiredToolBeforeFinishAttempts > 0 {
+			opts = append(opts, WithRequiredToolBeforeFinishAttempts(config.RequiredToolBeforeFinishAttempts))
+		}
 	}
 
 	if config.EnableForceReasoningTool {

@@ -126,6 +126,11 @@ type AgentConfig struct {
 	// tries to finish early. Empty uses a generic default naming the tool; override it when
 	// the tool needs specific arguments explained.
 	RequiredToolBeforeFinishPrompt string `json:"required_tool_before_finish_prompt" form:"required_tool_before_finish_prompt"`
+
+	// RequiredToolBeforeFinishAttempts caps how often the model is told to run the required
+	// tool before the answer is let through anyway (with a warning in the log). Zero or
+	// unset uses the default of 3.
+	RequiredToolBeforeFinishAttempts int `json:"required_tool_before_finish_attempts" form:"required_tool_before_finish_attempts"`
 }
 
 type AgentConfigMeta struct {
@@ -564,6 +569,33 @@ func NewAgentConfigMeta(
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{
+				Name:         "required_tool_before_finish",
+				Label:        "Required Tool Before Finish",
+				Type:         "text",
+				DefaultValue: "",
+				Placeholder:  "check_policy",
+				HelpText:     "Name of a tool the agent must call successfully (a JSON result with \"ok\": true) before it may send its final answer. Has no effect if the agent does not have this tool. Leave empty to disable.",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "required_tool_before_finish_prompt",
+				Label:        "Required Tool Prompt",
+				Type:         "textarea",
+				DefaultValue: "",
+				HelpText:     "Instruction sent to the model when it tries to finish before the required tool has passed. Leave empty to use a default that names the tool.",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "required_tool_before_finish_attempts",
+				Label:        "Required Tool Attempts",
+				Type:         "number",
+				DefaultValue: 3,
+				Min:          1,
+				Step:         1,
+				HelpText:     "How many times the model is told to run the required tool before its answer is sent anyway",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
 				Name:         "last_message_duration",
 				Label:        "Last Message Duration",
 				Type:         "text",
@@ -605,11 +637,12 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 	type Alias AgentConfig
 	aux := &struct {
 		*Alias
-		MCPSTDIOServersConfig interface{} `json:"mcp_stdio_servers"`
-		MaxEvaluationLoops    interface{} `json:"max_evaluation_loops"`
-		MaxAttempts            interface{} `json:"max_attempts"`
-		ParallelJobs           interface{} `json:"parallel_jobs"`
-		KnowledgeBaseResults  interface{} `json:"kb_results"`
+		MCPSTDIOServersConfig            interface{} `json:"mcp_stdio_servers"`
+		MaxEvaluationLoops               interface{} `json:"max_evaluation_loops"`
+		MaxAttempts                      interface{} `json:"max_attempts"`
+		RequiredToolBeforeFinishAttempts interface{} `json:"required_tool_before_finish_attempts"`
+		ParallelJobs                     interface{} `json:"parallel_jobs"`
+		KnowledgeBaseResults             interface{} `json:"kb_results"`
 	}{
 		Alias: (*Alias)(a),
 	}
@@ -621,6 +654,7 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 	// Parse integer fields that may come as strings
 	a.MaxEvaluationLoops = parseIntField(aux.MaxEvaluationLoops)
 	a.MaxAttempts = parseIntField(aux.MaxAttempts)
+	a.RequiredToolBeforeFinishAttempts = parseIntField(aux.RequiredToolBeforeFinishAttempts)
 	a.ParallelJobs = parseIntField(aux.ParallelJobs)
 	a.KnowledgeBaseResults = parseIntField(aux.KnowledgeBaseResults)
 	a.LoopDetection = parseIntField(aux.LoopDetection)
