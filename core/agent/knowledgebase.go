@@ -41,11 +41,8 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 
 	// Walk conversation from bottom to top, and find the first message of the user
 	// to use it as a query to the KB
-	userMessage := conv.GetLatestUserMessage().Content
-
-	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage, "lastMessage", conv.GetLatestUserMessage())
-
-	if userMessage == "" {
+	lastUser := conv.GetLatestUserMessage()
+	if lastUser == nil || lastUser.Content == "" {
 		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)
 		if obs != nil {
 			obs.Completion = &types.Completion{
@@ -55,6 +52,9 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 		}
 		return conv
 	}
+	userMessage := lastUser.Content
+
+	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage)
 
 	results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
 	if err != nil {
