@@ -139,3 +139,37 @@ func TestUnreachableMCPServerIsSkippedThenRecovered(t *testing.T) {
 		t.Fatalf("live sessions after the server came back = %d, want 1", got)
 	}
 }
+
+func TestRefreshMCPSessionsDoesNotCloseBorrowedSession(t *testing.T) {
+	server := newRestartableMCPServer(t)
+	client := mcp.NewClient(&mcp.Implementation{Name: "shared-client", Version: "v1"}, nil)
+	session, err := client.Connect(context.Background(), &mcp.StreamableClientTransport{Endpoint: server.http.URL}, nil)
+	if err != nil {
+		t.Fatalf("connect shared session: %v", err)
+	}
+	t.Cleanup(func() { session.Close() })
+
+	a := newTestAgent(t)
+	a.options.extraMCPSessions = []*mcp.ClientSession{session}
+	if err := a.initMCPActions(); err != nil {
+		t.Fatalf("initMCPActions: %v", err)
+	}
+	if got := len(a.mcpActionDefinitions); got != 1 {
+		t.Fatalf("tools after init = %d, want 1", got)
+	}
+
+	// Cancelling one borrower must not close the owner's shared session.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	a.context = types.NewActionContext(ctx, cancel)
+	a.refreshMCPSessions()
+	if got := len(a.liveMCPSessions()); got != 0 {
+		t.Fatalf("live sessions after failed ping = %d, want 0", got)
+	}
+	if got := len(a.mcpActionDefinitions); got != 0 {
+		t.Fatalf("tools after failed ping = %d, want 0", got)
+	}
+	if _, err := session.ListTools(context.Background(), nil); err != nil {
+		t.Fatalf("borrowed session is no longer usable by its owner: %v", err)
+	}
+}
