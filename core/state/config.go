@@ -26,6 +26,36 @@ func parseIntField(value interface{}) int {
 	return 0
 }
 
+// parseToolNames reads a tool name list sent either as a JSON array or, from
+// the agent form's textarea, as one string separated by commas or newlines.
+func parseToolNames(value interface{}) ([]string, error) {
+	var raw []string
+	switch v := value.(type) {
+	case nil:
+		return nil, nil
+	case string:
+		raw = strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == '\n' || r == '\r' })
+	case []interface{}:
+		for _, item := range v {
+			name, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("expected a list of tool names, got %T", item)
+			}
+			raw = append(raw, name)
+		}
+	default:
+		return nil, fmt.Errorf("expected a list of tool names or a comma separated string, got %T", value)
+	}
+
+	var names []string
+	for _, n := range raw {
+		if n = strings.TrimSpace(n); n != "" {
+			names = append(names, n)
+		}
+	}
+	return names, nil
+}
+
 type ConnectorConfig struct {
 	Type   string `json:"type"` // e.g. Slack
 	Config string `json:"config"`
@@ -114,9 +144,12 @@ type AgentConfig struct {
 	LoopDetection              int    `json:"loop_detection" form:"loop_detection"`
 	EnableAutoCompaction       bool   `json:"enable_auto_compaction" form:"enable_auto_compaction"`
 	AutoCompactionThreshold    int    `json:"auto_compaction_threshold" form:"auto_compaction_threshold"`
-	// AllowedTools/ExcludedTools constrain the agent's EFFECTIVE tool set (across MCP,
-	// built-in and KB-injected actions). If AllowedTools is non-empty, only those tool
-	// names are kept; ExcludedTools are always removed. Empty = unchanged behaviour.
+
+	// AllowedTools/ExcludedTools constrain the agent's effective tool set (built-in,
+	// user-configured and MCP tools). Control actions the agent needs to reply and
+	// stop are always kept; see agent.WithToolFilter.
+	// The UI submits them as a comma or newline separated string, the API as a
+	// JSON array; UnmarshalJSON accepts both.
 	AllowedTools  []string `json:"allowed_tools" form:"allowed_tools"`
 	ExcludedTools []string `json:"excluded_tools" form:"excluded_tools"`
 }
@@ -461,6 +494,24 @@ func NewAgentConfigMeta(
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{
+				Name:         "allowed_tools",
+				Label:        "Allowed Tools",
+				Type:         "textarea",
+				DefaultValue: "",
+				Placeholder:  "get_document_content, search",
+				HelpText:     "Comma or newline separated tool names. When set, the agent is offered only these tools (actions, knowledge base tools and MCP tools). send_message, stop and update_state are always kept. Leave empty to offer every tool.",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "excluded_tools",
+				Label:        "Excluded Tools",
+				Type:         "textarea",
+				DefaultValue: "",
+				Placeholder:  "search_memory",
+				HelpText:     "Comma or newline separated tool names that are never offered to the agent, even if they are in Allowed Tools. send_message, stop and update_state cannot be excluded; use their own settings instead.",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
 				Name:         "enable_skills",
 				Label:        "Enable Skills",
 				Type:         "checkbox",
@@ -603,6 +654,8 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 		MaxAttempts            interface{} `json:"max_attempts"`
 		ParallelJobs           interface{} `json:"parallel_jobs"`
 		KnowledgeBaseResults  interface{} `json:"kb_results"`
+		AllowedTools          interface{} `json:"allowed_tools"`
+		ExcludedTools         interface{} `json:"excluded_tools"`
 	}{
 		Alias: (*Alias)(a),
 	}
@@ -617,6 +670,14 @@ func (a *AgentConfig) UnmarshalJSON(data []byte) error {
 	a.ParallelJobs = parseIntField(aux.ParallelJobs)
 	a.KnowledgeBaseResults = parseIntField(aux.KnowledgeBaseResults)
 	a.LoopDetection = parseIntField(aux.LoopDetection)
+
+	var err error
+	if a.AllowedTools, err = parseToolNames(aux.AllowedTools); err != nil {
+		return fmt.Errorf("allowed_tools: %w", err)
+	}
+	if a.ExcludedTools, err = parseToolNames(aux.ExcludedTools); err != nil {
+		return fmt.Errorf("excluded_tools: %w", err)
+	}
 
 	// Handle MCP STDIO servers configuration
 	if aux.MCPSTDIOServersConfig != nil {

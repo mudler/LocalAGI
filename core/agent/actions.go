@@ -145,7 +145,14 @@ func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 	return baseActions
 }
 
+// availableActions returns the agent's own actions for a job, narrowed by the
+// per-agent tool allow/deny-list. Doing it here keeps the HUD, the builtin-tool
+// check and the tools handed to the model in agreement.
 func (a *Agent) availableActions(j *types.Job) types.Actions {
+	return a.options.toolFilter.filterActions(a.unfilteredActions(j))
+}
+
+func (a *Agent) unfilteredActions(j *types.Job) types.Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
 
 	defaultActions := slices.Clone(a.options.userActions)
@@ -174,37 +181,6 @@ func (a *Agent) availableActions(j *types.Job) types.Actions {
 	}
 
 	return defaultActions
-}
-
-// filterActions constrains a set of actions to a per-agent allow/deny-list by tool name.
-// If allow is non-empty, only actions whose name is in allow survive; names in deny are
-// always removed. Empty allow and deny → input is returned unchanged (backward compatible).
-func filterActions(acts types.Actions, allow, deny []string) types.Actions {
-	if len(allow) == 0 && len(deny) == 0 {
-		return acts
-	}
-	allowSet := make(map[string]struct{}, len(allow))
-	for _, n := range allow {
-		allowSet[n] = struct{}{}
-	}
-	denySet := make(map[string]struct{}, len(deny))
-	for _, n := range deny {
-		denySet[n] = struct{}{}
-	}
-	out := make(types.Actions, 0, len(acts))
-	for _, act := range acts {
-		name := string(act.Definition().Name)
-		if len(allowSet) > 0 {
-			if _, ok := allowSet[name]; !ok {
-				continue
-			}
-		}
-		if _, ok := denySet[name]; ok {
-			continue
-		}
-		out = append(out, act)
-	}
-	return out
 }
 
 func (a *Agent) prepareHUD() (promptHUD *PromptHUD) {

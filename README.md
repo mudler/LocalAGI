@@ -755,6 +755,30 @@ LocalAGI includes built-in **Skills** management. Skills are reusable instructio
 
 In Docker, the state directory is persisted (`/pool`), so skills are stored in `/pool/skills`. To use a host folder for skills, mount it over that path in your compose file (e.g. `- ./my-skills:/pool/skills`).
 
+### 4. Limiting the Tools of an Agent
+
+An agent gets tools from many places: the actions you configure, the knowledge base tools (`search_memory` and `add_memory` when "KB as tools" is on), skills, and every MCP server. For a single-purpose agent, or a small local model, a large tool set can cause the model to select the wrong tool. Two agent settings limit the tools that the model is offered:
+
+| Field | What it does |
+|-------|--------------|
+| `allowed_tools` | When set, the agent is offered only these tools. When empty, all tools are offered. |
+| `excluded_tools` | These tools are never offered, even if they are also in `allowed_tools`. |
+
+Both fields use tool names, as the model sees them. They apply to configured actions, knowledge base tools, skills tools and MCP tools. MCP tools are removed from the tool list that is sent to the model, not only from the agent's own list. In the Web UI, both fields are in **Advanced Settings** and take a comma or newline separated list. In the REST API, use a JSON array or the same comma separated string:
+
+```json
+{
+  "name": "document-fetcher",
+  "allowed_tools": ["get_document_content", "create_voucher"],
+  "excluded_tools": ["search_memory"]
+}
+```
+
+Some tools are not affected by these lists:
+
+- The control actions `send_message`, `stop` and `update_state` are always kept. The agent needs them to reply to scheduled runs, to stop, and to update its HUD state. Use **Initiate Conversations**, **Can Stop Itself** and **HUD** to turn them off.
+- Tools that a client sends with a single request (for example the `tools` field of an OpenAI-compatible request) are not filtered, because the caller selected them for that request.
+
 ### Development
 
 The development workflow is similar to the source build, but with additional steps for hot reloading of the frontend:
