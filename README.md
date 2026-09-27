@@ -14,11 +14,13 @@
 
 Try on [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/LocalAGI_bot)
 
+Telegram response streaming is enabled by default (`"streaming": "true"`). Private chats use native rich drafts, while groups progressively edit a placeholder. Set `"streaming": "false"` to suppress previews; final responses still use rich Markdown with MarkdownV2 and plain-text fallbacks.
+
 </div>
 
 Create customizable AI assistants, automations, chat bots and agents that run 100% locally. No need for agentic Python libraries or cloud service keys, just bring your GPU (or even just CPU) and a web browser.
 
-**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. Create Agents with a couple of clicks, connect via MCP and give it skills with [skillserver](https://github.com/mudler/skillserver). Every agent exposes a complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU).
+**LocalAGI** is a powerful, self-hostable AI Agent platform that allows you to design AI automations without writing code. Create Agents with a couple of clicks, connect via MCP, and use built-in **Skills** (manage skills in the Web UI and enable them per agent). Every agent exposes a complete drop-in replacement for OpenAI's Responses APIs with advanced agentic capabilities. No clouds. No data leaks. Just pure local AI that works on consumer-grade hardware (CPU and GPU). Skills follow the [skillserver](https://github.com/mudler/skillserver) format and can be created, imported, or synced from git.
 
 ## 🛡️ Take Back Your Privacy
 
@@ -33,12 +35,13 @@ LocalAGI ensures your data stays exactly where you want it—on your hardware. N
 - 🤖 **Advanced Agent Teaming**: Instantly create cooperative agent teams from a single prompt.
 - 📡 **Connectors**: Built-in integrations with Discord, Slack, Telegram, GitHub Issues, and IRC.
 - 🛠 **Comprehensive REST API**: Seamless integration into your workflows. Every agent created will support OpenAI Responses API out of the box.
-- 📚 **Short & Long-Term Memory**: Powered by [LocalRecall](https://github.com/mudler/LocalRecall).
+- 📚 **Short & Long-Term Memory**: Built-in knowledge base (RAG) for collections, file uploads, and semantic search. Manage collections in the Web UI under **Knowledge base**; agents with "Knowledge base" enabled use it automatically (implementation uses [LocalRecall](https://github.com/mudler/LocalRecall) libraries).
 - 🧠 **Planning & Reasoning**: Agents intelligently plan, reason, and adapt.
 - 🔄 **Periodic Tasks**: Schedule tasks with cron-like syntax.
 - 💾 **Memory Management**: Control memory usage with options for long-term and summary memory.
 - 🖼 **Multimodal Support**: Ready for vision, text, and more.
 - 🔧 **Extensible Custom Actions**: Easily script dynamic agent behaviors in Go (interpreted, no compilation!).
+- 📚 **Built-in Skills**: Manage reusable agent skills in the Web UI (create, edit, import/export, git sync). Enable "Skills" per agent to inject skill tools and the skill list into the agent.
 - 🛠 **Fully Customizable Models**: Use your own models or integrate seamlessly with [LocalAI](https://github.com/mudler/LocalAI).
 - 📊 **Observability**: Monitor agent status and view detailed observable updates in real-time.
 
@@ -107,7 +110,7 @@ Still having issues? see this Youtube video: https://youtu.be/HtVwIxW3ePg
     </td>
     <td width="50%" valign="top">
       <h3><a href="https://github.com/mudler/LocalRecall">LocalRecall</a></h3>
-      <p>A REST-ful API and knowledge base management system that provides persistent memory and storage capabilities for AI agents.</p>
+      <p>A REST-ful API and knowledge base management system. LocalAGI embeds this functionality: the Web UI includes a <strong>Knowledge base</strong> section and the same collections API, so you no longer need to run LocalRecall separately.</p>
     </td>
   </tr>
 </table>
@@ -195,7 +198,7 @@ Good (relatively small) models that have been tested are:
 - **✓ Flexible Model Integration**: Supports GGUF, GGML, and more thanks to [LocalAI](https://github.com/mudler/LocalAI).
 - **✓ Developer-Friendly**: Rich APIs and intuitive interfaces.
 - **✓ Effortless Setup**: Simple Docker compose setups and pre-built binaries.
-- **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, LocalAGI has it all.
+- **✓ Feature-Rich**: From planning to multimodal capabilities, connectors for Slack, MCP support, built-in Skills, LocalAGI has it all.
 
 ## 🌟 Screenshots
 
@@ -224,6 +227,7 @@ Explore detailed documentation including:
 - [REST API Documentation](#rest-api)
 - [Connector Configuration](#connectors)
 - [Agent Configuration](#agent-configuration-reference)
+- [Skills](#3-skills)
 
 ### Environment Configuration
 
@@ -237,10 +241,15 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
+| `LOCALAGI_LOCALRAG_URL` | Optional URL when using an external LocalRAG URL; not used for built-in knowledge base |
+| `LOCALAGI_BASE_URL` | Optional base URL for the app (defaults to ":3000") |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
+
+For the built-in knowledge base, optional env (defaults use `LOCALAGI_STATE_DIR`): `COLLECTION_DB_PATH`, `FILE_ASSETS`, `VECTOR_ENGINE` (e.g. `chromem`, `postgres`), `EMBEDDING_MODEL`, `DATABASE_URL` (when `VECTOR_ENGINE=postgres`).
+
+Skills are stored in a fixed `skills` subdirectory under `LOCALAGI_STATE_DIR` (e.g. `/pool/skills` in Docker). Git repo config for skills lives in that directory. No extra environment variables are required.
 
 ## Installation Options
 
@@ -335,15 +344,16 @@ import (
     "github.com/mudler/LocalAGI/core/types"
 )
 
-// Create a new agent pool
+// Create a new agent pool (call pool.SetRAGProvider(...) for knowledge base; see main.go)
 pool, err := state.NewAgentPool(
     "default-model",           // default model name
     "default-multimodal-model", // default multimodal model
-    "image-model",            // image generation model
+    "transcription-model",     // default transcription model
+    "en",                     // default transcription language
+    "tts-model",              // default TTS model
     "http://localhost:8080",  // API URL
-    "your-api-key",          // API key
-    "./state",               // state directory
-    "http://localhost:8081", // LocalRAG API URL
+    "your-api-key",           // API key
+    "./state",                // state directory
     func(config *AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action {
         // Define available actions for agents
         return func(ctx context.Context, pool *AgentPool) []types.Action {
@@ -370,8 +380,9 @@ pool, err := state.NewAgentPool(
             // Add your custom filters here
         }
     },
-    "10m", // timeout
-    true,  // enable conversation logs
+    "10m",  // timeout
+    true,   // enable conversation logs
+    nil,    // skills service (optional)
 )
 
 // Create a new agent in the pool
@@ -685,6 +696,47 @@ You can create MCP servers in any language that supports the MCP protocol and ad
 1. **Via Web UI**: In the MCP Settings section of agent creation, add MCP servers
 2. **Via API**: Include MCP server configuration in your agent config
 
+#### LocalAGI as an MCP Server
+
+LocalAGI also works the other way around: it exposes its own MCP server so that MCP clients can manage agents. The endpoint is served at `/mcp` on the same address as the Web UI and the REST API:
+
+```
+http://localhost:3000/mcp
+```
+
+It speaks Streamable HTTP and is protected by the same API keys as the rest of the API, so clients authenticate with `Authorization: Bearer <your-api-key>` when `LOCALAGI_API_KEYS` is set.
+
+Example client configuration:
+
+```json
+{
+  "mcpServers": {
+    "localagi": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+
+The following tools are available:
+
+| Tool | Description |
+|------|-------------|
+| `list_agents` | List the configured agents, with their model and current state |
+| `get_agent_config` | Read the full configuration of an agent |
+| `create_agent` | Create a new agent and start it (only `name` is required) |
+| `update_agent_config` | Replace the configuration of an agent and restart it |
+| `delete_agent` | Delete an agent and its state |
+| `pause_agent` | Pause a running agent |
+| `start_agent` | Resume a paused agent |
+| `get_agent_config_schema` | Describe the configuration fields, and the connectors, actions, dynamic prompts and filters available on this instance |
+
+`create_agent` and `update_agent_config` accept the same configuration as the REST API. Call `get_agent_config_schema` first to discover which connectors, actions and filters the instance provides, and what each one expects.
+
 #### Best Practices
 
 - **Security**: Always validate inputs and use proper authentication for remote MCP servers
@@ -692,6 +744,16 @@ You can create MCP servers in any language that supports the MCP protocol and ad
 - **Documentation**: Provide clear descriptions for all tools exposed by your MCP server
 - **Testing**: Test your MCP servers independently before integrating with LocalAGI
 - **Resource Management**: Ensure your MCP servers properly clean up resources
+
+### 3. Skills
+
+LocalAGI includes built-in **Skills** management. Skills are reusable instructions and resources (scripts, references, assets) that agents can use when "Enable Skills" is turned on for that agent.
+
+- **Skills section (Web UI)**: Open **Skills** in the sidebar. Skills are stored under the state directory (`STATE_DIR/skills`). Create, edit, search, import, and export skills. You can also add git repositories to sync skills from.
+- **Per-agent**: In agent creation or settings, enable **Enable Skills** in Advanced Settings. The agent will receive a list of available skills in its context and have access to skill tools (list, read, search, resources) via the built-in skills MCP.
+- Skills use the same format as [skillserver](https://github.com/mudler/skillserver) (e.g. `SKILL.md` in a directory). You can export skills from LocalAGI and use them with the standalone skillserver, or import skills created elsewhere.
+
+In Docker, the state directory is persisted (`/pool`), so skills are stored in `/pool/skills`. To use a host folder for skills, mount it over that path in your compose file (e.g. `- ./my-skills:/pool/skills`).
 
 ### Development
 
@@ -727,7 +789,7 @@ export LOCALAGI_MODEL=gemma-3-4b-it-qat
 export LOCALAGI_MULTIMODAL_MODEL=moondream2-20250414
 export LOCALAGI_IMAGE_MODEL=sd-1.5-ggml
 export LOCALAGI_LLM_API_URL=http://localai:8080
-export LOCALAGI_LOCALRAG_URL=http://localrecall:8080
+# Knowledge base is built-in; no separate LocalRecall service needed
 export LOCALAGI_STATE_DIR=./pool
 export LOCALAGI_TIMEOUT=5m
 export LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
@@ -807,6 +869,12 @@ Configuration options:
 - `mention_only`: When enabled, bot only responds when mentioned in groups
 - `admins`: Comma-separated list of Telegram usernames allowed to use the bot in private chats
 - `channel_id`: Optional channel ID for the bot to send messages to
+- `streaming`: Show progressive responses. Defaults to `true`; set it to `false` for final-only output.
+
+Private chats use native rich drafts when the configured Telegram Bot API
+supports the current rich-message methods. If those methods are unavailable,
+the connector automatically falls back to progressive message edits. Final
+responses fall back from rich Markdown to MarkdownV2 and then plain text.
 
 > **Important**: For group functionality to work properly:
 > 1. Go to @BotFather
@@ -1031,7 +1099,8 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_LLM_API_KEY` | API authentication |
 | `LOCALAGI_TIMEOUT` | Request timeout settings |
 | `LOCALAGI_STATE_DIR` | Where state gets stored |
-| `LOCALAGI_LOCALRAG_URL` | LocalRecall connection |
+| `LOCALAGI_LOCALRAG_URL` | Optional URL when using an external LocalRAG URL; not used for built-in knowledge base |
+| `LOCALAGI_BASE_URL` | Optional base URL for the app (defaults to ":3000") |
 | `LOCALAGI_SSHBOX_URL` | LocalAGI SSHBox URL, e.g. user:pass@ip:port |
 | `LOCALAGI_ENABLE_CONVERSATIONS_LOGGING` | Toggle conversation logs |
 | `LOCALAGI_API_KEYS` | A comma separated list of api keys used for authentication |

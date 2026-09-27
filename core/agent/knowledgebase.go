@@ -41,11 +41,8 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 
 	// Walk conversation from bottom to top, and find the first message of the user
 	// to use it as a query to the KB
-	userMessage := conv.GetLatestUserMessage().Content
-
-	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage, "lastMessage", conv.GetLatestUserMessage())
-
-	if userMessage == "" {
+	lastUser := conv.GetLatestUserMessage()
+	if lastUser == nil || lastUser.Content == "" {
 		xlog.Info("[Knowledge Base Lookup] No user message found in conversation", "agent", a.Character.Name)
 		if obs != nil {
 			obs.Completion = &types.Completion{
@@ -55,6 +52,9 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 		}
 		return conv
 	}
+	userMessage := lastUser.Content
+
+	xlog.Info("[Knowledge Base Lookup] Last user message", "agent", a.Character.Name, "message", userMessage)
 
 	results, err := a.options.ragdb.Search(userMessage, a.options.kbResults)
 	if err != nil {
@@ -134,6 +134,14 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 		return
 	}
 
+	// Memory can be enabled without a knowledge base (the pool only attaches
+	// a RAG DB when the knowledge base is enabled and its provider succeeds).
+	// Skip instead of dereferencing a nil RAG DB, which would crash the process.
+	if a.options.ragdb == nil {
+		xlog.Warn("Long term or summary memory is enabled but no RAG DB is configured, not saving conversation to memory", "agent", a.Character.Name)
+		return
+	}
+
 	xlog.Info("Saving conversation", "agent", a.Character.Name, "conversation size", len(conv))
 
 	if a.options.enableSummaryMemory && len(conv) > 0 {
@@ -141,8 +149,13 @@ func (a *Agent) saveCurrentConversation(conv Messages) {
 		fragment, err := a.llm.Ask(a.context.Context, fragment)
 		if err != nil {
 			xlog.Error("Error summarizing conversation", "error", err)
+			return
 		}
 		msg := fragment.LastMessage()
+		if msg == nil {
+			xlog.Error("Error summarizing conversation: empty response", "agent", a.Character.Name)
+			return
+		}
 
 		if err := a.options.ragdb.Store(msg.Content); err != nil {
 			xlog.Error("Error storing into memory", "error", err)

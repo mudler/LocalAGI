@@ -33,9 +33,10 @@ import (
 
 type (
 	App struct {
-		config *Config
+		config           *Config
 		*fiber.App
-		sharedState *internalTypes.AgentSharedState
+		sharedState      *internalTypes.AgentSharedState
+		collectionsState *CollectionsState // set when RegisterCollectionRoutes runs; used for in-process RAG
 	}
 )
 
@@ -385,7 +386,20 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			// Ask the agent for a response
 			response := agent.Ask(coreTypes.WithText(message))
 
-			if response.Error != nil {
+			if response == nil {
+				// Ask returned nil (e.g. context cancelled or WaitResult failed)
+				xlog.Error("Agent returned nil response", "agent", agentName)
+				errorData, err := json.Marshal(map[string]interface{}{
+					"error":     "agent request failed or was cancelled",
+					"timestamp": time.Now().Format(time.RFC3339),
+				})
+				if err != nil {
+					xlog.Error("Error marshaling error message", "error", err)
+				} else {
+					manager.Send(
+						sse.NewMessage(string(errorData)).WithEvent("json_error"))
+				}
+			} else if response.Error != nil {
 				// Send error message
 				xlog.Error("Error asking agent", "agent", agentName, "error", response.Error)
 				errorData, err := json.Marshal(map[string]interface{}{
@@ -575,7 +589,17 @@ func (a *App) Responses(pool *state.AgentPool, tracker *conversations.Conversati
 		}
 
 		agentName := request.Model
-		messages := append(conv, request.ToChatCompletionMessages()...)
+		newMessages := request.ToChatCompletionMessages()
+		messages := append(conv, newMessages...)
+
+		// Continuing a thread (previous_response_id) without any new user/tool message causes
+		// the job to end with an assistant message, which backends with enable_thinking reject.
+		// Require at least one new message when continuing so we never send assistant-final conv.
+		if previousResponseID != "" && len(conv) > 0 && len(newMessages) == 0 {
+			return c.Status(http.StatusBadRequest).JSON(types.ResponseBody{
+				Error: "previous_response_id was set but no new input was sent; send at least one user or tool message when continuing a conversation",
+			})
+		}
 
 		agent := pool.GetAgent(agentName)
 		if agent == nil {

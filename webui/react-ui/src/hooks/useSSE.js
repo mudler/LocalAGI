@@ -10,6 +10,7 @@ export function useSSE(agentName) {
   const [messages, setMessages] = useState([]);
   const [statusUpdates, setStatusUpdates] = useState([]);
   const [errorMessages, setErrorMessages] = useState([]);
+  const [streamEvents, setStreamEvents] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const eventSourceRef = useRef(null);
 
@@ -80,6 +81,23 @@ export function useSSE(agentName) {
       }
     });
     
+    // Handle 'stream_event' event (reasoning, content, tool_call, done)
+    eventSource.addEventListener('stream_event', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const timestamp = data.timestamp || new Date().toISOString();
+
+        setStreamEvents(prev => [...prev, {
+          id: `stream-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: data.type,
+          content: data,
+          timestamp,
+        }]);
+      } catch (error) {
+        console.error('Error parsing stream event:', error);
+      }
+    });
+
     // Handle 'error' event
     eventSource.addEventListener('json_error', (event) => {
       try {
@@ -124,6 +142,7 @@ export function useSSE(agentName) {
     messages,
     statusUpdates,
     errorMessages,
+    streamEvents,
     isConnected,
     reconnect,
   };

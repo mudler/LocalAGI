@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/mudler/cogito"
 	"github.com/mudler/cogito/clients"
 
@@ -61,7 +60,10 @@ type Agent struct {
 
 	newConversations chan *types.ConversationMessage
 
-	mcpSessions []*mcp.ClientSession
+	mcpSessions []*mcpSession
+	// mcpMutex guards mcpSessions and mcpActionDefinitions, which are re-dialed
+	// and rebuilt from the job loop as servers come and go.
+	mcpMutex sync.Mutex
 	// only contains the MCP action definitions for observables
 	mcpActionDefinitions types.Actions
 
@@ -75,6 +77,10 @@ type Agent struct {
 
 	// Task scheduler for managing reminders
 	taskScheduler *scheduler.Scheduler
+
+	// currentJobByConversation tracks the running job per conversation_id for cancel-previous-on-new-message
+	currentJobByConversation map[string]*types.Job
+	currentJobMu             sync.Mutex
 }
 
 type RAGDB interface {
@@ -99,16 +105,17 @@ func New(opts ...Option) (*Agent, error) {
 
 	ctx, cancel := context.WithCancel(c)
 	a := &Agent{
-		jobQueue:               make(chan *types.Job),
-		options:                options,
-		client:                 client,
-		Character:              options.character,
-		currentState:           &types.AgentInternalState{},
-		llm:                    llmClient,
-		context:                types.NewActionContext(ctx, cancel),
-		newConversations:       make(chan *types.ConversationMessage),
-		newMessagesSubscribers: options.newConversationsSubscribers,
-		sharedState:            types.NewAgentSharedState(options.lastMessageDuration),
+		jobQueue:                 make(chan *types.Job),
+		options:                  options,
+		client:                   client,
+		Character:                options.character,
+		currentState:             &types.AgentInternalState{},
+		llm:                      llmClient,
+		context:                  types.NewActionContext(ctx, cancel),
+		newConversations:         make(chan *types.ConversationMessage),
+		newMessagesSubscribers:   options.newConversationsSubscribers,
+		sharedState:              types.NewAgentSharedState(options.lastMessageDuration),
+		currentJobByConversation: make(map[string]*types.Job),
 	}
 
 	// Initialize observer if provided
@@ -143,7 +150,7 @@ func New(opts ...Option) (*Agent, error) {
 		schedulerPath = "scheduled_tasks.json"
 	}
 
-	store, err := scheduler.NewJSONStore(schedulerPath)
+	store, err := scheduler.NewJSONStoreWithRetention(schedulerPath, options.schedulerRetention)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create scheduler store: %v", err)
 	}
@@ -154,7 +161,7 @@ func New(opts ...Option) (*Agent, error) {
 		pollInterval = 30 * time.Second
 	}
 
-	a.taskScheduler = scheduler.NewScheduler(store, executor, pollInterval)
+	a.taskScheduler = scheduler.NewSchedulerWithPolicy(store, executor, pollInterval, options.schedulerCreation)
 	a.sharedState.Scheduler = a.taskScheduler
 	a.sharedState.AgentName = a.Character.Name
 	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)
@@ -173,6 +180,19 @@ func New(opts ...Option) (*Agent, error) {
 
 func (a *Agent) SharedState() *types.AgentSharedState {
 	return a.sharedState
+}
+
+// SetStreamCallback sets (or replaces) the stream callback on a live agent.
+// This allows callers to wire streaming events after agent creation,
+func (a *Agent) SetStreamCallback(fn func(cogito.StreamEvent)) {
+	a.options.streamCallback = fn
+}
+
+// StartConversationConsumer starts the goroutine that dispatches new conversation
+// messages to subscribers. This must be called when using AskDirect() without Run(),
+// otherwise the ConversationAction handler will deadlock on the newConversations channel.
+func (a *Agent) StartConversationConsumer() {
+	a.startNewConversationsConsumer()
 }
 
 func (a *Agent) startNewConversationsConsumer() {
@@ -207,6 +227,21 @@ func (a *Agent) Context() context.Context {
 	return a.context.Context
 }
 
+func (a *Agent) streamCallbackForJob(job *types.Job) func(cogito.StreamEvent) {
+	agentCallback := a.options.streamCallback
+	requestCallback := job.StreamCallback
+	if agentCallback == nil {
+		return requestCallback
+	}
+	if requestCallback == nil {
+		return agentCallback
+	}
+	return func(event cogito.StreamEvent) {
+		agentCallback(event)
+		requestCallback(event)
+	}
+}
+
 // Ask is a blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
@@ -232,6 +267,84 @@ func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 	))
 }
 
+// AskDirect executes a job synchronously without requiring Run() to be active.
+// Unlike Ask/Execute which enqueue to the internal jobQueue (consumed by Run()),
+// AskDirect calls consumeJob directly. This enables stateless execution where
+// the caller manages the event loop
+func (a *Agent) AskDirect(opts ...types.JobOption) *types.JobResult {
+	xlog.Debug("Agent AskDirect()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
+	defer func() {
+		xlog.Debug("Agent AskDirect finished", "agent", a.Character.Name)
+	}()
+
+	j := types.NewJob(
+		append(
+			opts,
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)...,
+	)
+
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "job"
+		obs.Icon = "plug"
+		a.observer.Update(*obs)
+		j.Obs = obs
+
+		if len(j.ConversationHistory) > 0 {
+			m := j.ConversationHistory[len(j.ConversationHistory)-1]
+			j.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
+			a.observer.Update(*j.Obs)
+		}
+
+		j.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
+			if a.observer == nil {
+				return
+			}
+			if j.Obs.Completion == nil {
+				j.Obs.Completion = &types.Completion{}
+			}
+			j.Obs.Completion.Conversation = ccm
+			if j.Result.Error != nil {
+				j.Obs.Completion.Error = j.Result.Error.Error()
+			}
+			a.observer.Update(*j.Obs)
+		})
+	}
+
+	a.consumeJob(j, UserRole)
+	return j.Result
+}
+
+// AskDirectSystem is like AskDirect but executes with SystemRole,
+// used for periodic autonomous runs and scheduled tasks.
+func (a *Agent) AskDirectSystem(opts ...types.JobOption) *types.JobResult {
+	xlog.Debug("Agent AskDirectSystem()", "agent", a.Character.Name)
+	defer func() {
+		xlog.Debug("Agent AskDirectSystem finished", "agent", a.Character.Name)
+	}()
+
+	j := types.NewJob(
+		append(
+			opts,
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)...,
+	)
+
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "standalone"
+		obs.Icon = "clock"
+		a.observer.Update(*obs)
+		j.Obs = obs
+	}
+
+	a.consumeJob(j, SystemRole)
+	return j.Result
+}
+
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Execute(j *types.Job) *types.JobResult {
@@ -240,7 +353,7 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 		xlog.Debug("Agent has finished", "agent", a.Character.Name)
 	}()
 
-	if j.Obs != nil {
+	if j.Obs != nil && a.observer != nil {
 		if len(j.ConversationHistory) > 0 {
 			m := j.ConversationHistory[len(j.ConversationHistory)-1]
 			j.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
@@ -248,14 +361,17 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 		}
 
 		j.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
-			j.Obs.Completion = &types.Completion{
-				Conversation: ccm,
+			if a.observer == nil {
+				return
 			}
-
+			// Merge into existing Completion so last-progress completion data is preserved
+			if j.Obs.Completion == nil {
+				j.Obs.Completion = &types.Completion{}
+			}
+			j.Obs.Completion.Conversation = ccm
 			if j.Result.Error != nil {
 				j.Obs.Completion.Error = j.Result.Error.Error()
 			}
-
 			a.observer.Update(*j.Obs)
 		})
 	}
@@ -271,6 +387,19 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 func (a *Agent) Enqueue(j *types.Job) {
 	j.ReasoningCallback = a.options.reasoningCallback
 	j.ResultCallback = a.options.resultCallback
+
+	// Cancel previous running job for this conversation if option is enabled
+	cancelPrevious := a.options.cancelPreviousOnNewMessage == nil || *a.options.cancelPreviousOnNewMessage
+	if cancelPrevious && j.Metadata != nil {
+		if convID, ok := j.Metadata[types.MetadataKeyConversationID].(string); ok && convID != "" {
+			a.currentJobMu.Lock()
+			existing := a.currentJobByConversation[convID]
+			a.currentJobMu.Unlock()
+			if existing != nil {
+				existing.Cancel()
+			}
+		}
+	}
 
 	a.jobQueue <- j
 }
@@ -371,7 +500,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 				xlog.Error("Error rendering template", "error", err)
 			}
 
-			content, err = templateExecute(promptTemplate, struct{}{})
+			content, err = templateExecute(promptTemplate, CommonTemplateData{AgentName: a.Character.Name})
 			if err != nil {
 				xlog.Error("Error executing template", "error", err)
 				content = message.Content
@@ -430,7 +559,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 				xlog.Error("Error rendering template", "error", err)
 			}
 
-			content, err = templateExecute(promptTemplate, struct{}{})
+			content, err = templateExecute(promptTemplate, CommonTemplateData{AgentName: a.Character.Name})
 			if err != nil {
 				xlog.Error("Error executing template", "error", err)
 				content = a.options.systemPrompt
@@ -539,27 +668,19 @@ func (a *Agent) processUserInputs(conv Messages) Messages {
 
 			// Add the text content as a new message with the same role first
 			if text != "" {
+				imageDesc := fmt.Sprintf("\n\n[Images in this message: %s]", strings.Join(imageDescriptions, "; "))
 				textMessage := openai.ChatCompletionMessage{
 					Role:    message.Role,
-					Content: text,
+					Content: text + imageDesc,
 				}
 				processedMessages = append(processedMessages, textMessage)
-
-				// Add the image descriptions as a system message after the text
-				explainerMessage := openai.ChatCompletionMessage{
-					Role: "system",
-					Content: fmt.Sprintf("The above message also contains %d image(s) which can be described as: %s",
-						len(images), strings.Join(imageDescriptions, "; ")),
-				}
-				processedMessages = append(processedMessages, explainerMessage)
 			} else {
-				// If there's no text, just add the image descriptions as a system message
-				explainerMessage := openai.ChatCompletionMessage{
-					Role: "system",
-					Content: fmt.Sprintf("Message contains %d image(s) which can be described as: %s",
-						len(images), strings.Join(imageDescriptions, "; ")),
-				}
-				processedMessages = append(processedMessages, explainerMessage)
+				// Images only: emit a single user message with the image description
+				content := fmt.Sprintf("[Attached images: %s]", strings.Join(imageDescriptions, "; "))
+				processedMessages = append(processedMessages, openai.ChatCompletionMessage{
+					Role:    message.Role,
+					Content: content,
+				})
 			}
 		} else {
 			// No image found, keep the original message
@@ -619,7 +740,7 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 		}
 	}
 
-	if a.Observer() != nil {
+	if a.Observer() != nil && job.Obs != nil {
 		obs := a.Observer().NewObservable()
 		obs.Name = "filter"
 		obs.Icon = "shield"
@@ -641,6 +762,36 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 	}
 
 	return failedBy == "" && (!hasTriggers || triggeredBy != ""), nil
+}
+
+// correctUnknownToolCall decides how to handle a tool call whose name does not
+// match any available action. corrected is false for the built-in control verbs
+// (stop/send_message/update_state), which are dispatched by name elsewhere and
+// need no correction. Otherwise it returns an Adjustment that feeds the valid
+// tool list back to the model so it can self-correct -- up to max attempts per
+// tool name, after which the call is skipped to avoid an unbounded re-selection
+// loop. attempts is mutated to track per-tool-name correction counts.
+func correctUnknownToolCall(name string, available []string, attempts map[string]int, max int) (decision cogito.ToolCallDecision, corrected bool) {
+	switch name {
+	case action.StopActionName, action.ConversationActionName, action.StateActionName:
+		return cogito.ToolCallDecision{}, false
+	}
+
+	if attempts[name] < max {
+		attempts[name]++
+		return cogito.ToolCallDecision{
+			Approved: true,
+			Adjustment: fmt.Sprintf(
+				"The tool %q does not exist and cannot be called. "+
+					"You must call one of the available tools, using its exact name: %s. "+
+					"Re-issue your request using one of these tools.",
+				name, strings.Join(available, ", ")),
+		}, true
+	}
+
+	// Repeated hallucination: skip the bad call instead of looping forever or
+	// aborting the whole run.
+	return cogito.ToolCallDecision{Skip: true}, true
 }
 
 // replyWithToolCall handles user-defined actions by recording the action state without setting Response
@@ -792,6 +943,7 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 }
 
 func (a *Agent) consumeJob(job *types.Job, role string) {
+	streamCallback := a.streamCallbackForJob(job)
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
 		return
@@ -805,6 +957,26 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		xlog.Info("Agent is paused, skipping job", "agent", a.Character.Name)
 		job.Result.Finish(fmt.Errorf("agent is paused"))
 		return
+	}
+
+	// Register this job as the current one for its conversation (for cancel-previous-on-new-message)
+	var conversationID string
+	if job.Metadata != nil {
+		if cid, ok := job.Metadata[types.MetadataKeyConversationID].(string); ok && cid != "" {
+			conversationID = cid
+			a.currentJobMu.Lock()
+			a.currentJobByConversation[conversationID] = job
+			a.currentJobMu.Unlock()
+		}
+	}
+	if conversationID != "" {
+		defer func() {
+			a.currentJobMu.Lock()
+			if a.currentJobByConversation[conversationID] == job {
+				delete(a.currentJobByConversation, conversationID)
+			}
+			a.currentJobMu.Unlock()
+		}()
 	}
 
 	// We are self evaluating if we consume the job as a system role
@@ -825,6 +997,28 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		}()
 	}
 
+	// Ensure job observable has Creation and Completion for jobs that bypass Execute() (e.g. periodic, scheduler)
+	if job.Obs != nil && a.observer != nil {
+		if job.Obs.Creation == nil && len(job.ConversationHistory) > 0 {
+			m := job.ConversationHistory[len(job.ConversationHistory)-1]
+			job.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
+			a.observer.Update(*job.Obs)
+		}
+		job.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
+			if a.observer == nil {
+				return
+			}
+			if job.Obs.Completion == nil {
+				job.Obs.Completion = &types.Completion{}
+			}
+			job.Obs.Completion.Conversation = ccm
+			if job.Result.Error != nil {
+				job.Obs.Completion.Error = job.Result.Error.Error()
+			}
+			a.observer.Update(*job.Obs)
+		})
+	}
+
 	conv = a.processPrompts(job.GetContext(), conv)
 	if ok, err := a.filterJob(job); !ok || err != nil {
 		if err != nil {
@@ -842,20 +1036,44 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	// Validate builtin tools against available actions
 	a.validateBuiltinTools(job)
 
-	fragment := cogito.NewFragment(conv...)
-
+	// Merge all leading system messages into one (self-eval, HUD, RAG, system prompt, custom prompts)
+	var selfEvalContent, hudContent string
 	if selfEvaluation {
-		fragment = fragment.AddStartMessage("system", pickSelfTemplate)
+		selfEvalContent = pickSelfTemplate
 	}
-
 	if a.options.enableHUD {
 		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(job), "")
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
 			return
 		}
-		fragment = fragment.AddStartMessage("system", prompt)
+		hudContent = prompt
 	}
+	conv = Messages(conv).mergeLeadingSystemMessages(selfEvalContent, hudContent)
+
+	// Backends with enable_thinking (e.g. vLLM) reject requests where the last message is
+	// assistant (treated as "assistant response prefill"). We can end with assistant when:
+	// - Web/API: client sends previous_response_id but no new input (ToChatCompletionMessages()
+	//   is empty), so messages = GetConversation(id) which was saved after the last reply and
+	//   ends with assistant.
+	// - Connectors: if they pass a thread that was stored ending with assistant and no new
+	//   user message is appended in that code path.
+	// - Periodic/scheduler jobs always use WithText(...) so they append a user message; they
+	//   do not end with assistant.
+	// Normalize so we never send a request that ends with assistant (avoids enable_thinking
+	// error); callers should ideally always append a new user message when continuing a thread.
+	if len(conv) > 0 && conv[len(conv)-1].Role == AssistantRole {
+		conv = append(conv, openai.ChatCompletionMessage{
+			Role:    UserRole,
+			Content: " ",
+		})
+	}
+
+	fragment := cogito.NewFragment(conv...)
+
+	// Re-dial any MCP server that dropped its session since the last turn, so
+	// its tools are available again instead of being lost until a restart.
+	a.refreshMCPSessions()
 
 	availableActions := a.getAvailableActionsForJob(job)
 	// Per-agent tool allow/deny-list: constrain the EFFECTIVE tool set across all
@@ -867,18 +1085,6 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	allActions := append(availableActions, filterActions(a.mcpActionDefinitions, a.options.allowedTools, a.options.excludedTools)...)
 
 	obs := job.Obs
-	if obs == nil && a.observer != nil && job.Obs != nil {
-		obs = a.observer.NewObservable()
-		obs.Name = "decision"
-		obs.Icon = "brain"
-		obs.ParentID = job.Obs.ID
-		obs.Creation = &types.Creation{
-			ChatCompletionRequest: &openai.ChatCompletionRequest{
-				Model:    a.options.LLMAPI.Model,
-				Messages: conv,
-			},
-		}
-	}
 
 	defer func() {
 		if obs != nil && a.observer != nil {
@@ -889,11 +1095,21 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	var err error
 	var userTool bool
+	// Set by tool callback when it decides the job outcome; Finish is then called once after ExecuteTools.
+	var finishedByCallback bool
+	var finishErr error
 
 	var observables = make(map[string]*types.Observable)
 
+	// Bounds the number of self-correction nudges we send when the model
+	// invokes a tool that does not exist, so a model that keeps hallucinating
+	// tool names cannot loop forever (cogito re-runs tool selection on every
+	// Adjustment). Keyed by tool name; once exhausted the bad call is skipped.
+	const maxToolCorrectionAttempts = 3
+	toolCorrectionAttempts := make(map[string]int)
+
 	cogitoOpts := []cogito.Option{
-		cogito.WithMCPs(a.mcpSessions...),
+		cogito.WithMCPs(a.liveMCPSessions()...),
 		cogito.WithTools(
 			cogitoTools...,
 		),
@@ -909,6 +1125,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			xlog.Debug("Cogito reasoning callback", "status", s)
 			if s == "" {
 				return
+			}
+			// Forward reasoning to stream callback
+			if streamCallback != nil {
+				streamCallback(cogito.StreamEvent{
+					Type:    cogito.StreamEventReasoning,
+					Content: s,
+				})
 			}
 			if a.observer != nil && job.Obs != nil {
 				job.Obs.AddProgress(
@@ -934,15 +1157,15 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			})
 		}),
 		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
-			if a.observer != nil && obs != nil {
-				obs := observables[t.ToolArguments.ID]
-				obs.Progress = append(obs.Progress, types.Progress{
+			toolObs := observables[t.ToolArguments.ID]
+			if a.observer != nil && toolObs != nil {
+				toolObs.Progress = append(toolObs.Progress, types.Progress{
 					ActionResult: t.Result,
 				})
-				obs.Name = "action"
-				obs.Icon = "bolt"
-				obs.MakeLastProgressCompletion()
-				a.observer.Update(*obs)
+				toolObs.Name = "action"
+				toolObs.Icon = "bolt"
+				toolObs.MakeLastProgressCompletion()
+				a.observer.Update(*toolObs)
 			}
 
 			// Use full ActionResult (including Metadata) from action result,
@@ -992,6 +1215,30 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 				xlog.Debug("Action found", "action", chosenAction)
 
+				// Guard against hallucinated / unavailable tool names. Models
+				// (local ones in particular) sometimes invoke a tool that was
+				// never offered. Without this the run proceeds with a nil action
+				// -- producing an empty result and a nil-pointer dereference in
+				// the observer/decision path below -- and the model receives no
+				// signal to recover. Feed the valid tool list back via cogito's
+				// Adjustment mechanism so the model re-selects an existing tool.
+				if chosenAction == nil {
+					available := make([]string, 0, len(allActions))
+					for _, act := range allActions {
+						available = append(available, act.Definition().Name.String())
+					}
+					if decision, corrected := correctUnknownToolCall(tc.Name, available, toolCorrectionAttempts, maxToolCorrectionAttempts); corrected {
+						if decision.Skip {
+							xlog.Warn("LLM repeatedly selected unknown tools, skipping call",
+								"tool", tc.Name, "available", available)
+						} else {
+							xlog.Warn("LLM selected an unknown tool, requesting self-correction",
+								"tool", tc.Name, "attempt", toolCorrectionAttempts[tc.Name], "available", available)
+						}
+						return decision
+					}
+				}
+
 				if chosenAction != nil && types.IsActionUserDefined(chosenAction) {
 					xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
 					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, tc.Reasoning)
@@ -1001,19 +1248,37 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					}
 				}
 
+				// Forward tool selection to stream callback
+				if streamCallback != nil {
+					toolName := tc.Name
+					if chosenAction != nil {
+						toolName = chosenAction.Definition().Name.String()
+					}
+					streamCallback(cogito.StreamEvent{
+						Type:     cogito.StreamEventToolCall,
+						ToolName: toolName,
+						ToolArgs: fmt.Sprintf("%v", tc.Arguments),
+					})
+				}
+
 				if a.observer != nil && job.Obs != nil {
 					obs := a.observer.NewObservable()
 					obs.Name = "decision"
 					obs.ParentID = job.Obs.ID
 					obs.Icon = "brain"
-					obs.Creation = &types.Creation{
+					creation := &types.Creation{
 						ChatCompletionRequest: &openai.ChatCompletionRequest{
 							Model:    a.options.LLMAPI.Model,
 							Messages: conv,
 						},
-						FunctionDefinition: chosenAction.Definition().ToFunctionDefinition(),
-						FunctionParams:     types.ActionParams(tc.Arguments),
+						FunctionParams: types.ActionParams(tc.Arguments),
 					}
+					// chosenAction can be nil for a built-in control verb that
+					// is handled by name below but absent from allActions.
+					if chosenAction != nil {
+						creation.FunctionDefinition = chosenAction.Definition().ToFunctionDefinition()
+					}
+					obs.Creation = creation
 
 					a.observer.Update(*obs)
 					observables[tc.ID] = obs
@@ -1029,7 +1294,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					toolArgs, _ := json.Marshal(tc.Arguments)
 					if err := json.Unmarshal([]byte(toolArgs), &message); err != nil {
 						xlog.Error("Error unmarshalling conversation response", "error", err)
-						job.Result.Finish(fmt.Errorf("error unmarshalling conversation response: %w", err))
+						finishedByCallback = true
+						finishErr = fmt.Errorf("error unmarshalling conversation response: %w", err)
 						return cogito.ToolCallDecision{
 							Approved: false,
 						}
@@ -1055,22 +1321,24 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 						msg,
 					}
 					job.Result.SetResponse("decided to initiate a new conversation")
-					job.Result.Finish(nil)
+					finishedByCallback = true
+					finishErr = nil
 					return cogito.ToolCallDecision{
-						Approved: true,
+						Approved: false,
 					}
 				case action.StateActionName:
 					// We need to store the result in the state
 					state := types.AgentInternalState{}
 					dat, _ := json.Marshal(tc.Arguments)
 					err = json.Unmarshal(dat, &state)
+					stateObs := observables[tc.ID]
 					if err != nil {
 						werr := fmt.Errorf("error unmarshalling state of the agent: %w", err)
-						if obs != nil && a.observer != nil {
-							obs.Completion = &types.Completion{
+						if stateObs != nil && a.observer != nil {
+							stateObs.Completion = &types.Completion{
 								Error: werr.Error(),
 							}
-							a.observer.Update(*obs)
+							a.observer.Update(*stateObs)
 						}
 						return cogito.ToolCallDecision{
 							Approved: false,
@@ -1078,27 +1346,32 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					}
 					// update the current state with the one we just got from the action
 					a.currentState = &state
-					if obs != nil && a.observer != nil {
-						obs.Progress = append(obs.Progress, types.Progress{
+					if stateObs != nil && a.observer != nil {
+						stateObs.Progress = append(stateObs.Progress, types.Progress{
 							AgentState: &state,
 						})
-						a.observer.Update(*obs)
+						a.observer.Update(*stateObs)
 					}
 
 					// update the state file
 					if a.options.statefile != "" {
 						if err := a.SaveState(a.options.statefile); err != nil {
-							if obs != nil && a.observer != nil {
-								obs.Completion = &types.Completion{
+							if stateObs != nil && a.observer != nil {
+								stateObs.Completion = &types.Completion{
 									Error: err.Error(),
 								}
-								a.observer.Update(*obs)
+								a.observer.Update(*stateObs)
 							}
 
 							return cogito.ToolCallDecision{
 								Approved: false,
 							}
 						}
+					}
+					// Mark state tool-call observable as completed successfully
+					if stateObs != nil && a.observer != nil {
+						stateObs.MakeLastProgressCompletion()
+						a.observer.Update(*stateObs)
 					}
 
 				}
@@ -1122,8 +1395,8 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 						})
 
 					job.Result.Conversation = conv
-					job.Result.Finish(nil)
-
+					finishedByCallback = true
+					finishErr = nil
 				}
 				return cogito.ToolCallDecision{
 					Approved: cont,
@@ -1158,14 +1431,31 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	if a.options.maxEvaluationLoops > 0 {
 		cogitoOpts = append(cogitoOpts,
-			cogito.WithMaxAttempts(a.options.maxEvaluationLoops),
 			cogito.WithIterations(a.options.maxEvaluationLoops),
 		)
+	}
+
+	if a.options.loopDetection > 0 {
+		cogitoOpts = append(cogitoOpts, cogito.WithLoopDetection(a.options.loopDetection))
 	}
 
 	if a.options.forceReasoningTool {
 		cogitoOpts = append(cogitoOpts,
 			cogito.WithForceReasoningTool())
+	}
+
+	if a.options.enableAutoCompaction {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithCompactionThreshold(a.options.autoCompactionThreshold))
+	}
+
+	if a.options.maxAttempts > 1 {
+		cogitoOpts = append(cogitoOpts, cogito.WithMaxAttempts(a.options.maxAttempts))
+		cogitoOpts = append(cogitoOpts, cogito.WithMaxRetries(a.options.maxAttempts))
+	}
+
+	if streamCallback != nil {
+		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(streamCallback))
 	}
 
 	fragment, err = cogito.ExecuteTools(
@@ -1185,13 +1475,16 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
+	if finishedByCallback {
+		job.Result.Finish(finishErr)
+		return
+	}
+
 	if userTool {
 		return
 	}
 
-	if len(fragment.Messages) > 0 &&
-		fragment.LastMessage().Role == "tool" {
-		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
+	if toolToCall, ok := lastToolCallName(fragment.Messages); ok {
 		switch toolToCall {
 		case action.StopActionName:
 			job.Result.Finish(nil)
@@ -1256,8 +1549,12 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// - evaluating the result
 	// - asking the agent to do something else based on the result
 
+	innerMonologue := a.options.innerMonologueTemplate
+	if innerMonologue == "" {
+		innerMonologue = innerMonologueTemplate
+	}
 	whatNext := types.NewJob(
-		types.WithText(innerMonologueTemplate),
+		types.WithText(innerMonologue),
 		types.WithReasoningCallback(a.options.reasoningCallback),
 		types.WithResultCallback(a.options.resultCallback),
 	)

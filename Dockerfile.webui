@@ -16,8 +16,8 @@ COPY webui/react-ui/ ./
 # Build the React UI
 RUN bun run build
 
-# Use a temporary build image based on Golang 1.24-alpine
-FROM golang:1.24-alpine AS builder
+# Use a temporary build image based on Golang 1.26-alpine
+FROM golang:1.26-alpine AS builder
 
 # Define argument for linker flags
 ARG LDFLAGS="-s -w"
@@ -44,7 +44,7 @@ COPY --from=ui-builder /app/dist /work/webui/react-ui/dist
 # Build the application
 RUN CGO_ENABLED=0 go build -ldflags="$LDFLAGS" -o localagi ./
 
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -61,4 +61,4 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /work/localagi /localagi
 
 # Define the command that will be run when the container is started
-ENTRYPOINT ["/localagi"]
+ENTRYPOINT ["/localagi", "serve"]

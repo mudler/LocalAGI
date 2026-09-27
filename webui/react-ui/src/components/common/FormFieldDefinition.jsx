@@ -9,12 +9,14 @@ import FormField from './FormField';
  * @param {Object} props.values Current values for the fields
  * @param {Function} props.onChange Handler for field value changes
  * @param {string} props.idPrefix Prefix for field IDs
+ * @param {boolean} props.disabled Disable every field; a single field can also carry `disabled: true`
  */
 const FormFieldDefinition = ({
   fields,
   values,
   onChange,
   idPrefix = '',
+  disabled = false,
 }) => {
   // Ensure values is an object
   const safeValues = values || {};
@@ -37,6 +39,7 @@ const FormFieldDefinition = ({
             min={field.min || 0}
             max={field.max || 2**31}
             step={field.step || 1}
+            disabled={disabled || field.disabled === true}
           />
         </div>
       ))}

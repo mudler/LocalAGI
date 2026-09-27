@@ -5,7 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mudler/LocalAGI/core/scheduler"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/cogito"
 )
 
 type Option func(*options) error
@@ -56,6 +59,8 @@ type options struct {
 	characterfile         string
 	statefile             string
 	schedulerStorePath    string // Path to scheduler JSON storage file
+	schedulerRetention    scheduler.RetentionPolicy
+	schedulerCreation     scheduler.CreationPolicy
 	context               context.Context
 	permanentGoal         string
 	timeout               string
@@ -66,11 +71,15 @@ type options struct {
 
 	// Evaluation settings
 	maxEvaluationLoops int
+	loopDetection      int
 	enableEvaluation   bool
 
 	prompts []DynamicPrompt
 
-	systemPrompt string
+	systemPrompt           string
+	innerMonologueTemplate string
+	skillPromptTemplate    string
+	schedulerTaskTemplate  string
 
 	// callbacks
 	reasoningCallback func(types.ActionCurrentState) bool
@@ -81,12 +90,24 @@ type options struct {
 	mcpServers                  []MCPServer
 	mcpStdioServers             []MCPSTDIOServer
 	mcpPrepareScript            string
+	extraMCPSessions            []*mcp.ClientSession
 	newConversationsSubscribers []func(*types.ConversationMessage)
 
-	observer     Observer
+	observer             Observer
+	enableAutoCompaction   bool
+	autoCompactionThreshold int
 	parallelJobs int
 
 	lastMessageDuration time.Duration
+
+	// cancelPreviousOnNewMessage: when true (or nil), Enqueue cancels the running job for the same conversation_id. When false, jobs are queued.
+	cancelPreviousOnNewMessage *bool
+
+	// maxAttempts: on ExecuteTools failure, retry up to this many times before surfacing the error to the user (1 = no retries).
+	maxAttempts int
+
+	// streamCallback receives streaming events from cogito during final answer generation.
+	streamCallback func(cogito.StreamEvent)
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -96,6 +117,7 @@ func (o *options) SeparatedMultimodalModel() bool {
 func defaultOptions() *options {
 	return &options{
 		parallelJobs:            1,
+		maxAttempts:             1,
 		periodicRuns:            15 * time.Minute,
 		schedulerPollInterval:   30 * time.Second,
 		maxEvaluationLoops:      2,
@@ -200,6 +222,29 @@ func WithParallelJobs(jobs int) Option {
 	}
 }
 
+// WithCancelPreviousOnNewMessage sets whether a new job with the same conversation_id cancels the currently running job (true) or is queued (false). Nil/default means true.
+func WithCancelPreviousOnNewMessage(cancel bool) Option {
+	return func(o *options) error {
+		o.cancelPreviousOnNewMessage = &cancel
+		return nil
+	}
+}
+
+// WithMaxAttempts sets how many times to attempt execution on failure before surfacing the error to the user (1 = no retries).
+func WithMaxAttempts(attempts int) Option {
+	return func(o *options) error {
+		o.maxAttempts = attempts
+		return nil
+	}
+}
+
+func WithLoopDetection(loops int) Option {
+	return func(o *options) error {
+		o.loopDetection = loops
+		return nil
+	}
+}
+
 func WithNewConversationSubscriber(sub func(*types.ConversationMessage)) Option {
 	return func(o *options) error {
 		o.newConversationsSubscribers = append(o.newConversationsSubscribers, sub)
@@ -278,6 +323,22 @@ func WithSystemPrompt(prompt string) Option {
 	}
 }
 
+// WithInnerMonologueTemplate sets the prompt used for periodic/standalone runs. If empty, the default template is used.
+func WithInnerMonologueTemplate(template string) Option {
+	return func(o *options) error {
+		o.innerMonologueTemplate = template
+		return nil
+	}
+}
+
+// WithSkillPromptTemplate sets the template for rendering skills in the prompt. If empty, the default template is used.
+func WithSkillPromptTemplate(template string) Option {
+	return func(o *options) error {
+		o.skillPromptTemplate = template
+		return nil
+	}
+}
+
 func WithMCPServers(servers ...MCPServer) Option {
 	return func(o *options) error {
 		o.mcpServers = servers
@@ -330,6 +391,14 @@ func WithPrompts(prompts ...DynamicPrompt) Option {
 	}
 }
 
+// WithMCPSession adds a pre-connected MCP client session (e.g. in-process skills MCP) to the agent.
+func WithMCPSession(session *mcp.ClientSession) Option {
+	return func(o *options) error {
+		o.extraMCPSessions = append(o.extraMCPSessions, session)
+		return nil
+	}
+}
+
 // WithDynamicPrompts is a helper function to create dynamic prompts
 // Dynamic prompts contains golang code which is executed dynamically
 // // to render a prompt to the LLM
@@ -372,6 +441,7 @@ func WithPeriodicRuns(duration string) Option {
 		t, err := time.ParseDuration(duration)
 		if err != nil {
 			o.periodicRuns, _ = time.ParseDuration("10m")
+			return nil
 		}
 		o.periodicRuns = t
 		return nil
@@ -528,6 +598,52 @@ func WithToolFilter(allow, deny []string) Option {
 func WithSchedulerStorePath(path string) Option {
 	return func(o *options) error {
 		o.schedulerStorePath = path
+		return nil
+	}
+}
+
+// WithSchedulerRetention bounds how much task run history the scheduler store keeps.
+func WithSchedulerRetention(p scheduler.RetentionPolicy) Option {
+	return func(o *options) error {
+		o.schedulerRetention = p
+		return nil
+	}
+}
+
+// WithSchedulerCreation bounds what an agent may schedule for itself.
+func WithSchedulerCreation(p scheduler.CreationPolicy) Option {
+	return func(o *options) error {
+		o.schedulerCreation = p
+		return nil
+	}
+}
+
+// WithSchedulerTaskTemplate sets the prompt used for scheduled/recurring tasks run by the scheduler.
+// If empty, the default inner monologue template is used with the task injected.
+func WithSchedulerTaskTemplate(template string) Option {
+	return func(o *options) error {
+		o.schedulerTaskTemplate = template
+		return nil
+	}
+}
+
+var EnableAutoCompaction = func(o *options) error {
+	o.enableAutoCompaction = true
+	return nil
+}
+
+func WithAutoCompactionThreshold(threshold int) Option {
+	return func(o *options) error {
+		o.autoCompactionThreshold = threshold
+		return nil
+	}
+}
+
+// WithStreamCallback sets a callback to receive streaming events from cogito
+// during final answer generation. This enables live token-by-token delivery.
+func WithStreamCallback(fn func(cogito.StreamEvent)) Option {
+	return func(o *options) error {
+		o.streamCallback = fn
 		return nil
 	}
 }

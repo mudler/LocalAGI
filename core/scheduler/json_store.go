@@ -5,15 +5,35 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 )
 
+// RetentionPolicy bounds how much execution history the store keeps.
+// A zero value for either field disables that limit.
+//
+// Run history is append-only otherwise, and every save re-marshals the whole
+// file — an unbounded task_runs list makes each task execution progressively
+// more expensive.
+type RetentionPolicy struct {
+	// MaxRunsPerTask keeps only this many of the most recent runs per task.
+	MaxRunsPerTask int
+	// MaxRunAge removes runs older than this.
+	MaxRunAge time.Duration
+}
+
+// Enabled reports whether the policy would remove anything at all.
+func (p RetentionPolicy) Enabled() bool {
+	return p.MaxRunsPerTask > 0 || p.MaxRunAge > 0
+}
+
 // JSONStore implements TaskStore using JSON file storage
 type JSONStore struct {
-	filePath string
-	mu       sync.RWMutex
-	data     *storeData
+	filePath  string
+	mu        sync.RWMutex
+	data      *storeData
+	retention RetentionPolicy
 }
 
 type storeData struct {
@@ -21,10 +41,18 @@ type storeData struct {
 	TaskRuns []*TaskRun `json:"task_runs"`
 }
 
-// NewJSONStore creates a new JSON-based task store
+// NewJSONStore creates a new JSON-based task store that retains all history.
 func NewJSONStore(filePath string) (*JSONStore, error) {
+	return NewJSONStoreWithRetention(filePath, RetentionPolicy{})
+}
+
+// NewJSONStoreWithRetention creates a store that bounds its run history.
+// An existing backlog on disk is pruned at load, so a store that has already
+// grown does not have to wait for the next task execution to shrink.
+func NewJSONStoreWithRetention(filePath string, retention RetentionPolicy) (*JSONStore, error) {
 	store := &JSONStore{
-		filePath: filePath,
+		filePath:  filePath,
+		retention: retention,
 		data: &storeData{
 			Tasks:    make([]*Task, 0),
 			TaskRuns: make([]*TaskRun, 0),
@@ -38,6 +66,13 @@ func NewJSONStore(filePath string) (*JSONStore, error) {
 		// File doesn't exist, create it
 		if err := store.save(); err != nil {
 			return nil, fmt.Errorf("failed to create store file: %w", err)
+		}
+		return store, nil
+	}
+
+	if store.pruneRuns() > 0 {
+		if err := store.save(); err != nil {
+			return nil, fmt.Errorf("failed to persist pruned store: %w", err)
 		}
 	}
 
@@ -155,7 +190,56 @@ func (s *JSONStore) LogRun(run *TaskRun) error {
 	defer s.mu.Unlock()
 
 	s.data.TaskRuns = append(s.data.TaskRuns, run)
+	s.pruneRuns()
 	return s.save()
+}
+
+// pruneRuns applies the retention policy to the run history and returns how
+// many records it dropped. Callers must hold the write lock.
+//
+// It walks backwards so that "keep N" keeps the newest N, and drops runs whose
+// task no longer exists — a one-time task is deleted right after its run is
+// logged, and those orphans would otherwise accumulate forever.
+func (s *JSONStore) pruneRuns() int {
+	if !s.retention.Enabled() {
+		return 0
+	}
+
+	known := make(map[string]struct{}, len(s.data.Tasks))
+	for _, t := range s.data.Tasks {
+		known[t.ID] = struct{}{}
+	}
+
+	var cutoff time.Time
+	if s.retention.MaxRunAge > 0 {
+		cutoff = time.Now().Add(-s.retention.MaxRunAge)
+	}
+
+	before := len(s.data.TaskRuns)
+	kept := make([]*TaskRun, 0, before)
+	perTask := map[string]int{}
+
+	for i := before - 1; i >= 0; i-- {
+		run := s.data.TaskRuns[i]
+
+		if _, ok := known[run.TaskID]; !ok {
+			continue
+		}
+		if !cutoff.IsZero() && run.RunAt.Before(cutoff) {
+			continue
+		}
+		if s.retention.MaxRunsPerTask > 0 && perTask[run.TaskID] >= s.retention.MaxRunsPerTask {
+			continue
+		}
+
+		perTask[run.TaskID]++
+		kept = append(kept, run)
+	}
+
+	slices.Reverse(kept)
+	s.data.TaskRuns = kept
+
+	return before - len(kept)
 }
 
 // GetRuns retrieves execution history for a task

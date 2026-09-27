@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"os"
+	"strings"
 
 	"github.com/mudler/LocalAGI/core/action"
 	"github.com/mudler/LocalAGI/core/types"
@@ -89,6 +90,43 @@ func (m Messages) GetLatestUserMessage() *openai.ChatCompletionMessage {
 	}
 
 	return nil
+}
+
+// mergeLeadingSystemMessages replaces all leading system messages with a single
+// system message. prefixBlocks are prepended in order (e.g. self-eval, then HUD).
+// Only non-empty prefixBlocks are joined. Mid-conversation system messages are unchanged.
+func (conv Messages) mergeLeadingSystemMessages(prefixBlocks ...string) Messages {
+	var leading []string
+	for _, s := range prefixBlocks {
+		if s != "" {
+			leading = append(leading, s)
+		}
+	}
+	i := 0
+	for i < len(conv) && conv[i].Role == SystemRole {
+		content := conv[i].Content
+		if content == "" && conv[i].MultiContent != nil {
+			for _, part := range conv[i].MultiContent {
+				if part.Type == openai.ChatMessagePartTypeText && part.Text != "" {
+					content = part.Text
+					break
+				}
+			}
+		}
+		if content != "" {
+			leading = append(leading, content)
+		}
+		i++
+	}
+	if len(leading) == 0 {
+		return conv
+	}
+	combined := strings.Join(leading, "\n\n")
+	single := openai.ChatCompletionMessage{
+		Role:    SystemRole,
+		Content: combined,
+	}
+	return append([]openai.ChatCompletionMessage{single}, conv[i:]...)
 }
 
 // getAvailableActionsForJob returns available actions including user-defined ones for a specific job
