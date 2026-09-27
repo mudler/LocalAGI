@@ -297,7 +297,9 @@ func (a *Agent) refreshMCPSessions() {
 
 		if s.session != nil {
 			xlog.Warn("MCP session is no longer responding, reconnecting", "server", s.describe)
-			s.session.Close()
+			if s.dial != nil {
+				s.session.Close()
+			}
 			s.session = nil
 			s.actions = nil
 			changed = true
