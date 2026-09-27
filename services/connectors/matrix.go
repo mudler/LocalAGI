@@ -243,8 +243,8 @@ func (m *Matrix) Start(a *agent.Agent) {
 
 	// This prevents the agent from picking up a backlog of messages and swamping the chat with responses.
 	syncer.FilterJSON = &mautrix.Filter{
-		Room: mautrix.RoomFilter{
-			Timeline: mautrix.FilterPart{
+		Room: &mautrix.RoomFilter{
+			Timeline: &mautrix.FilterPart{
 				Limit: 1,
 			},
 		},
