@@ -107,6 +107,20 @@ type options struct {
 
 	// streamCallback receives streaming events from cogito during final answer generation.
 	streamCallback func(cogito.StreamEvent)
+
+	// requiredFinishTool, when non-empty, names a tool the agent MUST call successfully
+	// before it may send a final answer. It only applies to agents that actually have that
+	// tool bound; for every other agent it is a no-op. Empty (the default) disables the gate.
+	requiredFinishTool string
+
+	// requiredFinishPrompt overrides the instruction the model receives when it tries to
+	// finish before the required tool has passed. Empty uses a generic default naming the tool.
+	requiredFinishPrompt string
+
+	// requiredFinishAttempts caps how often the model is nudged before the answer is let
+	// through anyway (logged). Zero uses defaultRequiredFinishAttempts. A gate that can loop
+	// forever is worse than one that gives up loudly.
+	requiredFinishAttempts int
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -233,6 +247,42 @@ func WithCancelPreviousOnNewMessage(cancel bool) Option {
 func WithMaxAttempts(attempts int) Option {
 	return func(o *options) error {
 		o.maxAttempts = attempts
+		return nil
+	}
+}
+
+// WithRequiredToolBeforeFinish requires the agent to call the named tool and have it succeed
+// before any final answer is sent. It is enforced at the OUTPUT, not asked for in the prompt:
+// a model that tries to finish first is deferred and told to call the tool.
+//
+// The gate applies ONLY to agents that have this tool bound, so enabling it on a pool where
+// some agents lack the tool is harmless. A tool run counts as passed when its result is JSON
+// containing "ok": true.
+//
+// Use it for any step that must not be skipped before an answer leaves the agent -- fact
+// validation, a policy check, a cost guard.
+func WithRequiredToolBeforeFinish(name string) Option {
+	return func(o *options) error {
+		o.requiredFinishTool = name
+		return nil
+	}
+}
+
+// WithRequiredToolBeforeFinishPrompt overrides the instruction the model gets when it tries to
+// finish before the required tool has passed. The default names the tool and asks for it to be
+// called; override it when the tool needs specific arguments explained.
+func WithRequiredToolBeforeFinishPrompt(prompt string) Option {
+	return func(o *options) error {
+		o.requiredFinishPrompt = prompt
+		return nil
+	}
+}
+
+// WithRequiredToolBeforeFinishAttempts caps how often the model is nudged before the answer is
+// allowed through anyway (with a warning in the log). Zero keeps the default of 3.
+func WithRequiredToolBeforeFinishAttempts(attempts int) Option {
+	return func(o *options) error {
+		o.requiredFinishAttempts = attempts
 		return nil
 	}
 }

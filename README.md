@@ -1084,6 +1084,26 @@ Here's an example of the agent configuration structure:
   "summary_long_term_memory": false
 }
 ```
+
+#### Required tool before finish
+
+Use `required_tool_before_finish` when a step must run before any answer leaves the agent, for example a fact check or a policy check. The agent cannot send its final answer until it has called the named tool and the tool has succeeded. LocalAGI enforces this on the output, so it does not depend on the model following the prompt.
+
+```json
+{
+  "required_tool_before_finish": "check_policy",
+  "required_tool_before_finish_prompt": "Call check_policy with your draft answer before you reply.",
+  "required_tool_before_finish_attempts": 3
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `required_tool_before_finish` | Name of the tool that must succeed first. Empty (the default) disables the check. If the agent does not have this tool, the setting has no effect. |
+| `required_tool_before_finish_prompt` | Instruction sent to the model when it tries to finish too early. Empty uses a default that names the tool. |
+| `required_tool_before_finish_attempts` | How many times the model is told to run the tool. After this number of attempts, the answer is sent anyway and a warning is logged. Default: 3. |
+
+A tool run counts as a success when its result is a JSON object with a top-level `"ok": true`. If the result is text that contains JSON, each JSON object in the text is checked in the same way. Library users set the same behavior with `WithRequiredToolBeforeFinish`, `WithRequiredToolBeforeFinishPrompt` and `WithRequiredToolBeforeFinishAttempts`.
 </details>
 
 <details>

@@ -646,6 +646,16 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, WithLoopDetection(config.LoopDetection))
 	}
 
+	if config.RequiredToolBeforeFinish != "" {
+		opts = append(opts, WithRequiredToolBeforeFinish(config.RequiredToolBeforeFinish))
+		if config.RequiredToolBeforeFinishPrompt != "" {
+			opts = append(opts, WithRequiredToolBeforeFinishPrompt(config.RequiredToolBeforeFinishPrompt))
+		}
+		if config.RequiredToolBeforeFinishAttempts > 0 {
+			opts = append(opts, WithRequiredToolBeforeFinishAttempts(config.RequiredToolBeforeFinishAttempts))
+		}
+	}
+
 	if config.EnableForceReasoningTool {
 		opts = append(opts, EnableForceReasoningTool)
 	}
