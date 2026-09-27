@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     sudo
 
 # Configure SSH
-RUN mkdir /var/run/sshd
+RUN mkdir -p /var/run/sshd
 RUN echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
 
 # Create startup script
