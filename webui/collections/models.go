@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mudler/localrecall/rag"
@@ -96,21 +97,64 @@ func (b *backendInProcess) construct(name, desired string) (*rag.PersistentKB, e
 	return kb, nil
 }
 
-// Called with operationMu held. Removing a source cannot cancel an active fetch,
-// so its history must outlive the current list of configured sources.
+// lockCollection serializes the operations of one collection that must see a
+// stable embedding identity: the model check and swap in writable, Reset, and
+// the Store or Search that follows the check. The lock is per collection
+// because hosts such as LocalAI share one backend between all agents, and a
+// long upload in one collection must not stall searches in the others.
+// PersistentKB already serializes Store and Search in a single collection.
+// Call it as: defer b.lockCollection(name)().
+func (b *backendInProcess) lockCollection(name string) func() {
+	b.locksMu.Lock()
+	if b.collectionLocks == nil {
+		b.collectionLocks = map[string]*sync.Mutex{}
+	}
+	mu, ok := b.collectionLocks[name]
+	if !ok {
+		mu = &sync.Mutex{}
+		b.collectionLocks[name] = mu
+	}
+	b.locksMu.Unlock()
+	mu.Lock()
+	return mu.Unlock
+}
+
+func (b *backendInProcess) markHadSources(name string) {
+	b.sourcesMu.Lock()
+	defer b.sourcesMu.Unlock()
+	if b.hadSources == nil {
+		b.hadSources = map[string]bool{}
+	}
+	b.hadSources[name] = true
+}
+
+func (b *backendInProcess) markResetWithSources(name string) {
+	b.sourcesMu.Lock()
+	defer b.sourcesMu.Unlock()
+	if b.resetWithSources == nil {
+		b.resetWithSources = map[string]bool{}
+	}
+	b.resetWithSources[name] = true
+}
+
+func (b *backendInProcess) sourceHistory(name string) (hadSources, resetWithSources bool) {
+	b.sourcesMu.Lock()
+	defer b.sourcesMu.Unlock()
+	return b.hadSources[name], b.resetWithSources[name]
+}
+
+// Removing a source cannot cancel an active fetch, so its history must outlive
+// the current list of configured sources.
 func (b *backendInProcess) rememberSources(name string, kb *rag.PersistentKB) {
 	if len(kb.GetExternalSources()) > 0 {
-		if b.hadSources == nil {
-			b.hadSources = map[string]bool{}
-		}
-		b.hadSources[name] = true
+		b.markHadSources(name)
 	}
 }
 
-// Called with operationMu held. Reads and resets deliberately use lookup instead,
-// so a mismatched collection can still be inspected and cleared.
+// Called with the collection lock held. Reads and resets deliberately use lookup
+// instead, so a mismatched collection can still be inspected and cleared.
 func (b *backendInProcess) writable(name string, settings CollectionModelSettings, create bool) (*rag.PersistentKB, error) {
-	if b.resetWithSources[name] {
+	if _, resetWithSources := b.sourceHistory(name); resetWithSources {
 		return nil, fmt.Errorf("collection %s had external sources; restart the service after reset before recreating it", name)
 	}
 	kb, exists := b.lookup(name)
@@ -136,7 +180,7 @@ func (b *backendInProcess) writable(name string, settings CollectionModelSetting
 	if model == settings.EmbeddingModel {
 		return kb, nil
 	}
-	if b.hadSources[name] {
+	if hadSources, _ := b.sourceHistory(name); hadSources {
 		return nil, fmt.Errorf("collection %s had external sources; reset and restart the service before switching embedding models", name)
 	}
 	if kb.Count() > 0 || len(kb.ListDocuments()) > 0 {

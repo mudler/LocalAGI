@@ -63,7 +63,13 @@ func newVectorEngine(
 
 // backendInProcess implements Backend using in-process state.
 type backendInProcess struct {
-	operationMu      sync.Mutex
+	// locksMu guards collectionLocks. Each entry serializes the operations
+	// of one collection; see lockCollection.
+	locksMu         sync.Mutex
+	collectionLocks map[string]*sync.Mutex
+	// sourcesMu guards the source history maps, which operations on
+	// different collections update concurrently.
+	sourcesMu        sync.Mutex
 	resetWithSources map[string]bool
 	hadSources       map[string]bool
 	state            *State
@@ -119,8 +125,7 @@ func (b *backendInProcess) CreateCollection(name string) error {
 }
 
 func (b *backendInProcess) createCollection(name string, settings CollectionModelSettings) error {
-	b.operationMu.Lock()
-	defer b.operationMu.Unlock()
+	defer b.lockCollection(name)()
 	_, err := b.writable(name, settings, true)
 	return err
 }
@@ -134,8 +139,7 @@ func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reade
 }
 
 func (b *backendInProcess) upload(collection, filename string, fileBody io.Reader, settings CollectionModelSettings) (string, error) {
-	b.operationMu.Lock()
-	defer b.operationMu.Unlock()
+	defer b.lockCollection(collection)()
 	kb, err := b.writable(collection, settings, false)
 	if err != nil {
 		return "", err
@@ -186,11 +190,25 @@ func (b *backendInProcess) Search(collection, query string, maxResults int) ([]S
 }
 
 func (b *backendInProcess) search(collection, query string, maxResults int, settings CollectionModelSettings) ([]SearchResult, error) {
-	b.operationMu.Lock()
-	defer b.operationMu.Unlock()
-	kb, err := b.writable(collection, settings, false)
+	out, maxResults, err := b.vectorSearch(collection, query, maxResults, settings)
 	if err != nil {
 		return nil, err
+	}
+	// The rerank call can take up to its HTTP timeout, and it only needs the
+	// candidates, so it runs without the collection lock.
+	return b.rerank(settings.RerankerModel, query, out, maxResults)
+}
+
+// rerankCandidateFactor widens the vector search when a reranker is set, so
+// the reranker can promote a relevant chunk that ranks just below the cutoff.
+const rerankCandidateFactor = 4
+
+// vectorSearch returns the candidates and the result count after defaults.
+func (b *backendInProcess) vectorSearch(collection, query string, maxResults int, settings CollectionModelSettings) ([]SearchResult, int, error) {
+	defer b.lockCollection(collection)()
+	kb, err := b.writable(collection, settings, false)
+	if err != nil {
+		return nil, 0, err
 	}
 	if maxResults <= 0 {
 		keys := kb.ListDocuments()
@@ -200,9 +218,15 @@ func (b *backendInProcess) search(collection, query string, maxResults int, sett
 			maxResults = 1
 		}
 	}
-	results, err := kb.Search(query, maxResults)
+	candidates := maxResults
+	if settings.RerankerModel != "" {
+		// Engines such as chromem reject a request for more results than
+		// the collection holds, so do not widen past the chunk count.
+		candidates = max(maxResults, min(maxResults*rerankCandidateFactor, kb.Count()))
+	}
+	results, err := kb.Search(query, candidates)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]SearchResult, 0, len(results))
 	for _, r := range results {
@@ -213,25 +237,21 @@ func (b *backendInProcess) search(collection, query string, maxResults int, sett
 			Similarity: r.Similarity,
 		})
 	}
-	return b.rerank(settings.RerankerModel, query, out, maxResults)
+	return out, maxResults, nil
 }
 
 func (b *backendInProcess) Reset(collection string) error {
-	b.operationMu.Lock()
-	defer b.operationMu.Unlock()
+	defer b.lockCollection(collection)()
 	kb, exists := b.lookup(collection)
 	if !exists {
 		return fmt.Errorf("collection not found: %s", collection)
 	}
 	sources := kb.GetExternalSources()
 	b.rememberSources(collection, kb)
-	if b.hadSources[collection] {
+	if hadSources, _ := b.sourceHistory(collection); hadSources {
 		// LocalRecall cannot cancel an in-flight source fetch. Keep the old
 		// identity and block recreation until a restart drains those writers.
-		if b.resetWithSources == nil {
-			b.resetWithSources = map[string]bool{}
-		}
-		b.resetWithSources[collection] = true
+		b.markResetWithSources(collection)
 		for _, source := range sources {
 			if err := b.state.SourceManager.RemoveSource(collection, source.URL); err != nil {
 				return err
@@ -241,7 +261,7 @@ func (b *backendInProcess) Reset(collection string) error {
 	if err := kb.Reset(); err != nil {
 		return err
 	}
-	if !b.resetWithSources[collection] {
+	if _, resetWithSources := b.sourceHistory(collection); !resetWithSources {
 		if err := os.Remove(b.identityPath(collection)); err != nil && !os.IsNotExist(err) {
 			return err
 		}
@@ -269,24 +289,19 @@ func (b *backendInProcess) AddSource(collection, url string, intervalMin int) er
 	if err != nil {
 		return err
 	}
-	b.operationMu.Lock()
-	defer b.operationMu.Unlock()
+	defer b.lockCollection(collection)()
 	kb, err := b.writable(collection, settings, false)
 	if err != nil {
 		return err
 	}
 	b.state.SourceManager.RegisterCollection(collection, kb)
 	// Even a partially failed add can leave persisted source metadata.
-	if b.hadSources == nil {
-		b.hadSources = map[string]bool{}
-	}
-	b.hadSources[collection] = true
+	b.markHadSources(collection)
 	return b.state.SourceManager.AddSource(collection, url, time.Duration(intervalMin)*time.Minute)
 }
 
 func (b *backendInProcess) RemoveSource(collection, url string) error {
-	b.operationMu.Lock()
-	defer b.operationMu.Unlock()
+	defer b.lockCollection(collection)()
 	if kb, exists := b.lookup(collection); exists {
 		b.rememberSources(collection, kb)
 	}
@@ -354,9 +369,7 @@ func NewInProcessBackend(cfg *Config) (Backend, *State) {
 		// data is still on disk / in the vector DB.
 		st.Collections[c] = collection
 		if collection != nil {
-			backend.operationMu.Lock()
 			backend.rememberSources(c, collection)
-			backend.operationMu.Unlock()
 			st.SourceManager.RegisterCollection(c, collection)
 		}
 	}
@@ -366,8 +379,7 @@ func NewInProcessBackend(cfg *Config) (Backend, *State) {
 		if err != nil {
 			return nil, false
 		}
-		backend.operationMu.Lock()
-		defer backend.operationMu.Unlock()
+		defer backend.lockCollection(name)()
 		collection, err := backend.writable(name, settings, true)
 		return collection, err == nil
 	}

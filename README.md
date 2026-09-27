@@ -1107,25 +1107,16 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
 </details>
 
-## LICENSE
-
-MIT License — See the [LICENSE](LICENSE) file for details.
-
----
-
-<p align="center">
-  <strong>LOCAL PROCESSING. GLOBAL THINKING.</strong><br>
-  Made with ❤️ by <a href="https://github.com/mudler">mudler</a>
-</p>
-
-### Per-agent knowledge models
+#### Per-agent knowledge models
 
 For the embedded knowledge base, each agent can set `embedding_model` and
 `reranker_model` in its configuration. An empty `embedding_model` uses the server's
 `EMBEDDING_MODEL`; an empty `reranker_model` keeps vector search without reranking.
 Reranking uses the server's OpenAI-compatible API URL and key and calls
 `/v1/rerank`. Both collection searches and agent memory searches apply the selected
-reranker and retain document source metadata. A reranker error fails the search.
+reranker and retain document source metadata. When a reranker is set, the
+vector search fetches up to four times the requested number of chunks, and the
+reranker picks the final results from those candidates. A reranker error fails the search.
 These settings do not configure a remote LocalRecall server.
 
 Collection model lookup prefers an exact agent name. A normalized collection
@@ -1151,3 +1142,14 @@ creating an agent's RAG provider does not call the resolver.
 Return an error to deny an embedding or reranking operation, for example when a
 model is not allowed for the user. Resolver errors prevent inference requests;
 existing collection inspection and reset remain available.
+
+## LICENSE
+
+MIT License — See the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  <strong>LOCAL PROCESSING. GLOBAL THINKING.</strong><br>
+  Made with ❤️ by <a href="https://github.com/mudler">mudler</a>
+</p>

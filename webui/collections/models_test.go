@@ -3,398 +3,531 @@ package collections
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mudler/localrecall/rag"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"testing"
 	"time"
+
+	"github.com/mudler/localrecall/rag"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func testModelBackend(t *testing.T, selected *CollectionModelSettings, reranked ...*bool) (Backend, *State, *[]string) {
-	t.Helper()
-	var mu sync.Mutex
-	models := []string{}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/rerank" {
-			for _, called := range reranked {
-				*called = true
-			}
-			if r.Header.Get("Authorization") != "Bearer secret" {
-				t.Error("missing rerank authentication")
-			}
-			var body struct {
-				Model     string
-				Documents []string
-			}
-			json.NewDecoder(r.Body).Decode(&body)
-			if body.Model != "ranker" {
-				t.Errorf("reranker = %q", body.Model)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"results":[{"index":0,"relevance_score":0.8}]}`))
-			return
+// fakeModelServer serves OpenAI-compatible embeddings and rerank responses and
+// records what the backend asked for.
+type fakeModelServer struct {
+	mu          sync.Mutex
+	models      []string
+	reranked    bool
+	rerankModel string
+	rerankAuth  string
+	// beforeEmbed and beforeRerank run before the response is written; tests
+	// use them to hold a request open.
+	beforeEmbed  func(body string)
+	beforeRerank func(body string)
+}
+
+func (f *fakeModelServer) embeddingModels() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.models...)
+}
+
+func (f *fakeModelServer) lastModel() string {
+	models := f.embeddingModels()
+	Expect(models).ToNot(BeEmpty())
+	return models[len(models)-1]
+}
+
+func (f *fakeModelServer) wasReranked() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reranked
+}
+
+func (f *fakeModelServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	raw, _ := io.ReadAll(r.Body)
+	body := string(raw)
+	if r.URL.Path == "/v1/rerank" {
+		var req struct{ Model string }
+		_ = json.Unmarshal(raw, &req)
+		f.mu.Lock()
+		f.reranked = true
+		f.rerankModel = req.Model
+		f.rerankAuth = r.Header.Get("Authorization")
+		hook := f.beforeRerank
+		f.mu.Unlock()
+		if hook != nil {
+			hook(body)
 		}
-		var body struct{ Model string }
-		json.NewDecoder(r.Body).Decode(&body)
-		mu.Lock()
-		models = append(models, body.Model)
-		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"data":[{"embedding":[1,0,0],"index":0}],"model":"test","usage":{}}`))
-	}))
-	t.Cleanup(server.Close)
-	b, st := NewInProcessBackend(&Config{LLMAPIURL: server.URL + "/v1", LLMAPIKey: "secret", CollectionDBPath: t.TempDir(), FileAssets: t.TempDir(), VectorEngine: "chromem", EmbeddingModel: "default", MaxChunkingSize: 200, ModelSettings: func(string) (CollectionModelSettings, error) { return *selected, nil }})
-	t.Cleanup(st.SourceManager.Stop)
-	return b, st, &models
+		_, _ = w.Write([]byte(`{"results":[{"index":0,"relevance_score":0.8}]}`))
+		return
+	}
+	var req struct{ Model string }
+	_ = json.Unmarshal(raw, &req)
+	f.mu.Lock()
+	f.models = append(f.models, req.Model)
+	hook := f.beforeEmbed
+	f.mu.Unlock()
+	if hook != nil {
+		hook(body)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"data":[{"embedding":[1,0,0],"index":0}],"model":"test","usage":{}}`))
 }
 
-func TestCollectionModelOverridesAndReset(t *testing.T) {
-	selected := CollectionModelSettings{EmbeddingModel: "custom", RerankerModel: "ranker"}
-	b, st, models := testModelBackend(t, &selected)
-	ragDB, _, ok := RAGProviderFromState(st)("agent")
-	if !ok {
-		t.Fatal("provider unavailable")
-	}
-	if err := ragDB.Store("a source document"); err != nil {
-		t.Fatal(err)
-	}
-	result, err := b.Search("agent", "query", 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result) != 1 || result[0].Similarity != 0.8 || result[0].Metadata["source"] == "" {
-		t.Fatalf("result lost score or citation: %+v", result)
-	}
-	embedded, err := ragDB.Search("query", 1)
-	if err != nil || len(embedded) != 1 || !strings.Contains(embedded[0], "source") {
-		t.Fatalf("embedded search: %v %v", embedded, err)
-	}
-	for _, model := range *models {
-		if model != "custom" {
-			t.Fatalf("unexpected embedding model %q", model)
-		}
-	}
-	selected.EmbeddingModel = "changed"
-	if _, err := b.Search("agent", "query", 1); err == nil || !strings.Contains(err.Error(), "reset") {
-		t.Fatalf("expected model mismatch error, got %v", err)
-	}
-	if err := ragDB.Store("must not be indexed"); err == nil {
-		t.Fatal("mixed embeddings accepted")
-	}
-	if err := b.Reset("agent"); err != nil {
-		t.Fatal(err)
-	}
-	if err := ragDB.Store("fresh document"); err != nil {
-		t.Fatal(err)
-	}
-	if got := (*models)[len(*models)-1]; got != "changed" {
-		t.Fatalf("model after reset=%s", got)
-	}
+func newModelBackend(selected *CollectionModelSettings) (*backendInProcess, *State, *fakeModelServer) {
+	fake := &fakeModelServer{}
+	server := httptest.NewServer(fake)
+	DeferCleanup(server.Close)
+	backend, st := NewInProcessBackend(&Config{
+		LLMAPIURL:        server.URL + "/v1",
+		LLMAPIKey:        "secret",
+		CollectionDBPath: GinkgoT().TempDir(),
+		FileAssets:       GinkgoT().TempDir(),
+		VectorEngine:     "chromem",
+		EmbeddingModel:   "default",
+		MaxChunkingSize:  200,
+		ModelSettings:    func(string) (CollectionModelSettings, error) { return *selected, nil },
+	})
+	DeferCleanup(st.SourceManager.Stop)
+	return backend.(*backendInProcess), st, fake
 }
 
-func TestRerankRejectsInvalidResults(t *testing.T) {
-	for _, response := range []string{`{"results":[{"index":2,"relevance_score":1}]}`, `{"results":[{"index":0,"relevance_score":1},{"index":0,"relevance_score":0.5}]}`, `{"results":[{"index":0,"relevance_score":1e50}]}`, `{}`, `{"results":[]}`} {
-		t.Run(response, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(response)) }))
-			defer server.Close()
-			b := &backendInProcess{cfg: &Config{LLMAPIURL: server.URL}}
-			if _, err := b.rerank("ranker", "query", []SearchResult{{Content: "one"}}, 1); err == nil {
-				t.Fatal("invalid rerank response accepted")
-			}
-		})
-	}
+func writeTempFile(content string) string {
+	path := filepath.Join(GinkgoT().TempDir(), "summary.txt")
+	Expect(os.WriteFile(path, []byte(content), 0600)).To(Succeed())
+	return path
 }
 
-func TestRerankOrdersResultsAndPreservesMetadata(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"results":[{"index":0,"relevance_score":0.1},{"index":1,"relevance_score":0.9}]}`))
-	}))
-	defer server.Close()
-	b := &backendInProcess{cfg: &Config{LLMAPIURL: server.URL}}
-	out, err := b.rerank("ranker", "query", []SearchResult{{ID: "first", Content: "one"}, {ID: "second", Content: "two", Metadata: map[string]string{"source": "citation"}}}, 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out[0].ID != "second" || out[0].Metadata["source"] != "citation" {
-		t.Fatalf("wrong order or citation: %+v", out)
-	}
-}
+var _ = Describe("Per-collection model settings", func() {
+	It("embeds with the override, reranks, and requires a reset to switch models", func() {
+		selected := CollectionModelSettings{EmbeddingModel: "custom", RerankerModel: "ranker"}
+		b, st, fake := newModelBackend(&selected)
+		ragDB, _, ok := RAGProviderFromState(st)("agent")
+		Expect(ok).To(BeTrue())
+		Expect(ragDB.Store("a source document")).To(Succeed())
 
-func TestEmbeddingIdentityCannotEscapeDirectory(t *testing.T) {
-	b := &backendInProcess{cfg: &Config{CollectionDBPath: t.TempDir()}}
-	path := b.identityPath("../../outside")
-	if !strings.HasPrefix(path, b.cfg.CollectionDBPath+"/embedding-models/") {
-		t.Fatalf("identity escapes its directory: %s", path)
-	}
-}
+		result, err := b.Search("agent", "query", 1)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Similarity).To(Equal(float32(0.8)))
+		Expect(result[0].Metadata["source"]).ToNot(BeEmpty())
+		Expect(fake.rerankModel).To(Equal("ranker"))
+		Expect(fake.rerankAuth).To(Equal("Bearer secret"))
 
-func TestEmbeddingIdentitySurvivesRestartAndLegacyMigration(t *testing.T) {
-	for _, legacy := range []bool{false, true} {
-		t.Run(fmt.Sprint(legacy), func(t *testing.T) {
+		embedded, err := ragDB.Search("query", 1)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(embedded).To(HaveLen(1))
+		Expect(embedded[0]).To(ContainSubstring("source"))
+		Expect(fake.embeddingModels()).To(HaveEach("custom"))
+
+		selected.EmbeddingModel = "changed"
+		_, err = b.Search("agent", "query", 1)
+		Expect(err).To(MatchError(ContainSubstring("reset")))
+		Expect(ragDB.Store("must not be indexed")).ToNot(Succeed(), "mixed embeddings accepted")
+
+		Expect(b.Reset("agent")).To(Succeed())
+		Expect(ragDB.Store("fresh document")).To(Succeed())
+		Expect(fake.lastModel()).To(Equal("changed"))
+	})
+
+	It("keeps the identity file inside its directory", func() {
+		b := &backendInProcess{cfg: &Config{CollectionDBPath: GinkgoT().TempDir()}}
+		Expect(b.identityPath("../../outside")).To(HavePrefix(b.cfg.CollectionDBPath + "/embedding-models/"))
+	})
+
+	DescribeTable("keeps the embedding identity across restarts",
+		func(legacy bool) {
 			selected := CollectionModelSettings{}
-			backend, st, models := testModelBackend(t, &selected)
-			b := backend.(*backendInProcess)
+			b, st, fake := newModelBackend(&selected)
 			db, _, _ := RAGProviderFromState(st)("agent")
-			if err := db.Store("persisted document"); err != nil {
-				t.Fatal(err)
-			}
+			Expect(db.Store("persisted document")).To(Succeed())
 			st.SourceManager.Stop()
 			if legacy {
-				if err := os.Remove(b.identityPath("agent")); err != nil {
-					t.Fatal(err)
-				}
+				Expect(os.Remove(b.identityPath("agent"))).To(Succeed())
 			}
+
 			selected.EmbeddingModel = "changed"
 			restarted, nextState := NewInProcessBackend(b.cfg)
 			defer nextState.SourceManager.Stop()
-			if _, err := restarted.Search("agent", "query", 1); err == nil {
-				t.Fatal("restart accepted changed embedding model")
-			}
+			_, err := restarted.Search("agent", "query", 1)
+			Expect(err).To(HaveOccurred(), "restart accepted changed embedding model")
+
 			entries, err := restarted.ListEntries("agent")
-			if err != nil || len(entries) != 1 {
-				t.Fatalf("cannot inspect mismatched collection: %v %v", entries, err)
-			}
-			for _, model := range *models {
-				if model != "default" {
-					t.Fatalf("constructor used changed model: %s", model)
-				}
-			}
+			Expect(err).ToNot(HaveOccurred(), "mismatched collection must stay inspectable")
+			Expect(entries).To(HaveLen(1))
+			Expect(fake.embeddingModels()).To(HaveEach("default"))
+
 			names, err := restarted.ListCollections()
-			if err != nil || len(names) != 1 {
-				t.Fatalf("sidecar exposed as a collection: %v %v", names, err)
-			}
-			if err := restarted.Reset("agent"); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(1), "sidecar exposed as a collection")
+			Expect(restarted.Reset("agent")).To(Succeed())
+		},
+		Entry("with an identity sidecar", false),
+		Entry("legacy store without a sidecar", true),
+	)
 
-func TestProviderDoesNotResolveModelsWhileConstructing(t *testing.T) {
-	selected := CollectionModelSettings{}
-	backend, st, _ := testModelBackend(t, &selected)
-	calls := 0
-	backend.(*backendInProcess).cfg.ModelSettings = func(string) (CollectionModelSettings, error) { calls++; return selected, nil }
-	db, _, ok := RAGProviderFromState(st)("agent")
-	if !ok || db == nil || calls != 0 {
-		t.Fatalf("provider invoked resolver: %d", calls)
-	}
-}
+	It("does not resolve models while constructing the provider", func() {
+		selected := CollectionModelSettings{}
+		b, st, _ := newModelBackend(&selected)
+		calls := 0
+		b.cfg.ModelSettings = func(string) (CollectionModelSettings, error) { calls++; return selected, nil }
+		db, _, ok := RAGProviderFromState(st)("agent")
+		Expect(ok).To(BeTrue())
+		Expect(db).ToNot(BeNil())
+		Expect(calls).To(BeZero())
+	})
 
-func TestRerankDoesNotFollowRedirectsOrHideErrors(t *testing.T) {
-	reached := false
-	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { reached = true }))
-	defer target.Close()
-	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusInternalServerError} {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Location", target.URL)
-			w.WriteHeader(status)
-		}))
-		b := &backendInProcess{cfg: &Config{LLMAPIURL: server.URL, LLMAPIKey: "secret"}}
-		if _, err := b.rerank("ranker", "query", []SearchResult{{Content: "one"}}, 1); err == nil {
-			t.Fatal("rerank failure ignored")
-		}
-		server.Close()
-	}
-	if reached {
-		t.Fatal("rerank request followed credential-bearing redirect")
-	}
-}
+	It("keeps the compaction date prefix on embedded stores", func() {
+		selected := CollectionModelSettings{}
+		b, st, _ := newModelBackend(&selected)
+		db, _, _ := RAGProviderFromState(st)("agent")
+		Expect(db.Store("document")).To(Succeed())
+		entries, err := b.ListEntries("agent")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(entries).To(HaveLen(1))
+		Expect(filepath.Base(entries[0])).To(HavePrefix(time.Now().Format("2006-01-02-")))
+	})
 
-func TestEmbeddedStorePreservesCompactionDatePrefix(t *testing.T) {
-	selected := CollectionModelSettings{}
-	b, st, _ := testModelBackend(t, &selected)
-	db, _, _ := RAGProviderFromState(st)("agent")
-	if err := db.Store("document"); err != nil {
-		t.Fatal(err)
-	}
-	entries, err := b.ListEntries("agent")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != 1 || !strings.HasPrefix(filepath.Base(entries[0]), time.Now().Format("2006-01-02-")) {
-		t.Fatalf("entry lacks compaction date prefix: %v", entries)
-	}
-}
+	It("requires a restart before recreating a reset collection that had sources", func() {
+		selected := CollectionModelSettings{}
+		b, st, _ := newModelBackend(&selected)
+		Expect(b.CreateCollection("agent")).To(Succeed())
+		kb := st.Collections["agent"]
+		Expect(kb.AddExternalSource(&rag.ExternalSource{URL: "https://example.invalid/source", UpdateInterval: time.Hour})).To(Succeed())
+		Expect(b.Reset("agent")).To(Succeed())
 
-func TestResetWithSourcesRequiresRestartBeforeRecreation(t *testing.T) {
-	selected := CollectionModelSettings{}
-	backend, st, _ := testModelBackend(t, &selected)
-	b := backend.(*backendInProcess)
-	if err := b.CreateCollection("agent"); err != nil {
-		t.Fatal(err)
-	}
-	kb := st.Collections["agent"]
-	if err := kb.AddExternalSource(&rag.ExternalSource{URL: "https://example.invalid/source", UpdateInterval: time.Hour}); err != nil {
-		t.Fatal(err)
-	}
-	if err := b.Reset("agent"); err != nil {
-		t.Fatal(err)
-	}
-	selected.EmbeddingModel = "changed"
-	if err := b.CreateCollection("agent"); err == nil || !strings.Contains(err.Error(), "restart") {
-		t.Fatalf("expected restart guard, got %v", err)
-	}
-	if model, err := b.storedModel("agent", "changed"); err != nil || model != "default" {
-		t.Fatalf("forgot identity while source might still write: %s %v", model, err)
-	}
-}
+		selected.EmbeddingModel = "changed"
+		Expect(b.CreateCollection("agent")).To(MatchError(ContainSubstring("restart")))
+		model, err := b.storedModel("agent", "changed")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(model).To(Equal("default"), "forgot identity while a source might still write")
+	})
 
-func TestRemovedSourcesStillPreventModelSwitch(t *testing.T) {
-	for _, reset := range []bool{false, true} {
-		t.Run(fmt.Sprintf("reset=%t", reset), func(t *testing.T) {
+	DescribeTable("remembers removed sources and blocks a model switch",
+		func(reset bool) {
 			selected := CollectionModelSettings{}
-			backend, st, _ := testModelBackend(t, &selected)
-			b := backend.(*backendInProcess)
-			if err := b.CreateCollection("agent"); err != nil {
-				t.Fatal(err)
-			}
+			b, st, _ := newModelBackend(&selected)
+			Expect(b.CreateCollection("agent")).To(Succeed())
 			url := "https://example.invalid/source"
 			// Seed persisted metadata without starting a network fetch. Removal
 			// must remember that a source could already have an in-flight fetch.
-			if err := st.Collections["agent"].AddExternalSource(&rag.ExternalSource{URL: url, UpdateInterval: time.Hour}); err != nil {
-				t.Fatal(err)
-			}
-			if err := b.RemoveSource("agent", url); err != nil {
-				t.Fatal(err)
-			}
+			Expect(st.Collections["agent"].AddExternalSource(&rag.ExternalSource{URL: url, UpdateInterval: time.Hour})).To(Succeed())
+			Expect(b.RemoveSource("agent", url)).To(Succeed())
 			if reset {
-				if err := b.Reset("agent"); err != nil {
-					t.Fatal(err)
-				}
+				Expect(b.Reset("agent")).To(Succeed())
 			}
+
 			selected.EmbeddingModel = "changed"
-			if err := b.CreateCollection("agent"); err == nil {
-				t.Fatal("removed source allowed model switch while its fetch may still write")
-			}
-			if model, err := b.storedModel("agent", "changed"); err != nil || model != "default" {
-				t.Fatalf("source identity changed: %q %v", model, err)
+			Expect(b.CreateCollection("agent")).ToNot(Succeed(), "removed source allowed a model switch while its fetch may still write")
+			model, err := b.storedModel("agent", "changed")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(model).To(Equal("default"))
+		},
+		Entry("without reset", false),
+		Entry("after reset", true),
+	)
+
+	It("does not reuse the old engine after a failed model switch", func() {
+		selected := CollectionModelSettings{}
+		b, st, fake := newModelBackend(&selected)
+		Expect(b.CreateCollection("agent")).To(Succeed())
+		selected.EmbeddingModel = "changed"
+		// Force the real constructor to fail after the new identity is saved.
+		b.cfg.VectorEngine = "unavailable"
+		Expect(b.CreateCollection("agent")).ToNot(Succeed())
+		b.cfg.VectorEngine = "chromem"
+
+		db, _, _ := RAGProviderFromState(st)("agent")
+		Expect(db.Store("retry after engine recovery")).To(Succeed())
+		Expect(fake.lastModel()).To(Equal("changed"))
+	})
+
+	It("resolves mixed-case agent names to their original model settings", func() {
+		selected := CollectionModelSettings{EmbeddingModel: "custom", RerankerModel: "ranker"}
+		b, st, fake := newModelBackend(&selected)
+		calls := 0
+		var names []string
+		b.cfg.ModelSettings = func(name string) (CollectionModelSettings, error) {
+			calls++
+			names = append(names, name)
+			return selected, nil
+		}
+		db, compact, ok := RAGProviderFromState(st)("Research")
+		Expect(ok).To(BeTrue())
+		Expect(calls).To(BeZero(), "provider must resolve lazily")
+
+		Expect(db.Store("research document")).To(Succeed())
+		Expect(compact.Collection()).To(Equal("research"))
+		results, err := db.Search("query", 1)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(results).To(HaveLen(1))
+		Expect(fake.wasReranked()).To(BeTrue())
+		Expect(fake.embeddingModels()).To(HaveEach("custom"))
+
+		selected.EmbeddingModel = "updated"
+		Expect(db.Store("must require reset")).ToNot(Succeed(), "updated setting not resolved dynamically")
+		Expect(db.Reset()).To(Succeed())
+		Expect(compact.Store(writeTempFile("compacted research"))).To(Succeed())
+		Expect(fake.lastModel()).To(Equal("updated"))
+		Expect(names).To(HaveEach("Research"))
+	})
+
+	It("blocks inference when the model resolver fails but keeps inspection and reset", func() {
+		selected := CollectionModelSettings{RerankerModel: "ranker"}
+		b, st, fake := newModelBackend(&selected)
+		db, compact, _ := RAGProviderFromState(st)("agent")
+		// Store does not rerank, so nothing has been reranked yet.
+		Expect(db.Store("existing document")).To(Succeed())
+		before := len(fake.embeddingModels())
+
+		denied := fmt.Errorf("model access denied")
+		b.cfg.ModelSettings = func(string) (CollectionModelSettings, error) { return selected, denied }
+		path := writeTempFile("summary")
+		checks := map[string]func() error{
+			"create":          func() error { return b.CreateCollection("agent") },
+			"upload":          func() error { _, err := b.Upload("agent", "file.txt", strings.NewReader("text")); return err },
+			"search":          func() error { _, err := b.Search("agent", "query", 1); return err },
+			"source":          func() error { return b.AddSource("agent", "invalid://source", 60) },
+			"embedded store":  func() error { return db.Store("new text") },
+			"embedded search": func() error { _, err := db.Search("query", 1); return err },
+			"compaction":      func() error { return compact.Store(path) },
+		}
+		for name, run := range checks {
+			Expect(run()).To(BeIdenticalTo(denied), name)
+		}
+		_, ok := st.EnsureCollection("agent")
+		Expect(ok).To(BeFalse(), "ensure ignored resolver failure")
+		Expect(fake.embeddingModels()).To(HaveLen(before), "denied resolver emitted embedding requests")
+		Expect(fake.wasReranked()).To(BeFalse(), "denied resolver emitted a rerank request")
+
+		entries, err := b.ListEntries("agent")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(entries).ToNot(BeEmpty())
+		Expect(b.Reset("agent")).To(Succeed())
+	})
+})
+
+// heldReader blocks its first Read until release is closed.
+type heldReader struct {
+	data     io.Reader
+	entered  chan struct{}
+	release  chan struct{}
+	signaled bool
+}
+
+func (r *heldReader) Read(p []byte) (int, error) {
+	if !r.signaled {
+		r.signaled = true
+		close(r.entered)
+		<-r.release
+	}
+	return r.data.Read(p)
+}
+
+var _ = Describe("Collection operation locking", func() {
+	const marker = "HOLD-THIS-EMBEDDING"
+
+	var (
+		selected CollectionModelSettings
+		b        *backendInProcess
+		fake     *fakeModelServer
+		entered  chan struct{}
+		release  chan struct{}
+		once     sync.Once
+	)
+
+	// holdOn makes requests whose body contains marker wait until release.
+	holdOn := func(body string) {
+		if strings.Contains(body, marker) {
+			once.Do(func() { close(entered) })
+			<-release
+		}
+	}
+
+	BeforeEach(func() {
+		selected = CollectionModelSettings{}
+		b, _, fake = newModelBackend(&selected)
+		entered = make(chan struct{})
+		release = make(chan struct{})
+		once = sync.Once{}
+		// Unblock anything still waiting if a spec fails early.
+		DeferCleanup(func() {
+			select {
+			case <-release:
+			default:
+				close(release)
 			}
 		})
-	}
-}
+		Expect(b.CreateCollection("alpha")).To(Succeed())
+		Expect(b.CreateCollection("beta")).To(Succeed())
+		_, err := b.Upload("beta", "beta.txt", strings.NewReader("beta document"))
+		Expect(err).ToNot(HaveOccurred())
+	})
 
-func TestFailedModelSwitchDoesNotReuseOldEngine(t *testing.T) {
-	selected := CollectionModelSettings{}
-	backend, st, models := testModelBackend(t, &selected)
-	b := backend.(*backendInProcess)
-	if err := b.CreateCollection("agent"); err != nil {
-		t.Fatal(err)
-	}
-	selected.EmbeddingModel = "changed"
-	// Force the real constructor to fail after the new identity is saved.
-	b.cfg.VectorEngine = "unavailable"
-	if err := b.CreateCollection("agent"); err == nil {
-		t.Fatal("expected engine initialization failure")
-	}
-	b.cfg.VectorEngine = "chromem"
-	db, _, _ := RAGProviderFromState(st)("agent")
-	if err := db.Store("retry after engine recovery"); err != nil {
-		t.Fatal(err)
-	}
-	if got := (*models)[len(*models)-1]; got != "changed" {
-		t.Fatalf("retry wrote vectors using %q under changed identity", got)
-	}
-}
+	It("does not serialize a slow upload in one collection with a search in another", func() {
+		fake.mu.Lock()
+		fake.beforeEmbed = holdOn
+		fake.mu.Unlock()
 
-func TestMixedCaseAgentResolvesOriginalModelSettings(t *testing.T) {
-	selected := CollectionModelSettings{EmbeddingModel: "custom", RerankerModel: "ranker"}
-	reranked := false
-	backend, st, models := testModelBackend(t, &selected, &reranked)
-	calls := 0
-	backend.(*backendInProcess).cfg.ModelSettings = func(name string) (CollectionModelSettings, error) {
-		calls++
-		if name != "Research" {
-			t.Errorf("model lookup name = %q, want Research", name)
-			return CollectionModelSettings{}, nil
-		}
-		return selected, nil
-	}
-	db, compact, ok := RAGProviderFromState(st)("Research")
-	if !ok || calls != 0 {
-		t.Fatalf("provider must resolve lazily: ok=%t calls=%d", ok, calls)
-	}
-	if err := db.Store("research document"); err != nil {
-		t.Fatal(err)
-	}
-	if compact.Collection() != "research" {
-		t.Fatalf("storage name = %q", compact.Collection())
-	}
-	results, err := db.Search("query", 1)
-	if err != nil || len(results) != 1 || !reranked {
-		t.Fatalf("search: %v %v reranked=%t", results, err, reranked)
-	}
-	for _, model := range *models {
-		if model != "custom" {
-			t.Fatalf("embedding model = %q", model)
-		}
-	}
-	selected.EmbeddingModel = "updated"
-	if err := db.Store("must require reset"); err == nil {
-		t.Fatal("updated setting not resolved dynamically")
-	}
-	if err := db.Reset(); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(t.TempDir(), "summary.txt")
-	if err := os.WriteFile(path, []byte("compacted research"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := compact.Store(path); err != nil {
-		t.Fatal(err)
-	}
-	if model := (*models)[len(*models)-1]; model != "updated" {
-		t.Fatalf("compaction model = %q", model)
-	}
-}
+		uploadDone := make(chan error, 1)
+		go func() {
+			defer GinkgoRecover()
+			_, err := b.Upload("alpha", "alpha.txt", strings.NewReader(marker))
+			uploadDone <- err
+		}()
+		Eventually(entered).Should(BeClosed())
 
-func TestModelResolverErrorBlocksInference(t *testing.T) {
-	selected := CollectionModelSettings{RerankerModel: "ranker"}
-	reranked := false
-	backend, st, models := testModelBackend(t, &selected, &reranked)
-	b := backend.(*backendInProcess)
-	db, compact, _ := RAGProviderFromState(st)("agent")
-	if err := db.Store("existing document"); err != nil {
-		t.Fatal(err)
+		searchDone := make(chan error, 1)
+		go func() {
+			defer GinkgoRecover()
+			_, err := b.Search("beta", "query", 1)
+			searchDone <- err
+		}()
+		Eventually(searchDone, 5*time.Second).Should(Receive(BeNil()), "search in beta waited for the upload in alpha")
+		Consistently(uploadDone, 100*time.Millisecond).ShouldNot(Receive())
+
+		close(release)
+		Eventually(uploadDone, 5*time.Second).Should(Receive(BeNil()))
+	})
+
+	It("does not hold the collection lock during the rerank call", func() {
+		selected.RerankerModel = "ranker"
+		fake.mu.Lock()
+		fake.beforeRerank = holdOn
+		fake.mu.Unlock()
+
+		searchDone := make(chan error, 1)
+		go func() {
+			defer GinkgoRecover()
+			_, err := b.Search("beta", marker, 1)
+			searchDone <- err
+		}()
+		Eventually(entered).Should(BeClosed())
+
+		// A model switch on beta needs the collection lock. It must fail
+		// quickly (beta has documents) instead of waiting for the reranker.
+		selected.EmbeddingModel = "changed"
+		createDone := make(chan error, 1)
+		go func() {
+			defer GinkgoRecover()
+			createDone <- b.CreateCollection("beta")
+		}()
+		Eventually(createDone, 5*time.Second).Should(Receive(MatchError(ContainSubstring("reset"))))
+
+		close(release)
+		Eventually(searchDone, 5*time.Second).Should(Receive(BeNil()))
+	})
+
+	It("still serializes a model switch with an in-flight upload in the same collection", func() {
+		// The reader holds the upload after its model check and before
+		// kb.Store, where only the collection lock protects the identity.
+		uploadDone := make(chan error, 1)
+		go func() {
+			defer GinkgoRecover()
+			_, err := b.Upload("alpha", "alpha.txt", &heldReader{data: strings.NewReader("alpha document"), entered: entered, release: release})
+			uploadDone <- err
+		}()
+		Eventually(entered).Should(BeClosed())
+
+		// alpha is still empty. Without the collection lock the switch would
+		// see no documents and swap the identity, and the upload would then
+		// store vectors from the old model.
+		selected.EmbeddingModel = "changed"
+		switchDone := make(chan error, 1)
+		go func() {
+			defer GinkgoRecover()
+			switchDone <- b.CreateCollection("alpha")
+		}()
+		Consistently(switchDone, 300*time.Millisecond).ShouldNot(Receive(), "model switch ran during an upload")
+
+		close(release)
+		Eventually(uploadDone, 5*time.Second).Should(Receive(BeNil()))
+		Eventually(switchDone, 5*time.Second).Should(Receive(MatchError(ContainSubstring("reset"))))
+		model, err := b.storedModel("alpha", "changed")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(model).To(Equal("default"))
+	})
+})
+
+var _ = Describe("Reranking", func() {
+	serve := func(handler http.HandlerFunc) *backendInProcess {
+		server := httptest.NewServer(handler)
+		DeferCleanup(server.Close)
+		return &backendInProcess{cfg: &Config{LLMAPIURL: server.URL, LLMAPIKey: "secret"}}
 	}
-	before := len(*models)
-	denied := fmt.Errorf("model access denied")
-	b.cfg.ModelSettings = func(string) (CollectionModelSettings, error) { return selected, denied }
-	path := filepath.Join(t.TempDir(), "summary.txt")
-	if err := os.WriteFile(path, []byte("summary"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	checks := []struct {
-		name string
-		run  func() error
-	}{
-		{"create", func() error { return b.CreateCollection("agent") }},
-		{"upload", func() error { _, err := b.Upload("agent", "file.txt", strings.NewReader("text")); return err }},
-		{"search", func() error { _, err := b.Search("agent", "query", 1); return err }},
-		{"source", func() error { return b.AddSource("agent", "invalid://source", 60) }},
-		{"embedded store", func() error { return db.Store("new text") }},
-		{"embedded search", func() error { _, err := db.Search("query", 1); return err }},
-		{"compaction", func() error { return compact.Store(path) }},
-	}
-	for _, check := range checks {
-		if err := check.run(); err != denied {
-			t.Errorf("%s: got %v, want resolver error", check.name, err)
+
+	DescribeTable("rejects invalid rerank responses",
+		func(response string) {
+			b := serve(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(response)) })
+			_, err := b.rerank("ranker", "query", []SearchResult{{Content: "one"}}, 1)
+			Expect(err).To(HaveOccurred())
+		},
+		Entry("index out of range", `{"results":[{"index":2,"relevance_score":1}]}`),
+		Entry("duplicate index", `{"results":[{"index":0,"relevance_score":1},{"index":0,"relevance_score":0.5}]}`),
+		Entry("infinite score", `{"results":[{"index":0,"relevance_score":1e50}]}`),
+		Entry("missing results", `{}`),
+		Entry("empty results", `{"results":[]}`),
+	)
+
+	It("orders results by score and keeps metadata", func() {
+		b := serve(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"results":[{"index":0,"relevance_score":0.1},{"index":1,"relevance_score":0.9}]}`))
+		})
+		out, err := b.rerank("ranker", "query", []SearchResult{{ID: "first", Content: "one"}, {ID: "second", Content: "two", Metadata: map[string]string{"source": "citation"}}}, 2)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(out[0].ID).To(Equal("second"))
+		Expect(out[0].Metadata).To(HaveKeyWithValue("source", "citation"))
+	})
+
+	It("does not follow redirects or hide HTTP errors", func() {
+		var reached bool
+		var mu sync.Mutex
+		target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			reached = true
+			mu.Unlock()
+		}))
+		DeferCleanup(target.Close)
+		for _, status := range []int{http.StatusTemporaryRedirect, http.StatusInternalServerError} {
+			b := serve(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Location", target.URL)
+				w.WriteHeader(status)
+			})
+			_, err := b.rerank("ranker", "query", []SearchResult{{Content: "one"}}, 1)
+			Expect(err).To(HaveOccurred(), "rerank failure ignored for HTTP %d", status)
 		}
-	}
-	if _, ok := st.EnsureCollection("agent"); ok {
-		t.Error("ensure ignored resolver failure")
-	}
-	if len(*models) != before || reranked {
-		t.Errorf("denied resolver emitted inference requests: embeddings=%d reranked=%t", len(*models)-before, reranked)
-	}
-	if entries, err := b.ListEntries("agent"); err != nil || len(entries) == 0 {
-		t.Fatalf("inspection unavailable: %v %v", entries, err)
-	}
-	if err := b.Reset("agent"); err != nil {
-		t.Fatalf("reset unavailable: %v", err)
-	}
-}
+		mu.Lock()
+		defer mu.Unlock()
+		Expect(reached).To(BeFalse(), "rerank request followed a credential-bearing redirect")
+	})
+
+	It("widens the vector search so the reranker sees more than the top hits", func() {
+		selected := CollectionModelSettings{RerankerModel: "ranker"}
+		b, _, fake := newModelBackend(&selected)
+		Expect(b.CreateCollection("wide")).To(Succeed())
+		for i := range 6 {
+			_, err := b.Upload("wide", fmt.Sprintf("doc-%d.txt", i), strings.NewReader(fmt.Sprintf("document %d", i)))
+			Expect(err).ToNot(HaveOccurred())
+		}
+		documents := make(chan int, 1)
+		fake.mu.Lock()
+		fake.beforeRerank = func(body string) {
+			var req struct{ Documents []string }
+			_ = json.Unmarshal([]byte(body), &req)
+			documents <- len(req.Documents)
+		}
+		fake.mu.Unlock()
+
+		out, err := b.Search("wide", "query", 1)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(out).To(HaveLen(1))
+		Expect(documents).To(Receive(Equal(rerankCandidateFactor)))
+	})
+})

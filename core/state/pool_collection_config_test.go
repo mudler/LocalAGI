@@ -1,26 +1,48 @@
 package state
 
-import "testing"
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
 
-func TestGetCollectionConfig(t *testing.T) {
-	pool := &AgentPool{pool: AgentPoolData{
-		"Research": {EmbeddingModel: "research-embed", RerankerModel: "research-rank"},
-	}}
-	for _, name := range []string{"Research", "research", " RESEARCH "} {
-		config, err := pool.GetCollectionConfig(name)
-		if err != nil || config == nil || config.EmbeddingModel != "research-embed" || config.RerankerModel != "research-rank" {
-			t.Fatalf("lookup %q: config=%+v error=%v", name, config, err)
-		}
-	}
-	if config, err := pool.GetCollectionConfig("missing"); config != nil || err != nil {
-		t.Fatalf("missing lookup: config=%+v error=%v", config, err)
-	}
-	pool.pool["RESEARCH"] = AgentConfig{EmbeddingModel: "other"}
-	if config, err := pool.GetCollectionConfig("research"); err == nil || config != nil {
-		t.Fatalf("ambiguous lookup: config=%+v error=%v", config, err)
-	}
-	config, err := pool.GetCollectionConfig("Research")
-	if err != nil || config == nil || config.EmbeddingModel != "research-embed" {
-		t.Fatalf("exact match must win: config=%+v error=%v", config, err)
-	}
-}
+var _ = Describe("AgentPool.GetCollectionConfig", func() {
+	var pool *AgentPool
+
+	BeforeEach(func() {
+		pool = &AgentPool{pool: AgentPoolData{
+			"Research": {EmbeddingModel: "research-embed", RerankerModel: "research-rank"},
+		}}
+	})
+
+	DescribeTable("resolves normalized collection names to the agent",
+		func(name string) {
+			config, err := pool.GetCollectionConfig(name)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config).ToNot(BeNil())
+			Expect(config.EmbeddingModel).To(Equal("research-embed"))
+			Expect(config.RerankerModel).To(Equal("research-rank"))
+		},
+		Entry("exact", "Research"),
+		Entry("lowercase", "research"),
+		Entry("padded uppercase", " RESEARCH "),
+	)
+
+	It("returns nil without error for an unknown collection", func() {
+		config, err := pool.GetCollectionConfig("missing")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).To(BeNil())
+	})
+
+	It("fails on an ambiguous normalized name but prefers an exact match", func() {
+		pool.pool["RESEARCH"] = AgentConfig{EmbeddingModel: "other"}
+
+		config, err := pool.GetCollectionConfig("research")
+		Expect(err).To(HaveOccurred())
+		Expect(config).To(BeNil())
+
+		config, err = pool.GetCollectionConfig("Research")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(config).ToNot(BeNil())
+		Expect(config.EmbeddingModel).To(Equal("research-embed"))
+	})
+})

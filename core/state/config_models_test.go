@@ -2,26 +2,23 @@ package state
 
 import (
 	"encoding/json"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestAgentConfigKnowledgeModelsRoundTrip(t *testing.T) {
-	var config AgentConfig
-	if err := json.Unmarshal([]byte(`{"embedding_model":"embed","reranker_model":"rank"}`), &config); err != nil {
-		t.Fatal(err)
-	}
-	if config.EmbeddingModel != "embed" || config.RerankerModel != "rank" {
-		t.Fatalf("lost models: %+v", config)
-	}
-	data, err := json.Marshal(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var roundTrip map[string]any
-	if err := json.Unmarshal(data, &roundTrip); err != nil {
-		t.Fatal(err)
-	}
-	if roundTrip["embedding_model"] != "embed" || roundTrip["reranker_model"] != "rank" {
-		t.Fatalf("models not serialized: %s", data)
-	}
-}
+var _ = Describe("AgentConfig knowledge models", func() {
+	It("round-trips embedding_model and reranker_model through JSON", func() {
+		var config AgentConfig
+		Expect(json.Unmarshal([]byte(`{"embedding_model":"embed","reranker_model":"rank"}`), &config)).To(Succeed())
+		Expect(config.EmbeddingModel).To(Equal("embed"))
+		Expect(config.RerankerModel).To(Equal("rank"))
+
+		data, err := json.Marshal(config)
+		Expect(err).ToNot(HaveOccurred())
+		var roundTrip map[string]any
+		Expect(json.Unmarshal(data, &roundTrip)).To(Succeed())
+		Expect(roundTrip).To(HaveKeyWithValue("embedding_model", "embed"))
+		Expect(roundTrip).To(HaveKeyWithValue("reranker_model", "rank"))
+	})
+})
