@@ -39,7 +39,7 @@ function CreateAgent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
+    if (!(formData.name || '').trim()) {
       showToast('Agent name is required', 'error');
       return;
     }
