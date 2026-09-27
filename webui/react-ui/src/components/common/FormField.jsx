@@ -13,6 +13,7 @@ import React from 'react';
  * @param {string} props.helpText Help text to display below the field
  * @param {Array} props.options Options for select inputs
  * @param {boolean} props.required Whether the field is required
+ * @param {boolean} props.disabled Whether the field is read-only for the user
  */
 const FormField = ({
   id,
@@ -28,6 +29,7 @@ const FormField = ({
   min = 0,
   max = 2**31,
   step = 1,
+  disabled = false,
 }) => {
   // Create label with required indicator
   const labelWithIndicator = required ? (
@@ -49,6 +51,7 @@ const FormField = ({
                 name={name}
                 checked={value === true || value === 'true'}
                 onChange={onChange}
+                disabled={disabled}
               />
               {labelWithIndicator}
             </label>
@@ -66,6 +69,7 @@ const FormField = ({
               onChange={onChange}
               className="form-control"
               required={required}
+              disabled={disabled}
             >
               {options.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -89,6 +93,7 @@ const FormField = ({
               placeholder={placeholder}
               required={required}
               rows={5}
+              disabled={disabled}
             />
             {helpText && <small className="form-text text-muted">{helpText}</small>}
           </>
@@ -109,6 +114,7 @@ const FormField = ({
               min={min}
               max={max}
               step={step}
+              disabled={disabled}
             />
             {helpText && <small className="form-text text-muted">{helpText}</small>}
           </>
@@ -126,6 +132,7 @@ const FormField = ({
               className="form-control"
               placeholder={placeholder}
               required={required}
+              disabled={disabled}
             />
             {helpText && <small className="form-text text-muted">{helpText}</small>}
           </>

@@ -32,12 +32,24 @@ func (j *JobResult) SetResult(text ActionState) {
 }
 
 // Finish marks the job as done and closes the ready channel.
+//
+// Finish is idempotent: a job may be finished from more than one code path
+// (for example an early finish inside a tool decision followed by the regular
+// completion). Closing the ready channel twice would panic with
+// "close of closed channel" and take the whole agent down, so the first call
+// wins: its error is kept and its finalizers run; later calls are no-ops.
 func (j *JobResult) Finish(e error) {
 	j.Lock()
-	j.Error = e
+	select {
+	case <-j.ready:
+		// Already finished.
+		j.Unlock()
+		return
+	default:
+		j.Error = e
+		close(j.ready)
+	}
 	j.Unlock()
-
-	close(j.ready)
 
 	for _, f := range j.Finalizers {
 		f(j.Conversation)

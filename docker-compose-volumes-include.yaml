@@ -1,0 +1,6 @@
+volumes:
+  postgres_data:
+  models:
+  backends:
+  images:
+  localagi_pool:
