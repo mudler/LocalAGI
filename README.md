@@ -1107,6 +1107,42 @@ LocalAGI supports environment configurations. Note that these environment variab
 | `LOCALAGI_CUSTOM_ACTIONS_DIR` | Directory containing custom Go action files to be automatically loaded |
 </details>
 
+#### Per-agent knowledge models
+
+For the embedded knowledge base, each agent can set `embedding_model` and
+`reranker_model` in its configuration. An empty `embedding_model` uses the server's
+`EMBEDDING_MODEL`; an empty `reranker_model` keeps vector search without reranking.
+Reranking uses the server's OpenAI-compatible API URL and key and calls
+`/v1/rerank`. Both collection searches and agent memory searches apply the selected
+reranker and retain document source metadata. When a reranker is set, the
+vector search fetches up to four times the requested number of chunks, and the
+reranker picks the final results from those candidates. A reranker error fails the search.
+These settings do not configure a remote LocalRecall server.
+
+Collection model lookup prefers an exact agent name. A normalized collection
+name, such as `research` for agent `Research`, also resolves that agent when the
+match is unique. Ambiguous normalized names fail instead of selecting a model.
+
+A collection records its embedding model separately from its document data.
+Changing that model on a collection with documents or external sources fails with
+an instruction to reset it. Reset, recreate the collection, and upload the documents
+again to use the new model. Existing collections without a model record use the
+server's default embedding model. Keep that default unchanged until those
+collections have been opened once and their model records have been saved.
+
+For a collection with external URL sources, reset it and restart the service
+before recreating it. Reset removes scheduled sources, but an in-flight fetch
+cannot be cancelled. Recreation is blocked until restart to prevent that fetch
+from writing embeddings from the previous model into the recreated collection.
+
+Applications embedding `webui/collections` can provide
+`Config.ModelSettings func(string) (CollectionModelSettings, error)` to resolve the embedding
+and reranker models by collection name. Model resolution occurs during operations;
+creating an agent's RAG provider does not call the resolver.
+Return an error to deny an embedding or reranking operation, for example when a
+model is not allowed for the user. Resolver errors prevent inference requests;
+existing collection inspection and reset remain available.
+
 ## LICENSE
 
 MIT License — See the [LICENSE](LICENSE) file for details.

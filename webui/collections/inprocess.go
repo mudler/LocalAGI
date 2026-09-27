@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/mudler/localrecall/rag"
@@ -62,9 +63,18 @@ func newVectorEngine(
 
 // backendInProcess implements Backend using in-process state.
 type backendInProcess struct {
-	state        *State
-	cfg          *Config
-	openAIClient *openai.Client
+	// locksMu guards collectionLocks. Each entry serializes the operations
+	// of one collection; see lockCollection.
+	locksMu         sync.Mutex
+	collectionLocks map[string]*sync.Mutex
+	// sourcesMu guards the source history maps, which operations on
+	// different collections update concurrently.
+	sourcesMu        sync.Mutex
+	resetWithSources map[string]bool
+	hadSources       map[string]bool
+	state            *State
+	cfg              *Config
+	openAIClient     *openai.Client
 }
 
 var _ Backend = (*backendInProcess)(nil)
@@ -93,7 +103,7 @@ func (b *backendInProcess) lookup(name string) (*rag.PersistentKB, bool) {
 	if kb, ok := b.state.Collections[name]; ok && kb != nil {
 		return kb, true
 	}
-	kb = newVectorEngine(b.cfg.VectorEngine, b.openAIClient, b.cfg.LLMAPIURL, b.cfg.LLMAPIKey, name, b.cfg.CollectionDBPath, b.cfg.FileAssets, b.cfg.EmbeddingModel, b.cfg.DatabaseURL, b.cfg.MaxChunkingSize, b.cfg.ChunkOverlap)
+	kb, _ = b.construct(name, b.cfg.EmbeddingModel)
 	if kb == nil {
 		return nil, false
 	}
@@ -107,21 +117,32 @@ func (b *backendInProcess) ListCollections() ([]string, error) {
 }
 
 func (b *backendInProcess) CreateCollection(name string) error {
-	collection := newVectorEngine(b.cfg.VectorEngine, b.openAIClient, b.cfg.LLMAPIURL, b.cfg.LLMAPIKey, name, b.cfg.CollectionDBPath, b.cfg.FileAssets, b.cfg.EmbeddingModel, b.cfg.DatabaseURL, b.cfg.MaxChunkingSize, b.cfg.ChunkOverlap)
-	if collection == nil {
-		return fmt.Errorf("unsupported or misconfigured vector engine")
+	settings, err := b.settings(name)
+	if err != nil {
+		return err
 	}
-	b.state.Mu.Lock()
-	b.state.Collections[name] = collection
-	b.state.SourceManager.RegisterCollection(name, collection)
-	b.state.Mu.Unlock()
-	return nil
+	return b.createCollection(name, settings)
+}
+
+func (b *backendInProcess) createCollection(name string, settings CollectionModelSettings) error {
+	defer b.lockCollection(name)()
+	_, err := b.writable(name, settings, true)
+	return err
 }
 
 func (b *backendInProcess) Upload(collection, filename string, fileBody io.Reader) (string, error) {
-	kb, exists := b.lookup(collection)
-	if !exists {
-		return "", fmt.Errorf("collection not found: %s", collection)
+	settings, err := b.settings(collection)
+	if err != nil {
+		return "", err
+	}
+	return b.upload(collection, filename, fileBody, settings)
+}
+
+func (b *backendInProcess) upload(collection, filename string, fileBody io.Reader, settings CollectionModelSettings) (string, error) {
+	defer b.lockCollection(collection)()
+	kb, err := b.writable(collection, settings, false)
+	if err != nil {
+		return "", err
 	}
 	// Write to a temp file; kb.Store will copy it into the correct UUID
 	// subdirectory under the collection's asset dir.
@@ -161,9 +182,33 @@ func (b *backendInProcess) GetEntryContent(collection, entry string) (string, in
 }
 
 func (b *backendInProcess) Search(collection, query string, maxResults int) ([]SearchResult, error) {
-	kb, exists := b.lookup(collection)
-	if !exists {
-		return nil, fmt.Errorf("collection not found: %s", collection)
+	settings, err := b.settings(collection)
+	if err != nil {
+		return nil, err
+	}
+	return b.search(collection, query, maxResults, settings)
+}
+
+func (b *backendInProcess) search(collection, query string, maxResults int, settings CollectionModelSettings) ([]SearchResult, error) {
+	out, maxResults, err := b.vectorSearch(collection, query, maxResults, settings)
+	if err != nil {
+		return nil, err
+	}
+	// The rerank call can take up to its HTTP timeout, and it only needs the
+	// candidates, so it runs without the collection lock.
+	return b.rerank(settings.RerankerModel, query, out, maxResults)
+}
+
+// rerankCandidateFactor widens the vector search when a reranker is set, so
+// the reranker can promote a relevant chunk that ranks just below the cutoff.
+const rerankCandidateFactor = 4
+
+// vectorSearch returns the candidates and the result count after defaults.
+func (b *backendInProcess) vectorSearch(collection, query string, maxResults int, settings CollectionModelSettings) ([]SearchResult, int, error) {
+	defer b.lockCollection(collection)()
+	kb, err := b.writable(collection, settings, false)
+	if err != nil {
+		return nil, 0, err
 	}
 	if maxResults <= 0 {
 		keys := kb.ListDocuments()
@@ -173,9 +218,15 @@ func (b *backendInProcess) Search(collection, query string, maxResults int) ([]S
 			maxResults = 1
 		}
 	}
-	results, err := kb.Search(query, maxResults)
+	candidates := maxResults
+	if settings.RerankerModel != "" {
+		// Engines such as chromem reject a request for more results than
+		// the collection holds, so do not widen past the chunk count.
+		candidates = max(maxResults, min(maxResults*rerankCandidateFactor, kb.Count()))
+	}
+	results, err := kb.Search(query, candidates)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]SearchResult, 0, len(results))
 	for _, r := range results {
@@ -186,18 +237,39 @@ func (b *backendInProcess) Search(collection, query string, maxResults int) ([]S
 			Similarity: r.Similarity,
 		})
 	}
-	return out, nil
+	return out, maxResults, nil
 }
 
 func (b *backendInProcess) Reset(collection string) error {
+	defer b.lockCollection(collection)()
 	kb, exists := b.lookup(collection)
 	if !exists {
 		return fmt.Errorf("collection not found: %s", collection)
 	}
+	sources := kb.GetExternalSources()
+	b.rememberSources(collection, kb)
+	if hadSources, _ := b.sourceHistory(collection); hadSources {
+		// LocalRecall cannot cancel an in-flight source fetch. Keep the old
+		// identity and block recreation until a restart drains those writers.
+		b.markResetWithSources(collection)
+		for _, source := range sources {
+			if err := b.state.SourceManager.RemoveSource(collection, source.URL); err != nil {
+				return err
+			}
+		}
+	}
+	if err := kb.Reset(); err != nil {
+		return err
+	}
+	if _, resetWithSources := b.sourceHistory(collection); !resetWithSources {
+		if err := os.Remove(b.identityPath(collection)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
 	b.state.Mu.Lock()
 	delete(b.state.Collections, collection)
 	b.state.Mu.Unlock()
-	return kb.Reset()
+	return nil
 }
 
 func (b *backendInProcess) DeleteEntry(collection, entry string) ([]string, error) {
@@ -213,15 +285,26 @@ func (b *backendInProcess) DeleteEntry(collection, entry string) ([]string, erro
 }
 
 func (b *backendInProcess) AddSource(collection, url string, intervalMin int) error {
-	kb, exists := b.lookup(collection)
-	if !exists {
-		return fmt.Errorf("collection not found: %s", collection)
+	settings, err := b.settings(collection)
+	if err != nil {
+		return err
+	}
+	defer b.lockCollection(collection)()
+	kb, err := b.writable(collection, settings, false)
+	if err != nil {
+		return err
 	}
 	b.state.SourceManager.RegisterCollection(collection, kb)
+	// Even a partially failed add can leave persisted source metadata.
+	b.markHadSources(collection)
 	return b.state.SourceManager.AddSource(collection, url, time.Duration(intervalMin)*time.Minute)
 }
 
 func (b *backendInProcess) RemoveSource(collection, url string) error {
+	defer b.lockCollection(collection)()
+	if kb, exists := b.lookup(collection); exists {
+		b.rememberSources(collection, kb)
+	}
 	return b.state.SourceManager.RemoveSource(collection, url)
 }
 
@@ -269,13 +352,15 @@ func NewInProcessBackend(cfg *Config) (Backend, *State) {
 	openaiConfig := openai.DefaultConfig(cfg.LLMAPIKey)
 	openaiConfig.BaseURL = cfg.LLMAPIURL
 	openAIClient := openai.NewClientWithConfig(openaiConfig)
+	backend := &backendInProcess{state: st, cfg: cfg, openAIClient: openAIClient}
+	st.backend = backend
 
 	os.MkdirAll(cfg.CollectionDBPath, 0755)
 	os.MkdirAll(cfg.FileAssets, 0755)
 
 	colls := rag.ListAllCollections(cfg.CollectionDBPath)
 	for _, c := range colls {
-		collection := newVectorEngine(cfg.VectorEngine, openAIClient, cfg.LLMAPIURL, cfg.LLMAPIKey, c, cfg.CollectionDBPath, cfg.FileAssets, cfg.EmbeddingModel, cfg.DatabaseURL, cfg.MaxChunkingSize, cfg.ChunkOverlap)
+		collection, _ := backend.construct(c, cfg.EmbeddingModel)
 		// Register every on-disk collection — even when the engine wrapper
 		// failed to construct (e.g. the embedding service was momentarily
 		// unreachable). A nil entry marks "known on disk but not yet loaded";
@@ -284,27 +369,22 @@ func NewInProcessBackend(cfg *Config) (Backend, *State) {
 		// data is still on disk / in the vector DB.
 		st.Collections[c] = collection
 		if collection != nil {
+			backend.rememberSources(c, collection)
 			st.SourceManager.RegisterCollection(c, collection)
 		}
 	}
 
 	st.EnsureCollection = func(name string) (*rag.PersistentKB, bool) {
-		st.Mu.Lock()
-		defer st.Mu.Unlock()
-		if kb, ok := st.Collections[name]; ok && kb != nil {
-			return kb, true
-		}
-		collection := newVectorEngine(cfg.VectorEngine, openAIClient, cfg.LLMAPIURL, cfg.LLMAPIKey, name, cfg.CollectionDBPath, cfg.FileAssets, cfg.EmbeddingModel, cfg.DatabaseURL, cfg.MaxChunkingSize, cfg.ChunkOverlap)
-		if collection == nil {
+		settings, err := backend.settings(name)
+		if err != nil {
 			return nil, false
 		}
-		st.Collections[name] = collection
-		st.SourceManager.RegisterCollection(name, collection)
-		return collection, true
+		defer backend.lockCollection(name)()
+		collection, err := backend.writable(name, settings, true)
+		return collection, err == nil
 	}
 
 	st.SourceManager.Start()
 
-	backend := &backendInProcess{state: st, cfg: cfg, openAIClient: openAIClient}
 	return backend, st
 }
