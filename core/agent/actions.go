@@ -145,7 +145,14 @@ func (a *Agent) getAvailableActionsForJob(job *types.Job) types.Actions {
 	return baseActions
 }
 
+// availableActions returns the agent's own actions for a job, narrowed by the
+// per-agent tool allow/deny-list. Doing it here keeps the HUD, the builtin-tool
+// check and the tools handed to the model in agreement.
 func (a *Agent) availableActions(j *types.Job) types.Actions {
+	return a.options.toolFilter.filterActions(a.unfilteredActions(j))
+}
+
+func (a *Agent) unfilteredActions(j *types.Job) types.Actions {
 	//	defaultActions := append(a.options.userActions, action.NewReply())
 
 	defaultActions := slices.Clone(a.options.userActions)

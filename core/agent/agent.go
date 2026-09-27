@@ -1169,9 +1169,13 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	// its tools are available again instead of being lost until a restart.
 	a.refreshMCPSessions()
 
+	// Built-in and configured actions are narrowed by the tool allow/deny-list in
+	// availableActions; MCP tools are narrowed twice below, once for the lookup set
+	// and once (WithMCPToolFilter) for the tool list cogito builds from the live
+	// sessions, which is what the model actually sees.
 	availableActions := a.getAvailableActionsForJob(job)
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
-	allActions := append(availableActions, a.mcpActionDefinitions...)
+	allActions := append(availableActions, a.options.toolFilter.filterActions(a.mcpActionDefinitions)...)
 
 	obs := job.Obs
 
@@ -1213,6 +1217,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	cogitoOpts := []cogito.Option{
 		cogito.WithMCPs(a.liveMCPSessions()...),
+		cogito.WithMCPToolFilter(a.options.toolFilter.mcpToolFilter()),
 		cogito.WithTools(
 			cogitoTools...,
 		),

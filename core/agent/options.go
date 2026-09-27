@@ -43,6 +43,7 @@ type options struct {
 	randomIdentity                                                                               bool
 	userActions                                                                                  types.Actions
 	jobFilters                                                                                   types.JobFilters
+	toolFilter                                                                                   *toolFilter
 	enableHUD, standaloneJob, showCharacter, enableKB, enableSummaryMemory, enableLongTermMemory bool
 	stripThinkingTags                                                                            bool
 	kbAutoSearch                                                                                 bool
@@ -628,6 +629,20 @@ func WithTTSModel(model string) Option {
 func WithKBAutoSearch(enabled bool) Option {
 	return func(o *options) error {
 		o.kbAutoSearch = enabled
+		return nil
+	}
+}
+
+// WithToolFilter constrains the agent's effective tool set by tool name. When
+// allow is non-empty only those tools are offered to the model; names in deny
+// are always removed. It covers configured actions (including the knowledge
+// base tools) and MCP tools. The control actions the agent loop depends on
+// (send_message, stop, update_state) are never filtered: they are governed by
+// their own options. Tools a caller passes with a single request are not
+// filtered either. Empty allow and deny leave the tool set unchanged.
+func WithToolFilter(allow, deny []string) Option {
+	return func(o *options) error {
+		o.toolFilter = newToolFilter(allow, deny)
 		return nil
 	}
 }

@@ -604,6 +604,10 @@ func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConf
 		opts = append(opts, EnableGuidedTools)
 	}
 
+	if len(config.AllowedTools) > 0 || len(config.ExcludedTools) > 0 {
+		opts = append(opts, WithToolFilter(config.AllowedTools, config.ExcludedTools))
+	}
+
 	if config.StripThinkingTags {
 		opts = append(opts, EnableStripThinkingTags)
 	}
