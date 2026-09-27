@@ -95,10 +95,16 @@ type broadcastManager struct {
 }
 
 // NewManager initializes and returns a new Manager instance.
-func NewManager(workerPoolSize int) Manager {
+// bufferSize sets the broadcast channel capacity so Send() rarely blocks;
+// delivery itself is handled by a single goroutine to preserve message order
+// (SSE consumers rely on it, e.g. for token streams).
+func NewManager(bufferSize int) Manager {
+	if bufferSize < 1 {
+		bufferSize = 1
+	}
 	manager := &broadcastManager{
-		broadcast:      make(chan Envelope),
-		workerPoolSize: workerPoolSize,
+		broadcast:      make(chan Envelope, bufferSize*16),
+		workerPoolSize: bufferSize,
 		messageHistory: newHistory(10),
 	}
 
@@ -176,27 +182,36 @@ func (manager *broadcastManager) Clients() []string {
 	return clients
 }
 
-// startWorkers starts worker goroutines for message broadcasting.
+// startWorkers starts the delivery goroutine for message broadcasting.
+//
+// Delivery is intentionally single-threaded: a pool of competing workers on
+// the same channel delivers messages to clients in nondeterministic order,
+// which scrambles token-level SSE streams (observed as interleaved/corrupted
+// chat output in the UI). One goroutine consuming a buffered channel keeps
+// FIFO order end-to-end; per-client backpressure is still handled by the
+// non-blocking send below (slow clients drop messages instead of stalling
+// everyone else).
 func (manager *broadcastManager) startWorkers() {
-	for i := 0; i < manager.workerPoolSize; i++ {
-		go func() {
-			for message := range manager.broadcast {
-				manager.clients.Range(func(key, value any) bool {
-					client, ok := value.(Listener)
-					if !ok {
-						return true // Continue iteration
-					}
-					select {
-					case client.Chan() <- message:
-						manager.messageHistory.Add(message)
-					default:
-						// If the client's channel is full, drop the message
-					}
+	go func() {
+		for message := range manager.broadcast {
+			// Record once per message — not once per delivered client —
+			// so history stays duplicate-free and is kept even when no
+			// client is currently connected.
+			manager.messageHistory.Add(message)
+			manager.clients.Range(func(key, value any) bool {
+				client, ok := value.(Listener)
+				if !ok {
 					return true // Continue iteration
-				})
-			}
-		}()
-	}
+				}
+				select {
+				case client.Chan() <- message:
+				default:
+					// If the client's channel is full, drop the message
+				}
+				return true // Continue iteration
+			})
+		}
+	}()
 }
 
 // register adds a client to the manager.
@@ -210,6 +225,7 @@ func (manager *broadcastManager) unregister(clientID string) {
 }
 
 type history struct {
+	mu       sync.Mutex
 	messages []Envelope
 	maxSize  int // Maximum number of messages to retain
 }
@@ -222,6 +238,8 @@ func newHistory(maxSize int) *history {
 }
 
 func (h *history) Add(message Envelope) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.messages = append(h.messages, message)
 	// Ensure history does not exceed maxSize
 	if len(h.messages) > h.maxSize {
@@ -230,8 +248,21 @@ func (h *history) Add(message Envelope) {
 	}
 }
 
+// Send replays the retained history to a client. It snapshots the messages
+// under the lock but delivers outside of it: the client channel is written
+// from the connection handler's goroutine while the delivery goroutine may
+// concurrently Add, so holding the lock across channel sends could deadlock
+// a full client against the broadcaster.
 func (h *history) Send(c Listener) {
-	for _, msg := range h.messages {
-		c.Chan() <- msg
+	h.mu.Lock()
+	snapshot := make([]Envelope, len(h.messages))
+	copy(snapshot, h.messages)
+	h.mu.Unlock()
+	for _, msg := range snapshot {
+		select {
+		case c.Chan() <- msg:
+		default:
+			// Drop replayed history for clients whose buffer is already full.
+		}
 	}
 }
