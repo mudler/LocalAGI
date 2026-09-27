@@ -440,6 +440,7 @@ func WithPeriodicRuns(duration string) Option {
 		t, err := time.ParseDuration(duration)
 		if err != nil {
 			o.periodicRuns, _ = time.ParseDuration("10m")
+			return nil
 		}
 		o.periodicRuns = t
 		return nil
