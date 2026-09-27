@@ -11,20 +11,15 @@ services:
       - /dev/dri
       - /dev/kfd
 
+  postgres:
+    extends:
+      file: docker-compose.yaml
+      service: postgres
+
   dind:
     extends:
       file: docker-compose.yaml
       service: dind
-
-  localrecall:
-    extends:
-      file: docker-compose.yaml
-      service: localrecall
-
-  localrecall-healthcheck:
-    extends:
-      file: docker-compose.yaml
-      service: localrecall-healthcheck
 
   localagi:
     extends:

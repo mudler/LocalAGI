@@ -1,0 +1,472 @@
+package connectors
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
+	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/cogito"
+)
+
+type recordingTelegramExecutor struct{ got *types.Job }
+
+func (r *recordingTelegramExecutor) Execute(j *types.Job) *types.JobResult {
+	r.got = j
+	return j.Result
+}
+
+func TestTelegramExecutesTrackedJobIdentity(t *testing.T) {
+	tracked := types.NewJob()
+	executor := &recordingTelegramExecutor{}
+	telegramExecuteJob(executor, tracked)
+	if executor.got != tracked {
+		t.Fatal("executor received a different job")
+	}
+}
+
+func TestTelegramStreamingJobMarksLegacyStatusDeliveryDisabled(t *testing.T) {
+	metadata := map[string]any{"chatID": int64(42)}
+	job, session := telegramNewJobWithStream(t.Context(), &telegramStreamAPI{}, 42, true, telegramStreamDelivery{}, nil, "job", metadata)
+	defer session.Close()
+
+	if telegramUseLegacyStatusDelivery(job) {
+		t.Fatal("streaming job routed to legacy status delivery")
+	}
+	if got, ok := job.Metadata[telegramStreamingMetadataKey].(bool); !ok || !got {
+		t.Fatalf("streaming metadata = %#v, want true", job.Metadata[telegramStreamingMetadataKey])
+	}
+}
+
+func TestTelegramNonStreamingJobKeepsLegacyStatusDelivery(t *testing.T) {
+	job := types.NewJob(types.WithMetadata(map[string]any{"chatID": int64(42)}))
+	if !telegramUseLegacyStatusDelivery(job) {
+		t.Fatal("non-streaming job did not route to legacy status delivery")
+	}
+}
+
+func TestTelegramStreamingCallbacksDoNotInvokeLegacyStatusPath(t *testing.T) {
+	job := types.NewJob(types.WithMetadata(map[string]any{telegramStreamingMetadataKey: true}))
+	calls := 0
+	telegramDeliverLegacyStatus(job, func() { calls++ })
+	if calls != 0 {
+		t.Fatalf("legacy status calls = %d, want 0", calls)
+	}
+}
+
+func TestTelegramNonStreamingCallbacksInvokeLegacyStatusPath(t *testing.T) {
+	job := types.NewJob()
+	calls := 0
+	telegramDeliverLegacyStatus(job, func() { calls++ })
+	if calls != 1 {
+		t.Fatalf("legacy status calls = %d, want 1", calls)
+	}
+}
+
+type recordingTelegramBot struct {
+	sends, edits []models.ParseMode
+	texts        []string
+	sendParams   []*bot.SendMessageParams
+	deleted      []int
+	nextID       int
+}
+
+type contextBlockingTelegramBot struct {
+	recordingTelegramBot
+	started  chan struct{}
+	returned chan struct{}
+}
+
+func (b *contextBlockingTelegramBot) EditMessageText(ctx context.Context, _ *bot.EditMessageTextParams) (*models.Message, error) {
+	close(b.started)
+	<-ctx.Done()
+	close(b.returned)
+	return nil, ctx.Err()
+}
+
+func (b *recordingTelegramBot) SendMessage(_ context.Context, p *bot.SendMessageParams) (*models.Message, error) {
+	b.sends = append(b.sends, p.ParseMode)
+	b.sendParams = append(b.sendParams, p)
+	b.texts = append(b.texts, p.Text)
+	b.nextID++
+	return &models.Message{ID: b.nextID}, nil
+}
+func (b *recordingTelegramBot) EditMessageText(_ context.Context, p *bot.EditMessageTextParams) (*models.Message, error) {
+	b.edits = append(b.edits, p.ParseMode)
+	b.texts = append(b.texts, p.Text)
+	return &models.Message{ID: p.MessageID}, nil
+}
+func (b *recordingTelegramBot) DeleteMessage(_ context.Context, p *bot.DeleteMessageParams) (bool, error) {
+	b.deleted = append(b.deleted, p.MessageID)
+	return true, nil
+}
+
+func TestTelegramDeliveryClearResetsPlaceholderAndFallbackSendsAfterRich(t *testing.T) {
+	tg := &Telegram{placeholders: map[string]int{}}
+	b := &recordingTelegramBot{nextID: 10}
+	d := tg.telegramDelivery(t.Context(), b, -1, 7, "job", 10)
+	if err := d.clearPreview(t.Context(), -1); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.finalMarkdown(t.Context(), -1, []string{"later"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(b.deleted) != 1 || len(b.edits) != 0 || len(b.sends) != 1 {
+		t.Fatalf("deleted/edits/sends = %v/%d/%d", b.deleted, len(b.edits), len(b.sends))
+	}
+	if b.sendParams[0].ReplyParameters == nil || b.sendParams[0].ReplyParameters.MessageID != 7 {
+		t.Fatalf("fallback reply = %#v", b.sendParams[0].ReplyParameters)
+	}
+	if b.sendParams[0].LinkPreviewOptions == nil || b.sendParams[0].LinkPreviewOptions.IsDisabled == nil || !*b.sendParams[0].LinkPreviewOptions.IsDisabled {
+		t.Fatalf("link previews not disabled: %#v", b.sendParams[0])
+	}
+}
+
+func TestTelegramStreamingJobCancellationStillAllowsFinalDelivery(t *testing.T) {
+	api := &telegramStreamAPI{}
+	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
+	defer session.Close()
+	job.Cancel()
+	if err := session.Finalize("completed answer", nil); err != nil {
+		t.Fatalf("Finalize after normal job completion: %v", err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 1 || finals[0].RichMessage.Markdown != "completed answer" {
+		t.Fatalf("finals = %#v, want persistent completed answer", finals)
+	}
+}
+
+func TestTelegramTurnCancellationAbortsInflightLegacyEdit(t *testing.T) {
+	tg := &Telegram{placeholders: map[string]int{"job": 10}}
+	b := &contextBlockingTelegramBot{
+		started:  make(chan struct{}),
+		returned: make(chan struct{}),
+	}
+	delivery := tg.telegramDelivery(context.Background(), b, -1, 7, "job", 10)
+	_, session := telegramNewJobWithStream(t.Context(), &telegramStreamAPI{}, -1, false, delivery, nil, "job", nil)
+
+	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "working"})
+	select {
+	case <-b.started:
+	case <-time.After(time.Second):
+		t.Fatal("legacy preview edit did not start")
+	}
+
+	session.Close()
+	select {
+	case <-b.returned:
+	case <-time.After(time.Second):
+		t.Fatal("preview cancellation did not unblock the legacy edit")
+	}
+}
+
+type cancellingTelegramAPI struct {
+	started  chan struct{}
+	returned chan struct{}
+	calls    atomic.Int32
+}
+
+func (a *cancellingTelegramAPI) sendMessageDraft(ctx context.Context, _ telegramMessageDraft) error {
+	if a.calls.Add(1) == 1 {
+		close(a.started)
+	}
+	<-ctx.Done()
+	close(a.returned)
+	return ctx.Err()
+}
+func (*cancellingTelegramAPI) sendRichMessage(context.Context, telegramRichMessage) error { return nil }
+
+func TestTelegramTurnCancellationAbortsInflightDraftRequest(t *testing.T) {
+	api := &cancellingTelegramAPI{started: make(chan struct{}), returned: make(chan struct{})}
+	_, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
+	select {
+	case <-api.started:
+	case <-time.After(time.Second):
+		t.Fatal("draft request did not start")
+	}
+	session.Close()
+	select {
+	case <-api.returned:
+	case <-time.After(time.Second):
+		t.Fatal("in-flight draft request was not cancelled")
+	}
+	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "must not restart previews"})
+	time.Sleep(telegramStreamInterval + 50*time.Millisecond)
+	if got := api.calls.Load(); got != 1 {
+		t.Fatalf("draft calls after turn cancellation = %d, want 1", got)
+	}
+}
+
+func TestTelegramJobCompletionDoesNotCancelPendingTurnPreview(t *testing.T) {
+	api := &telegramStreamAPI{}
+	job, session := telegramNewJobWithStream(t.Context(), api, 1, true, telegramStreamDelivery{}, nil, "job", nil)
+	defer session.Close()
+	waitTelegramStream(t, func() bool { drafts, _ := api.snapshot(); return len(drafts) == 1 })
+
+	session.Accept(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "completed answer"})
+	// Agent.consumeJob cancels its job context when computation completes. The
+	// Telegram consumer belongs to the surrounding turn and must remain alive
+	// long enough for the handler to drain it.
+	job.Cancel()
+	if err := session.Flush(); err != nil {
+		t.Fatalf("Flush after job completion: %v", err)
+	}
+
+	drafts, _ := api.snapshot()
+	if got := drafts[len(drafts)-1].Text; got != "completed answer"+telegramStreamCursor {
+		t.Fatalf("flushed draft = %q, want completed answer", got)
+	}
+}
+
+type orderedTelegramAPI struct {
+	mu     sync.Mutex
+	events *[]string
+	calls  int
+}
+
+type contextRecordingTelegramAPI struct {
+	contexts []context.Context
+}
+
+func (*contextRecordingTelegramAPI) sendMessageDraft(context.Context, telegramMessageDraft) error {
+	return nil
+}
+
+func (a *contextRecordingTelegramAPI) sendRichMessage(ctx context.Context, _ telegramRichMessage) error {
+	a.contexts = append(a.contexts, ctx)
+	if ctx == nil {
+		return errors.New("rich message received nil context")
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("rich message received canceled context: %w", err)
+	}
+	return errors.New("force fallback delivery")
+}
+
+func (*orderedTelegramAPI) sendMessageDraft(context.Context, telegramMessageDraft) error {
+	return nil
+}
+func (a *orderedTelegramAPI) sendRichMessage(_ context.Context, m telegramRichMessage) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.calls++
+	*a.events = append(*a.events, "rich:"+m.RichMessage.Markdown)
+	if a.calls == 2 {
+		return errors.New("rejected")
+	}
+	return nil
+}
+
+type orderedTelegramBot struct {
+	recordingTelegramBot
+	events *[]string
+}
+
+func (b *orderedTelegramBot) SendMessage(ctx context.Context, p *bot.SendMessageParams) (*models.Message, error) {
+	*b.events = append(*b.events, "send:"+p.Text)
+	return b.recordingTelegramBot.SendMessage(ctx, p)
+}
+func (b *orderedTelegramBot) DeleteMessage(ctx context.Context, p *bot.DeleteMessageParams) (bool, error) {
+	*b.events = append(*b.events, "delete")
+	return b.recordingTelegramBot.DeleteMessage(ctx, p)
+}
+
+func TestTelegramMixedRichFallbackUsesRealDeliveryInOrder(t *testing.T) {
+	var events []string
+	tg := &Telegram{placeholders: map[string]int{"job": 10}}
+	b := &orderedTelegramBot{recordingTelegramBot: recordingTelegramBot{nextID: 10}, events: &events}
+	delivery := tg.telegramDelivery(t.Context(), b, -1, 7, "job", 10)
+	api := &orderedTelegramAPI{events: &events}
+	s := telegramFinalSession(t.Context(), api, -1, false, delivery)
+	answer := strings.Repeat("a", telegramMaxMessageLength) + "second"
+	if err := s.deliverFinal(answer, nil); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"delete", "rich:" + strings.Repeat("a", telegramMaxMessageLength), "rich:second", "send:second"}
+	if len(events) != len(want) {
+		t.Fatalf("events = %#v, want %#v", events, want)
+	}
+	for i := range want {
+		if events[i] != want[i] {
+			t.Fatalf("events = %#v, want %#v", events, want)
+		}
+	}
+	if len(b.edits) != 0 {
+		t.Fatalf("fallback edited old placeholder: %#v", b.edits)
+	}
+}
+
+func TestTelegramDeliveryCreatesLazyPlaceholderWithoutIdenticalEditAndUsesMarkdownV2(t *testing.T) {
+	tg := &Telegram{placeholders: map[string]int{}}
+	b := &recordingTelegramBot{}
+	d := tg.telegramDelivery(t.Context(), b, 1, 0, "job", 0)
+	if err := d.editPreview(t.Context(), 1, "thinking"); err != nil {
+		t.Fatal(err)
+	}
+	if len(b.sends) != 1 || len(b.edits) != 0 {
+		t.Fatalf("sends/edits = %d/%d", len(b.sends), len(b.edits))
+	}
+	if err := d.finalMarkdown(t.Context(), 1, []string{"final"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(b.edits) != 1 || b.edits[0] != models.ParseModeMarkdown {
+		t.Fatalf("parse modes = %#v", b.edits)
+	}
+}
+
+func TestTelegramDeliveryLazyFinalCreationCarriesMarkdownV2ParseMode(t *testing.T) {
+	tg := &Telegram{placeholders: map[string]int{}}
+	b := &recordingTelegramBot{}
+	d := tg.telegramDelivery(t.Context(), b, 1, 0, "job", 0)
+	if err := d.finalMarkdown(t.Context(), 1, []string{"*final*"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(b.sends) != 1 || b.sends[0] != models.ParseModeMarkdown || len(b.edits) != 0 {
+		t.Fatalf("send modes/edits = %#v/%d", b.sends, len(b.edits))
+	}
+}
+
+func TestTelegramStreamingDefaultsEnabled(t *testing.T) {
+	tg, err := NewTelegramConnector(map[string]string{"token": "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tg.streaming {
+		t.Fatal("streaming = false, want true when omitted")
+	}
+}
+
+func TestTelegramStreamingCanBeDisabled(t *testing.T) {
+	tg, err := NewTelegramConnector(map[string]string{"token": "test", "streaming": "false"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tg.streaming {
+		t.Fatal("streaming = true, want false")
+	}
+}
+
+func TestTelegramAskOptionsAttachMatchingSession(t *testing.T) {
+	api := &telegramStreamAPI{}
+	session := newTelegramStreamSession(t.Context(), api, 42, true, telegramStreamDelivery{})
+	defer session.Close()
+
+	job := types.NewJob(telegramAskOptions(nil, "job", map[string]any{"chatID": int64(42)}, session)...)
+	if job.StreamCallback == nil {
+		t.Fatal("request stream callback is nil")
+	}
+	job.StreamCallback(cogito.StreamEvent{Type: cogito.StreamEventContent, Content: "hello"})
+	if err := session.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	drafts, _ := api.snapshot()
+	if got := drafts[len(drafts)-1].Text; got != "hello"+telegramStreamCursor {
+		t.Fatalf("preview = %q, want hello", got)
+	}
+}
+
+func TestTelegramAskOptionsWithoutSessionDoesNotStream(t *testing.T) {
+	job := types.NewJob(telegramAskOptions(nil, "job", nil, nil)...)
+	if job.StreamCallback != nil {
+		t.Fatal("request stream callback is set while streaming is disabled")
+	}
+}
+
+func TestTelegramGroupFinalAttemptsRichBeforeFallback(t *testing.T) {
+	api := &telegramStreamAPI{}
+	session := telegramFinalSession(t.Context(), api, -42, false, telegramStreamDelivery{})
+	if err := session.deliverFinal("**answer**", nil); err != nil {
+		t.Fatal(err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 1 || finals[0].RichMessage.Markdown != "**answer**" {
+		t.Fatalf("rich finals = %#v, want raw Markdown attempted once", finals)
+	}
+}
+
+func TestTelegramFinalDeliveryContinuesAfterPreviewCleanupFailure(t *testing.T) {
+	api := &telegramStreamAPI{}
+	session := telegramFinalSession(t.Context(), api, -42, false, telegramStreamDelivery{
+		clearPreview: func(context.Context, int64) error {
+			return errors.New("delete failed")
+		},
+	})
+	if err := session.deliverFinal("persistent answer", nil); err != nil {
+		t.Fatalf("deliverFinal after cleanup failure: %v", err)
+	}
+	_, finals := api.snapshot()
+	if len(finals) != 1 || finals[0].RichMessage.Markdown != "persistent answer" {
+		t.Fatalf("finals = %#v, want persistent answer", finals)
+	}
+}
+
+func TestTelegramFinalOnlyDeliveryUsesSuppliedLiveContext(t *testing.T) {
+	type contextKey struct{}
+	supplied := context.WithValue(t.Context(), contextKey{}, "final-only")
+	api := &contextRecordingTelegramAPI{}
+	var cleanupContexts, markdownContexts, plainContexts []context.Context
+	session := telegramFinalSession(supplied, api, -42, false, telegramStreamDelivery{
+		clearPreview: func(ctx context.Context, _ int64) error {
+			cleanupContexts = append(cleanupContexts, ctx)
+			if ctx == nil {
+				return errors.New("cleanup received nil context")
+			}
+			return ctx.Err()
+		},
+		finalMarkdown: func(ctx context.Context, _ int64, _ []string) error {
+			markdownContexts = append(markdownContexts, ctx)
+			if ctx == nil {
+				return errors.New("markdown fallback received nil context")
+			}
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return errors.New("force plain fallback delivery")
+		},
+		finalPlain: func(ctx context.Context, _ int64, _ []string) error {
+			plainContexts = append(plainContexts, ctx)
+			if ctx == nil {
+				return errors.New("plain fallback received nil context")
+			}
+			return ctx.Err()
+		},
+	})
+	defer session.cancel()
+
+	if err := session.deliverFinal("final answer", nil); err != nil {
+		t.Fatalf("deliverFinal() error = %v", err)
+	}
+
+	operations := []struct {
+		name     string
+		contexts []context.Context
+	}{
+		{name: "cleanup", contexts: cleanupContexts},
+		{name: "rich API", contexts: api.contexts},
+		{name: "Markdown fallback", contexts: markdownContexts},
+		{name: "plain fallback", contexts: plainContexts},
+	}
+	for _, operation := range operations {
+		t.Run(operation.name, func(t *testing.T) {
+			if len(operation.contexts) != 1 {
+				t.Fatalf("contexts = %#v, want one call", operation.contexts)
+			}
+			if operation.contexts[0] != supplied {
+				t.Fatalf("context = %#v, want supplied context %#v", operation.contexts[0], supplied)
+			}
+			if err := operation.contexts[0].Err(); err != nil {
+				t.Fatalf("context is not live: %v", err)
+			}
+			if got := operation.contexts[0].Value(contextKey{}); got != "final-only" {
+				t.Fatalf("context value = %#v, want final-only", got)
+			}
+		})
+	}
+}

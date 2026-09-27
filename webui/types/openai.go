@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	coreTypes "github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )

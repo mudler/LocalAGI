@@ -10,12 +10,15 @@ function Chat() {
   const messagesEndRef = useRef(null);
   
   // Use our custom chat hook
-  const { 
-    messages, 
-    sending, 
-    error, 
-    isConnected, 
-    sendMessage, 
+  const {
+    messages,
+    sending,
+    error,
+    isConnected,
+    streamReasoning,
+    streamContent,
+    streamToolCalls,
+    sendMessage,
     clearChat,
     clearError
   } = useChat(name);
@@ -33,7 +36,7 @@ function Chat() {
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, streamContent, streamReasoning, streamToolCalls]);
 
   // Show error toast if there's an error
   useEffect(() => {
@@ -115,6 +118,46 @@ function Chat() {
                 </div>
               </div>
             ))
+          )}
+          {sending && (streamReasoning || streamContent || streamToolCalls.length > 0) && (
+            <div className="message message-agent">
+              <div className="message-content">
+                {streamReasoning && (
+                  <details open={!streamContent && streamToolCalls.length === 0} style={{ marginBottom: (streamContent || streamToolCalls.length > 0) ? '0.5rem' : 0 }}>
+                    <summary style={{ cursor: 'pointer', fontStyle: 'italic', opacity: 0.7 }}>
+                      {streamContent || streamToolCalls.length > 0 ? 'Thinking' : 'Thinking...'}
+                    </summary>
+                    <div
+                      ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
+                      style={{ whiteSpace: 'pre-wrap', opacity: 0.6, fontSize: '0.9em', marginTop: '0.25rem', maxHeight: '300px', overflowY: 'auto' }}
+                    >
+                      {streamReasoning}
+                    </div>
+                  </details>
+                )}
+                {streamToolCalls.length > 0 ? (
+                  <div style={{ marginTop: '0.25rem' }}>
+                    {streamToolCalls.map((tc, idx) => (
+                      <div key={idx} style={{ fontSize: '0.85em', opacity: 0.7, padding: '2px 0' }}>
+                        <i className="fas fa-wrench" style={{ marginRight: '6px' }} />
+                        <strong>{tc.name}</strong>
+                        {tc.args && <span style={{ opacity: 0.5, marginLeft: '4px', fontSize: '0.9em' }}>{tc.args}</span>}
+                        <span style={{ opacity: 0.5, marginLeft: '4px' }}>calling...</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : streamContent ? (
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{streamContent}</div>
+                ) : null}
+              </div>
+            </div>
+          )}
+          {sending && !streamReasoning && !streamContent && streamToolCalls.length === 0 && (
+            <div className="message message-agent">
+              <div className="message-content" style={{ fontStyle: 'italic', opacity: 0.5 }}>
+                <i className="fas fa-spinner fa-spin" style={{ marginRight: '6px' }} /> Working...
+              </div>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>

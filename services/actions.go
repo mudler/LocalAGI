@@ -13,7 +13,7 @@ import (
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 
 	"github.com/mudler/LocalAGI/services/actions"
 )
@@ -22,8 +22,6 @@ const (
 	// Actions
 	ActionSearch                         = "search"
 	ActionCustom                         = "custom"
-	ActionBrowserAgentRunner             = "browser-agent-runner"
-	ActionDeepResearchRunner             = "deep-research-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
 	ActionGithubIssueOpener              = "github-issue-opener"
 	ActionGithubIssueEditor              = "github-issue-editor"
@@ -47,16 +45,21 @@ const (
 	ActionTwitterPost                    = "twitter-post"
 	ActionSendMail                       = "send-mail"
 	ActionGenerateImage                  = "generate_image"
+	ActionGenerateSong                   = "generate_song"
+	ActionGeneratePDF                    = "generate_pdf"
 	ActionCounter                        = "counter"
 	ActionCallAgents                     = "call_agents"
 	ActionShellcommand                   = "shell-command"
 	ActionSendTelegramMessage            = "send-telegram-message"
 	ActionSetReminder                    = "set_reminder"
+	ActionSetRecurringReminder           = "set_recurring_reminder"
+	ActionSetOneTimeReminder             = "set_onetime_reminder"
 	ActionListReminders                  = "list_reminders"
 	ActionRemoveReminder                 = "remove_reminder"
 	ActionAddToMemory                    = "add_to_memory"
 	ActionListMemory                     = "list_memory"
 	ActionRemoveFromMemory               = "remove_from_memory"
+	ActionSearchMemory                   = "search_memory"
 	ActionPiKVMPowerControl              = "pikvm_power_control"
 	ActionWebhook                        = "webhook"
 )
@@ -79,8 +82,6 @@ var AvailableActions = []string{
 	ActionGithubGetAllContent,
 	ActionGithubRepositorySearchFiles,
 	ActionGithubRepositoryListFiles,
-	ActionBrowserAgentRunner,
-	ActionDeepResearchRunner,
 	ActionGithubRepositoryCreateOrUpdate,
 	ActionGithubIssueReader,
 	ActionGithubIssueCommenter,
@@ -94,6 +95,8 @@ var AvailableActions = []string{
 	ActionWikipedia,
 	ActionSendMail,
 	ActionGenerateImage,
+	ActionGenerateSong,
+	ActionGeneratePDF,
 	ActionTwitterPost,
 	ActionCounter,
 	ActionCallAgents,
@@ -105,6 +108,7 @@ var AvailableActions = []string{
 	ActionAddToMemory,
 	ActionListMemory,
 	ActionRemoveFromMemory,
+	ActionSearchMemory,
 	ActionPiKVMPowerControl,
 	ActionWebhook,
 }
@@ -116,19 +120,19 @@ var DefaultActions = []config.FieldGroup{
 		Fields: actions.SearchConfigMeta(),
 	},
 	{
-		Name:   "browser-agent-runner",
-		Label:  "Browser Agent Runner",
-		Fields: actions.BrowserAgentRunnerConfigMeta(),
-	},
-	{
-		Name:   "deep-research-runner",
-		Label:  "Deep Research Runner",
-		Fields: actions.DeepResearchRunnerConfigMeta(),
-	},
-	{
 		Name:   "generate_image",
 		Label:  "Generate Image",
 		Fields: actions.GenImageConfigMeta(),
+	},
+	{
+		Name:   "generate_song",
+		Label:  "Generate Song",
+		Fields: actions.GenSongConfigMeta(),
+	},
+	{
+		Name:   "generate_pdf",
+		Label:  "Generate PDF",
+		Fields: actions.GenPDFConfigMeta(),
 	},
 	{
 		Name:   "add_to_memory",
@@ -144,6 +148,11 @@ var DefaultActions = []config.FieldGroup{
 		Name:   "remove_from_memory",
 		Label:  "Remove from Memory",
 		Fields: actions.RemoveFromMemoryConfigMeta(),
+	},
+	{
+		Name:   "search_memory",
+		Label:  "Search Memory",
+		Fields: actions.SearchMemoryConfigMeta(),
 	},
 	{
 		Name:   "github-issue-labeler",
@@ -281,8 +290,13 @@ var DefaultActions = []config.FieldGroup{
 		Fields: actions.SendTelegramMessageConfigMeta(),
 	},
 	{
-		Name:   "set_reminder",
-		Label:  "Set Reminder",
+		Name:   "set_recurring_reminder",
+		Label:  "Set Recurring Reminder",
+		Fields: []config.Field{},
+	},
+	{
+		Name:   "set_onetime_reminder",
+		Label:  "Set One-Time Reminder",
 		Fields: []config.Field{},
 	},
 	{
@@ -308,11 +322,9 @@ var DefaultActions = []config.FieldGroup{
 }
 
 const (
-	ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
-	ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
-	ActionConfigSSHBoxURL          = "sshbox-url"
-	ConfigStateDir                 = "state-dir"
-	CustomActionsDir               = "custom-actions-dir"
+	ActionConfigSSHBoxURL = "sshbox-url"
+	ConfigStateDir        = "state-dir"
+	CustomActionsDir      = "custom-actions-dir"
 )
 
 func customActions(customActionsDir string, existingActionConfigs map[string]map[string]string) (allActions []types.Action) {
@@ -400,13 +412,17 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		config = map[string]string{}
 	}
 
-	memoryFilePath := memoryPath(agentName, actionsConfigs)
+	memoryIdxPath := memoryIndexPath(agentName, actionsConfigs)
 
 	switch name {
 	case ActionCustom:
 		a, err = action.NewCustom(config, "")
 	case ActionGenerateImage:
 		a = actions.NewGenImage(config)
+	case ActionGenerateSong:
+		a = actions.NewGenSong(config)
+	case ActionGeneratePDF:
+		a = actions.NewGenPDF(config)
 	case ActionSearch:
 		a = actions.NewSearch(config)
 	case ActionGithubIssueLabeler:
@@ -419,10 +435,6 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGithubIssueCloser(config)
 	case ActionGithubIssueSearcher:
 		a = actions.NewGithubIssueSearch(config)
-	case ActionBrowserAgentRunner:
-		a = actions.NewBrowserAgentRunner(config, actionsConfigs[ActionConfigBrowserAgentRunner])
-	case ActionDeepResearchRunner:
-		a = actions.NewDeepResearchRunner(config, actionsConfigs[ActionConfigDeepResearchRunner])
 	case ActionGithubIssueReader:
 		a = actions.NewGithubIssueReader(config)
 	case ActionGithubPRReader:
@@ -467,18 +479,22 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewShell(config, actionsConfigs[ActionConfigSSHBoxURL])
 	case ActionSendTelegramMessage:
 		a = actions.NewSendTelegramMessageRunner(config)
-	case ActionSetReminder:
-		a = action.NewReminder()
+	case ActionSetRecurringReminder:
+		a = action.NewRecurringReminder()
+	case ActionSetOneTimeReminder:
+		a = action.NewOneTimeReminder()
 	case ActionListReminders:
 		a = action.NewListReminders()
 	case ActionRemoveReminder:
 		a = action.NewRemoveReminder()
 	case ActionAddToMemory:
-		a, _, _ = actions.NewMemoryActions(memoryFilePath, config)
+		a, _, _, _ = actions.NewMemoryActions(memoryIdxPath, config)
 	case ActionListMemory:
-		_, a, _ = actions.NewMemoryActions(memoryFilePath, config)
+		_, a, _, _ = actions.NewMemoryActions(memoryIdxPath, config)
 	case ActionRemoveFromMemory:
-		_, _, a = actions.NewMemoryActions(memoryFilePath, config)
+		_, _, a, _ = actions.NewMemoryActions(memoryIdxPath, config)
+	case ActionSearchMemory:
+		_, _, _, a = actions.NewMemoryActions(memoryIdxPath, config)
 	case ActionPiKVMPowerControl:
 		a = actions.NewPiKVMAction(config)
 	default:

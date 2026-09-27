@@ -2,6 +2,7 @@ package webui
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,9 +16,9 @@ import (
 	coreTypes "github.com/mudler/LocalAGI/core/types"
 	internalTypes "github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/llm"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services"
 	"github.com/mudler/LocalAGI/webui/types"
+	"github.com/mudler/xlog"
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
@@ -26,22 +27,42 @@ import (
 	"github.com/mudler/LocalAGI/core/state"
 
 	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/template/html/v2"
 )
 
 type (
 	App struct {
-		config *Config
+		config           *Config
 		*fiber.App
-		sharedState *internalTypes.AgentSharedState
+		sharedState      *internalTypes.AgentSharedState
+		collectionsState *CollectionsState // set when RegisterCollectionRoutes runs; used for in-process RAG
 	}
 )
+
+//go:embed public/*
+var staticFiles embed.FS
 
 func NewApp(opts ...Option) *App {
 	config := NewConfig(opts...)
 
 	// Initialize a new Fiber app
 	// Pass the engine to the Views
-	webapp := fiber.New(fiber.Config{})
+
+	// Create the engine using your embedded files
+	engine := html.NewFileSystem(http.FS(staticFiles), ".html")
+
+	// Pass the engine to Fiber when creating the app
+	webapp := fiber.New(fiber.Config{
+		Views: engine,
+	})
+
+	webapp.Use("/public", filesystem.New(filesystem.Config{
+		Root: http.FS(staticFiles),
+		// PathPrefix tells the middleware to look inside the embedded "public" folder
+		PathPrefix: "public",
+		Browse:     false, // Set to true if you want directory browsing
+	}))
 
 	a := &App{
 		config:      config,
@@ -365,7 +386,20 @@ func (a *App) Chat(pool *state.AgentPool) func(c *fiber.Ctx) error {
 			// Ask the agent for a response
 			response := agent.Ask(coreTypes.WithText(message))
 
-			if response.Error != nil {
+			if response == nil {
+				// Ask returned nil (e.g. context cancelled or WaitResult failed)
+				xlog.Error("Agent returned nil response", "agent", agentName)
+				errorData, err := json.Marshal(map[string]interface{}{
+					"error":     "agent request failed or was cancelled",
+					"timestamp": time.Now().Format(time.RFC3339),
+				})
+				if err != nil {
+					xlog.Error("Error marshaling error message", "error", err)
+				} else {
+					manager.Send(
+						sse.NewMessage(string(errorData)).WithEvent("json_error"))
+				}
+			} else if response.Error != nil {
 				// Send error message
 				xlog.Error("Error asking agent", "agent", agentName, "error", response.Error)
 				errorData, err := json.Marshal(map[string]interface{}{
@@ -555,7 +589,17 @@ func (a *App) Responses(pool *state.AgentPool, tracker *conversations.Conversati
 		}
 
 		agentName := request.Model
-		messages := append(conv, request.ToChatCompletionMessages()...)
+		newMessages := request.ToChatCompletionMessages()
+		messages := append(conv, newMessages...)
+
+		// Continuing a thread (previous_response_id) without any new user/tool message causes
+		// the job to end with an assistant message, which backends with enable_thinking reject.
+		// Require at least one new message when continuing so we never send assistant-final conv.
+		if previousResponseID != "" && len(conv) > 0 && len(newMessages) == 0 {
+			return c.Status(http.StatusBadRequest).JSON(types.ResponseBody{
+				Error: "previous_response_id was set but no new input was sent; send at least one user or tool message when continuing a conversation",
+			})
+		}
 
 		agent := pool.GetAgent(agentName)
 		if agent == nil {

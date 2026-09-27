@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services/actions"
+	"github.com/mudler/xlog"
 
 	. "github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
@@ -296,9 +296,9 @@ var _ = Describe("Agent test", func() {
 				WithModel(testModel),
 				WithLLMAPIKey(apiKeyURL),
 				WithTimeout("10m"),
-				WithNewConversationSubscriber(func(m openai.ChatCompletionMessage) {
+				WithNewConversationSubscriber(func(m *types.ConversationMessage) {
 					mu.Lock()
-					message = m
+					message = m.Message
 					mu.Unlock()
 				}),
 				WithActions(

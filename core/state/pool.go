@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -13,16 +12,53 @@ import (
 	"time"
 
 	. "github.com/mudler/LocalAGI/core/agent"
-	"github.com/mudler/LocalAGI/core/sse"
+	"github.com/mudler/LocalAGI/core/conversations"
+	"github.com/mudler/LocalAGI/core/scheduler"
+	sseLib "github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/llm"
 	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/pkg/utils"
-	"github.com/sashabaranov/go-openai"
-	"github.com/sashabaranov/go-openai/jsonschema"
 
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/mudler/cogito"
+	"github.com/mudler/xlog"
 )
+
+// SkillsProvider supplies the skills dynamic prompt and MCP session when skills are enabled for an agent.
+type SkillsProvider interface {
+	GetSkillsPrompt(config *AgentConfig) (DynamicPrompt, error)
+	GetMCPSession(ctx context.Context) (*mcp.ClientSession, error)
+}
+
+// RAGProvider returns a RAGDB and optional compaction client for a collection (e.g. agent name).
+// effectiveRAGURL/Key are pool/agent defaults; implementation may use them (HTTP) or ignore them (embedded).
+type RAGProvider func(collectionName, effectiveRAGURL, effectiveRAGKey string) (RAGDB, KBCompactionClient, bool)
+
+// NewHTTPRAGProvider returns a RAGProvider that uses the LocalRAG HTTP API. When effective URL/key are empty, baseURL/baseKey are used.
+func NewHTTPRAGProvider(baseURL, baseKey string) RAGProvider {
+	return func(collectionName, effectiveURL, effectiveKey string) (RAGDB, KBCompactionClient, bool) {
+		url := effectiveURL
+		if url == "" {
+			url = baseURL
+		}
+		key := effectiveKey
+		if key == "" {
+			key = baseKey
+		}
+		wc := localrag.NewWrappedClient(url, key, collectionName)
+		return wc, &wrappedClientCompactionAdapter{WrappedClient: wc}, true
+	}
+}
+
+// PoolLimits bounds how much a pool accumulates: conversation dumps, which
+// nothing ever reads back; scheduler run history, which every task execution
+// re-marshals in full; and the tasks an agent may schedule for itself.
+type PoolLimits struct {
+	Conversations     conversations.RetentionPolicy
+	ConversationSweep time.Duration
+	SchedulerRuns     scheduler.RetentionPolicy
+	SchedulerCreation scheduler.CreationPolicy
+}
 
 type AgentPool struct {
 	sync.Mutex
@@ -30,17 +66,28 @@ type AgentPool struct {
 	pooldir                                                       string
 	pool                                                          AgentPoolData
 	agents                                                        map[string]*Agent
-	managers                                                      map[string]sse.Manager
+	managers                                                      map[string]sseLib.Manager
 	agentStatus                                                   map[string]*Status
 	apiURL, defaultModel, defaultMultimodalModel, defaultTTSModel string
 	defaultTranscriptionModel, defaultTranscriptionLanguage       string
-	imageModel, localRAGAPI, localRAGKey, apiKey                  string
+	apiKey                                                        string
+	ragProvider                                                   RAGProvider
 	availableActions                                              func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action
 	connectors                                                    func(*AgentConfig) []Connector
 	dynamicPrompt                                                 func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt
 	filters                                                       func(*AgentConfig) types.JobFilters
 	timeout                                                       string
 	conversationLogs                                              string
+	skillsService                                                 SkillsProvider
+	limits                                                        PoolLimits
+	convPruner                                                    *conversations.Pruner
+}
+
+// SetRAGProvider sets the single RAG provider (HTTP or embedded). Must be called after pool creation.
+func (a *AgentPool) SetRAGProvider(fn RAGProvider) {
+	a.Lock()
+	defer a.Unlock()
+	a.ragProvider = fn
 }
 
 type Status struct {
@@ -74,14 +121,15 @@ func loadPoolFromFile(path string) (*AgentPoolData, error) {
 }
 
 func NewAgentPool(
-	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, imageModel, apiURL, apiKey, directory string,
-	LocalRAGAPI string,
+	defaultModel, defaultMultimodalModel, defaultTranscriptionModel, defaultTranscriptionLanguage, defaultTTSModel, apiURL, apiKey, directory string,
 	availableActions func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []types.Action,
 	connectors func(*AgentConfig) []Connector,
 	promptBlocks func(*AgentConfig) func(ctx context.Context, pool *AgentPool) []DynamicPrompt,
 	filters func(*AgentConfig) types.JobFilters,
 	timeout string,
 	withLogs bool,
+	skillsService SkillsProvider,
+	limits PoolLimits,
 ) (*AgentPool, error) {
 	// if file exists, try to load an existing pool.
 	// if file does not exist, create a new pool.
@@ -92,7 +140,6 @@ func NewAgentPool(
 	if withLogs {
 		conversationPath = filepath.Join(directory, "conversations")
 	}
-
 	if _, err := os.Stat(poolfile); err != nil {
 		// file does not exist, create a new pool
 		return &AgentPool{
@@ -104,25 +151,36 @@ func NewAgentPool(
 			defaultTranscriptionModel:    defaultTranscriptionModel,
 			defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 			defaultTTSModel:              defaultTTSModel,
-			imageModel:                   imageModel,
-			localRAGAPI:                  LocalRAGAPI,
 			apiKey:                       apiKey,
 			agents:                       make(map[string]*Agent),
 			pool:                         make(map[string]AgentConfig),
 			agentStatus:                  make(map[string]*Status),
-			managers:                     make(map[string]sse.Manager),
+			managers:                     make(map[string]sseLib.Manager),
 			connectors:                   connectors,
 			availableActions:             availableActions,
 			dynamicPrompt:                promptBlocks,
 			filters:                      filters,
 			timeout:                      timeout,
 			conversationLogs:             conversationPath,
+			limits:                       limits,
+			convPruner:                   conversations.NewPruner(conversationPath, limits.Conversations, limits.ConversationSweep),
+			skillsService:                skillsService,
 		}, nil
 	}
 
 	poolData, err := loadPoolFromFile(poolfile)
 	if err != nil {
-		return nil, err
+		bakPath := poolfile + ".bak"
+		poolData, err = loadPoolFromFile(bakPath)
+		if err != nil {
+			xlog.Warn("Pool file invalid and backup missing or invalid, starting with empty pool", "poolfile", poolfile, "error", err)
+			poolData = &AgentPoolData{}
+		} else {
+			xlog.Info("Recovered pool from backup, repairing main file", "poolfile", poolfile)
+			if repairData, _ := json.MarshalIndent(poolData, "", "  "); len(repairData) > 0 {
+				_ = os.WriteFile(poolfile, repairData, 0644)
+			}
+		}
 	}
 	return &AgentPool{
 		file:                         poolfile,
@@ -133,25 +191,34 @@ func NewAgentPool(
 		defaultTranscriptionModel:    defaultTranscriptionModel,
 		defaultTranscriptionLanguage: defaultTranscriptionLanguage,
 		defaultTTSModel:              defaultTTSModel,
-		imageModel:                   imageModel,
 		apiKey:                       apiKey,
 		agents:                       make(map[string]*Agent),
-		managers:                     make(map[string]sse.Manager),
+		managers:                     make(map[string]sseLib.Manager),
 		agentStatus:                  map[string]*Status{},
 		pool:                         *poolData,
 		connectors:                   connectors,
-		localRAGAPI:                  LocalRAGAPI,
 		dynamicPrompt:                promptBlocks,
 		filters:                      filters,
 		availableActions:             availableActions,
 		timeout:                      timeout,
 		conversationLogs:             conversationPath,
+		limits:                       limits,
+		convPruner:                   conversations.NewPruner(conversationPath, limits.Conversations, limits.ConversationSweep),
+		skillsService:                skillsService,
 	}, nil
 }
 
 func replaceInvalidChars(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
 	return strings.ReplaceAll(s, " ", "_")
+}
+
+// StartAgentStandalone starts an agent without saving it to the pool registry.
+// It is intended for running a single agent from the CLI without the web server.
+func (a *AgentPool) StartAgentStandalone(name string, agentConfig *AgentConfig) error {
+	a.Lock()
+	defer a.Unlock()
+	return a.startAgentWithConfig(name, a.pooldir, agentConfig, nil)
 }
 
 // CreateAgent adds a new agent to the pool
@@ -170,14 +237,7 @@ func (a *AgentPool) CreateAgent(name string, agentConfig *AgentConfig) error {
 		return err
 	}
 
-	go func(ac AgentConfig) {
-		// Create the agent avatar
-		if err := createAgentAvatar(a.apiURL, a.apiKey, a.defaultModel, a.imageModel, a.pooldir, ac); err != nil {
-			xlog.Error("Failed to create agent avatar", "error", err)
-		}
-	}(a.pool[name])
-
-	return a.startAgentWithConfig(name, agentConfig, nil)
+	return a.startAgentWithConfig(name, a.pooldir, agentConfig, nil)
 }
 
 func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
@@ -186,21 +246,21 @@ func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
 
 	oldAgent := a.agents[name]
 	var o *types.Observable
-	obs := oldAgent.Observer()
-	if obs != nil {
-		o = obs.NewObservable()
-		o.Name = "Restarting Agent"
-		o.Icon = "sync"
-		o.Creation = &types.Creation{}
-		obs.Update(*o)
+	var obs Observer
+	if oldAgent != nil {
+		obs = oldAgent.Observer()
+		if obs != nil {
+			o = obs.NewObservable()
+			o.Name = "Restarting Agent"
+			o.Icon = "sync"
+			o.Creation = &types.Creation{}
+			obs.Update(*o)
+		}
+		stateFile, characterFile := a.stateFiles(name)
+		os.Remove(stateFile)
+		os.Remove(characterFile)
+		oldAgent.Stop()
 	}
-
-	stateFile, characterFile := a.stateFiles(name)
-
-	os.Remove(stateFile)
-	os.Remove(characterFile)
-
-	oldAgent.Stop()
 
 	a.pool[name] = *agentConfig
 	delete(a.agents, name)
@@ -213,7 +273,7 @@ func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
 		return err
 	}
 
-	if err := a.startAgentWithConfig(name, agentConfig, obs); err != nil {
+	if err := a.startAgentWithConfig(name, a.pooldir, agentConfig, obs); err != nil {
 		if obs != nil {
 			o.Completion = &types.Completion{Error: err.Error()}
 			obs.Update(*o)
@@ -227,84 +287,6 @@ func (a *AgentPool) RecreateAgent(name string, agentConfig *AgentConfig) error {
 	}
 
 	return nil
-}
-
-func createAgentAvatar(APIURL, APIKey, model, imageModel, avatarDir string, agent AgentConfig) error {
-	client := llm.NewClient(APIKey, APIURL+"/v1", "10m")
-
-	if imageModel == "" {
-		return fmt.Errorf("image model not set")
-	}
-
-	if model == "" {
-		return fmt.Errorf("default model not set")
-	}
-
-	imagePath := filepath.Join(avatarDir, "avatars", fmt.Sprintf("%s.png", agent.Name))
-	if _, err := os.Stat(imagePath); err == nil {
-		// Image already exists
-		xlog.Debug("Avatar already exists", "path", imagePath)
-		return nil
-	}
-
-	var results struct {
-		ImagePrompt string `json:"image_prompt"`
-	}
-
-	err := llm.GenerateTypedJSONWithGuidance(
-		context.Background(),
-		llm.NewClient(APIKey, APIURL, "10m"),
-		"Generate a prompt that I can use to create a random avatar for the bot '"+agent.Name+"', the description of the bot is: "+agent.Description,
-		model,
-		jsonschema.Definition{
-			Type: jsonschema.Object,
-			Properties: map[string]jsonschema.Definition{
-				"image_prompt": {
-					Type:        jsonschema.String,
-					Description: "The prompt to generate the image",
-				},
-			},
-			Required: []string{"image_prompt"},
-		}, &results)
-	if err != nil {
-		return fmt.Errorf("failed to generate image prompt: %w", err)
-	}
-
-	if results.ImagePrompt == "" {
-		xlog.Error("Failed to generate image prompt")
-		return fmt.Errorf("failed to generate image prompt")
-	}
-
-	req := openai.ImageRequest{
-		Prompt:         results.ImagePrompt,
-		Model:          imageModel,
-		Size:           openai.CreateImageSize256x256,
-		ResponseFormat: openai.CreateImageResponseFormatB64JSON,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-
-	resp, err := client.CreateImage(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to generate image: %w", err)
-	}
-
-	if len(resp.Data) == 0 {
-		return fmt.Errorf("failed to generate image")
-	}
-
-	imageJson := resp.Data[0].B64JSON
-
-	os.MkdirAll(filepath.Join(avatarDir, "avatars"), 0755)
-
-	// Save the image to the agent directory
-	imageData, err := base64.StdEncoding.DecodeString(imageJson)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(imagePath, imageData, 0644)
 }
 
 func (a *AgentPool) List() []string {
@@ -328,12 +310,12 @@ func (a *AgentPool) GetStatusHistory(name string) *Status {
 	return a.agentStatus[name]
 }
 
-func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs Observer) error {
-	var manager sse.Manager
+func (a *AgentPool) startAgentWithConfig(name, pooldir string, config *AgentConfig, obs Observer) error {
+	var manager sseLib.Manager
 	if m, ok := a.managers[name]; ok {
 		manager = m
 	} else {
-		manager = sse.NewManager(5)
+		manager = sseLib.NewManager(5)
 	}
 	ctx := context.Background()
 	model := a.defaultModel
@@ -367,29 +349,33 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		config.PeriodicRuns = "10m"
 	}
 
-	// XXX: Why do we update the pool config from an Agent's config?
+	if config.SchedulerPollInterval == "" {
+		config.SchedulerPollInterval = "30s"
+	}
+
+	// Use agent-specific config when set, otherwise pool defaults. Do not update pool from agent config.
+	effectiveAPIURL := a.apiURL
 	if config.APIURL != "" {
-		a.apiURL = config.APIURL
+		effectiveAPIURL = config.APIURL
 	} else {
 		config.APIURL = a.apiURL
 	}
-
+	effectiveAPIKey := a.apiKey
 	if config.APIKey != "" {
-		a.apiKey = config.APIKey
+		effectiveAPIKey = config.APIKey
 	} else {
 		config.APIKey = a.apiKey
 	}
-
-	if config.LocalRAGURL != "" {
-		a.localRAGAPI = config.LocalRAGURL
-	}
-
-	if config.LocalRAGAPIKey != "" {
-		a.localRAGKey = config.LocalRAGAPIKey
-	}
+	effectiveLocalRAGAPI := config.LocalRAGURL
+	effectiveLocalRAGKey := config.LocalRAGAPIKey
 
 	connectors := a.connectors(config)
 	promptBlocks := a.dynamicPrompt(config)(ctx, a)
+	if a.skillsService != nil && config.EnableSkills {
+		if prompt, err := a.skillsService.GetSkillsPrompt(config); err == nil && prompt != nil {
+			promptBlocks = append(promptBlocks, prompt)
+		}
+	}
 	actions := a.availableActions(config)(ctx, a)
 	filters := a.filters(config)
 	stateFile, characterFile := a.stateFiles(name)
@@ -413,7 +399,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		"Creating agent",
 		"name", name,
 		"model", model,
-		"api_url", a.apiURL,
+		"api_url", effectiveAPIURL,
 		"actions", actionsLog,
 		"connectors", connectorLog,
 		"filters", filtersLog,
@@ -429,14 +415,18 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 	}
 
 	opts := []Option{
+		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
+		WithSchedulerRetention(a.limits.SchedulerRuns),
+		WithSchedulerCreation(a.limits.SchedulerCreation),
 		WithModel(model),
-		WithLLMAPIURL(a.apiURL),
+		WithLLMAPIURL(effectiveAPIURL),
 		WithContext(ctx),
 		WithMCPServers(config.MCPServers...),
 		WithTranscriptionModel(transcriptionModel),
 		WithTranscriptionLanguage(transcriptionLanguage),
 		WithTTSModel(ttsModel),
 		WithPeriodicRuns(config.PeriodicRuns),
+		WithSchedulerPollInterval(config.SchedulerPollInterval),
 		WithPermanentGoal(config.PermanentGoal),
 		WithMCPSTDIOServers(config.MCPSTDIOServers...),
 		WithPrompts(promptBlocks...),
@@ -451,20 +441,23 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		),
 		WithStateFile(stateFile),
 		WithCharacterFile(characterFile),
-		WithLLMAPIKey(a.apiKey),
+		WithLLMAPIKey(effectiveAPIKey),
 		WithTimeout(a.timeout),
-		WithRAGDB(localrag.NewWrappedClient(a.localRAGAPI, a.localRAGKey, name)),
 		WithAgentReasoningCallback(func(state types.ActionCurrentState) bool {
+			var actionName types.ActionDefinitionName
+			if state.Action != nil {
+				actionName = state.Action.Definition().Name
+			}
 			xlog.Info(
 				"Agent is thinking",
 				"agent", name,
 				"reasoning", state.Reasoning,
-				"action", state.Action.Definition().Name,
+				"action", actionName,
 				"params", state.Params,
 			)
 
 			manager.Send(
-				sse.NewMessage(
+				sseLib.NewMessage(
 					fmt.Sprintf(`Thinking: %s`, utils.HTMLify(state.Reasoning)),
 				).WithEvent("status"),
 			)
@@ -477,6 +470,8 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 			return true
 		}),
 		WithSystemPrompt(config.SystemPrompt),
+		WithInnerMonologueTemplate(config.InnerMonologueTemplate),
+		WithSchedulerTaskTemplate(config.SchedulerTaskTemplate),
 		WithMultimodalModel(multimodalModel),
 		WithLastMessageDuration(config.LastMessageDuration),
 		WithAgentResultCallback(func(state types.ActionState) {
@@ -491,16 +486,20 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 				"Calling agent result callback",
 			)
 
+			var actionName types.ActionDefinitionName
+			if state.ActionCurrentState.Action != nil {
+				actionName = state.ActionCurrentState.Action.Definition().Name
+			}
 			text := fmt.Sprintf(`Reasoning: %s
 			Action taken: %+v
 			Parameters: %+v
 			Result: %s`,
 				state.Reasoning,
-				state.ActionCurrentState.Action.Definition().Name,
+				actionName,
 				state.ActionCurrentState.Params,
 				state.Result)
 			manager.Send(
-				sse.NewMessage(
+				sseLib.NewMessage(
 					utils.HTMLify(
 						text,
 					),
@@ -534,12 +533,24 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		opts = append(opts, EnableSummaryMemory)
 	}
 
+	if config.ConversationStorageMode != "" {
+		opts = append(opts, WithConversationStorageMode(ConversationStorageMode(config.ConversationStorageMode)))
+	}
+
 	if config.CanStopItself {
 		opts = append(opts, CanStopItself)
 	}
 
 	if config.CanPlan {
 		opts = append(opts, EnablePlanning)
+	}
+
+	if config.PlanReviewerModel != "" {
+		opts = append(opts, WithPlanReviewerLLM(config.PlanReviewerModel))
+	}
+
+	if config.DisableSinkState {
+		opts = append(opts, DisableSinkState)
 	}
 
 	if config.InitiateConversations {
@@ -554,16 +565,55 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		}
 	}
 
-	if config.EnableKnowledgeBase {
-		opts = append(opts, EnableKnowledgeBase)
+	if a.skillsService != nil && config.EnableSkills {
+		if session, err := a.skillsService.GetMCPSession(ctx); err == nil && session != nil {
+			opts = append(opts, WithMCPSession(session))
+		}
+	}
+
+	var ragDB RAGDB
+	var compactionClient KBCompactionClient
+	if config.EnableKnowledgeBase && a.ragProvider != nil {
+		if db, comp, ok := a.ragProvider(name, effectiveLocalRAGAPI, effectiveLocalRAGKey); ok && db != nil {
+			ragDB = db
+			compactionClient = comp
+		}
+	}
+	if ragDB != nil {
+		opts = append(opts, WithRAGDB(ragDB), EnableKnowledgeBase)
+		kbAutoSearch := config.KBAutoSearch
+		if !config.KBAutoSearch && !config.KBAsTools {
+			kbAutoSearch = true
+		}
+		opts = append(opts, WithKBAutoSearch(kbAutoSearch))
+		if config.KBAsTools {
+			kbResults := config.KnowledgeBaseResults
+			if kbResults <= 0 {
+				kbResults = 5
+			}
+			searchAction, addAction := NewKBWrapperActions(ragDB, kbResults)
+			opts = append(opts, WithActions(searchAction, addAction))
+		}
 	}
 
 	if config.EnableReasoning {
 		opts = append(opts, EnableForceReasoning)
 	}
 
+	if config.EnableGuidedTools {
+		opts = append(opts, EnableGuidedTools)
+	}
+
 	if config.StripThinkingTags {
 		opts = append(opts, EnableStripThinkingTags)
+	}
+
+	if config.EnableAutoCompaction {
+		opts = append(opts, EnableAutoCompaction)
+	}
+
+	if config.AutoCompactionThreshold > 0 {
+		opts = append(opts, WithAutoCompactionThreshold(config.AutoCompactionThreshold))
 	}
 
 	if config.KnowledgeBaseResults > 0 {
@@ -574,6 +624,12 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		opts = append(opts, WithParallelJobs(config.ParallelJobs))
 	}
 
+	if config.CancelPreviousOnNewMessage != nil {
+		opts = append(opts, WithCancelPreviousOnNewMessage(*config.CancelPreviousOnNewMessage))
+	} else {
+		opts = append(opts, WithCancelPreviousOnNewMessage(true))
+	}
+
 	if config.EnableEvaluation {
 		opts = append(opts, EnableEvaluation())
 	}
@@ -581,6 +637,52 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 	if config.MaxEvaluationLoops > 0 {
 		opts = append(opts, WithMaxEvaluationLoops(config.MaxEvaluationLoops))
 	}
+
+	if config.MaxAttempts > 0 {
+		opts = append(opts, WithMaxAttempts(config.MaxAttempts))
+	}
+
+	if config.LoopDetection > 0 {
+		opts = append(opts, WithLoopDetection(config.LoopDetection))
+	}
+
+	if config.EnableForceReasoningTool {
+		opts = append(opts, EnableForceReasoningTool)
+	}
+
+	// Wire cogito streaming events into the SSE manager for live token delivery
+	opts = append(opts, WithStreamCallback(func(ev cogito.StreamEvent) {
+		switch ev.Type {
+		case cogito.StreamEventReasoning:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "reasoning",
+				"content":   ev.Content,
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		case cogito.StreamEventContent:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "content",
+				"content":   ev.Content,
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		case cogito.StreamEventToolCall:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "tool_call",
+				"tool_name": ev.ToolName,
+				"tool_args": ev.ToolArgs,
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		case cogito.StreamEventDone:
+			data, _ := json.Marshal(map[string]interface{}{
+				"type":      "done",
+				"timestamp": time.Now().Format(time.RFC3339),
+			})
+			manager.Send(sseLib.NewMessage(string(data)).WithEvent("stream_event"))
+		}
+	}))
 
 	xlog.Info("Starting agent", "name", name, "config", config)
 
@@ -598,6 +700,10 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 		}
 	}()
 
+	if config.EnableKnowledgeBase && config.EnableKBCompaction && compactionClient != nil {
+		go runCompactionTicker(ctx, compactionClient, config, effectiveAPIURL, effectiveAPIKey, model)
+	}
+
 	xlog.Info("Starting connectors", "name", name, "config", config)
 
 	for _, c := range connectors {
@@ -607,7 +713,7 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 	go func() {
 		for {
 			time.Sleep(1 * time.Second) // Send a message every seconds
-			manager.Send(sse.NewMessage(
+			manager.Send(sseLib.NewMessage(
 				utils.HTMLify(agent.State().String()),
 			).WithEvent("hud"))
 		}
@@ -622,11 +728,12 @@ func (a *AgentPool) startAgentWithConfig(name string, config *AgentConfig, obs O
 func (a *AgentPool) StartAll() error {
 	a.Lock()
 	defer a.Unlock()
+	a.convPruner.Start()
 	for name, config := range a.pool {
 		if a.agents[name] != nil { // Agent already started
 			continue
 		}
-		if err := a.startAgentWithConfig(name, &config, nil); err != nil {
+		if err := a.startAgentWithConfig(name, a.pooldir, &config, nil); err != nil {
 			xlog.Error("Failed to start agent", "name", name, "error", err)
 		}
 	}
@@ -636,6 +743,7 @@ func (a *AgentPool) StartAll() error {
 func (a *AgentPool) StopAll() {
 	a.Lock()
 	defer a.Unlock()
+	a.convPruner.Stop()
 	for _, agent := range a.agents {
 		agent.Stop()
 	}
@@ -664,10 +772,121 @@ func (a *AgentPool) Start(name string) error {
 		return nil
 	}
 	if config, ok := a.pool[name]; ok {
-		return a.startAgentWithConfig(name, &config, nil)
+		return a.startAgentWithConfig(name, a.pooldir, &config, nil)
 	}
 
 	return fmt.Errorf("agent %s not found", name)
+}
+
+// CreateOnly creates the agent instance without calling Run().
+// This is used in distributed mode where the agent is executed statelessly
+// via AskDirect() — the persistent Run() loop is not needed.
+func (a *AgentPool) CreateOnly(name string) error {
+	a.Lock()
+	defer a.Unlock()
+	if _, ok := a.agents[name]; ok {
+		return nil // already created
+	}
+	if config, ok := a.pool[name]; ok {
+		return a.createAgentWithoutRun(name, a.pooldir, &config)
+	}
+	return fmt.Errorf("agent %s not found", name)
+}
+
+// createAgentWithoutRun is like startAgentWithConfig but skips Run(), connectors, and HUD.
+func (a *AgentPool) createAgentWithoutRun(name, pooldir string, config *AgentConfig) error {
+	var manager sseLib.Manager
+	if m, ok := a.managers[name]; ok {
+		manager = m
+	} else {
+		manager = sseLib.NewManager(5)
+	}
+	ctx := context.Background()
+	model := a.defaultModel
+	multimodalModel := a.defaultMultimodalModel
+	transcriptionModel := a.defaultTranscriptionModel
+	transcriptionLanguage := a.defaultTranscriptionLanguage
+	ttsModel := a.defaultTTSModel
+
+	if config.MultimodalModel != "" {
+		multimodalModel = config.MultimodalModel
+	}
+	if config.TranscriptionModel != "" {
+		transcriptionModel = config.TranscriptionModel
+	}
+	if config.TranscriptionLanguage != "" {
+		transcriptionLanguage = config.TranscriptionLanguage
+	}
+	if config.TTSModel != "" {
+		ttsModel = config.TTSModel
+	}
+	if config.Model != "" {
+		model = config.Model
+	} else {
+		config.Model = model
+	}
+
+	effectiveAPIURL := a.apiURL
+	if config.APIURL != "" {
+		effectiveAPIURL = config.APIURL
+	} else {
+		config.APIURL = a.apiURL
+	}
+	effectiveAPIKey := a.apiKey
+	if config.APIKey != "" {
+		effectiveAPIKey = config.APIKey
+	} else {
+		config.APIKey = a.apiKey
+	}
+
+	promptBlocks := a.dynamicPrompt(config)(ctx, a)
+	if a.skillsService != nil && config.EnableSkills {
+		if prompt, err := a.skillsService.GetSkillsPrompt(config); err == nil && prompt != nil {
+			promptBlocks = append(promptBlocks, prompt)
+		}
+	}
+	actions := a.availableActions(config)(ctx, a)
+	stateFile, characterFile := a.stateFiles(name)
+
+	obs := NewSSEObserver(name, manager)
+
+	opts := []Option{
+		WithSchedulerStorePath(filepath.Join(pooldir, fmt.Sprintf("scheduler-%s.json", name))),
+		WithSchedulerRetention(a.limits.SchedulerRuns),
+		WithSchedulerCreation(a.limits.SchedulerCreation),
+		WithModel(model),
+		WithLLMAPIURL(effectiveAPIURL),
+		WithContext(ctx),
+		WithTranscriptionModel(transcriptionModel),
+		WithTranscriptionLanguage(transcriptionLanguage),
+		WithTTSModel(ttsModel),
+		WithPrompts(promptBlocks...),
+		WithActions(actions...),
+		WithObserver(obs),
+		WithMultimodalModel(multimodalModel),
+		WithCharacterFile(characterFile),
+		WithStateFile(stateFile),
+		WithSystemPrompt(config.SystemPrompt),
+	}
+	if effectiveAPIKey != "" {
+		opts = append(opts, WithLLMAPIKey(effectiveAPIKey))
+	}
+	xlog.Info("Creating agent (no Run)", "name", name, "model", model, "api_url", effectiveAPIURL)
+
+	agent, err := New(opts...)
+	if err != nil {
+		return err
+	}
+
+	a.agents[name] = agent
+	a.managers[name] = manager
+
+	// Start the conversation consumer so ConversationAction doesn't deadlock.
+	// This is normally started by Run(), but we skip Run() in distributed mode.
+	agent.StartConversationConsumer()
+
+	xlog.Info("Agent created (no Run)", "name", name)
+	return nil
 }
 
 func (a *AgentPool) stateFiles(name string) (string, string) {
@@ -690,9 +909,6 @@ func (a *AgentPool) Remove(name string) error {
 	delete(a.agents, name)
 	delete(a.pool, name)
 
-	// remove avatar
-	os.Remove(filepath.Join(a.pooldir, "avatars", fmt.Sprintf("%s.png", name)))
-
 	if err := a.save(); err != nil {
 		return err
 	}
@@ -710,7 +926,21 @@ func (a *AgentPool) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(a.file, data, 0644)
+	tmpPath := a.file + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, a.file); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	bakPath := a.file + ".bak"
+	if err := os.WriteFile(bakPath, data, 0644); err != nil {
+		// best-effort; main file is already good
+		xlog.Warn("Failed to write pool backup", "path", bakPath, "error", err)
+	}
+	return nil
 }
 
 func (a *AgentPool) GetAgent(name string) *Agent {
@@ -739,8 +969,9 @@ func (a *AgentPool) GetConfig(name string) *AgentConfig {
 	return &agent
 }
 
-func (a *AgentPool) GetManager(name string) sse.Manager {
+func (a *AgentPool) GetManager(name string) sseLib.Manager {
 	a.Lock()
 	defer a.Unlock()
 	return a.managers[name]
 }
+

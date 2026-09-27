@@ -29,7 +29,10 @@ const AgentForm = ({
 
   // Handle input changes
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target.name.target;
+    const { value, type, checked } = e.target;
+    const name = e.target.name;
+    // Guard: name must be a string (some sections pass synthetic events where name can be wrong)
+    if (typeof name !== 'string') return;
     
     // Convert value to number if it's a number input
     const processedValue = type === 'number' ? Number(value) : value;
@@ -272,7 +275,7 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'mcp-section' ? 'block' : 'none' }}>
-              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange}  />
+              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'memory-section' ? 'block' : 'none' }}>
@@ -327,7 +330,7 @@ const AgentForm = ({
             </div>
 
             <div style={{ display: activeSection === 'mcp-section' ? 'block' : 'none' }}>
-              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange}  />
+              <MCPServersSection formData={formData} handleAddMCPServer={handleAddMCPServer} handleRemoveMCPServer={handleRemoveMCPServer} handleMCPServerChange={handleMCPServerChange} handleInputChange={handleInputChange} metadata={metadata} />
             </div>
 
             <div style={{ display: activeSection === 'memory-section' ? 'block' : 'none' }}>

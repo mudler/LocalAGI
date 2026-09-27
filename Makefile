@@ -15,7 +15,7 @@ run-nokb:
 	$(MAKE) run KBDISABLEINDEX=true
 
 webui/react-ui/dist:
-	docker run --entrypoint /bin/bash -v $(ROOT_DIR):/app oven/bun:1 -c "cd /app/webui/react-ui && bun install && bun run build"
+	docker run --entrypoint /bin/bash -v $(ROOT_DIR):/app:z oven/bun:1 -c "cd /app/webui/react-ui && bun install && bun run build"
 
 .PHONY: build
 build: webui/react-ui/dist

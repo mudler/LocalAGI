@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/services/actions"
 	"github.com/mudler/LocalAGI/services/prompts"
+	"github.com/mudler/xlog"
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/state"
@@ -122,7 +122,7 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 
 			dynamicPromptsFound := dynamicPrompts(customDirectory, existingDynamicPromptsConfigs)
 
-			memoryFilePath := memoryPath(a.Name, dynamicConfig)
+			memoryIdxPath := memoryIndexPath(a.Name, dynamicConfig)
 			promptblocks := []agent.DynamicPrompt{}
 
 			for _, c := range a.DynamicPrompts {
@@ -137,7 +137,7 @@ func DynamicPrompts(dynamicConfig map[string]string) func(*state.AgentConfig) fu
 					}
 					promptblocks = append(promptblocks, prompt)
 				case DynamicPromptMemory:
-					_, memory, _ := actions.NewMemoryActions(memoryFilePath, dynamicConfig)
+					_, memory, _, _ := actions.NewMemoryActions(memoryIdxPath, dynamicConfig)
 
 					promptblocks = append(promptblocks,
 						prompts.NewMemoryPrompt(config, memory),

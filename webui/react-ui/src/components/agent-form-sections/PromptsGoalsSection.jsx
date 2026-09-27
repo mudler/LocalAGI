@@ -34,21 +34,23 @@ const PromptsGoalsSection = ({
     return metadata.PromptsGoalsSection;
   };
 
-  // Handle field value changes
-  const handleFieldChange = (name, value) => {
+  // Handle field value changes (FormField passes the event)
+  const handleFieldChange = (e) => {
+    const { name, value, type, checked } = e.target;
     const field = getFields().find(f => f.name === name);
     if (field && field.type === 'checkbox') {
       handleInputChange({
         target: {
           name,
           type: 'checkbox',
-          checked: value === 'true'
+          checked
         }
       });
     } else {
       handleInputChange({
         target: {
           name,
+          type,
           value
         }
       });

@@ -17,7 +17,7 @@ function AgentsList() {
       if (!response.ok) {
         throw new Error(`Server responded with status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       setAgents(data.agents || []);
       setStatuses(data.statuses || {});
@@ -38,18 +38,18 @@ function AgentsList() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      
+
       if (response.ok) {
         // Update local state
         setStatuses(prev => ({
           ...prev,
           [name]: !isActive
         }));
-        
+
         // Show success toast
         const action = isActive ? 'paused' : 'started';
         showToast(`Agent "${name}" ${action} successfully`, 'success');
-        
+
         // Refresh the agents list to ensure we have the latest data
         fetchAgents();
       } else {
@@ -67,13 +67,13 @@ function AgentsList() {
     if (!confirm(`Are you sure you want to delete agent "${name}"? This action cannot be undone.`)) {
       return;
     }
-    
+
     try {
       const response = await fetch(`/api/agent/${name}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
-      
+
       if (response.ok) {
         // Remove from local state
         setAgents(prev => prev.filter(agent => agent !== name));
@@ -82,7 +82,7 @@ function AgentsList() {
           delete newStatuses[name];
           return newStatuses;
         });
-        
+
         // Show success toast
         showToast(`Agent "${name}" deleted successfully`, 'success');
       } else {
@@ -130,76 +130,69 @@ function AgentsList() {
       </header>
 
       {agents.length > 0 ? (
-        <div className="agents-grid">
-          {agents.map(name => (
-            <div key={name} className="agent-card" data-agent={name} data-active={statuses[name]}>
-              <div className="agent-content text-center">
-                <div className="avatar-container mb-4">
-                  <img 
-                    src={`/avatars/${name}.png`} 
-                    alt={name} 
-                    className="w-24 h-24 rounded-full" 
-                    style={{
-                      border: '2px solid var(--primary)', 
-                      boxShadow: 'var(--neon-glow)', 
-                      display: 'none',
-                      margin: '0 auto'
-                    }}
-                    onLoad={(e) => {
-                      e.target.style.display = 'block';
-                      e.target.nextElementSibling.style.display = 'none';
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextElementSibling.style.display = 'flex';
-                    }}
-                  />
-                  <div className="avatar-placeholder" style={{margin: '0 auto'}}>
-                    <span className="placeholder-text"><i className="fas fa-sync fa-spin"></i></span>
-                  </div>
-                </div>
-                
-                <div className="agent-header">
-                  <h2>{name}</h2>
-                  <span className={`status-badge ${statuses[name] ? 'active' : 'inactive'}`}>
-                    {statuses[name] ? 'Active' : 'Paused'}
-                  </span>
-                </div>
-              
-                <div className="agent-actions">
-                  <Link to={`/talk/${name}`} className="action-btn chat-btn">
-                    <i className="fas fa-comment"></i> Chat
-                  </Link>
-                  <Link to={`/status/${name}`} className="action-btn status-btn">
-                    <i className="fas fa-chart-line"></i> Status
-                  </Link>
-                  <Link to={`/settings/${name}`} className="action-btn settings-btn">
-                    <i className="fas fa-cog"></i> Settings
-                  </Link>
-                </div>
-                
-                <div className="agent-actions mt-2">
-                  <button 
-                    className="action-btn toggle-btn"
-                    onClick={() => toggleAgentStatus(name, statuses[name])}
-                  >
-                    {statuses[name] ? (
-                      <><i className="fas fa-pause"></i> Pause</>
-                    ) : (
-                      <><i className="fas fa-play"></i> Start</>
-                    )}
-                  </button>
-                  
-                  <button 
-                    className="action-btn delete-btn"
-                    onClick={() => deleteAgent(name)}
-                  >
-                    <i className="fas fa-trash-alt"></i> Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="agents-table-container">
+          <table className="agents-table">
+            <thead>
+              <tr>
+                <th>Agent Name</th>
+                <th>Status</th>
+                <th>Quick Actions</th>
+                <th>Management</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agents.map(name => (
+                <tr key={name} data-agent={name} data-active={statuses[name]}>
+                  <td>
+                    <div className="agent-info">
+                      <span className="agent-name-main">{name}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${statuses[name] ? 'active' : 'inactive'}`}>
+                      {statuses[name] ? 'Active' : 'Paused'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="agent-table-actions">
+                      <Link to={`/talk/${name}`} className="action-btn chat-btn" title="Chat">
+                        <i className="fas fa-comment"></i> Chat
+                      </Link>
+                      <Link to={`/status/${name}`} className="action-btn status-btn" title="Status">
+                        <i className="fas fa-chart-line"></i> Status
+                      </Link>
+                      <Link to={`/settings/${name}`} className="action-btn settings-btn" title="Settings">
+                        <i className="fas fa-cog"></i> Settings
+                      </Link>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="agent-table-actions">
+                      <button
+                        className="action-btn toggle-btn"
+                        onClick={() => toggleAgentStatus(name, statuses[name])}
+                        title={statuses[name] ? "Pause Agent" : "Start Agent"}
+                      >
+                        {statuses[name] ? (
+                          <><i className="fas fa-pause"></i> Pause</>
+                        ) : (
+                          <><i className="fas fa-play"></i> Start</>
+                        )}
+                      </button>
+
+                      <button
+                        className="action-btn delete-btn"
+                        onClick={() => deleteAgent(name)}
+                        title="Delete Agent"
+                      >
+                        <i className="fas fa-trash-alt"></i> Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="no-agents">

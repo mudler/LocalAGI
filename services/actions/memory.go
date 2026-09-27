@@ -2,22 +2,29 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"sync"
+	"time"
 
-	"io"
-
+	"github.com/blevesearch/bleve/v2"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-// Remove global const and mutex, and add them as fields to a struct
+// indexCache avoids opening the same Bleve index path multiple times, which would
+// deadlock (Bleve uses file locks; a second Open() on the same path blocks).
+var (
+	indexCache   = map[string]bleve.Index{}
+	indexCacheMu sync.Mutex
+)
 
 type MemoryActions struct {
-	filePath          string
+	index             bleve.Index
+	indexPath         string
 	customName        string
 	customDescription string
 }
@@ -25,138 +32,269 @@ type MemoryActions struct {
 type AddToMemoryAction struct{ *MemoryActions }
 type ListMemoryAction struct{ *MemoryActions }
 type RemoveFromMemoryAction struct{ *MemoryActions }
+type SearchMemoryAction struct{ *MemoryActions }
 
-// NewMemoryActions returns the three actions, using the provided filePath and config
-func NewMemoryActions(filePath string, config map[string]string) (*AddToMemoryAction, *ListMemoryAction, *RemoveFromMemoryAction) {
-	ma := &MemoryActions{filePath: filePath}
+// MemoryEntry matches the MCP memory structure (Bleve-backed).
+type MemoryEntry struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// NewMemoryActions returns the four memory actions (Add, List, Remove, Search) using a Bleve index at indexPath.
+func NewMemoryActions(indexPath string, config map[string]string) (*AddToMemoryAction, *ListMemoryAction, *RemoveFromMemoryAction, *SearchMemoryAction) {
+	ma := &MemoryActions{indexPath: indexPath}
 	if config != nil {
 		ma.customName = config["custom_name"]
 		ma.customDescription = config["custom_description"]
 	}
-	return &AddToMemoryAction{ma}, &ListMemoryAction{ma}, &RemoveFromMemoryAction{ma}
-}
-
-type addToMemoryParams struct {
-	Item string `json:"item"`
-}
-
-type removeFromMemoryParams struct {
-	Index *int   `json:"index,omitempty"`
-	Value string `json:"value,omitempty"`
-}
-
-func (m *MemoryActions) readMemory() ([]string, error) {
-	f, err := os.Open(m.filePath)
+	idx, err := openOrCreateBleveIndex(indexPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, err
+		// Allow lazy init: index will be nil and operations will return this error
+		ma.index = nil
+	} else {
+		ma.index = idx
 	}
-	defer f.Close()
-	var items []string
-	if err := json.NewDecoder(f).Decode(&items); err != nil {
-		if err == io.EOF {
-			return []string{}, nil
-		}
-		return nil, err
-	}
-	return items, nil
+	return &AddToMemoryAction{ma}, &ListMemoryAction{ma}, &RemoveFromMemoryAction{ma}, &SearchMemoryAction{ma}
 }
 
-func (m *MemoryActions) writeMemory(items []string) error {
-	f, err := os.Create(m.filePath)
+func openOrCreateBleveIndex(indexPath string) (bleve.Index, error) {
+	indexCacheMu.Lock()
+	if idx, ok := indexCache[indexPath]; ok {
+		indexCacheMu.Unlock()
+		return idx, nil
+	}
+	indexCacheMu.Unlock()
+
+	var idx bleve.Index
+	var err error
+	if _, statErr := os.Stat(indexPath); statErr == nil {
+		idx, err = bleve.Open(indexPath)
+	} else {
+		os.MkdirAll(filepath.Dir(indexPath), 0755)
+		mapping := bleve.NewIndexMapping()
+		entryMapping := bleve.NewDocumentMapping()
+
+		nameFieldMapping := bleve.NewTextFieldMapping()
+		nameFieldMapping.Analyzer = "standard"
+		nameFieldMapping.Store = true
+		entryMapping.AddFieldMappingsAt("name", nameFieldMapping)
+
+		contentFieldMapping := bleve.NewTextFieldMapping()
+		contentFieldMapping.Analyzer = "standard"
+		contentFieldMapping.Store = true
+		entryMapping.AddFieldMappingsAt("content", contentFieldMapping)
+
+		dateFieldMapping := bleve.NewDateTimeFieldMapping()
+		dateFieldMapping.Store = true
+		entryMapping.AddFieldMappingsAt("created_at", dateFieldMapping)
+
+		mapping.AddDocumentMapping("_default", entryMapping)
+		idx, err = bleve.New(indexPath, mapping)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	indexCacheMu.Lock()
+	indexCache[indexPath] = idx
+	indexCacheMu.Unlock()
+	return idx, nil
+}
+
+func (m *MemoryActions) ensureIndex() error {
+	if m.index != nil {
+		return nil
+	}
+	idx, err := openOrCreateBleveIndex(m.indexPath)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(items)
+	m.index = idx
+	return nil
+}
+
+func generateID() string {
+	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+type addToMemoryParams struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+}
+
+type removeFromMemoryParams struct {
+	ID string `json:"id"`
+}
+
+type searchMemoryParams struct {
+	Query string `json:"query"`
 }
 
 func (a *AddToMemoryAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	if err := a.ensureIndex(); err != nil {
+		return types.ActionResult{}, err
+	}
 	var req addToMemoryParams
 	if err := params.Unmarshal(&req); err != nil {
 		return types.ActionResult{}, fmt.Errorf("invalid parameters: %w", err)
 	}
-	if req.Item == "" {
-		return types.ActionResult{}, fmt.Errorf("item cannot be empty")
+	if req.Name == "" && req.Content == "" {
+		return types.ActionResult{}, fmt.Errorf("name or content cannot both be empty")
 	}
-	items, err := a.readMemory()
-	if err != nil {
-		return types.ActionResult{}, err
+	entry := MemoryEntry{
+		ID:        generateID(),
+		Name:      req.Name,
+		Content:   req.Content,
+		CreatedAt: time.Now(),
 	}
-	items = append(items, req.Item)
-	if err := a.writeMemory(items); err != nil {
-		return types.ActionResult{}, err
+	if err := a.index.Index(entry.ID, entry); err != nil {
+		return types.ActionResult{}, fmt.Errorf("failed to index memory entry: %w", err)
 	}
 	return types.ActionResult{
-		Result:   fmt.Sprintf("Added item to memory: %s", req.Item),
-		Metadata: map[string]any{"item": req.Item, "count": len(items)},
+		Result:   fmt.Sprintf("Added memory entry: id=%s name=%q", entry.ID, entry.Name),
+		Metadata: map[string]any{"id": entry.ID, "name": entry.Name, "content": entry.Content, "created_at": entry.CreatedAt},
 	}, nil
 }
 
 func (a *ListMemoryAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
-	items, err := a.readMemory()
-	if err != nil {
+	if err := a.ensureIndex(); err != nil {
 		return types.ActionResult{}, err
 	}
+	query := bleve.NewMatchAllQuery()
+	searchRequest := bleve.NewSearchRequest(query)
+	searchRequest.Size = 10000
+	searchRequest.Fields = []string{"name", "created_at"}
+	searchRequest.SortBy([]string{"-created_at"})
 
-	outputResult := "Number of items in memory: " + strconv.Itoa(len(items)) + "\n"
-	for i, item := range items {
-		outputResult += fmt.Sprintf("%d) %s\n", i, item)
+	searchResult, err := a.index.Search(searchRequest)
+	if err != nil {
+		return types.ActionResult{}, fmt.Errorf("failed to search index: %w", err)
 	}
 
+	type listEntry struct {
+		Name      string
+		CreatedAt time.Time
+	}
+	entries := make([]listEntry, 0, len(searchResult.Hits))
+	for _, hit := range searchResult.Hits {
+		e := listEntry{}
+		if v, ok := hit.Fields["name"].(string); ok {
+			e.Name = v
+		}
+		if v, ok := hit.Fields["created_at"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, v); err == nil {
+				e.CreatedAt = t
+			}
+		} else if v, ok := hit.Fields["created_at"].(time.Time); ok {
+			e.CreatedAt = v
+		}
+		entries = append(entries, e)
+	}
+
+	outputResult := "Number of items in memory: " + strconv.Itoa(len(entries)) + "\n"
+	for i, e := range entries {
+		createdStr := e.CreatedAt.Format(time.RFC3339)
+		outputResult += fmt.Sprintf("%d) %s (created_at: %s)\n", i, e.Name, createdStr)
+	}
+
+	names := make([]string, len(entries))
+	for i, e := range entries {
+		names[i] = e.Name
+	}
 	return types.ActionResult{
 		Result:   outputResult,
-		Metadata: map[string]any{"items": items},
+		Metadata: map[string]any{"names": names, "entries": entries, "count": len(entries)},
 	}, nil
 }
 
 func (a *RemoveFromMemoryAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	if err := a.ensureIndex(); err != nil {
+		return types.ActionResult{}, err
+	}
 	var req removeFromMemoryParams
 	if err := params.Unmarshal(&req); err != nil {
 		return types.ActionResult{}, fmt.Errorf("invalid parameters: %w", err)
 	}
-	items, err := a.readMemory()
+	if req.ID == "" {
+		return types.ActionResult{}, fmt.Errorf("id is required to remove a memory entry")
+	}
+	doc, err := a.index.Document(req.ID)
 	if err != nil {
-		return types.ActionResult{}, err
+		return types.ActionResult{}, fmt.Errorf("failed to check document: %w", err)
 	}
-	var removed string
-	if req.Index != nil {
-		idx := *req.Index
-		if idx < 0 || idx >= len(items) {
-			return types.ActionResult{}, fmt.Errorf("index out of range")
-		}
-		removed = items[idx]
-		items = append(items[:idx], items[idx+1:]...)
-	} else if req.Value != "" {
-		found := false
-		for i, v := range items {
-			if v == req.Value {
-				removed = v
-				items = append(items[:i], items[i+1:]...)
-				found = true
-				break
-			}
-		}
-		if !found {
-			return types.ActionResult{}, fmt.Errorf("value not found in memory")
-		}
-	} else {
-		return types.ActionResult{}, fmt.Errorf("must provide index or value to remove")
+	if doc == nil {
+		return types.ActionResult{}, fmt.Errorf("memory entry with ID %q not found", req.ID)
 	}
-	if err := a.writeMemory(items); err != nil {
-		return types.ActionResult{}, err
+	if err := a.index.Delete(req.ID); err != nil {
+		return types.ActionResult{}, fmt.Errorf("failed to delete memory entry: %w", err)
 	}
 	return types.ActionResult{
-		Result:   fmt.Sprintf("Removed item from memory: %s", removed),
-		Metadata: map[string]any{"removed": removed, "count": len(items)},
+		Result:   fmt.Sprintf("Removed memory entry with ID %q", req.ID),
+		Metadata: map[string]any{"removed_id": req.ID},
+	}, nil
+}
+
+func (a *SearchMemoryAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
+	if err := a.ensureIndex(); err != nil {
+		return types.ActionResult{}, err
+	}
+	var req searchMemoryParams
+	if err := params.Unmarshal(&req); err != nil {
+		return types.ActionResult{}, fmt.Errorf("invalid parameters: %w", err)
+	}
+	if req.Query == "" {
+		return types.ActionResult{}, fmt.Errorf("query cannot be empty")
+	}
+	nameQuery := bleve.NewMatchQuery(req.Query)
+	nameQuery.SetField("name")
+	contentQuery := bleve.NewMatchQuery(req.Query)
+	contentQuery.SetField("content")
+	disjunctionQuery := bleve.NewDisjunctionQuery(nameQuery, contentQuery)
+
+	searchRequest := bleve.NewSearchRequest(disjunctionQuery)
+	searchRequest.Size = 100
+	searchRequest.Fields = []string{"name", "content", "created_at"}
+
+	searchResult, err := a.index.Search(searchRequest)
+	if err != nil {
+		return types.ActionResult{}, fmt.Errorf("failed to search index: %w", err)
+	}
+
+	results := make([]MemoryEntry, 0, len(searchResult.Hits))
+	for _, hit := range searchResult.Hits {
+		e := MemoryEntry{ID: hit.ID}
+		if v, ok := hit.Fields["name"].(string); ok {
+			e.Name = v
+		}
+		if v, ok := hit.Fields["content"].(string); ok {
+			e.Content = v
+		}
+		if v, ok := hit.Fields["created_at"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, v); err == nil {
+				e.CreatedAt = t
+			}
+		} else if v, ok := hit.Fields["created_at"].(time.Time); ok {
+			e.CreatedAt = v
+		}
+		results = append(results, e)
+	}
+
+	outputResult := fmt.Sprintf("Query: %q — %d result(s)\n", req.Query, len(results))
+	for i, e := range results {
+		outputResult += fmt.Sprintf("%d) [%s] %s — %s\n", i, e.ID, e.Name, e.Content)
+	}
+
+	return types.ActionResult{
+		Result:   outputResult,
+		Metadata: map[string]any{"query": req.Query, "results": results, "count": len(results)},
 	}, nil
 }
 
 func (a *AddToMemoryAction) Definition() types.ActionDefinition {
 	name := "add_to_memory"
-	description := "Add a string item to memory (stored in a JSON file)."
+	description := "Add a new entry to memory storage (name and/or content). Stored in a Bleve index."
 	if a.customName != "" {
 		name = a.customName
 	}
@@ -167,18 +305,22 @@ func (a *AddToMemoryAction) Definition() types.ActionDefinition {
 		Name:        types.ActionDefinitionName(name),
 		Description: description,
 		Properties: map[string]jsonschema.Definition{
-			"item": {
+			"name": {
 				Type:        jsonschema.String,
-				Description: "The string item to add to memory.",
+				Description: "The name/title of the memory entry.",
+			},
+			"content": {
+				Type:        jsonschema.String,
+				Description: "The content to store in memory.",
 			},
 		},
-		Required: []string{"item"},
+		Required: []string{},
 	}
 }
 
 func (a *ListMemoryAction) Definition() types.ActionDefinition {
 	name := "list_memory"
-	description := "List all items currently stored in memory."
+	description := "List all memory entry names."
 	if a.customName != "" {
 		name = a.customName
 	}
@@ -195,7 +337,7 @@ func (a *ListMemoryAction) Definition() types.ActionDefinition {
 
 func (a *RemoveFromMemoryAction) Definition() types.ActionDefinition {
 	name := "remove_from_memory"
-	description := "Remove an item from memory by index or value."
+	description := "Remove a memory entry by ID."
 	if a.customName != "" {
 		name = a.customName
 	}
@@ -206,22 +348,41 @@ func (a *RemoveFromMemoryAction) Definition() types.ActionDefinition {
 		Name:        types.ActionDefinitionName(name),
 		Description: description,
 		Properties: map[string]jsonschema.Definition{
-			"index": {
-				Type:        jsonschema.Integer,
-				Description: "The index of the item to remove (optional, 0-based)",
-			},
-			"value": {
+			"id": {
 				Type:        jsonschema.String,
-				Description: "The value of the item to remove (optional)",
+				Description: "The ID of the memory entry to remove.",
 			},
 		},
-		Required: []string{},
+		Required: []string{"id"},
 	}
 }
 
-func (a *AddToMemoryAction) Plannable() bool      { return true }
-func (a *ListMemoryAction) Plannable() bool       { return true }
-func (a *RemoveFromMemoryAction) Plannable() bool { return true }
+func (a *SearchMemoryAction) Definition() types.ActionDefinition {
+	name := "search_memory"
+	description := "Search memory entries by name and content using full-text search."
+	if a.customName != "" {
+		name = a.customName
+	}
+	if a.customDescription != "" {
+		description = a.customDescription
+	}
+	return types.ActionDefinition{
+		Name:        types.ActionDefinitionName(name),
+		Description: description,
+		Properties: map[string]jsonschema.Definition{
+			"query": {
+				Type:        jsonschema.String,
+				Description: "The search query to find matching memory entries.",
+			},
+		},
+		Required: []string{"query"},
+	}
+}
+
+func (a *AddToMemoryAction) Plannable() bool       { return true }
+func (a *ListMemoryAction) Plannable() bool        { return true }
+func (a *RemoveFromMemoryAction) Plannable() bool  { return true }
+func (a *SearchMemoryAction) Plannable() bool      { return true }
 
 // AddToMemoryConfigMeta returns the metadata for AddToMemory action configuration fields
 func AddToMemoryConfigMeta() []config.Field {
@@ -238,7 +399,7 @@ func AddToMemoryConfigMeta() []config.Field {
 			Label:    "Custom Description",
 			Type:     config.FieldTypeText,
 			Required: false,
-			HelpText: "Custom description for the action (optional, defaults to 'Add a string item to memory (stored in a JSON file).')",
+			HelpText: "Custom description for the action (optional)",
 		},
 	}
 }
@@ -258,7 +419,7 @@ func ListMemoryConfigMeta() []config.Field {
 			Label:    "Custom Description",
 			Type:     config.FieldTypeText,
 			Required: false,
-			HelpText: "Custom description for the action (optional, defaults to 'List all items currently stored in memory.')",
+			HelpText: "Custom description for the action (optional)",
 		},
 	}
 }
@@ -278,7 +439,27 @@ func RemoveFromMemoryConfigMeta() []config.Field {
 			Label:    "Custom Description",
 			Type:     config.FieldTypeText,
 			Required: false,
-			HelpText: "Custom description for the action (optional, defaults to 'Remove an item from memory by index or value.')",
+			HelpText: "Custom description for the action (optional)",
+		},
+	}
+}
+
+// SearchMemoryConfigMeta returns the metadata for SearchMemory action configuration fields
+func SearchMemoryConfigMeta() []config.Field {
+	return []config.Field{
+		{
+			Name:     "custom_name",
+			Label:    "Custom Name",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Custom name for the action (optional, defaults to 'search_memory')",
+		},
+		{
+			Name:     "custom_description",
+			Label:    "Custom Description",
+			Type:     config.FieldTypeText,
+			Required: false,
+			HelpText: "Custom description for the action (optional)",
 		},
 	}
 }

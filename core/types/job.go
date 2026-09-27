@@ -9,6 +9,11 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+// MetadataKeyConversationID is the job metadata key for per-conversation identity.
+// When set (e.g. "slack:CHANNEL_ID", "telegram:CHAT_ID"), the agent may cancel the
+// currently running job for that conversation before enqueueing a new one.
+const MetadataKeyConversationID = "conversation_id"
+
 // Job is a request to the agent to do something
 type Job struct {
 	// The job is a request to the agent to do something
@@ -17,6 +22,7 @@ type Job struct {
 	Result              *JobResult
 	ReasoningCallback   func(ActionCurrentState) bool
 	ResultCallback      func(ActionState)
+	StreamCallback      func(cogito.StreamEvent)
 	ConversationHistory []openai.ChatCompletionMessage
 	UUID                string
 	Metadata            map[string]interface{}
@@ -77,7 +83,13 @@ func WithResultCallback(f func(ActionState)) JobOption {
 	}
 }
 
-func WithMetadata(metadata map[string]interface{}) JobOption {
+func WithStreamCallback(f func(cogito.StreamEvent)) JobOption {
+	return func(j *Job) {
+		j.StreamCallback = f
+	}
+}
+
+func WithMetadata(metadata map[string]any) JobOption {
 	return func(j *Job) {
 		j.Metadata = metadata
 	}

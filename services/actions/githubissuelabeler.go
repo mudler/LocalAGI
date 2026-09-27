@@ -8,7 +8,7 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 

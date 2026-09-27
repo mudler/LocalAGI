@@ -4,20 +4,23 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/localoperator"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/LocalAGI/pkg/xstrings"
 	"github.com/mudler/LocalAGI/services/actions"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
+	"github.com/mudler/LocalAGI/services/connectors/common"
 
 	"github.com/slack-go/slack/socketmode"
 
@@ -36,6 +39,7 @@ type Slack struct {
 	// To track placeholder messages
 	placeholders     map[string]string // map[jobUUID]messageTS
 	placeholderMutex sync.RWMutex
+	jobStatus        map[string]*common.StatusAccumulator // map[jobUUID]accumulator
 	apiClient        *slack.Client
 
 	// Track active jobs for cancellation
@@ -53,15 +57,39 @@ func NewSlack(config map[string]string) *Slack {
 		channelID:    config["channelID"],
 		channelMode:  config["channelMode"] == "true",
 		placeholders: make(map[string]string),
+		jobStatus:    make(map[string]*common.StatusAccumulator),
 		activeJobs:   make(map[string][]*types.Job),
 	}
 }
 
 func (t *Slack) AgentResultCallback() func(state types.ActionState) {
 	return func(state types.ActionState) {
-		// Mark the job as completed when we get the final result
-		if state.ActionCurrentState.Job != nil && state.ActionCurrentState.Job.Metadata != nil {
-			if channel, ok := state.ActionCurrentState.Job.Metadata["channel"].(string); ok && channel != "" {
+		// Update placeholder with tool result if still in progress
+		job := state.ActionCurrentState.Job
+		if job != nil && job.Metadata != nil {
+			if channel, ok := job.Metadata["channel"].(string); ok && channel != "" {
+				t.placeholderMutex.Lock()
+				msgTs, exists := t.placeholders[job.UUID]
+				if exists && msgTs != "" && t.apiClient != nil {
+					acc, ok := t.jobStatus[job.UUID]
+					if !ok {
+						acc = common.NewStatusAccumulator()
+						t.jobStatus[job.UUID] = acc
+					}
+					acc.AppendToolResult(common.ActionDisplayName(state.Action), state.Result)
+					thought := acc.BuildMessage(thinkingMessage, 3000)
+					t.placeholderMutex.Unlock()
+					_, _, _, err := t.apiClient.UpdateMessage(
+						channel,
+						msgTs,
+						slack.MsgOptionText(githubmarkdownconvertergo.Slack(thought), false),
+					)
+					if err != nil {
+						xlog.Error(fmt.Sprintf("Error updating tool result message: %v", err))
+					}
+					t.placeholderMutex.Lock()
+				}
+				t.placeholderMutex.Unlock()
 				t.activeJobsMutex.Lock()
 				delete(t.activeJobs, channel)
 				t.activeJobsMutex.Unlock()
@@ -73,7 +101,7 @@ func (t *Slack) AgentResultCallback() func(state types.ActionState) {
 func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bool {
 	return func(state types.ActionCurrentState) bool {
 		// Check if we have a placeholder message for this job
-		t.placeholderMutex.RLock()
+		t.placeholderMutex.Lock()
 		msgTs, exists := t.placeholders[state.Job.UUID]
 		channel := ""
 		if state.Job.Metadata != nil {
@@ -81,18 +109,31 @@ func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 				channel = ch
 			}
 		}
-		t.placeholderMutex.RUnlock()
-
 		if !exists || msgTs == "" || channel == "" || t.apiClient == nil {
-			return true // Skip if we don't have a message to update
+			t.placeholderMutex.Unlock()
+			return true
 		}
 
-		thought := thinkingMessage + "\n\n"
+		// Update when we have reasoning or a tool call to show
+		if state.Reasoning == "" && state.Action == nil {
+			t.placeholderMutex.Unlock()
+			return true
+		}
+
+		acc, ok := t.jobStatus[state.Job.UUID]
+		if !ok {
+			acc = common.NewStatusAccumulator()
+			t.jobStatus[state.Job.UUID] = acc
+		}
 		if state.Reasoning != "" {
-			thought += "Current thought process:\n" + state.Reasoning
+			acc.AppendReasoning(state.Reasoning)
 		}
+		if state.Action != nil {
+			acc.AppendToolCall(common.ActionDisplayName(state.Action), state.Params.String())
+		}
+		thought := acc.BuildMessage(thinkingMessage, 3000)
+		t.placeholderMutex.Unlock()
 
-		// Update the placeholder message with the current reasoning
 		_, _, _, err := t.apiClient.UpdateMessage(
 			channel,
 			msgTs,
@@ -102,25 +143,6 @@ func (t *Slack) AgentReasoningCallback() func(state types.ActionCurrentState) bo
 			xlog.Error(fmt.Sprintf("Error updating reasoning message: %v", err))
 		}
 		return true
-	}
-}
-
-// cancelActiveJobForChannel cancels any active job for the given channel
-func (t *Slack) cancelActiveJobForChannel(channelID string) {
-	t.activeJobsMutex.RLock()
-	ctxs, exists := t.activeJobs[channelID]
-	t.activeJobsMutex.RUnlock()
-
-	if exists {
-		xlog.Info(fmt.Sprintf("Cancelling active job for channel: %s", channelID))
-
-		// Mark the job as inactive
-		t.activeJobsMutex.Lock()
-		for _, c := range ctxs {
-			c.Cancel()
-		}
-		delete(t.activeJobs, channelID)
-		t.activeJobsMutex.Unlock()
 	}
 }
 
@@ -149,63 +171,193 @@ func replaceUserIDsWithNamesInMessage(api *slack.Client, message string) string 
 	return message
 }
 
-func generateAttachmentsFromJobResponse(j *types.JobResult, api *slack.Client, channelID, ts string) (attachments []slack.Attachment) {
-	for _, state := range j.State {
-		// coming from the browser agent
-		if history, exists := state.Metadata[actions.MetadataBrowserAgentHistory]; exists {
-			if historyStruct, ok := history.(*localoperator.StateHistory); ok {
-				state := historyStruct.States[len(historyStruct.States)-1]
-				// Decode base64 screenshot and upload to Slack
-				if state.Screenshot != "" {
-					screenshotData, err := base64.StdEncoding.DecodeString(state.Screenshot)
-					if err != nil {
-						xlog.Error(fmt.Sprintf("Error decoding screenshot: %v", err))
-						continue
-					}
+// attachmentsFromMetadataOnly returns link/image attachments from metadata (no file uploads).
+// Used when posting a message so we can include URLs/images in the same post.
+func attachmentsFromMetadataOnly(metadata map[string]interface{}) (attachments []slack.Attachment) {
+	if metadata == nil {
+		return nil
+	}
+	if urls, exists := metadata[actions.MetadataUrls]; exists {
+		for _, url := range xstrings.UniqueSlice(stringSliceFromMetadata(urls)) {
+			attachments = append(attachments, slack.Attachment{
+				Title:     "URL",
+				TitleLink: url,
+				Text:      url,
+			})
+		}
+	}
+	if imagesUrls, exists := metadata[actions.MetadataImages]; exists {
+		for _, url := range xstrings.UniqueSlice(stringSliceFromMetadata(imagesUrls)) {
+			attachments = append(attachments, slack.Attachment{
+				Title:     "Image",
+				TitleLink: url,
+				ImageURL:  url,
+			})
+		}
+	}
+	return attachments
+}
 
-					data := string(screenshotData)
-					// Upload the file to Slack
-					_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
-						Reader:          bytes.NewReader(screenshotData),
-						FileSize:        len(data),
-						ThreadTimestamp: ts,
-						Channel:         channelID,
-						Filename:        "screenshot.png",
-						InitialComment:  "Browser Agent Screenshot",
-					})
-					if err != nil {
-						xlog.Error(fmt.Sprintf("Error uploading screenshot: %v", err))
-						continue
-					}
-				}
+// stringSliceFromMetadata converts a metadata value to []string, supporting both
+// []string and []interface{} (e.g. from JSON). Returns nil if the value is not a supported slice type.
+func stringSliceFromMetadata(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+
+	switch v := v.(type) {
+	case string:
+		return []string{v}
+	case []string:
+		return v
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, e := range v {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
 			}
 		}
+		return out
+	}
+	return nil
+}
 
-		// coming from the search action
-		if urls, exists := state.Metadata[actions.MetadataUrls]; exists {
-			for _, url := range xstrings.UniqueSlice(urls.([]string)) {
-				attachment := slack.Attachment{
-					Title:     "URL",
-					TitleLink: url,
-					Text:      url,
-				}
-				attachments = append(attachments, attachment)
+// uploadFilesFromMetadata uploads song and PDF files from metadata to the given thread.
+// Paths must be local filesystem paths; URLs will be skipped with a clear log.
+// Call after posting a message so threadTs is the message timestamp.
+func uploadFilesFromMetadata(metadata map[string]interface{}, api *slack.Client, channelID, threadTs string) {
+	if metadata == nil {
+		return
+	}
+	isURL := func(p string) bool {
+		return strings.HasPrefix(p, "http://") || strings.HasPrefix(p, "https://")
+	}
+	if songPaths, exists := metadata[actions.MetadataSongs]; exists {
+		sl := stringSliceFromMetadata(songPaths)
+		for _, path := range xstrings.UniqueSlice(sl) {
+			if isURL(path) {
+				xlog.Error("Slack upload skipped: song path is a URL, need local path", "path", path)
+				continue
 			}
-		}
-
-		// coming from the gen image actions
-		if imagesUrls, exists := state.Metadata[actions.MetadataImages]; exists {
-			for _, url := range xstrings.UniqueSlice(imagesUrls.([]string)) {
-				attachment := slack.Attachment{
-					Title:     "Image",
-					TitleLink: url,
-					ImageURL:  url,
-				}
-				attachments = append(attachments, attachment)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				xlog.Error("Error reading song file", "path", path, "error", err)
+				continue
+			}
+			filename := filepath.Base(path)
+			if filename == "" || filename == "." {
+				filename = "audio"
+			}
+			_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+				Reader:          bytes.NewReader(data),
+				FileSize:        len(data),
+				ThreadTimestamp: threadTs,
+				Channel:         channelID,
+				Filename:        filename,
+				Title:           filename,
+				InitialComment:  "Generated song",
+			})
+			if err != nil {
+				xlog.Error("Slack UploadFileV2 failed for song", "error", err, "path", path)
 			}
 		}
 	}
-	return
+	if pdfPaths, exists := metadata[actions.MetadataPDFs]; exists {
+		sl := stringSliceFromMetadata(pdfPaths)
+		for _, path := range xstrings.UniqueSlice(sl) {
+			if isURL(path) {
+				xlog.Error("Slack upload skipped: PDF path is a URL, need local path", "path", path)
+				continue
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				xlog.Error("Error reading PDF file", "path", path, "error", err)
+				continue
+			}
+			filename := filepath.Base(path)
+			if filename == "" || filename == "." {
+				filename = "document.pdf"
+			}
+			xlog.Debug("Uploading PDF from metadata to Slack thread", "filename", filename, "path", path)
+			_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+				Reader:          bytes.NewReader(data),
+				FileSize:        len(data),
+				ThreadTimestamp: threadTs,
+				Channel:         channelID,
+				Filename:        filename,
+				Title:           filename,
+				InitialComment:  "Generated PDF document",
+			})
+			if err != nil {
+				xlog.Error("Slack UploadFileV2 failed for PDF", "error", err, "path", path)
+			}
+		}
+	}
+	// Handle generated images (download from URL and upload as file, so temporary URLs like DALL-E are preserved)
+	if imageUrls, exists := metadata[actions.MetadataImages]; exists {
+		sl := stringSliceFromMetadata(imageUrls)
+		for _, imgURL := range xstrings.UniqueSlice(sl) {
+			resp, err := http.Get(imgURL)
+			if err != nil {
+				xlog.Error("Error downloading image for Slack upload", "url", imgURL, "error", err)
+				continue
+			}
+			data, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				xlog.Error("Error reading image body for Slack upload", "url", imgURL, "error", err)
+				continue
+			}
+			if len(data) == 0 {
+				xlog.Error("Empty image body for Slack upload", "url", imgURL)
+				continue
+			}
+			_, err = api.UploadFileV2(slack.UploadFileV2Parameters{
+				Reader:          bytes.NewReader(data),
+				FileSize:        len(data),
+				ThreadTimestamp: threadTs,
+				Channel:         channelID,
+				Filename:        "image.png",
+				Title:           "Generated image",
+				InitialComment:  "Generated image",
+			})
+			if err != nil {
+				xlog.Error("Slack UploadFileV2 failed for image", "error", err, "url", imgURL)
+			}
+		}
+	}
+}
+
+// attachmentsAndUploadsFromMetadata returns link/image attachments and uploads files (songs, PDFs)
+// from a metadata map. Used both by JobResult.State and by ConversationMessage.Metadata
+// (e.g. when newconversation/send_message is used so metadata is passed without going through State).
+func attachmentsAndUploadsFromMetadata(metadata map[string]interface{}, api *slack.Client, channelID, threadTs string) (attachments []slack.Attachment) {
+	attachments = attachmentsFromMetadataOnly(metadata)
+	uploadFilesFromMetadata(metadata, api, channelID, threadTs)
+	return attachments
+}
+
+// attachmentsFromJobResponseOnly returns link/image attachments from job response without uploading files.
+// Use with uploadJobResultFiles so uploads happen once per reply.
+func attachmentsFromJobResponseOnly(j *types.JobResult) []slack.Attachment {
+	if j == nil {
+		return nil
+	}
+	var out []slack.Attachment
+	for _, state := range j.State {
+		out = append(out, attachmentsFromMetadataOnly(state.Metadata)...)
+	}
+	return out
+}
+
+// uploadJobResultFiles uploads all song/PDF files from job result states to the given thread once.
+func uploadJobResultFiles(res *types.JobResult, api *slack.Client, channelID, threadTs string) {
+	if res == nil {
+		return
+	}
+	for _, state := range res.State {
+		uploadFilesFromMetadata(state.Metadata, api, channelID, threadTs)
+	}
 }
 
 // ImageData represents a single image with its metadata
@@ -380,9 +532,6 @@ func (t *Slack) handleChannelMessage(
 		return
 	}
 
-	// Cancel any active job for this channel before starting a new one
-	t.cancelActiveJobForChannel(ev.Channel)
-
 	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("slack:%s", t.channelID))
 
 	message := replaceUserIDsWithNamesInMessage(api, cleanUpUsernameFromMessage(ev.Text, b))
@@ -411,9 +560,10 @@ func (t *Slack) handleChannelMessage(
 
 		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
 
-		// Add channel to metadata for tracking
+		// Add channel and conversation_id for tracking and cancel-previous-on-new-message
 		metadata := map[string]interface{}{
-			"channel": ev.Channel,
+			"channel":                       ev.Channel,
+			types.MetadataKeyConversationID: "slack:" + ev.Channel,
 		}
 		agentOptions = append(agentOptions, types.WithMetadata(metadata))
 
@@ -461,50 +611,61 @@ func (t *Slack) handleChannelMessage(
 
 		xlog.Debug("After adding message to conversation tracker", "conversation", a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("slack:%s", t.channelID)))
 
-		//res.Response = githubmarkdownconvertergo.Slack(res.Response)
-
-		replyWithPostMessage(res.Response, api, ev, postMessageParams, res)
+		convertedResponse := githubmarkdownconvertergo.Slack(res.Response)
+		replyWithPostMessage(convertedResponse, api, ev, postMessageParams, res)
 
 	}()
 }
 
 func replyWithPostMessage(finalResponse string, api *slack.Client, ev *slackevents.MessageEvent, postMessageParams slack.PostMessageParameters, res *types.JobResult) {
+	attachments := attachmentsFromJobResponseOnly(res)
 	if len(finalResponse) > 4000 {
-		// split response in multiple messages, and update the first
-
+		// Split response into multiple messages; post first to get thread ts, upload files once, then post rest in thread
 		messages := xstrings.SplitParagraph(finalResponse, 3000)
-
-		for _, message := range messages {
-			_, _, err := api.PostMessage(ev.Channel,
+		var firstTs string
+		for i, message := range messages {
+			opts := []slack.MsgOption{
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(message, true),
+				slack.MsgOptionText(message, false),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
-				slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, "")...),
-			)
+				slack.MsgOptionAttachments(attachments...),
+			}
+			if i > 0 && firstTs != "" {
+				opts = append(opts, slack.MsgOptionTS(firstTs))
+			}
+			_, ts, err := api.PostMessage(ev.Channel, opts...)
 			if err != nil {
-				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
+				xlog.Error("Error posting message", "error", err)
+				continue
+			}
+			if i == 0 {
+				firstTs = ts
+				uploadJobResultFiles(res, api, ev.Channel, firstTs)
 			}
 		}
 	} else {
-		_, _, err := api.PostMessage(ev.Channel,
+		_, ts, err := api.PostMessage(ev.Channel,
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
-			slack.MsgOptionText(res.Response, true),
+			slack.MsgOptionText(finalResponse, false),
 			slack.MsgOptionPostMessageParameters(postMessageParams),
-			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, "")...),
-		//	slack.MsgOptionTS(ts),
+			slack.MsgOptionAttachments(attachments...),
 		)
 		if err != nil {
-			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
+			xlog.Error("Error posting message", "error", err)
+			return
 		}
+		uploadJobResultFiles(res, api, ev.Channel, ts)
 	}
 }
 
-func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackevents.AppMentionEvent, msgTs string, ts string, res *types.JobResult) {
+func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackevents.AppMentionEvent, msgTs string, ts string, postMessageParams slack.PostMessageParameters, res *types.JobResult) {
+	attachments := attachmentsFromJobResponseOnly(res)
+	// Use the thread root timestamp (ts), not the placeholder reply timestamp (msgTs).
+	// Slack API: "Never use a reply's ts value; use its parent instead."
+	uploadJobResultFiles(res, api, ev.Channel, ts)
 	if len(finalResponse) > 3000 {
-		// split response in multiple messages, and update the first
-
 		messages := xstrings.SplitParagraph(finalResponse, 3000)
 
 		_, _, _, err := api.UpdateMessage(
@@ -512,11 +673,12 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			msgTs,
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
-			slack.MsgOptionText(messages[0], true),
-			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, msgTs)...),
+			slack.MsgOptionText(messages[0], false),
+			slack.MsgOptionPostMessageParameters(postMessageParams),
+			slack.MsgOptionAttachments(attachments...),
 		)
 		if err != nil {
-			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
+			xlog.Error("Error updating final message", "error", err)
 		}
 
 		for i, message := range messages {
@@ -526,11 +688,12 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			_, _, err = api.PostMessage(ev.Channel,
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(message, true),
+				slack.MsgOptionText(message, false),
+				slack.MsgOptionPostMessageParameters(postMessageParams),
 				slack.MsgOptionTS(ts),
 			)
 			if err != nil {
-				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
+				xlog.Error("Error posting message", "error", err)
 			}
 		}
 	} else {
@@ -539,11 +702,12 @@ func replyToUpdateMessage(finalResponse string, api *slack.Client, ev *slackeven
 			msgTs,
 			slack.MsgOptionLinkNames(true),
 			slack.MsgOptionEnableLinkUnfurl(),
-			slack.MsgOptionText(finalResponse, true),
-			slack.MsgOptionAttachments(generateAttachmentsFromJobResponse(res, api, ev.Channel, msgTs)...),
+			slack.MsgOptionText(finalResponse, false),
+			slack.MsgOptionPostMessageParameters(postMessageParams),
+			slack.MsgOptionAttachments(attachments...),
 		)
 		if err != nil {
-			xlog.Error(fmt.Sprintf("Error updating final message: %v", err))
+			xlog.Error("Error updating final message", "error", err)
 		}
 	}
 }
@@ -675,9 +839,10 @@ func (t *Slack) handleMention(
 			}
 		}
 
-		// Add channel to job metadata for use in callbacks
+		// Add channel and conversation_id for callbacks and cancel-previous-on-new-message
 		metadata := map[string]interface{}{
-			"channel": ev.Channel,
+			"channel":                       ev.Channel,
+			types.MetadataKeyConversationID: "slack:" + ev.Channel,
 		}
 
 		// Call the agent with the conversation history
@@ -687,9 +852,9 @@ func (t *Slack) handleMention(
 			types.WithMetadata(metadata),
 		)
 
-		if res.Response == "" {
+		if res == nil || res.Response == "" {
 			xlog.Debug(fmt.Sprintf("Empty response from agent"))
-			replyToUpdateMessage("there was an internal error. try again!", api, ev, msgTs, ts, res)
+			replyToUpdateMessage("there was an internal error. try again!", api, ev, msgTs, ts, postMessageParams, res)
 
 			// _, _, err := api.DeleteMessage(ev.Channel, msgTs)
 			// if err != nil {
@@ -700,20 +865,24 @@ func (t *Slack) handleMention(
 
 		// get user id
 		user, err := api.GetUserInfo(ev.User)
+		displayName := ev.User
 		if err != nil {
 			xlog.Error(fmt.Sprintf("Error getting user info: %v", err))
+		} else if user != nil {
+			displayName = user.Name
 		}
 
-		// Format the final response
-		//finalResponse := githubmarkdownconvertergo.Slack(res.Response)
-		finalResponse := fmt.Sprintf("@%s %s", user.Name, res.Response)
+		// Format the final response (convert GitHub markdown to Slack mrkdwn)
+		convertedResponse := githubmarkdownconvertergo.Slack(res.Response)
+		finalResponse := fmt.Sprintf("@%s %s", displayName, convertedResponse)
 		xlog.Debug("Send final response to slack", "response", finalResponse)
 
-		replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, res)
+		replyToUpdateMessage(finalResponse, api, ev, msgTs, ts, postMessageParams, res)
 
-		// Clean up the placeholder map
+		// Clean up the placeholder map and job status
 		t.placeholderMutex.Lock()
 		delete(t.placeholders, jobUUID)
+		delete(t.jobStatus, jobUUID)
 		t.placeholderMutex.Unlock()
 	}()
 }
@@ -734,22 +903,34 @@ func (t *Slack) Start(a *agent.Agent) {
 
 	if t.channelID != "" {
 		xlog.Debug(fmt.Sprintf("Listening for messages in channel %s", t.channelID))
-		// handle new conversations
-		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-			xlog.Debug("Subscriber(slack)", "message", ccm.Content)
-			_, _, err := api.PostMessage(t.channelID,
+		// handle new conversations (e.g. send_message / newconversation action)
+		// Preserve metadata (PDFs, songs, images, URLs) so attachments are not lost
+		a.AddSubscriber(func(ccm *types.ConversationMessage) {
+			xlog.Debug("Subscriber(slack)", "message", ccm.Message.Content)
+			convertedContent := githubmarkdownconvertergo.Slack(ccm.Message.Content)
+			attachments := attachmentsFromMetadataOnly(ccm.Metadata)
+			channelID, ts, err := api.PostMessage(t.channelID,
 				slack.MsgOptionLinkNames(true),
 				slack.MsgOptionEnableLinkUnfurl(),
-				slack.MsgOptionText(ccm.Content, true),
+				slack.MsgOptionText(convertedContent, false),
 				slack.MsgOptionPostMessageParameters(postMessageParams),
+				slack.MsgOptionAttachments(attachments...),
 			)
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 			}
+			// Always upload files (PDFs, songs) when metadata is present—to the same thread if post succeeded, else to channel
+			if ccm.Metadata != nil {
+				ch, threadTs := t.channelID, ""
+				if err == nil {
+					ch, threadTs = channelID, ts
+				}
+				uploadFilesFromMetadata(ccm.Metadata, api, ch, threadTs)
+			}
 			a.SharedState().ConversationTracker.AddMessage(
 				fmt.Sprintf("slack:%s", t.channelID),
 				openai.ChatCompletionMessage{
-					Content: ccm.Content,
+					Content: ccm.Message.Content,
 					Role:    "assistant",
 				},
 			)

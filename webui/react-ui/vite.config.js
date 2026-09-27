@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   // Define backend URL with port from environment variable or default to 8080
-  const backendUrl = `http://${env.BACKEND_HOST || 'localhost'}:${env.BACKEND_PORT || '3000'}`
+  const backendUrl = `http://${env.LOCALAGI_BASE_URL || 'localhost:3000'}`
 
   return {
     plugins: [react()],
@@ -29,8 +29,7 @@ export default defineConfig(({ mode }) => {
         '/chat': backendUrl,
         '/status': backendUrl,
         '/action': backendUrl,
-        '/actions': backendUrl,
-        '/avatars': backendUrl
+        '/actions': backendUrl
       }
     }
   }

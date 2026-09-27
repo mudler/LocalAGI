@@ -27,6 +27,8 @@ type (
 	Manager interface {
 		Send(message Envelope)
 		Handle(ctx *fiber.Ctx, cl Listener)
+		Register(cl Listener)
+		Unregister(id string)
 		Clients() []string
 	}
 
@@ -108,6 +110,17 @@ func NewManager(workerPoolSize int) Manager {
 // Send broadcasts a message to all connected clients.
 func (manager *broadcastManager) Send(message Envelope) {
 	manager.broadcast <- message
+}
+
+// Register adds a client to the broadcast list and sends message history.
+func (manager *broadcastManager) Register(cl Listener) {
+	manager.register(cl)
+	manager.messageHistory.Send(cl)
+}
+
+// Unregister removes a client from the broadcast list and closes its channel.
+func (manager *broadcastManager) Unregister(id string) {
+	manager.unregister(id)
 }
 
 // Handle sets up a new client and handles the connection.

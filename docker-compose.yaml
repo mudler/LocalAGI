@@ -8,8 +8,7 @@ services:
     image: localai/localai:master
     command: 
     - ${MODEL_NAME:-gemma-3-4b-it-qat}
-    - ${MULTIMODAL_MODEL:-moondream2-20250414}
-    - ${IMAGE_MODEL:-sd-1.5-ggml}
+    - ${MULTIMODAL_MODEL:-gemma-3-4b-it-qat}
     - granite-embedding-107m-multilingual
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
@@ -22,30 +21,25 @@ services:
       - DEBUG=true
       #- LOCALAI_API_KEY=sk-1234567890
     volumes:
-      - ./volumes/models:/models
-      - ./volumes/backends:/backends
-      - ./volumes/images:/tmp/generated/images
+      - models:/models
+      - backends:/backends
+      - images:/tmp/generated/images
 
-  localrecall:
-    image: quay.io/mudler/localrecall:main
-    ports:
-      - 8080
+  postgres:
+    image: quay.io/mudler/localrecall:${LOCALRECALL_VERSION:-v0.5.2}-postgresql
     environment:
-      - COLLECTION_DB_PATH=/db
-      - EMBEDDING_MODEL=granite-embedding-107m-multilingual
-      - FILE_ASSETS=/assets
-      - OPENAI_API_KEY=sk-1234567890
-      - OPENAI_BASE_URL=http://localai:8080
+      - POSTGRES_DB=localrecall
+      - POSTGRES_USER=localrecall
+      - POSTGRES_PASSWORD=localrecall
+    ports:
+      - 5432:5432
     volumes:
-      - ./volumes/localrag/db:/db
-      - ./volumes/localrag/assets/:/assets
-
-  localrecall-healthcheck:
-    depends_on:
-      localrecall:
-        condition: service_started
-    image: busybox
-    command: ["sh", "-c", "until wget -q -O - http://localrecall:8080 > /dev/null 2>&1; do echo 'Waiting for localrecall...'; sleep 1; done; echo 'localrecall is up!'"]
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U localrecall"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   sshbox:
     build:
@@ -64,8 +58,11 @@ services:
   dind:
     image: docker:dind
     privileged: true
+    command: ["dockerd", "-H", "tcp://0.0.0.0:2375", "-H", "unix:///var/run/docker.sock"]
     environment:
       - DOCKER_TLS_CERTDIR=""
+    expose:
+      - 2375
     healthcheck:
       test: ["CMD", "docker", "info"]
       interval: 10s
@@ -76,8 +73,8 @@ services:
     depends_on:
       localai:
         condition: service_healthy
-      localrecall-healthcheck:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       dind:
         condition: service_healthy
     build:
@@ -89,11 +86,13 @@ services:
     environment:
       - LOCALAGI_MODEL=${MODEL_NAME:-gemma-3-4b-it-qat}
       - LOCALAGI_MULTIMODAL_MODEL=${MULTIMODAL_MODEL:-moondream2-20250414}
-      - LOCALAGI_IMAGE_MODEL=${IMAGE_MODEL:-sd-1.5-ggml}
       - LOCALAGI_LLM_API_URL=http://localai:8080
       #- LOCALAGI_LLM_API_KEY=sk-1234567890
-      - LOCALAGI_LOCALRAG_URL=http://localrecall:8080
       - LOCALAGI_STATE_DIR=/pool
+      # Knowledge base (collections) with PostgreSQL by default
+      - VECTOR_ENGINE=postgres
+      - DATABASE_URL=postgresql://localrecall:localrecall@postgres:5432/localrecall?sslmode=disable
+      - EMBEDDING_MODEL=granite-embedding-107m-multilingual
       - LOCALAGI_TIMEOUT=5m
       - LOCALAGI_ENABLE_CONVERSATIONS_LOGGING=false
       - LOCALAGI_SSHBOX_URL=root:root@sshbox:22
@@ -101,4 +100,13 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./volumes/localagi/:/pool
+      - localagi_pool:/pool
+      # Optional: mount a host directory for skills (replaces the default state-dir/skills path)
+      # - ./skills:/pool/skills
+
+volumes:
+  postgres_data:
+  models:
+  backends:
+  images:
+  localagi_pool:

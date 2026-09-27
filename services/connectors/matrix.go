@@ -10,7 +10,7 @@ import (
 	"github.com/mudler/LocalAGI/core/agent"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/xlog"
 	"github.com/sashabaranov/go-openai"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/event"
@@ -93,25 +93,6 @@ func (m *Matrix) AgentReasoningCallback() func(state types.ActionCurrentState) b
 	}
 }
 
-// cancelActiveJobForRoom cancels any active job for the given room
-func (m *Matrix) cancelActiveJobForRoom(roomID string) {
-	m.activeJobsMutex.RLock()
-	ctxs, exists := m.activeJobs[roomID]
-	m.activeJobsMutex.RUnlock()
-
-	if exists {
-		xlog.Info(fmt.Sprintf("Cancelling active job for room: %s", roomID))
-
-		// Mark the job as inactive
-		m.activeJobsMutex.Lock()
-		for _, c := range ctxs {
-			c.Cancel()
-		}
-		delete(m.activeJobs, roomID)
-		m.activeJobsMutex.Unlock()
-	}
-}
-
 func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 	if m.roomID != evt.RoomID.String() && m.roomMode { // If we have a roomID and it's not the same as the event room
 		// Skip messages from other rooms
@@ -136,9 +117,6 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 		return
 	}
 
-	// Cancel any active job for this room before starting a new one
-	m.cancelActiveJobForRoom(evt.RoomID.String())
-
 	currentConv := a.SharedState().ConversationTracker.GetConversation(fmt.Sprintf("matrix:%s", evt.RoomID.String()))
 
 	message := evt.Content.AsMessage().Body
@@ -159,9 +137,10 @@ func (m *Matrix) handleRoomMessage(a *agent.Agent, evt *event.Event) {
 
 		agentOptions = append(agentOptions, types.WithConversationHistory(currentConv))
 
-		// Add room to metadata for tracking
+		// Add room and conversation_id for tracking and cancel-previous-on-new-message
 		metadata := map[string]any{
-			"room": evt.RoomID.String(),
+			"room":                          evt.RoomID.String(),
+			types.MetadataKeyConversationID: "matrix:" + evt.RoomID.String(),
 		}
 		agentOptions = append(agentOptions, types.WithMetadata(metadata))
 
@@ -225,16 +204,16 @@ func (m *Matrix) Start(a *agent.Agent) {
 
 	if m.roomID != "" {
 		// handle new conversations
-		a.AddSubscriber(func(ccm openai.ChatCompletionMessage) {
-			xlog.Debug("Subscriber(matrix)", "message", ccm.Content)
-			_, err := m.client.SendText(context.Background(), id.RoomID(m.roomID), ccm.Content)
+		a.AddSubscriber(func(ccm *types.ConversationMessage) {
+			xlog.Debug("Subscriber(matrix)", "message", ccm.Message.Content)
+			_, err := m.client.SendText(context.Background(), id.RoomID(m.roomID), ccm.Message.Content)
 			if err != nil {
 				xlog.Error(fmt.Sprintf("Error posting message: %v", err))
 			}
 			a.SharedState().ConversationTracker.AddMessage(
 				fmt.Sprintf("matrix:%s", m.roomID),
 				openai.ChatCompletionMessage{
-					Content: ccm.Content,
+					Content: ccm.Message.Content,
 					Role:    "assistant",
 				},
 			)

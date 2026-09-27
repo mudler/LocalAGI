@@ -8,3 +8,5 @@ LocalAGI
 **/.env
 .vscode
 volumes/
+example/scheduler/scheduler
+example/scheduler/example_tasks.json

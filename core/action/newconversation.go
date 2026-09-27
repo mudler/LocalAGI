@@ -7,7 +7,7 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
-const ConversationActionName = "new_conversation"
+const ConversationActionName = "send_message"
 
 func NewConversation() *ConversationAction {
 	return &ConversationAction{}

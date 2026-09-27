@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"path/filepath"
 
 	"github.com/dave-gray101/v2keyauth"
 	fiber "github.com/gofiber/fiber/v2"
@@ -18,21 +17,15 @@ import (
 
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
-	"github.com/mudler/LocalAGI/pkg/xlog"
+	"github.com/mudler/LocalAGI/pkg/localrag"
 	"github.com/mudler/LocalAGI/services"
+	"github.com/mudler/xlog"
 )
 
 //go:embed react-ui/dist/*
 var reactUI embed.FS
 
 func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
-
-	// Static avatars in a.pooldir/avatars
-	webapp.Use("/avatars", filesystem.New(filesystem.Config{
-		Root: http.Dir(filepath.Join(app.config.StateDir, "avatars")),
-		//	PathPrefix: "avatars",
-		Browse: true,
-	}))
 
 	if len(app.config.ApiKeys) > 0 {
 		kaConfig, err := GetKeyAuthConfig(app.config.ApiKeys)
@@ -42,18 +35,10 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		webapp.Use(v2keyauth.New(*kaConfig))
 	}
 
-	webapp.Get("/old", func(c *fiber.Ctx) error {
-		return c.Render("old/views/index", fiber.Map{
-			"Agents":     pool.List(),
-			"AgentCount": len(pool.List()),
-			"Actions":    len(services.AvailableActions),
-			"Connectors": len(services.AvailableConnectors),
-		})
-	})
-
 	webapp.Get("/", func(c *fiber.Ctx) error {
 		return c.Redirect("/app")
 	})
+
 	webapp.Use("/app", filesystem.New(filesystem.Config{
 		Root:       http.FS(reactUI),
 		PathPrefix: "react-ui/dist",
@@ -69,29 +54,6 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		return c.Send(indexHTML)
 	})
 
-	webapp.Get("/old/agents", func(c *fiber.Ctx) error {
-		statuses := map[string]bool{}
-		for _, a := range pool.List() {
-			agent := pool.GetAgent(a)
-			if agent == nil {
-				xlog.Error("Agent not found", "name", a)
-				continue
-			}
-			statuses[a] = !agent.Paused()
-		}
-		return c.Render("old/views/agents", fiber.Map{
-			"Agents": pool.List(),
-			"Status": statuses,
-		})
-	})
-
-	webapp.Get("/old/create", func(c *fiber.Ctx) error {
-		return c.Render("old/views/create", fiber.Map{
-			"Actions":      services.AvailableActions,
-			"Connectors":   services.AvailableConnectors,
-			"PromptBlocks": services.AvailableBlockPrompts,
-		})
-	})
 	// Define a route for the GET method on the root path '/'
 	webapp.Get("/sse/:name", func(c *fiber.Ctx) error {
 		m := pool.GetManager(c.Params("name"))
@@ -103,21 +65,7 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 		return nil
 	})
 
-	webapp.Get("/old/status/:name", func(c *fiber.Ctx) error {
-		history := pool.GetStatusHistory(c.Params("name"))
-		if history == nil {
-			history = &state.Status{ActionResults: []types.ActionState{}}
-		}
-		// reverse history
-
-		return c.Render("old/views/status", fiber.Map{
-			"Name":    c.Params("name"),
-			"History": Reverse(history.Results()),
-		})
-	})
-
 	webapp.Get("/api/notify/:name", app.Notify(pool))
-	webapp.Post("/old/chat/:name", app.OldChat(pool))
 
 	webapp.Post("/api/agent/create", app.Create(pool))
 	webapp.Delete("/api/agent/:name", app.Delete(pool))
@@ -126,45 +74,13 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 
 	webapp.Post("/api/chat/:name", app.Chat(pool))
 
+	webapp.Get("/login", func(c *fiber.Ctx) error {
+		return c.Status(401).Redirect("/app") // After login, just redirect to index
+	})
+
 	conversationTracker := conversations.NewConversationTracker[string](app.config.ConversationStoreDuration)
 
 	webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
-
-	webapp.Get("/old/talk/:name", func(c *fiber.Ctx) error {
-		return c.Render("old/views/chat", fiber.Map{
-			//	"Character": agent.Character,
-			"Name": c.Params("name"),
-		})
-	})
-
-	webapp.Get("/old/settings/:name", func(c *fiber.Ctx) error {
-		status := false
-		for _, a := range pool.List() {
-			if a == c.Params("name") {
-				status = !pool.GetAgent(a).Paused()
-			}
-		}
-
-		return c.Render("old/views/settings", fiber.Map{
-			"Name":         c.Params("name"),
-			"Status":       status,
-			"Actions":      services.AvailableActions,
-			"Connectors":   services.AvailableConnectors,
-			"PromptBlocks": services.AvailableBlockPrompts,
-		})
-	})
-
-	webapp.Get("/old/actions-playground", func(c *fiber.Ctx) error {
-		return c.Render("old/views/actions", fiber.Map{})
-	})
-
-	webapp.Get("/old/group-create", func(c *fiber.Ctx) error {
-		return c.Render("old/views/group-create", fiber.Map{
-			"Actions":      services.AvailableActions,
-			"Connectors":   services.AvailableConnectors,
-			"PromptBlocks": services.AvailableBlockPrompts,
-		})
-	})
 
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:name/config", app.GetAgentConfig(pool))
@@ -276,6 +192,42 @@ func (app *App) registerRoutes(pool *state.AgentPool, webapp *fiber.App) {
 	webapp.Post("/settings/import", app.ImportAgent(pool))
 	webapp.Get("/settings/export/:name", app.ExportAgent(pool))
 
+	// Skills API (when app.config.SkillsService is set)
+	webapp.Get("/api/skills/config", app.GetSkillsConfig)
+	webapp.Get("/api/skills", app.ListSkills)
+	webapp.Get("/api/skills/search", app.SearchSkills)
+	webapp.Post("/api/skills", app.CreateSkill)
+	webapp.Get("/api/skills/export/*", app.ExportSkill)
+	webapp.Post("/api/skills/import", app.ImportSkill)
+	webapp.Get("/api/skills/:name", app.GetSkill)
+	webapp.Put("/api/skills/:name", app.UpdateSkill)
+	webapp.Delete("/api/skills/:name", app.DeleteSkill)
+	webapp.Get("/api/skills/:name/resources", app.ListSkillResources)
+	webapp.Get("/api/skills/:name/resources/*", app.GetSkillResource)
+	webapp.Post("/api/skills/:name/resources", app.CreateSkillResource)
+	webapp.Put("/api/skills/:name/resources/*", app.UpdateSkillResource)
+	webapp.Delete("/api/skills/:name/resources/*", app.DeleteSkillResource)
+	webapp.Get("/api/git-repos", app.ListGitRepos)
+	webapp.Post("/api/git-repos", app.AddGitRepo)
+	webapp.Put("/api/git-repos/:id", app.UpdateGitRepo)
+	webapp.Delete("/api/git-repos/:id", app.DeleteGitRepo)
+	webapp.Post("/api/git-repos/:id/sync", app.SyncGitRepo)
+	webapp.Post("/api/git-repos/:id/toggle", app.ToggleGitRepo)
+
+	// Model Context Protocol endpoint, exposing agent management to MCP clients.
+	app.registerMCPRoutes(pool, webapp)
+
+	// Collections / knowledge base API (LocalRecall-compatible). Same interface for in-process or remote.
+	var collectionsBackend CollectionsBackend
+	if app.config.LocalRAGURL != "" {
+		client := localrag.NewClient(app.config.LocalRAGURL, app.config.LLMAPIKey)
+		collectionsBackend = NewCollectionsBackendHTTP(client)
+	} else {
+		var state *CollectionsState
+		collectionsBackend, state = NewInProcessCollectionsBackend(app.config)
+		app.collectionsState = state
+	}
+	app.RegisterCollectionRoutes(webapp, app.config, collectionsBackend)
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -325,7 +277,9 @@ func getApiKeyErrorHandler(opaqueErrors bool, apiKeys []string) fiber.ErrorHandl
 			if opaqueErrors {
 				return ctx.SendStatus(401)
 			}
-			return ctx.Status(401).Render("old/views/login", fiber.Map{})
+			return ctx.Status(401).Render("public/views/login", fiber.Map{
+				"Title": "Login Required",
+			})
 		}
 		if opaqueErrors {
 			return ctx.SendStatus(500)

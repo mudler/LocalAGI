@@ -13,14 +13,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/mudler/LocalAGI/pkg/xlog"
 	"github.com/mudler/cogito"
+	"github.com/mudler/cogito/clients"
+
+	"github.com/mudler/xlog"
 
 	"github.com/mudler/LocalAGI/core/action"
+	"github.com/mudler/LocalAGI/core/scheduler"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/llm"
-	"github.com/robfig/cron/v3"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -29,6 +30,20 @@ const (
 	AssistantRole = "assistant"
 	SystemRole    = "system"
 )
+
+// NoToolToCallArgs defines the arguments for the no_tool_to_call sink state tool
+type NoToolToCallArgs struct {
+	Reasoning string `json:"reasoning" description:"The reasoning for why no tool is being called"`
+}
+
+// NoToolToCallTool is a custom sink state tool that logs when no other tool is needed
+type NoToolToCallTool struct{}
+
+// Run executes the no_tool_to_call tool and logs a message
+func (t NoToolToCallTool) Run(args NoToolToCallArgs) (string, any, error) {
+	xlog.Info("No tool to call - agent decided no action was needed", "reasoning", args.Reasoning)
+	return fmt.Sprintf("No action needed: %s", args.Reasoning), nil, nil
+}
 
 type Agent struct {
 	sync.Mutex
@@ -43,19 +58,29 @@ type Agent struct {
 	selfEvaluationInProgress bool
 	pause                    bool
 
-	newConversations chan openai.ChatCompletionMessage
+	newConversations chan *types.ConversationMessage
 
-	mcpSessions []*mcp.ClientSession
+	mcpSessions []*mcpSession
+	// mcpMutex guards mcpSessions and mcpActionDefinitions, which are re-dialed
+	// and rebuilt from the job loop as servers come and go.
+	mcpMutex sync.Mutex
 	// only contains the MCP action definitions for observables
 	mcpActionDefinitions types.Actions
 
 	subscriberMutex        sync.Mutex
-	newMessagesSubscribers []func(openai.ChatCompletionMessage)
+	newMessagesSubscribers []func(*types.ConversationMessage)
 
 	observer Observer
 
 	llm         cogito.LLM
 	sharedState *types.AgentSharedState
+
+	// Task scheduler for managing reminders
+	taskScheduler *scheduler.Scheduler
+
+	// currentJobByConversation tracks the running job per conversation_id for cancel-previous-on-new-message
+	currentJobByConversation map[string]*types.Job
+	currentJobMu             sync.Mutex
 }
 
 type RAGDB interface {
@@ -72,7 +97,7 @@ func New(opts ...Option) (*Agent, error) {
 	}
 
 	client := llm.NewClient(options.LLMAPI.APIKey, options.LLMAPI.APIURL, options.timeout)
-	llmClient := cogito.NewOpenAILLM(options.LLMAPI.Model, options.LLMAPI.APIKey, options.LLMAPI.APIURL)
+	llmClient := clients.NewLocalAILLM(options.LLMAPI.Model, options.LLMAPI.APIKey, options.LLMAPI.APIURL)
 	c := context.Background()
 	if options.context != nil {
 		c = options.context
@@ -80,16 +105,17 @@ func New(opts ...Option) (*Agent, error) {
 
 	ctx, cancel := context.WithCancel(c)
 	a := &Agent{
-		jobQueue:               make(chan *types.Job),
-		options:                options,
-		client:                 client,
-		Character:              options.character,
-		currentState:           &types.AgentInternalState{},
-		llm:                    llmClient,
-		context:                types.NewActionContext(ctx, cancel),
-		newConversations:       make(chan openai.ChatCompletionMessage),
-		newMessagesSubscribers: options.newConversationsSubscribers,
-		sharedState:            types.NewAgentSharedState(options.lastMessageDuration),
+		jobQueue:                 make(chan *types.Job),
+		options:                  options,
+		client:                   client,
+		Character:                options.character,
+		currentState:             &types.AgentInternalState{},
+		llm:                      llmClient,
+		context:                  types.NewActionContext(ctx, cancel),
+		newConversations:         make(chan *types.ConversationMessage),
+		newMessagesSubscribers:   options.newConversationsSubscribers,
+		sharedState:              types.NewAgentSharedState(options.lastMessageDuration),
+		currentJobByConversation: make(map[string]*types.Job),
 	}
 
 	// Initialize observer if provided
@@ -118,6 +144,28 @@ func New(opts ...Option) (*Agent, error) {
 	a.initMCPActions()
 	xlog.Info("Done populating actions from MCP Servers")
 
+	// Initialize task scheduler for reminders
+	schedulerPath := options.schedulerStorePath
+	if schedulerPath == "" {
+		schedulerPath = "scheduled_tasks.json"
+	}
+
+	store, err := scheduler.NewJSONStoreWithRetention(schedulerPath, options.schedulerRetention)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scheduler store: %v", err)
+	}
+
+	executor := &agentSchedulerExecutor{agent: a}
+	pollInterval := options.schedulerPollInterval
+	if pollInterval == 0 {
+		pollInterval = 30 * time.Second
+	}
+
+	a.taskScheduler = scheduler.NewSchedulerWithPolicy(store, executor, pollInterval, options.schedulerCreation)
+	a.sharedState.Scheduler = a.taskScheduler
+	a.sharedState.AgentName = a.Character.Name
+	xlog.Info("Task scheduler initialized", "store_path", schedulerPath, "poll_interval", pollInterval)
+
 	xlog.Info(
 		"Agent created",
 		"agent", a.Character.Name,
@@ -134,6 +182,19 @@ func (a *Agent) SharedState() *types.AgentSharedState {
 	return a.sharedState
 }
 
+// SetStreamCallback sets (or replaces) the stream callback on a live agent.
+// This allows callers to wire streaming events after agent creation,
+func (a *Agent) SetStreamCallback(fn func(cogito.StreamEvent)) {
+	a.options.streamCallback = fn
+}
+
+// StartConversationConsumer starts the goroutine that dispatches new conversation
+// messages to subscribers. This must be called when using AskDirect() without Run(),
+// otherwise the ConversationAction handler will deadlock on the newConversations channel.
+func (a *Agent) StartConversationConsumer() {
+	a.startNewConversationsConsumer()
+}
+
 func (a *Agent) startNewConversationsConsumer() {
 	go func() {
 		for {
@@ -142,19 +203,21 @@ func (a *Agent) startNewConversationsConsumer() {
 				return
 
 			case msg := <-a.newConversations:
-				xlog.Debug("New conversation", "agent", a.Character.Name, "message", msg.Content)
+				xlog.Debug("New conversation", "agent", a.Character.Name, "message", msg.Message.Content)
 				a.subscriberMutex.Lock()
 				subs := a.newMessagesSubscribers
 				a.subscriberMutex.Unlock()
 				for _, s := range subs {
-					s(msg)
+					if s != nil && msg != nil {
+						s(msg)
+					}
 				}
 			}
 		}
 	}()
 }
 
-func (a *Agent) AddSubscriber(f func(openai.ChatCompletionMessage)) {
+func (a *Agent) AddSubscriber(f func(*types.ConversationMessage)) {
 	a.subscriberMutex.Lock()
 	defer a.subscriberMutex.Unlock()
 	a.newMessagesSubscribers = append(a.newMessagesSubscribers, f)
@@ -162,6 +225,21 @@ func (a *Agent) AddSubscriber(f func(openai.ChatCompletionMessage)) {
 
 func (a *Agent) Context() context.Context {
 	return a.context.Context
+}
+
+func (a *Agent) streamCallbackForJob(job *types.Job) func(cogito.StreamEvent) {
+	agentCallback := a.options.streamCallback
+	requestCallback := job.StreamCallback
+	if agentCallback == nil {
+		return requestCallback
+	}
+	if requestCallback == nil {
+		return agentCallback
+	}
+	return func(event cogito.StreamEvent) {
+		agentCallback(event)
+		requestCallback(event)
+	}
 }
 
 // Ask is a blocking call that returns the response as soon as it's ready.
@@ -189,6 +267,84 @@ func (a *Agent) Ask(opts ...types.JobOption) *types.JobResult {
 	))
 }
 
+// AskDirect executes a job synchronously without requiring Run() to be active.
+// Unlike Ask/Execute which enqueue to the internal jobQueue (consumed by Run()),
+// AskDirect calls consumeJob directly. This enables stateless execution where
+// the caller manages the event loop
+func (a *Agent) AskDirect(opts ...types.JobOption) *types.JobResult {
+	xlog.Debug("Agent AskDirect()", "agent", a.Character.Name, "model", a.options.LLMAPI.Model)
+	defer func() {
+		xlog.Debug("Agent AskDirect finished", "agent", a.Character.Name)
+	}()
+
+	j := types.NewJob(
+		append(
+			opts,
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)...,
+	)
+
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "job"
+		obs.Icon = "plug"
+		a.observer.Update(*obs)
+		j.Obs = obs
+
+		if len(j.ConversationHistory) > 0 {
+			m := j.ConversationHistory[len(j.ConversationHistory)-1]
+			j.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
+			a.observer.Update(*j.Obs)
+		}
+
+		j.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
+			if a.observer == nil {
+				return
+			}
+			if j.Obs.Completion == nil {
+				j.Obs.Completion = &types.Completion{}
+			}
+			j.Obs.Completion.Conversation = ccm
+			if j.Result.Error != nil {
+				j.Obs.Completion.Error = j.Result.Error.Error()
+			}
+			a.observer.Update(*j.Obs)
+		})
+	}
+
+	a.consumeJob(j, UserRole)
+	return j.Result
+}
+
+// AskDirectSystem is like AskDirect but executes with SystemRole,
+// used for periodic autonomous runs and scheduled tasks.
+func (a *Agent) AskDirectSystem(opts ...types.JobOption) *types.JobResult {
+	xlog.Debug("Agent AskDirectSystem()", "agent", a.Character.Name)
+	defer func() {
+		xlog.Debug("Agent AskDirectSystem finished", "agent", a.Character.Name)
+	}()
+
+	j := types.NewJob(
+		append(
+			opts,
+			types.WithReasoningCallback(a.options.reasoningCallback),
+			types.WithResultCallback(a.options.resultCallback),
+		)...,
+	)
+
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "standalone"
+		obs.Icon = "clock"
+		a.observer.Update(*obs)
+		j.Obs = obs
+	}
+
+	a.consumeJob(j, SystemRole)
+	return j.Result
+}
+
 // Ask is a pre-emptive, blocking call that returns the response as soon as it's ready.
 // It discards any other computation.
 func (a *Agent) Execute(j *types.Job) *types.JobResult {
@@ -197,7 +353,7 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 		xlog.Debug("Agent has finished", "agent", a.Character.Name)
 	}()
 
-	if j.Obs != nil {
+	if j.Obs != nil && a.observer != nil {
 		if len(j.ConversationHistory) > 0 {
 			m := j.ConversationHistory[len(j.ConversationHistory)-1]
 			j.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
@@ -205,25 +361,45 @@ func (a *Agent) Execute(j *types.Job) *types.JobResult {
 		}
 
 		j.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
-			j.Obs.Completion = &types.Completion{
-				Conversation: ccm,
+			if a.observer == nil {
+				return
 			}
-
+			// Merge into existing Completion so last-progress completion data is preserved
+			if j.Obs.Completion == nil {
+				j.Obs.Completion = &types.Completion{}
+			}
+			j.Obs.Completion.Conversation = ccm
 			if j.Result.Error != nil {
 				j.Obs.Completion.Error = j.Result.Error.Error()
 			}
-
 			a.observer.Update(*j.Obs)
 		})
 	}
 
 	a.Enqueue(j)
-	return j.Result.WaitResult()
+	result, err := j.Result.WaitResult(a.context.Context)
+	if err != nil {
+		return nil
+	}
+	return result
 }
 
 func (a *Agent) Enqueue(j *types.Job) {
 	j.ReasoningCallback = a.options.reasoningCallback
 	j.ResultCallback = a.options.resultCallback
+
+	// Cancel previous running job for this conversation if option is enabled
+	cancelPrevious := a.options.cancelPreviousOnNewMessage == nil || *a.options.cancelPreviousOnNewMessage
+	if cancelPrevious && j.Metadata != nil {
+		if convID, ok := j.Metadata[types.MetadataKeyConversationID].(string); ok && convID != "" {
+			a.currentJobMu.Lock()
+			existing := a.currentJobByConversation[convID]
+			a.currentJobMu.Unlock()
+			if existing != nil {
+				existing.Cancel()
+			}
+		}
+	}
 
 	a.jobQueue <- j
 }
@@ -267,10 +443,16 @@ func (a *Agent) TTS(ctx context.Context, text string) ([]byte, error) {
 var ErrContextCanceled = fmt.Errorf("context canceled")
 
 func (a *Agent) Stop() {
+	xlog.Debug("Stopping agent", "agent", a.Character.Name)
+
+	// Stop the scheduler
+	a.taskScheduler.Stop()
+	xlog.Info("Task scheduler stopped")
+
 	a.Lock()
 	defer a.Unlock()
-	xlog.Debug("Stopping agent", "agent", a.Character.Name)
-	a.closeMCPSTDIOServers()
+
+	a.closeMCPServers()
 	a.context.Cancel()
 }
 
@@ -310,6 +492,21 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			continue
 		}
 
+		content := message.Content
+
+		if strings.Contains(content, "{{") {
+			promptTemplate, err := templateBase("template", content)
+			if err != nil {
+				xlog.Error("Error rendering template", "error", err)
+			}
+
+			content, err = templateExecute(promptTemplate, CommonTemplateData{AgentName: a.Character.Name})
+			if err != nil {
+				xlog.Error("Error executing template", "error", err)
+				content = message.Content
+			}
+		}
+
 		if message.ImageBase64 != "" {
 			// iF model support both images and text, process it as a single multicontent message and return
 			if !a.options.SeparatedMultimodalModel() {
@@ -319,7 +516,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 						MultiContent: []openai.ChatMessagePart{
 							{
 								Type: openai.ChatMessagePartTypeText,
-								Text: message.Content,
+								Text: content,
 							},
 							{
 								Type: openai.ChatMessagePartTypeImageURL,
@@ -339,7 +536,7 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 					conversation = append([]openai.ChatCompletionMessage{
 						{
 							Role:    prompt.Role(),
-							Content: fmt.Sprintf("%s\n\nImage description: %s", message.Content, imageDescription),
+							Content: fmt.Sprintf("%s\n\nImage description: %s", content, imageDescription),
 						}}, conversation...)
 				}
 			}
@@ -347,18 +544,33 @@ func (a *Agent) processPrompts(ctx context.Context, conversation Messages) Messa
 			conversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    prompt.Role(),
-					Content: message.Content,
+					Content: content,
 				}}, conversation...)
 		}
 	}
 
 	// TODO: move to a Promptblock?
 	if a.options.systemPrompt != "" {
-		if !conversation.Exist(a.options.systemPrompt) {
+		content := a.options.systemPrompt
+
+		if strings.Contains(content, "{{") {
+			promptTemplate, err := templateBase("template", a.options.systemPrompt)
+			if err != nil {
+				xlog.Error("Error rendering template", "error", err)
+			}
+
+			content, err = templateExecute(promptTemplate, CommonTemplateData{AgentName: a.Character.Name})
+			if err != nil {
+				xlog.Error("Error executing template", "error", err)
+				content = a.options.systemPrompt
+			}
+		}
+
+		if !conversation.Exist(content) {
 			conversation = append([]openai.ChatCompletionMessage{
 				{
 					Role:    "system",
-					Content: a.options.systemPrompt,
+					Content: content,
 				}}, conversation...)
 		}
 	}
@@ -456,27 +668,19 @@ func (a *Agent) processUserInputs(conv Messages) Messages {
 
 			// Add the text content as a new message with the same role first
 			if text != "" {
+				imageDesc := fmt.Sprintf("\n\n[Images in this message: %s]", strings.Join(imageDescriptions, "; "))
 				textMessage := openai.ChatCompletionMessage{
 					Role:    message.Role,
-					Content: text,
+					Content: text + imageDesc,
 				}
 				processedMessages = append(processedMessages, textMessage)
-
-				// Add the image descriptions as a system message after the text
-				explainerMessage := openai.ChatCompletionMessage{
-					Role: "system",
-					Content: fmt.Sprintf("The above message also contains %d image(s) which can be described as: %s",
-						len(images), strings.Join(imageDescriptions, "; ")),
-				}
-				processedMessages = append(processedMessages, explainerMessage)
 			} else {
-				// If there's no text, just add the image descriptions as a system message
-				explainerMessage := openai.ChatCompletionMessage{
-					Role: "system",
-					Content: fmt.Sprintf("Message contains %d image(s) which can be described as: %s",
-						len(images), strings.Join(imageDescriptions, "; ")),
-				}
-				processedMessages = append(processedMessages, explainerMessage)
+				// Images only: emit a single user message with the image description
+				content := fmt.Sprintf("[Attached images: %s]", strings.Join(imageDescriptions, "; "))
+				processedMessages = append(processedMessages, openai.ChatCompletionMessage{
+					Role:    message.Role,
+					Content: content,
+				})
 			}
 		} else {
 			// No image found, keep the original message
@@ -536,7 +740,7 @@ func (a *Agent) filterJob(job *types.Job) (ok bool, err error) {
 		}
 	}
 
-	if a.Observer() != nil {
+	if a.Observer() != nil && job.Obs != nil {
 		obs := a.Observer().NewObservable()
 		obs.Name = "filter"
 		obs.Icon = "shield"
@@ -607,7 +811,7 @@ func (a *Agent) validateBuiltinTools(job *types.Job) {
 	}
 
 	// Get available actions
-	availableActions := a.availableActions()
+	availableActions := a.availableActions(job)
 
 	for _, tool := range builtinTools {
 		functionName := tool.Name
@@ -709,6 +913,7 @@ func (a *Agent) addFunctionResultToConversation(ctx context.Context, chosenActio
 }
 
 func (a *Agent) consumeJob(job *types.Job, role string) {
+	streamCallback := a.streamCallbackForJob(job)
 	if err := job.GetContext().Err(); err != nil {
 		job.Result.Finish(fmt.Errorf("expired"))
 		return
@@ -722,6 +927,26 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		xlog.Info("Agent is paused, skipping job", "agent", a.Character.Name)
 		job.Result.Finish(fmt.Errorf("agent is paused"))
 		return
+	}
+
+	// Register this job as the current one for its conversation (for cancel-previous-on-new-message)
+	var conversationID string
+	if job.Metadata != nil {
+		if cid, ok := job.Metadata[types.MetadataKeyConversationID].(string); ok && cid != "" {
+			conversationID = cid
+			a.currentJobMu.Lock()
+			a.currentJobByConversation[conversationID] = job
+			a.currentJobMu.Unlock()
+		}
+	}
+	if conversationID != "" {
+		defer func() {
+			a.currentJobMu.Lock()
+			if a.currentJobByConversation[conversationID] == job {
+				delete(a.currentJobByConversation, conversationID)
+			}
+			a.currentJobMu.Unlock()
+		}()
 	}
 
 	// We are self evaluating if we consume the job as a system role
@@ -742,6 +967,28 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		}()
 	}
 
+	// Ensure job observable has Creation and Completion for jobs that bypass Execute() (e.g. periodic, scheduler)
+	if job.Obs != nil && a.observer != nil {
+		if job.Obs.Creation == nil && len(job.ConversationHistory) > 0 {
+			m := job.ConversationHistory[len(job.ConversationHistory)-1]
+			job.Obs.Creation = &types.Creation{ChatCompletionMessage: &m}
+			a.observer.Update(*job.Obs)
+		}
+		job.Result.AddFinalizer(func(ccm []openai.ChatCompletionMessage) {
+			if a.observer == nil {
+				return
+			}
+			if job.Obs.Completion == nil {
+				job.Obs.Completion = &types.Completion{}
+			}
+			job.Obs.Completion.Conversation = ccm
+			if job.Result.Error != nil {
+				job.Obs.Completion.Error = job.Result.Error.Error()
+			}
+			a.observer.Update(*job.Obs)
+		})
+	}
+
 	conv = a.processPrompts(job.GetContext(), conv)
 	if ok, err := a.filterJob(job); !ok || err != nil {
 		if err != nil {
@@ -759,38 +1006,50 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	// Validate builtin tools against available actions
 	a.validateBuiltinTools(job)
 
-	fragment := cogito.NewFragment(conv...)
-
+	// Merge all leading system messages into one (self-eval, HUD, RAG, system prompt, custom prompts)
+	var selfEvalContent, hudContent string
 	if selfEvaluation {
-		fragment = fragment.AddStartMessage("system", pickSelfTemplate)
+		selfEvalContent = pickSelfTemplate
 	}
-
 	if a.options.enableHUD {
-		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(), "")
+		prompt, err := renderTemplate(hudTemplate, a.prepareHUD(), a.availableActions(job), "")
 		if err != nil {
 			job.Result.Finish(fmt.Errorf("error renderTemplate: %w", err))
 			return
 		}
-		fragment = fragment.AddStartMessage("system", prompt)
+		hudContent = prompt
 	}
+	conv = Messages(conv).mergeLeadingSystemMessages(selfEvalContent, hudContent)
+
+	// Backends with enable_thinking (e.g. vLLM) reject requests where the last message is
+	// assistant (treated as "assistant response prefill"). We can end with assistant when:
+	// - Web/API: client sends previous_response_id but no new input (ToChatCompletionMessages()
+	//   is empty), so messages = GetConversation(id) which was saved after the last reply and
+	//   ends with assistant.
+	// - Connectors: if they pass a thread that was stored ending with assistant and no new
+	//   user message is appended in that code path.
+	// - Periodic/scheduler jobs always use WithText(...) so they append a user message; they
+	//   do not end with assistant.
+	// Normalize so we never send a request that ends with assistant (avoids enable_thinking
+	// error); callers should ideally always append a new user message when continuing a thread.
+	if len(conv) > 0 && conv[len(conv)-1].Role == AssistantRole {
+		conv = append(conv, openai.ChatCompletionMessage{
+			Role:    UserRole,
+			Content: " ",
+		})
+	}
+
+	fragment := cogito.NewFragment(conv...)
+
+	// Re-dial any MCP server that dropped its session since the last turn, so
+	// its tools are available again instead of being lost until a restart.
+	a.refreshMCPSessions()
 
 	availableActions := a.getAvailableActionsForJob(job)
 	cogitoTools := availableActions.ToCogitoTools(job.GetContext(), a.sharedState)
 	allActions := append(availableActions, a.mcpActionDefinitions...)
 
 	obs := job.Obs
-	if obs == nil && a.observer != nil && job.Obs != nil {
-		obs = a.observer.NewObservable()
-		obs.Name = "decision"
-		obs.Icon = "brain"
-		obs.ParentID = job.Obs.ID
-		obs.Creation = &types.Creation{
-			ChatCompletionRequest: &openai.ChatCompletionRequest{
-				Model:    a.options.LLMAPI.Model,
-				Messages: conv,
-			},
-		}
-	}
 
 	defer func() {
 		if obs != nil && a.observer != nil {
@@ -801,14 +1060,37 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 	var err error
 	var userTool bool
+	// Set by tool callback when it decides the job outcome; Finish is then called once after ExecuteTools.
+	var finishedByCallback bool
+	var finishErr error
 
 	var observables = make(map[string]*types.Observable)
 
 	cogitoOpts := []cogito.Option{
-		cogito.WithMCPs(a.mcpSessions...),
+		cogito.WithMCPs(a.liveMCPSessions()...),
+		cogito.WithTools(
+			cogitoTools...,
+		),
+		cogito.WithSinkState(
+			cogito.NewToolDefinition(
+				NoToolToCallTool{},
+				NoToolToCallArgs{},
+				"no_tool_to_call",
+				"Called when no other tool is needed to respond to the user",
+			),
+		),
 		cogito.WithReasoningCallback(func(s string) {
 			xlog.Debug("Cogito reasoning callback", "status", s)
-
+			if s == "" {
+				return
+			}
+			// Forward reasoning to stream callback
+			if streamCallback != nil {
+				streamCallback(cogito.StreamEvent{
+					Type:    cogito.StreamEventReasoning,
+					Content: s,
+				})
+			}
 			if a.observer != nil && job.Obs != nil {
 				job.Obs.AddProgress(
 					types.Progress{
@@ -825,20 +1107,46 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					})
 				a.observer.Update(*job.Obs)
 			}
+			job.Callback(types.ActionCurrentState{
+				Job:       job,
+				Action:    nil,
+				Params:    types.ActionParams{},
+				Reasoning: s,
+			})
 		}),
-		cogito.WithTools(
-			cogitoTools...,
-		),
 		cogito.WithToolCallResultCallback(func(t cogito.ToolStatus) {
-			if a.observer != nil && obs != nil {
-				obs := observables[t.ToolArguments.ID]
-				obs.Progress = append(obs.Progress, types.Progress{
+			toolObs := observables[t.ToolArguments.ID]
+			if a.observer != nil && toolObs != nil {
+				toolObs.Progress = append(toolObs.Progress, types.Progress{
 					ActionResult: t.Result,
 				})
-				obs.Name = "action"
-				obs.Icon = "bolt"
-				obs.MakeLastProgressCompletion()
-				a.observer.Update(*obs)
+				toolObs.Name = "action"
+				toolObs.Icon = "bolt"
+				toolObs.MakeLastProgressCompletion()
+				a.observer.Update(*toolObs)
+			}
+
+			// Use full ActionResult (including Metadata) from action result,
+			// so connectors receive e.g. songs_paths, images_url for sending files.
+			actionResult := &types.ActionResult{
+				Result: t.Result,
+			}
+			if t.ResultData != nil {
+				switch res := t.ResultData.(type) {
+				case types.ActionResult:
+					actionResult = &res
+				}
+			}
+
+			// Merge action metadata into job metadata so it accumulates across actions
+			// and is available when ConversationAction runs
+			if actionResult.Metadata != nil {
+				if job.Metadata == nil {
+					job.Metadata = make(map[string]interface{})
+				}
+				for key, value := range actionResult.Metadata {
+					job.Metadata[key] = value
+				}
 			}
 
 			aa := allActions.Find(t.Name)
@@ -849,14 +1157,14 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					Params:    types.ActionParams(t.ToolArguments.Arguments),
 					Reasoning: t.ToolArguments.Reasoning,
 				},
-				ActionResult: types.ActionResult{Result: t.Result},
+				ActionResult: *actionResult,
 			}
 			job.Result.SetResult(state)
 			job.CallbackWithResult(state)
-			conv = a.addFunctionResultToConversation(job.GetContext(), aa, types.ActionParams(t.ToolArguments.Arguments), types.ActionResult{Result: t.Result}, conv)
+			conv = a.addFunctionResultToConversation(job.GetContext(), aa, types.ActionParams(t.ToolArguments.Arguments), *actionResult, conv)
 		}),
 		cogito.WithToolCallBack(
-			func(tc *cogito.ToolChoice) bool {
+			func(tc *cogito.ToolChoice, _ *cogito.SessionState) cogito.ToolCallDecision {
 
 				xlog.Debug("Tool call back", "tool_call", tc)
 
@@ -869,7 +1177,22 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 					xlog.Debug("User-defined action chosen, returning tool call", "action", chosenAction.Definition().Name)
 					a.replyWithToolCall(job, conv, tc.Arguments, chosenAction, tc.Reasoning)
 					userTool = true
-					return false
+					return cogito.ToolCallDecision{
+						Approved: false,
+					}
+				}
+
+				// Forward tool selection to stream callback
+				if streamCallback != nil {
+					toolName := tc.Name
+					if chosenAction != nil {
+						toolName = chosenAction.Definition().Name.String()
+					}
+					streamCallback(cogito.StreamEvent{
+						Type:     cogito.StreamEventToolCall,
+						ToolName: toolName,
+						ToolArgs: fmt.Sprintf("%v", tc.Arguments),
+					})
 				}
 
 				if a.observer != nil && job.Obs != nil {
@@ -892,14 +1215,19 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 				switch tc.Name {
 				case action.StopActionName:
-					return false
+					return cogito.ToolCallDecision{
+						Approved: false,
+					}
 				case action.ConversationActionName:
 					message := action.ConversationActionResponse{}
 					toolArgs, _ := json.Marshal(tc.Arguments)
 					if err := json.Unmarshal([]byte(toolArgs), &message); err != nil {
 						xlog.Error("Error unmarshalling conversation response", "error", err)
-						job.Result.Finish(fmt.Errorf("error unmarshalling conversation response: %w", err))
-						return false
+						finishedByCallback = true
+						finishErr = fmt.Errorf("error unmarshalling conversation response: %w", err)
+						return cogito.ToolCallDecision{
+							Approved: false,
+						}
 					}
 
 					msg := openai.ChatCompletionMessage{
@@ -907,53 +1235,72 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 						Content: message.Message,
 					}
 
+					// Get accumulated metadata from job (e.g., images, files generated by previous actions in this job)
+					// This is per-job metadata, so parallel jobs won't interfere with each other
+					metadata := job.Metadata
+
 					go func(agent *Agent) {
-						xlog.Info("Sending new conversation to channel", "agent", agent.Character.Name, "message", msg.Content)
-						agent.newConversations <- msg
+						xlog.Info("Sending new conversation to channel", "agent", agent.Character.Name, "message", msg.Content, "metadata_keys", len(metadata))
+						// Send ConversationMessage with both the message and accumulated metadata
+						agent.newConversations <- types.NewConversationMessage(msg).WithMetadata(metadata)
+						// Job metadata is automatically cleared when job finishes, no need to manually clear
 					}(a)
 
 					job.Result.Conversation = []openai.ChatCompletionMessage{
 						msg,
 					}
 					job.Result.SetResponse("decided to initiate a new conversation")
-					job.Result.Finish(nil)
-					return true
+					finishedByCallback = true
+					finishErr = nil
+					return cogito.ToolCallDecision{
+						Approved: false,
+					}
 				case action.StateActionName:
 					// We need to store the result in the state
 					state := types.AgentInternalState{}
 					dat, _ := json.Marshal(tc.Arguments)
 					err = json.Unmarshal(dat, &state)
+					stateObs := observables[tc.ID]
 					if err != nil {
 						werr := fmt.Errorf("error unmarshalling state of the agent: %w", err)
-						if obs != nil && a.observer != nil {
-							obs.Completion = &types.Completion{
+						if stateObs != nil && a.observer != nil {
+							stateObs.Completion = &types.Completion{
 								Error: werr.Error(),
 							}
-							a.observer.Update(*obs)
+							a.observer.Update(*stateObs)
 						}
-						return false
+						return cogito.ToolCallDecision{
+							Approved: false,
+						}
 					}
 					// update the current state with the one we just got from the action
 					a.currentState = &state
-					if obs != nil && a.observer != nil {
-						obs.Progress = append(obs.Progress, types.Progress{
+					if stateObs != nil && a.observer != nil {
+						stateObs.Progress = append(stateObs.Progress, types.Progress{
 							AgentState: &state,
 						})
-						a.observer.Update(*obs)
+						a.observer.Update(*stateObs)
 					}
 
 					// update the state file
 					if a.options.statefile != "" {
 						if err := a.SaveState(a.options.statefile); err != nil {
-							if obs != nil && a.observer != nil {
-								obs.Completion = &types.Completion{
+							if stateObs != nil && a.observer != nil {
+								stateObs.Completion = &types.Completion{
 									Error: err.Error(),
 								}
-								a.observer.Update(*obs)
+								a.observer.Update(*stateObs)
 							}
 
-							return false
+							return cogito.ToolCallDecision{
+								Approved: false,
+							}
 						}
+					}
+					// Mark state tool-call observable as completed successfully
+					if stateObs != nil && a.observer != nil {
+						stateObs.MakeLastProgressCompletion()
+						a.observer.Update(*stateObs)
 					}
 
 				}
@@ -977,10 +1324,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 						})
 
 					job.Result.Conversation = conv
-					job.Result.Finish(nil)
-
+					finishedByCallback = true
+					finishErr = nil
 				}
-				return cont
+				return cogito.ToolCallDecision{
+					Approved: cont,
+				}
 			},
 		),
 	}
@@ -990,17 +1339,52 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		if a.options.enableEvaluation {
 			cogitoOpts = append(cogitoOpts, cogito.EnableAutoPlanReEvaluator)
 		}
+		if a.options.LLMAPI.ReviewerModel != "" {
+			llmClient := clients.NewLocalAILLM(a.options.LLMAPI.ReviewerModel, a.options.LLMAPI.APIKey, a.options.LLMAPI.APIURL)
+			cogitoOpts = append(cogitoOpts, cogito.WithReviewerLLM(llmClient))
+		}
+	}
+
+	// Important: DisableSinkState must be before WithForceReasoning()
+	if a.options.disableSinkState {
+		cogitoOpts = append(cogitoOpts, cogito.DisableSinkState)
 	}
 
 	if a.options.forceReasoning {
 		cogitoOpts = append(cogitoOpts, cogito.WithForceReasoning())
 	}
 
+	if a.options.enableGuidedTools {
+		cogitoOpts = append(cogitoOpts, cogito.EnableGuidedTools)
+	}
+
 	if a.options.maxEvaluationLoops > 0 {
 		cogitoOpts = append(cogitoOpts,
-			cogito.WithMaxAttempts(a.options.maxEvaluationLoops),
 			cogito.WithIterations(a.options.maxEvaluationLoops),
 		)
+	}
+
+	if a.options.loopDetection > 0 {
+		cogitoOpts = append(cogitoOpts, cogito.WithLoopDetection(a.options.loopDetection))
+	}
+
+	if a.options.forceReasoningTool {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithForceReasoningTool())
+	}
+
+	if a.options.enableAutoCompaction {
+		cogitoOpts = append(cogitoOpts,
+			cogito.WithCompactionThreshold(a.options.autoCompactionThreshold))
+	}
+
+	if a.options.maxAttempts > 1 {
+		cogitoOpts = append(cogitoOpts, cogito.WithMaxAttempts(a.options.maxAttempts))
+		cogitoOpts = append(cogitoOpts, cogito.WithMaxRetries(a.options.maxAttempts))
+	}
+
+	if streamCallback != nil {
+		cogitoOpts = append(cogitoOpts, cogito.WithStreamCallback(streamCallback))
 	}
 
 	fragment, err = cogito.ExecuteTools(
@@ -1020,13 +1404,16 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
+	if finishedByCallback {
+		job.Result.Finish(finishErr)
+		return
+	}
+
 	if userTool {
 		return
 	}
 
-	if len(fragment.Messages) > 0 &&
-		fragment.LastMessage().Role == "tool" {
-		toolToCall := fragment.Messages[len(fragment.Messages)-2].ToolCalls[0].Function.Name
+	if toolToCall, ok := lastToolCallName(fragment.Messages); ok {
 		switch toolToCall {
 		case action.StopActionName:
 			job.Result.Finish(nil)
@@ -1039,13 +1426,7 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		return
 	}
 
-	responseFragment, err := a.llm.Ask(job.GetContext(), fragment)
-	if err != nil {
-		job.Result.Finish(err)
-		return
-	}
-
-	result := a.cleanupLLMResponse(responseFragment.LastMessage().Content)
+	result := a.cleanupLLMResponse(fragment.LastMessage().Content)
 
 	conv = append(fragment.Messages, openai.ChatCompletionMessage{
 		Role:    "assistant",
@@ -1087,84 +1468,6 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 
 	xlog.Debug("Agent is running periodically", "agent", a.Character.Name)
 
-	// Check for reminders that need to be triggered
-	now := time.Now()
-	var triggeredReminders []types.ReminderActionResponse
-	var remainingReminders []types.ReminderActionResponse
-
-	for _, reminder := range a.sharedState.Reminders {
-		xlog.Debug("Checking reminder", "reminder", reminder)
-		if now.After(reminder.NextRun) {
-			triggeredReminders = append(triggeredReminders, reminder)
-			xlog.Debug("Reminder triggered", "reminder", reminder)
-			// Calculate next run time for recurring reminders
-			if reminder.IsRecurring {
-				xlog.Debug("Reminder is recurring", "reminder", reminder)
-				parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-				schedule, err := parser.Parse(reminder.CronExpr)
-				if err == nil {
-					nextRun := schedule.Next(now)
-					xlog.Debug("Next run time", "reminder", reminder, "nextRun", nextRun)
-					reminder.LastRun = now
-					reminder.NextRun = nextRun
-					remainingReminders = append(remainingReminders, reminder)
-				}
-			}
-		} else {
-			xlog.Debug("Reminder not triggered", "reminder", reminder)
-			remainingReminders = append(remainingReminders, reminder)
-		}
-	}
-
-	// Update the reminders list
-	a.sharedState.Reminders = remainingReminders
-
-	// Handle triggered reminders
-	for _, reminder := range triggeredReminders {
-		xlog.Info("Processing triggered reminder", "agent", a.Character.Name, "message", reminder.Message)
-
-		// Create a more natural conversation flow for the reminder
-		reminderJob := types.NewJob(
-			types.WithText(fmt.Sprintf("I have a reminder for you: %s", reminder.Message)),
-			types.WithReasoningCallback(a.options.reasoningCallback),
-			types.WithResultCallback(a.options.resultCallback),
-		)
-
-		// Add the reminder message to the job's metadata
-		reminderJob.Metadata = map[string]interface{}{
-			"message":     reminder.Message,
-			"is_reminder": true,
-		}
-
-		// Process the reminder as a normal conversation
-		a.consumeJob(reminderJob, UserRole)
-
-		// After the reminder job is complete, ensure the user is notified
-		if reminderJob.Result != nil && reminderJob.Result.Conversation != nil {
-			// Get the last assistant message from the conversation
-			var lastAssistantMsg *openai.ChatCompletionMessage
-			for i := len(reminderJob.Result.Conversation) - 1; i >= 0; i-- {
-				if reminderJob.Result.Conversation[i].Role == AssistantRole {
-					lastAssistantMsg = &reminderJob.Result.Conversation[i]
-					break
-				}
-			}
-
-			if lastAssistantMsg != nil && lastAssistantMsg.Content != "" {
-				// Send the reminder response to the user
-				msg := openai.ChatCompletionMessage{
-					Role:    "assistant",
-					Content: fmt.Sprintf("Reminder Update: %s\n\n%s", reminder.Message, lastAssistantMsg.Content),
-				}
-
-				go func(agent *Agent) {
-					xlog.Info("Sending reminder response to user", "agent", agent.Character.Name, "message", msg.Content)
-					agent.newConversations <- msg
-				}(a)
-			}
-		}
-	}
-
 	if !a.options.standaloneJob {
 		return
 	}
@@ -1175,17 +1478,35 @@ func (a *Agent) periodicallyRun(timer *time.Timer) {
 	// - evaluating the result
 	// - asking the agent to do something else based on the result
 
+	innerMonologue := a.options.innerMonologueTemplate
+	if innerMonologue == "" {
+		innerMonologue = innerMonologueTemplate
+	}
 	whatNext := types.NewJob(
-		types.WithText(innerMonologueTemplate),
+		types.WithText(innerMonologue),
 		types.WithReasoningCallback(a.options.reasoningCallback),
 		types.WithResultCallback(a.options.resultCallback),
 	)
+
+	// Attach observable so UI can show standalone job progress (decisions, actions, reasoning)
+	if a.observer != nil {
+		obs := a.observer.NewObservable()
+		obs.Name = "standalone"
+		obs.Icon = "clock"
+		a.observer.Update(*obs)
+		whatNext.Obs = obs
+	}
+
 	a.consumeJob(whatNext, SystemRole)
 
 	xlog.Info("STOP -- Periodically run is done", "agent", a.Character.Name)
 }
 
 func (a *Agent) Run() error {
+	// Start the scheduler
+	a.taskScheduler.Start()
+	xlog.Info("Task scheduler started")
+
 	a.startNewConversationsConsumer()
 	xlog.Debug("Agent is now running", "agent", a.Character.Name)
 	// The agent run does two things:
