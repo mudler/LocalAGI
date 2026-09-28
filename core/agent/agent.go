@@ -1005,6 +1005,15 @@ func jsonObjectOK(data []byte) bool {
 	return ok
 }
 
+// appendBypassNotice appends the configured bypass notice to an answer that left the
+// required-tool gate ungated. It is a no-op without a notice and never appends twice.
+func appendBypassNotice(answer, notice string) string {
+	if notice == "" || strings.HasSuffix(strings.TrimSpace(answer), notice) {
+		return answer
+	}
+	return strings.TrimRight(answer, " \t\n") + "\n\n" + notice
+}
+
 // requiredToolGate enforces, at the OUTPUT, that an agent runs its required tool
 // (to ok:true) before sending its final answer. It returns (decision, blocked):
 // blocked=true means the final message must be deferred and the model told to run the
@@ -1433,6 +1442,14 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 						}
 					}
 
+					// The gate let the message through after its attempt cap: mark it so the
+					// recipient can tell it skipped the required check.
+					if requiredToolAvailable && !requiredToolPassed && requiredFinishAttempts >= maxRequiredFinishAttempts {
+						xlog.Warn("required-tool gate: bypass after max attempts, message sent ungated",
+							"agent", a.Character.Name, "tool", requiredFinishTool)
+						message.Message = appendBypassNotice(message.Message, a.options.requiredFinishBypassNotice)
+					}
+
 					msg := openai.ChatCompletionMessage{
 						Role:    "assistant",
 						Content: message.Message,
@@ -1691,8 +1708,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			break
 		}
 	}
-	if requiredToolAvailableAtFinish && !requiredToolPassed &&
-		requiredFinishAttempts >= maxRequiredFinishAttempts {
+	finalizedUngated := requiredToolAvailableAtFinish && !requiredToolPassed &&
+		requiredFinishAttempts >= maxRequiredFinishAttempts
+	if finalizedUngated {
 		xlog.Warn("required-tool gate: bypass after max attempts, answer finalized ungated",
 			"agent", a.Character.Name, "tool", requiredFinishTool)
 	}
@@ -1703,6 +1721,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	result := a.cleanupLLMResponse(fragment.LastMessage().Content)
+	if finalizedUngated {
+		result = appendBypassNotice(result, a.options.requiredFinishBypassNotice)
+	}
 
 	conv = append(fragment.Messages, openai.ChatCompletionMessage{
 		Role:    "assistant",
