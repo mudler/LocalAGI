@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 
 	"github.com/mudler/LocalAGI/core/types"
@@ -49,6 +50,7 @@ var _ = Describe("stop action in consumeJob", func() {
 	It("finishes without an error when the model stops after a tool", func() {
 		llm.AddCreateChatCompletionFunction("read_state", `{}`)
 		llm.AddCreateChatCompletionFunction("stop", `{}`)
+		llm.SetAskResponse("done")
 
 		job := types.NewJob(types.WithText("read the state, then stop"))
 		a.consumeJob(job, UserRole)
@@ -56,6 +58,48 @@ var _ = Describe("stop action in consumeJob", func() {
 		res, err := job.Result.WaitResult(context.Background())
 		Expect(err).ToNot(HaveOccurred())
 		Expect(res.Error).ToNot(HaveOccurred())
+	})
+
+	// AGNTSIO#688: in a user chat job the model chose stop instead of answering and the chat
+	// received nothing. A stop there must still end with a reply the user can read.
+	It("delivers a reply when the model stops in a user chat job", func() {
+		llm.AddCreateChatCompletionFunction("read_state", `{}`)
+		llm.AddCreateChatCompletionFunction("stop", `{}`)
+		llm.SetAskResponse("I found no suitable template, so I cannot draft this offer.")
+
+		job := types.NewJob(types.WithText("draft an offer"))
+		a.consumeJob(job, UserRole)
+
+		res, err := job.Result.WaitResult(context.Background())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Error).ToNot(HaveOccurred())
+		Expect(res.Response).To(Equal("I found no suitable template, so I cannot draft this offer."))
+	})
+
+	It("still ends silently when an autonomous (system) run stops", func() {
+		// Counter-check: no user is waiting, so no extra reply is requested.
+		llm.AddCreateChatCompletionFunction("read_state", `{}`)
+		llm.AddCreateChatCompletionFunction("stop", `{}`)
+
+		job := types.NewJob(types.WithText("periodic check"))
+		a.consumeJob(job, SystemRole)
+
+		res, err := job.Result.WaitResult(context.Background())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Error).ToNot(HaveOccurred())
+		Expect(res.Response).To(BeEmpty())
+	})
+
+	It("reports an error when the reply after a stop cannot be produced", func() {
+		llm.AddCreateChatCompletionFunction("stop", `{}`)
+		llm.SetAskError(errors.New("backend down"))
+
+		job := types.NewJob(types.WithText("hello"))
+		a.consumeJob(job, UserRole)
+
+		res, err := job.Result.WaitResult(context.Background())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.Error).To(HaveOccurred())
 	})
 
 	It("still reports a genuine failure", func() {
