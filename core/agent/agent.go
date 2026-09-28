@@ -1399,6 +1399,11 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 				switch tc.Name {
 				case action.StopActionName:
+					// A deliberate stop ends the run. Rejecting the call makes cogito
+					// return ErrToolCallCallbackInterrupted; mark the job as settled
+					// by the callback so that is not reported as a failure.
+					finishedByCallback = true
+					finishErr = nil
 					return cogito.ToolCallDecision{
 						Approved: false,
 					}
