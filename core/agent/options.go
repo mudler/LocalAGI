@@ -93,10 +93,10 @@ type options struct {
 	extraMCPSessions            []*mcp.ClientSession
 	newConversationsSubscribers []func(*types.ConversationMessage)
 
-	observer             Observer
-	enableAutoCompaction   bool
+	observer                Observer
+	enableAutoCompaction    bool
 	autoCompactionThreshold int
-	parallelJobs int
+	parallelJobs            int
 
 	lastMessageDuration time.Duration
 
@@ -122,6 +122,10 @@ type options struct {
 	// through anyway (logged). Zero uses defaultRequiredFinishAttempts. A gate that can loop
 	// forever is worse than one that gives up loudly.
 	requiredFinishAttempts int
+
+	// requiredFinishBypassNotice, when non-empty, is appended to an answer that leaves the
+	// agent ungated because the attempt cap was reached. Empty keeps the log-only behaviour.
+	requiredFinishBypassNotice string
 }
 
 func (o *options) SeparatedMultimodalModel() bool {
@@ -284,6 +288,17 @@ func WithRequiredToolBeforeFinishPrompt(prompt string) Option {
 func WithRequiredToolBeforeFinishAttempts(attempts int) Option {
 	return func(o *options) error {
 		o.requiredFinishAttempts = attempts
+		return nil
+	}
+}
+
+// WithRequiredToolBypassNotice sets a notice that is appended to the final answer when the
+// required-tool gate gives up after its attempt cap and lets the answer through without the
+// required tool having passed. The user then sees that the answer skipped the check instead
+// of receiving it silently. Empty (the default) keeps the log-only behaviour.
+func WithRequiredToolBypassNotice(notice string) Option {
+	return func(o *options) error {
+		o.requiredFinishBypassNotice = notice
 		return nil
 	}
 }

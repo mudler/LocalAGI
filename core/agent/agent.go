@@ -1005,6 +1005,15 @@ func jsonObjectOK(data []byte) bool {
 	return ok
 }
 
+// appendBypassNotice appends the configured bypass notice to an answer that left the
+// required-tool gate ungated. It is a no-op without a notice and never appends twice.
+func appendBypassNotice(answer, notice string) string {
+	if notice == "" || strings.HasSuffix(strings.TrimSpace(answer), notice) {
+		return answer
+	}
+	return strings.TrimRight(answer, " \t\n") + "\n\n" + notice
+}
+
 // requiredToolGate enforces, at the OUTPUT, that an agent runs its required tool
 // (to ok:true) before sending its final answer. It returns (decision, blocked):
 // blocked=true means the final message must be deferred and the model told to run the
@@ -1191,6 +1200,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	// Set by tool callback when it decides the job outcome; Finish is then called once after ExecuteTools.
 	var finishedByCallback bool
 	var finishErr error
+	// Set when the model chose the stop action. In a user chat job someone is waiting for an
+	// answer, so a stop there must still produce a reply (see replyAfterStop below) instead of
+	// ending the job with an empty response.
+	var stoppedByAction bool
 
 	var observables = make(map[string]*types.Observable)
 
@@ -1399,6 +1412,12 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 
 				switch tc.Name {
 				case action.StopActionName:
+					// A deliberate stop ends the run. Rejecting the call makes cogito
+					// return ErrToolCallCallbackInterrupted; mark the job as settled
+					// by the callback so that is not reported as a failure.
+					finishedByCallback = true
+					finishErr = nil
+					stoppedByAction = true
 					return cogito.ToolCallDecision{
 						Approved: false,
 					}
@@ -1421,6 +1440,14 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 						return cogito.ToolCallDecision{
 							Approved: false,
 						}
+					}
+
+					// The gate let the message through after its attempt cap: mark it so the
+					// recipient can tell it skipped the required check.
+					if requiredToolAvailable && !requiredToolPassed && requiredFinishAttempts >= maxRequiredFinishAttempts {
+						xlog.Warn("required-tool gate: bypass after max attempts, message sent ungated",
+							"agent", a.Character.Name, "tool", requiredFinishTool)
+						message.Message = appendBypassNotice(message.Message, a.options.requiredFinishBypassNotice)
 					}
 
 					msg := openai.ChatCompletionMessage{
@@ -1590,6 +1617,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		// Checked before the error: a callback that ends the run returns
 		// Approved=false, which cogito reports as ErrToolCallCallbackInterrupted.
 		if finishedByCallback {
+			// A stop in a user chat job is not the end yet: the user still gets a reply.
+			if stoppedByAction && role == UserRole {
+				return false
+			}
 			job.Result.Finish(finishErr)
 			return true
 		}
@@ -1610,6 +1641,10 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 			return true
 		}
 		if toolToCall, ok := lastToolCallName(fragment.Messages); ok && toolToCall == action.StopActionName {
+			if role == UserRole {
+				stoppedByAction = true
+				return false
+			}
 			job.Result.Finish(nil)
 			return true
 		}
@@ -1622,6 +1657,16 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	)
 	if runConcluded() {
 		return
+	}
+	if stoppedByAction && role == UserRole {
+		reply, rerr := a.replyAfterStop(job.GetContext(), fragment)
+		if rerr != nil {
+			xlog.Error("stop in a chat job: final reply failed", "agent", a.Character.Name, "error", rerr)
+			job.Result.Finish(fmt.Errorf("agent stopped and could not produce a reply: %w", rerr))
+			return
+		}
+		fragment = reply
+		finishedByCallback, finishErr, stoppedByAction, err = false, nil, false, nil
 	}
 
 	// Required-tool gate, text-finalization path. The send_message gate above only fires
@@ -1654,9 +1699,18 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 		if runConcluded() {
 			return
 		}
+		// Asked to run the required tool, the model stopped instead: keep the answer it gave
+		// and finalize as after the attempt cap (logged bypass below), rather than ending empty.
+		if stoppedByAction {
+			fragment = answered
+			finishedByCallback, finishErr, stoppedByAction, err = false, nil, false, nil
+			requiredFinishAttempts = maxRequiredFinishAttempts
+			break
+		}
 	}
-	if requiredToolAvailableAtFinish && !requiredToolPassed &&
-		requiredFinishAttempts >= maxRequiredFinishAttempts {
+	finalizedUngated := requiredToolAvailableAtFinish && !requiredToolPassed &&
+		requiredFinishAttempts >= maxRequiredFinishAttempts
+	if finalizedUngated {
 		xlog.Warn("required-tool gate: bypass after max attempts, answer finalized ungated",
 			"agent", a.Character.Name, "tool", requiredFinishTool)
 	}
@@ -1667,6 +1721,9 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	}
 
 	result := a.cleanupLLMResponse(fragment.LastMessage().Content)
+	if finalizedUngated {
+		result = appendBypassNotice(result, a.options.requiredFinishBypassNotice)
+	}
 
 	conv = append(fragment.Messages, openai.ChatCompletionMessage{
 		Role:    "assistant",
@@ -1681,6 +1738,51 @@ func (a *Agent) consumeJob(job *types.Job, role string) {
 	})
 	job.Result.SetResponse(result)
 	job.Result.Finish(nil)
+}
+
+// stopReplyPrompt asks for the closing reply after the model chose to stop in a chat job.
+const stopReplyPrompt = "You chose to stop. The user is still waiting for a reply: give your final answer now " +
+	"as plain text — the answer, or briefly why you cannot help with this request. Do not call any tool."
+
+// replyAfterStop produces the closing reply when the model chose the stop action in a user chat
+// job. The stop tool call is dropped from the conversation (it has no tool result, which some
+// backends reject), the model is asked once for a plain-text reply without tools, and the
+// resulting fragment ends with that assistant message.
+func (a *Agent) replyAfterStop(ctx context.Context, f cogito.Fragment) (cogito.Fragment, error) {
+	msgs := f.Messages
+	for len(msgs) > 0 {
+		last := msgs[len(msgs)-1]
+		if last.Role == "assistant" && len(last.ToolCalls) > 0 && allStopCalls(last.ToolCalls) {
+			msgs = msgs[:len(msgs)-1]
+			continue
+		}
+		if last.Role == "tool" && last.Name == action.StopActionName {
+			msgs = msgs[:len(msgs)-1]
+			continue
+		}
+		break
+	}
+	f.Messages = append(append([]openai.ChatCompletionMessage{}, msgs...), openai.ChatCompletionMessage{
+		Role:    "user",
+		Content: stopReplyPrompt,
+	})
+	out, err := a.llm.Ask(ctx, f)
+	if err != nil {
+		return f, err
+	}
+	if out.LastMessage() == nil || strings.TrimSpace(out.LastMessage().Content) == "" {
+		return out, fmt.Errorf("empty reply after stop")
+	}
+	return out, nil
+}
+
+func allStopCalls(calls []openai.ToolCall) bool {
+	for _, c := range calls {
+		if c.Function.Name != action.StopActionName {
+			return false
+		}
+	}
+	return true
 }
 
 func stripThinkingTags(content string) string {
