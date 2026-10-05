@@ -23,7 +23,7 @@ require (
 	github.com/mudler/skillserver v0.0.5-0.20260221145827-0639a82c8f49
 	github.com/mudler/xlog v0.0.5
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/gomega v1.44.0
 	github.com/philippgille/chromem-go v0.7.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sashabaranov/go-openai v1.41.2
@@ -33,7 +33,7 @@ require (
 	github.com/tmc/langchaingo v0.1.14
 	github.com/traefik/yaegi v0.16.1
 	github.com/valyala/fasthttp v1.68.0
-	golang.org/x/crypto v0.50.0
+	golang.org/x/crypto v0.53.0
 	jaytaylor.com/html2text v0.0.0-20230321000545-74c2419ad056
 	maunium.net/go/mautrix v0.25.2
 	mvdan.cc/xurls/v2 v2.6.0
@@ -103,10 +103,10 @@ require (
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.etcd.io/bbolt v1.4.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/mod v0.34.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
@@ -154,10 +154,10 @@ require (
 	go.mau.fi/util v0.9.2 // indirect
 	go.starlark.net v0.0.0-20250417143717-f57e51f710eb // indirect
 	golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b
-	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
-	golang.org/x/tools v0.43.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
