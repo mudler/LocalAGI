@@ -1,16 +1,31 @@
 package collections
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/sashabaranov/go-openai"
 )
 
 func TestPostgresCollectionLogsDoNotExposeCredentials(t *testing.T) {
 	const childEnv = "LOCALAGI_TEST_POSTGRES_LOG_DSN"
 	if dsn := os.Getenv(childEnv); dsn != "" {
-		if kb := newVectorEngine("postgres", nil, "", "", "credentials-test", t.TempDir(), t.TempDir(), "", dsn, 100, 0); kb != nil {
+		// LocalRecall gets a test embedding before it connects to the
+		// database, so serve one: the driver error, which can contain
+		// the credentials, must still be reached.
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":[{"embedding":[1,0,0],"index":0}],"model":"test","usage":{}}`))
+		}))
+		defer server.Close()
+		config := openai.DefaultConfig("")
+		config.BaseURL = server.URL + "/v1"
+		client := openai.NewClientWithConfig(config)
+		if kb := newVectorEngine("postgres", client, "", "", "credentials-test", t.TempDir(), t.TempDir(), "", dsn, 100, 0); kb != nil {
 			t.Fatal("expected initialization to fail without a database")
 		}
 		return
