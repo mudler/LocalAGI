@@ -83,8 +83,8 @@ github.com/bwmarrin/discordgo v0.29.0/go.mod h1:NJZpH+1AfhIcyQsPeuBKsUtYrRnjkyu0
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
-github.com/chasefleming/elem-go v0.30.0 h1:BlhV1ekv1RbFiM8XZUQeln1Ikb4D+bu2eDO4agREvok=
-github.com/chasefleming/elem-go v0.30.0/go.mod h1:hz73qILBIKnTgOujnSMtEj20/epI+f6vg71RUilJAA4=
+github.com/chasefleming/elem-go v0.36.0 h1:lfghlo3xZnsA3If6lzwOzP8Fg9Y8aOeJrUU2TsipbCo=
+github.com/chasefleming/elem-go v0.36.0/go.mod h1:ZuPZTvqjeOV8FLLvtig+i9ESduMndwt885XXE85rnZc=
 github.com/cloudflare/circl v1.6.1 h1:zqIqSPIndyBh1bjLVVDHMPpVKqp8Su/V+6MeDzzQBQ0=
 github.com/cloudflare/circl v1.6.1/go.mod h1:uddAzsPgqdMAYatqJ0lsjX1oECcQLIlRpzZh3pJrofs=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
