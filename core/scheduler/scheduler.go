@@ -18,6 +18,8 @@ type Scheduler struct {
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
 	mu           sync.RWMutex
+	lifecycleMu  sync.Mutex // guards ctx, cancel and stopped
+	stopped      bool
 	runningTasks map[string]context.CancelFunc
 	policy       CreationPolicy
 }
@@ -39,8 +41,16 @@ func NewSchedulerWithPolicy(store TaskStore, executor AgentExecutor, pollInterva
 	}
 }
 
-// Start begins the scheduler's polling loop
+// Start begins the scheduler's polling loop. It is safe to call concurrently
+// with Stop. A scheduler that has been stopped cannot be started again.
 func (s *Scheduler) Start() {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+
+	if s.stopped {
+		xlog.Warn("Scheduler already stopped, not starting")
+		return
+	}
 	if s.ctx != nil {
 		xlog.Warn("Scheduler already started")
 		return
@@ -49,24 +59,35 @@ func (s *Scheduler) Start() {
 	s.ctx = ctx
 	s.cancel = cancel
 	s.wg.Add(1)
-	go s.run()
+	go s.run(ctx)
 	xlog.Info("Task scheduler started", "poll_interval", s.pollInterval)
 }
 
-// Stop gracefully stops the scheduler
+// Stop gracefully stops the scheduler. It is safe to call concurrently with
+// Start and more than once; only the first call has an effect.
 func (s *Scheduler) Stop() {
-	if s.cancel != nil {
-		s.cancel()
+	s.lifecycleMu.Lock()
+	if s.stopped {
+		s.lifecycleMu.Unlock()
+		return
+	}
+	s.stopped = true
+	cancel := s.cancel
+	s.lifecycleMu.Unlock()
+
+	// ctx and cancel stay set after Stop: executeTask reads s.ctx, and
+	// the goroutines that read it are all finished once Wait returns.
+	if cancel != nil {
+		cancel()
 	}
 	s.wg.Wait()
 	s.store.Close()
 	xlog.Info("Task scheduler stopped")
-	s.cancel = nil
-	s.ctx = nil
 }
 
-// run is the main polling loop
-func (s *Scheduler) run() {
+// run is the main polling loop. It gets ctx as an argument so it never reads
+// the shared field.
+func (s *Scheduler) run(ctx context.Context) {
 	defer s.wg.Done()
 
 	ticker := time.NewTicker(s.pollInterval)
@@ -74,7 +95,7 @@ func (s *Scheduler) run() {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			s.processDueTasks()
