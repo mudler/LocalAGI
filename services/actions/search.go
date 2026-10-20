@@ -30,10 +30,13 @@ func NewSearch(config map[string]string) *SearchAction {
 	}
 
 	slog.Info("Search action with results: ", "results", intResult)
-	return &SearchAction{results: intResult}
+	return &SearchAction{results: intResult, provider: config["provider"]}
 }
 
-type SearchAction struct{ results int }
+type SearchAction struct {
+	results  int
+	provider string
+}
 
 func (a *SearchAction) Run(ctx context.Context, sharedState *types.AgentSharedState, params types.ActionParams) (types.ActionResult, error) {
 	result := struct {
@@ -44,6 +47,14 @@ func (a *SearchAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 		fmt.Printf("error: %v", err)
 
 		return types.ActionResult{}, err
+	}
+	switch a.provider {
+	case "parallel":
+		return parallelSearch(ctx, result.Query)
+	case "", "duckduckgo":
+		// Empty provider preserves search configurations saved before the selector.
+	default:
+		return types.ActionResult{}, fmt.Errorf("unknown search provider %q", a.provider)
 	}
 	ddg, err := duckduckgo.New(a.results, "LocalAGI")
 	if err != nil {
@@ -95,6 +106,17 @@ func (a *SearchAction) Plannable() bool {
 func SearchConfigMeta() []config.Field {
 	return []config.Field{
 		{
+			Name:         "provider",
+			Label:        "Search Provider",
+			Type:         config.FieldTypeSelect,
+			DefaultValue: "duckduckgo",
+			Options: []config.FieldOption{
+				{Value: "duckduckgo", Label: "DuckDuckGo"},
+				{Value: "parallel", Label: "Parallel Search MCP"},
+			},
+			HelpText: "Parallel sends searches to search.parallel.ai, with no account or API key required. DuckDuckGo remains the default.",
+		},
+		{
 			Name:         "results",
 			Label:        "Number of Results",
 			Type:         config.FieldTypeNumber,
@@ -102,7 +124,7 @@ func SearchConfigMeta() []config.Field {
 			Min:          1,
 			Max:          100,
 			Step:         1,
-			HelpText:     "Number of search results to return",
+			HelpText:     "Number of DuckDuckGo search results to return; Parallel manages its own result count",
 		},
 	}
 }
