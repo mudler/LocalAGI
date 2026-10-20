@@ -431,6 +431,33 @@ For more details about available configuration options and features, refer to th
 
 </details>
 
+## Web search
+
+The built-in **Search** action uses DuckDuckGo by default. To use
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp), select
+**Parallel Search MCP** in the action's **Search Provider** field. Parallel offers
+free web search powered by Fast mode, without an account or API key. Selecting it
+sends the search query to the hosted `https://search.parallel.ai/mcp` endpoint;
+keep DuckDuckGo selected if you do not want to use that service.
+
+For JSON agent configuration, set the search action's configuration to
+`{"provider":"parallel"}`. For example:
+
+```json
+{
+  "actions": [
+    {"name": "search", "config": "{\"provider\":\"parallel\"}"}
+  ]
+}
+```
+
+Existing configurations without a provider keep DuckDuckGo. The tool remains
+`search_internet`, with source URLs included in its result metadata, and existing
+tool allow/deny lists still apply. The **Number of Results** setting applies only
+to DuckDuckGo; Parallel manages its own result count. Parallel requests have a
+60-second timeout and honor job cancellation. Service errors, including free-tier
+rate limits, are returned to the agent without switching providers.
+
 ## 🔧 Extending LocalAGI
 
 LocalAGI provides two powerful ways to extend its functionality with custom actions:
