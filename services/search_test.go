@@ -300,3 +300,28 @@ func TestSearchProviderParallelCallCancellation(t *testing.T) {
 		})
 	}
 }
+
+func TestSearchProviderParallelSourceURLs(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "source-fixture", Version: "1"}, nil)
+	server.AddTool(&mcp.Tool{Name: "web_search", InputSchema: json.RawMessage(`{"type":"object"}`)}, func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		// Match the live endpoint's JSON text response, including escaped excerpts.
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: `{"results":[{"url":"https://go.dev/doc/go1.26","title":"Go release notes","excerpts":["See https://go.dev/issue/123.\nNext line"]},{"url":"javascript:alert(1)"}]}`}}}, nil
+	})
+	fixture := httptest.NewServer(mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true}))
+	defer fixture.Close()
+	target, _ := url.Parse(fixture.URL)
+	realTransport := http.DefaultTransport
+	routeSearch(t, searchRoundTripper(func(r *http.Request) (*http.Response, error) {
+		r = r.Clone(r.Context())
+		r.URL.Scheme = target.Scheme
+		r.URL.Host = target.Host
+		return realTransport.RoundTrip(r)
+	}))
+	text, raw, err := configuredSearch(t, context.Background(), `{"provider":"parallel"}`)
+	if err != nil || !strings.Contains(text, "Go release notes") {
+		t.Fatalf("result consumption: %q %v", text, err)
+	}
+	if got := raw.(types.ActionResult).Metadata["urls"]; !reflect.DeepEqual(got, []string{"https://go.dev/doc/go1.26"}) {
+		t.Fatalf("source URLs included escaped excerpt or invalid URL: %v", got)
+	}
+}

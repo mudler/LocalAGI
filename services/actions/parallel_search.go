@@ -2,8 +2,10 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -83,6 +85,22 @@ func parallelSearch(ctx context.Context, query string) (types.ActionResult, erro
 	if strings.TrimSpace(result) == "" {
 		return types.ActionResult{}, fmt.Errorf("Parallel search returned no text")
 	}
-	urls := xurls.Strict().FindAllString(result, -1)
+	// Search MCP returns JSON text. Read source URLs from its result entries so
+	// URLs in JSON-escaped excerpts cannot leak into citation metadata.
+	var search struct {
+		Results []struct {
+			URL string `json:"url"`
+		} `json:"results"`
+	}
+	urls := []string{}
+	if json.Unmarshal([]byte(result), &search) == nil && search.Results != nil {
+		for _, entry := range search.Results {
+			if u, err := url.Parse(entry.URL); err == nil && u.Host != "" && (u.Scheme == "http" || u.Scheme == "https") {
+				urls = append(urls, entry.URL)
+			}
+		}
+	} else {
+		urls = xurls.Strict().FindAllString(result, -1)
+	}
 	return types.ActionResult{Result: result, Metadata: map[string]interface{}{MetadataUrls: urls}}, nil
 }
