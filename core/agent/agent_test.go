@@ -131,6 +131,7 @@ var _ = Describe("Agent test", func() {
 		It("pick the correct action", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
+				WithLLMAPIKey(apiKeyURL),
 				WithModel(testModel),
 				EnableForceReasoning,
 				WithTimeout("10m"),
@@ -183,6 +184,7 @@ var _ = Describe("Agent test", func() {
 		It("pick the correct action", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
+				WithLLMAPIKey(apiKeyURL),
 				WithModel(testModel),
 				WithTimeout("10m"),
 				//	WithRandomIdentity(),
@@ -208,6 +210,7 @@ var _ = Describe("Agent test", func() {
 		It("updates the state with internal actions", func() {
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
+				WithLLMAPIKey(apiKeyURL),
 				WithModel(testModel),
 				WithTimeout("10m"),
 				EnableHUD,
@@ -329,6 +332,7 @@ var _ = Describe("Agent test", func() {
 			It("it automatically performs things in the background", func() {
 				agent, err := New(
 					WithLLMAPIURL(apiURL),
+					WithLLMAPIKey(apiKeyURL),
 					WithModel(testModel),
 					EnableHUD,
 					EnableStandaloneJob,

@@ -24,6 +24,7 @@ var _ = Describe("Agent test", func() {
 			var err error
 			agent, err = New(
 				WithLLMAPIURL(apiURL),
+				WithLLMAPIKey(apiKeyURL),
 				WithModel(testModel),
 				WithTimeout("10m"),
 				WithRandomIdentity(),
@@ -46,6 +47,7 @@ var _ = Describe("Agent test", func() {
 
 			agent, err := New(
 				WithLLMAPIURL(apiURL),
+				WithLLMAPIKey(apiKeyURL),
 				WithModel(testModel),
 				WithRandomIdentity("An 90-year old man with a long beard, a wizard, who lives in a tower."),
 			)
