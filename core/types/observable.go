@@ -49,7 +49,15 @@ func (o *Observable) AddProgress(p Progress) {
 
 func (o *Observable) MakeLastProgressCompletion() {
 	if len(o.Progress) == 0 {
-		xlog.Error("Observable completed without any progress", "id", o.ID, "name", o.Name)
+		// Normal for the top-level job observable: its outcome is written by the
+		// job-result finalizer, not through progress entries. Mark it completed
+		// so observers do not show it as still running, and keep this at debug —
+		// logged as an error it fired on every successful chat and read like a
+		// failure.
+		if o.Completion == nil {
+			o.Completion = &Completion{}
+		}
+		xlog.Debug("Observable completed without progress entries", "id", o.ID, "name", o.Name)
 		return
 	}
 	p := o.Progress[len(o.Progress)-1]

@@ -117,7 +117,7 @@ type AgentConfig struct {
 	IdentityGuidance           string `json:"identity_guidance" form:"identity_guidance"`
 	PeriodicRuns               string `json:"periodic_runs" form:"periodic_runs"`
 	SchedulerPollInterval      string `json:"scheduler_poll_interval" form:"scheduler_poll_interval"`
-	SchedulerTaskTemplate   string `json:"scheduler_task_template" form:"scheduler_task_template"`
+	SchedulerTaskTemplate      string `json:"scheduler_task_template" form:"scheduler_task_template"`
 	PermanentGoal              string `json:"permanent_goal" form:"permanent_goal"`
 	EnableKnowledgeBase        bool   `json:"enable_kb" form:"enable_kb"`
 	EnableKBCompaction         bool   `json:"enable_kb_compaction" form:"enable_kb_compaction"`
@@ -163,6 +163,11 @@ type AgentConfig struct {
 	// tool before the answer is let through anyway (with a warning in the log). Zero or
 	// unset uses the default of 3.
 	RequiredToolBeforeFinishAttempts int `json:"required_tool_before_finish_attempts" form:"required_tool_before_finish_attempts"`
+
+	// RequiredToolBypassNotice is appended to the final answer when the required tool never
+	// passed and the answer is let through after the attempt cap, so the user can tell it
+	// skipped the check. Empty keeps the log-only behaviour.
+	RequiredToolBypassNotice string `json:"required_tool_bypass_notice" form:"required_tool_bypass_notice"`
 
 	// AllowedTools/ExcludedTools constrain the agent's effective tool set (built-in,
 	// user-configured and MCP tools). Control actions the agent needs to reply and
@@ -426,14 +431,14 @@ func NewAgentConfigMeta(
 				HelpText:     "Prompt used for periodic/standalone runs when the agent evaluates what to do next. If empty, the default autonomous agent instructions are used.",
 				Tags:         config.Tags{Section: "PromptsGoals"},
 			},
-				{
-					Name:         "scheduler_task_template",
-					Label:        "Scheduler Task Template",
-					Type:         "textarea",
-					DefaultValue: "",
-					HelpText:     "Template for scheduled/recurring tasks. Use {{.Task}} to reference the task. Example: \"Execute: {{.Task}}\". If empty, the default inner monologue template is used with the task injected.",
-					Tags:         config.Tags{Section: "PromptsGoals"},
-				},
+			{
+				Name:         "scheduler_task_template",
+				Label:        "Scheduler Task Template",
+				Type:         "textarea",
+				DefaultValue: "",
+				HelpText:     "Template for scheduled/recurring tasks. Use {{.Task}} to reference the task. Example: \"Execute: {{.Task}}\". If empty, the default inner monologue template is used with the task injected.",
+				Tags:         config.Tags{Section: "PromptsGoals"},
+			},
 			{
 				Name:         "standalone_job",
 				Label:        "Standalone Job",
@@ -665,6 +670,14 @@ func NewAgentConfigMeta(
 				Min:          1,
 				Step:         1,
 				HelpText:     "How many times the model is told to run the required tool before its answer is sent anyway",
+				Tags:         config.Tags{Section: "AdvancedSettings"},
+			},
+			{
+				Name:         "required_tool_bypass_notice",
+				Label:        "Required Tool Bypass Notice",
+				Type:         "textarea",
+				DefaultValue: "",
+				HelpText:     "Text appended to the answer when it is sent without the required tool having passed (after the attempt cap). Leave empty to only log the bypass.",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
 			{
