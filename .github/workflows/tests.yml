@@ -16,7 +16,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
-    - uses: actions/setup-go@v6
+    - uses: actions/setup-go@v7
       with:
         go-version: '>=1.26.0'
     - name: Run tests
@@ -27,7 +27,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
-    - uses: actions/setup-go@v6
+    - uses: actions/setup-go@v7
       with:
         go-version: '>=1.26.0'
     - run: |
