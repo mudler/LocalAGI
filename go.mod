@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/blevesearch/bleve/v2 v2.5.7
 	github.com/bwmarrin/discordgo v0.29.0
-	github.com/chasefleming/elem-go v0.30.0
+	github.com/chasefleming/elem-go v0.36.0
 	github.com/dave-gray101/v2keyauth v0.0.0-20240624150259-c45d584d25e2
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/eritikass/githubmarkdownconvertergo v0.1.10
