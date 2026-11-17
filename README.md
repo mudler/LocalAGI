@@ -78,6 +78,10 @@ Now you can access and manage your agents at [http://localhost:8080](http://loca
 
 Still having issues? see this Youtube video: https://youtu.be/HtVwIxW3ePg
 
+## 🚀 One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/LocalAGI/)
+
 ## Videos
 
 [![Creating a basic agent](https://img.youtube.com/vi/HtVwIxW3ePg/mqdefault.jpg)](https://youtu.be/HtVwIxW3ePg)
